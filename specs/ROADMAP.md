@@ -65,6 +65,13 @@ from validation feedback to safe automatic repair.
   controlled return transitions, complete routing, and two-run installed-KiCad
   evidence pass for all four cases. See the
   [completion audit](human-quality-hierarchical-multilayer/AUDIT.md).
+- Mixed-domain held-out architecture synthesis for an independently frozen
+  behavior-only corpus. Eight feasible unfamiliar combinations now pass
+  catalog selection, trusted multi-analysis evidence, readable hierarchy,
+  deterministic multilayer physical synthesis, installed-KiCad ERC/strict DRC,
+  connectivity, writer/round-trip checks, and replay; one contradictory input
+  and four adversarial inputs fail closed. See the [completion
+  audit](multi-stage-out-of-distribution-synthesis/AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic

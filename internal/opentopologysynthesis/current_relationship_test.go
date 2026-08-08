@@ -481,7 +481,7 @@ func TestCurrentLimitedSwitchRelationshipIsRetainedByDefaultSearch(t *testing.T)
 	if regulatorIndex < 0 {
 		t.Fatalf("default search omitted behavior-compatible current regulation: candidates=%d", len(search.Candidates))
 	}
-	order := synthesisCandidateEvaluationOrder(search.Candidates)
+	order := synthesisCandidateEvaluationOrder(requirement, inventory, search.Candidates)
 	if len(order) == 0 || order[0] != regulatorIndex {
 		t.Fatalf("behavior-compatible current regulator evaluated at index %d through order %v", regulatorIndex, order)
 	}
@@ -498,7 +498,7 @@ func TestDefaultSearchCurrentLimitedFirstTrialIsPhysicallyReady(t *testing.T) {
 	inventory, environment := testHeldOutSynthesisEnvironment(t)
 	policy := DefaultPolicy()
 	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
-	order := synthesisCandidateEvaluationOrder(search.Candidates)
+	order := synthesisCandidateEvaluationOrder(requirement, inventory, search.Candidates)
 	if search.Status != TopologySearchCandidates || len(order) == 0 {
 		t.Fatalf("default search status=%s candidates=%d issues=%#v", search.Status, len(search.Candidates), search.Issues)
 	}
@@ -639,6 +639,11 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 	if len(candidates) != 2 {
 		t.Fatalf("high-side regulated-current relationship produced no candidates: consumption=%#v rejections=%#v", consumption, rejections)
 	}
+	relationships := regulatedCurrentRelationships(requirement)
+	if len(relationships) != 1 {
+		t.Fatalf("high-side regulated-current relationships = %#v", relationships)
+	}
+	inputConditioning := transconductanceInputConditioningRequired(requirement, relationships[0])
 	directFound, bufferedFound := false, false
 	activeStructures := map[string]bool{}
 	for _, candidate := range candidates {
@@ -653,10 +658,16 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		bufferedDrive := counts["npn_bjt"] == 3
 		wantPassDevices := topologyHighSidePassDeviceCount(requirement, passPrimitive)
 		wantResistors := 11
+		wantCapacitors := 0
 		if wantPassDevices > 1 {
 			wantResistors += wantPassDevices
 		}
 		wantInstances, wantNPN := 5+wantPassDevices+wantResistors, 2
+		if inputConditioning {
+			wantInstances += 2
+			wantResistors++
+			wantCapacitors = 1
+		}
 		if bufferedDrive {
 			wantInstances, wantNPN, wantResistors = wantInstances+2, 3, wantResistors+1
 			bufferedFound = true
@@ -670,7 +681,8 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		activeStructures[activeHash] = true
 		if candidate.Score.BehaviorGap != 0 || len(candidate.Graph.Instances) != wantInstances ||
 			counts["opamp"] != 2 || counts["pnp_bjt"] != wantPassDevices || counts["npn_bjt"] != wantNPN ||
-			counts["p_channel_mosfet"] != 1 || counts["resistor"] != wantResistors {
+			counts["p_channel_mosfet"] != 1 || counts["resistor"] != wantResistors ||
+			counts["capacitor"] != wantCapacitors {
 			t.Fatalf("high-side regulated-current graph score=%#v counts=%v topology=%s",
 				candidate.Score, counts, testGraphTopologySummary(candidate.Graph))
 		}

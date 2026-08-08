@@ -103,6 +103,49 @@ func TestPlanAutonomousCorrectionPreservesCoveredTerminalDiagnostics(t *testing.
 	}
 }
 
+func TestPlanAutonomousCorrectionTreatsAbortedNetValidationAsConflictSymptom(t *testing.T) {
+	request := correctionExplicitRequest()
+	placementRequest, placements := correctionPlacementState(false)
+	conflict := correctionDiagnostic(
+		CorrectionForeignNetCrossing, routing.RepairClearance,
+		[]string{"J1", "R1"}, []string{"BLOCKING_NET", "FAILED_NET"},
+	)
+	conflict.IssueCode = reports.CodeRouteCopperConflict
+	terminal := correctionDiagnostic(CorrectionUnsupportedGeometry, routing.RepairUnknown, nil, []string{"SKIPPED_NET"})
+	terminal.IssueCode = reports.CodeValidationFailed
+	terminal.Path = "explicit_circuit.nets.SKIPPED_NET"
+	terminal.AutomaticAction = false
+
+	plan, err := PlanAutonomousCorrection(
+		request, placementRequest, placements,
+		[]AutonomousCorrectionDiagnostic{terminal, conflict},
+		AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Authorized || plan.StopReason != "" || len(plan.Actions) != 1 ||
+		plan.Actions[0].Kind != CorrectionActionImproveEndpointFanout {
+		t.Fatalf("conflict-rooted plan = %#v", plan)
+	}
+	if len(plan.Diagnostics) != 2 {
+		t.Fatalf("plan discarded aborted-pass evidence: %#v", plan.Diagnostics)
+	}
+
+	terminal.Path = "explicit_circuit.nets.SKIPPED_NET.return_path"
+	plan, err = PlanAutonomousCorrection(
+		request, placementRequest, placements,
+		[]AutonomousCorrectionDiagnostic{terminal, conflict},
+		AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Authorized || plan.StopReason != CorrectionStopUnsupportedDiagnostic {
+		t.Fatalf("independent net constraint was suppressed by route conflict: %#v", plan)
+	}
+}
+
 func TestPlanAutonomousCorrectionAcceptsRouteScopedCoverageWithoutRefs(t *testing.T) {
 	request := correctionExplicitRequest()
 	placementRequest, placements := correctionPlacementState(false)

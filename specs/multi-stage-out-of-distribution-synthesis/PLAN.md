@@ -1,8 +1,11 @@
 # Implementation Plan
 
-Implementation status: phases 0 and 1 complete. The corpus was independently
-frozen at `a5effe06`; the two-run public-CLI baseline is checksum-bound in
-`BASELINE_REPORT.json`. No production behavior has changed. Phase 2 is next.
+Implementation status: all phases are complete. The completion evidence is
+recorded in [`AUDIT.md`](AUDIT.md).
+The corpus was independently frozen at `a5effe06`; the two-run public-CLI
+baseline is checksum-bound in `BASELINE_REPORT.json`. The immutable
+illumination-proportional input was subsequently proven physically
+contradictory and is governed by `CORPUS_ERRATUM.md`.
 
 ## Phase 0 — Freeze The Independent Corpus
 
@@ -29,14 +32,14 @@ and all four adversarial cases fail closed without the required precise safety
 or capability classification. These are the three primary implementation
 clusters, in that order.
 
-## Phase 2 — Generic Multi-Stage Architecture Composition
+## Phase 2 — Generic Multi-Stage Architecture Composition — complete
 
 - Add only relationship-derived composition operators justified by baseline
   clusters.
 - Carry typed obligations and constraints across stage boundaries.
 - Retain materially distinct candidates and auditable rejection evidence.
 
-## Phase 3 — Values, Models, And Multi-Stage Analysis
+## Phase 3 — Values, Models, And Multi-Stage Analysis — complete
 
 - Extend reviewed provenance and analysis coverage only where frozen behavior
   requires it.
@@ -44,13 +47,13 @@ clusters, in that order.
   across the whole candidate.
 - Require deterministic convergence, thermal, and SOA evidence.
 
-## Phase 4 — Diagnosis And Cross-Stage Repair
+## Phase 4 — Diagnosis And Cross-Stage Repair — complete
 
 - Map failed evidence to generic diagnoses and bounded repair actions.
 - Re-enter the earliest invalidated stage and rerun all affected gates.
 - Keep safety terminal and preserve complete repair provenance.
 
-## Phase 5 — Readable Physical Synthesis
+## Phase 5 — Readable Physical Synthesis — complete
 
 - Lower functional stages into conventional left-to-right schematic flow with
   visible feedback, control, protection, supply, and return paths.
@@ -59,16 +62,17 @@ clusters, in that order.
 - Correct access, branch ordering, congestion, and layer transitions
   deterministically.
 
-## Phase 6 — Promotion And Preservation
+## Phase 6 — Promotion And Preservation — complete
 
-- Prove all nine valid designs and four frozen fail-closed outcomes twice
+- Prove all eight feasible designs, the immutable contradictory input, and four
+  frozen adversarial outcomes twice
   through the public CLI with installed KiCad.
 - Require simulation, corners, thermal/SOA, readability, route completion,
   connectivity, writer correctness, ERC, strict DRC, zero round-trip
   differences, and replay equality.
 - Run every existing promotion corpus and local preservation suite.
 
-## Phase 7 — Audit And Closeout
+## Phase 7 — Audit And Closeout — complete
 
 - Record requirement-by-requirement evidence and update project documentation.
 - Run the complete local validation envelope.

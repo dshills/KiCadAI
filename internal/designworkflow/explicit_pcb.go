@@ -16,6 +16,8 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const explicitDensePlacementCandidateLimit = 65_536
+
 func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOptions) PlacementStageResult {
 	if ctx == nil {
 		ctx = context.Background()
@@ -115,6 +117,10 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	rightAngleFallbackPlacedCount := 0
 	rightAngleFallbackUnplacedCount := 0
 	rightAngleFallbackUnplacedRefs := []string{}
+	softRegionFallback := false
+	softRegionFallbackPlacedCount := 0
+	softRegionFallbackUnplacedCount := 0
+	softRegionFallbackUnplacedRefs := []string{}
 	if result.Status != placement.StatusPlaced &&
 		request.ExplicitCircuit.RoutingPolicy == ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
 		rotatedRequest := explicitRightAnglePlacementFallback(placementRequest)
@@ -129,6 +135,20 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 			rightAngleFallback = true
 		}
 	}
+	if result.Status != placement.StatusPlaced {
+		if softRequest, available := explicitOverlappingRegionPlacementFallback(placementRequest); available {
+			softResult := placement.PlaceContext(ctx, softRequest)
+			softRegionFallbackPlacedCount = softResult.Metrics.PlacedCount
+			softRegionFallbackUnplacedCount = softResult.Metrics.UnplacedCount
+			softRegionFallbackUnplacedRefs = explicitUnplacedRefs(softResult)
+			if softResult.Status == placement.StatusPlaced ||
+				softResult.Metrics.PlacedCount > result.Metrics.PlacedCount {
+				placementRequest = softRequest
+				result = softResult
+				softRegionFallback = true
+			}
+		}
+	}
 	issues = append(issues, result.Issues...)
 	stage := NewStageResult(StagePlacement, issues)
 	stage.Summary = map[string]any{
@@ -138,6 +158,10 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		"right_angle_fallback": rightAngleFallback, "right_angle_fallback_placed_count": rightAngleFallbackPlacedCount,
 		"right_angle_fallback_unplaced_count": rightAngleFallbackUnplacedCount,
 		"right_angle_fallback_unplaced_refs":  rightAngleFallbackUnplacedRefs,
+		"soft_region_fallback":                softRegionFallback,
+		"soft_region_fallback_placed_count":   softRegionFallbackPlacedCount,
+		"soft_region_fallback_unplaced_count": softRegionFallbackUnplacedCount,
+		"soft_region_fallback_unplaced_refs":  softRegionFallbackUnplacedRefs,
 	}
 	if scoring := placementCandidateScoringSummary(result.CandidateScoring); scoring != nil {
 		stage.Summary["candidate_scoring"] = scoring
@@ -215,6 +239,365 @@ func explicitRightAnglePlacementFallback(request placement.Request) placement.Re
 		}
 	}
 	return placement.NormalizeRequest(result)
+}
+
+// explicitOverlappingRegionPlacementFallback relaxes only mutually
+// overlapping synthesized functional regions. Their overlap already proves
+// that they cannot all be disjoint hard partitions. They remain weighted soft
+// preferences in the placer, while board, collision, edge, proximity, thermal,
+// and every non-overlapping region constraint stays hard.
+func explicitOverlappingRegionPlacementFallback(request placement.Request) (placement.Request, bool) {
+	overlapped := make(map[int]bool)
+	for leftIndex, left := range request.RegionRules {
+		if !left.Required || left.Source != "circuit_graph" || left.Preferred.IsZero() {
+			continue
+		}
+		for rightIndex := leftIndex + 1; rightIndex < len(request.RegionRules); rightIndex++ {
+			right := request.RegionRules[rightIndex]
+			if !right.Required || right.Source != "circuit_graph" || right.Preferred.IsZero() {
+				continue
+			}
+			if left.Preferred.Min.XMM < right.Preferred.Max.XMM && right.Preferred.Min.XMM < left.Preferred.Max.XMM &&
+				left.Preferred.Min.YMM < right.Preferred.Max.YMM && right.Preferred.Min.YMM < left.Preferred.Max.YMM {
+				overlapped[leftIndex] = true
+				overlapped[rightIndex] = true
+			}
+		}
+	}
+	if len(overlapped) == 0 {
+		return request, false
+	}
+	result := request
+	result.RegionRules = slices.Clone(request.RegionRules)
+	result.Components = slices.Clone(request.Components)
+	for index := range overlapped {
+		result.RegionRules[index].Required = false
+	}
+	for index := range result.Components {
+		component := &result.Components[index]
+		// Explicit-circuit lowering seeds every movable part on top; that is a
+		// generated preference, not an authored side constraint. The public
+		// request's AllowBackLayer rule remains the authoritative permission.
+		if request.Rules.AllowBackLayer && explicitBackSidePlacementEligible(*component) {
+			component.Side = placement.SideAny
+			if component.Edge != placement.EdgeNone {
+				component.Side = placement.SideBottom
+			}
+		}
+	}
+	explicitOrientDenseEdgeComponents(&result)
+	if denseRegion, found := explicitDenseInteriorPlacementRegion(result); found {
+		explicitOrientDenseInteriorComponents(&result, denseRegion.Refs)
+		result.RegionRules = append(result.RegionRules, denseRegion)
+		result.RegionRules = append(result.RegionRules, explicitDenseInteriorPlacementSlots(result, denseRegion)...)
+	}
+	// The derived anchors make the large-package floorplan deterministic. Place
+	// that reserved cohort before flexible edge SMD parts so drilled pads cannot
+	// be shadowed by an earlier opposite-face placement; edge constraints still
+	// govern where those later parts may move.
+	result.ComponentOrder = placement.ComponentOrderDenseLargestFootprintFirstV1
+	result.Rules.MaxCandidatesPerPart = max(result.Rules.MaxCandidatesPerPart, explicitDensePlacementCandidateLimit)
+	return placement.NormalizeRequest(result), true
+}
+
+// explicitDenseInteriorPlacementSlots partitions a proven-fit dense region
+// into deterministic per-component cells. A plain cohort region still lets
+// connectivity scoring center the first large package across two otherwise
+// viable columns, so the last package can fail despite sufficient board area.
+// The cells are derived solely from the region, package courtyards, spacing,
+// and stable reference order; they do not encode circuit or fixture identity.
+func explicitDenseInteriorPlacementSlots(request placement.Request, region placement.RegionRule) []placement.RegionRule {
+	if len(region.Refs) < 2 || region.Preferred.IsZero() {
+		return nil
+	}
+	componentsByRef := make(map[string]placement.Component, len(request.Components))
+	for _, component := range request.Components {
+		componentsByRef[strings.ToUpper(strings.TrimSpace(component.Ref))] = component
+	}
+	refs := slices.Clone(region.Refs)
+	slices.Sort(refs)
+	type densePart struct {
+		ref    string
+		bounds placement.Rect
+	}
+	parts := make([]densePart, 0, len(refs))
+	maximumWidth, maximumHeight := 0.0, 0.0
+	for _, ref := range refs {
+		component, found := componentsByRef[strings.ToUpper(strings.TrimSpace(ref))]
+		if !found {
+			return nil
+		}
+		rotation := 0.0
+		if component.Rotation.FixedDeg != nil {
+			rotation = *component.Rotation.FixedDeg
+		} else if len(component.Rotation.AllowedDeg) != 0 {
+			rotation = component.Rotation.AllowedDeg[0]
+		}
+		probe, ok := placement.NewPlacementResult(component, placement.Placement{RotationDeg: rotation, Layer: "F.Cu"}, request.Rules)
+		if !ok {
+			return nil
+		}
+		parts = append(parts, densePart{ref: ref, bounds: probe.Bounds})
+		maximumWidth = max(maximumWidth, probe.Bounds.Max.XMM-probe.Bounds.Min.XMM)
+		maximumHeight = max(maximumHeight, probe.Bounds.Max.YMM-probe.Bounds.Min.YMM)
+	}
+	regionWidth := region.Preferred.Max.XMM - region.Preferred.Min.XMM
+	regionHeight := region.Preferred.Max.YMM - region.Preferred.Min.YMM
+	grid := request.Rules.GridMM
+	if grid <= 0 {
+		grid = placement.DefaultRules().GridMM
+	}
+	usable := placement.BoardUsableRect(request.Board, request.Rules)
+	gridOriginX := math.Round(usable.Min.XMM/grid) * grid
+	gridOriginY := math.Round(usable.Min.YMM/grid) * grid
+	snapUp := func(value, origin float64) float64 {
+		return origin + math.Ceil((value-origin)/grid-1e-9)*grid
+	}
+	var anchors []placement.Point
+	for candidateColumns := 1; candidateColumns <= len(refs); candidateColumns++ {
+		candidateRows := (len(refs) + candidateColumns - 1) / candidateColumns
+		if float64(candidateColumns)*maximumWidth > regionWidth+grid+1e-12 ||
+			float64(candidateRows)*maximumHeight > regionHeight+grid+1e-12 {
+			continue
+		}
+		candidateAnchors := make([]placement.Point, len(parts))
+		rowStartY := region.Preferred.Min.YMM
+		fits := true
+		for index := 0; index < len(parts); {
+			cursorX, rowMaximumY := region.Preferred.Min.XMM, rowStartY
+			for column := 0; column < candidateColumns && index < len(parts); column, index = column+1, index+1 {
+				part := parts[index]
+				anchor := placement.Point{
+					XMM: snapUp(cursorX-part.bounds.Min.XMM, gridOriginX),
+					YMM: snapUp(rowStartY-part.bounds.Min.YMM, gridOriginY),
+				}
+				placedBounds := placement.Rect{
+					Min: placement.Point{XMM: part.bounds.Min.XMM + anchor.XMM, YMM: part.bounds.Min.YMM + anchor.YMM},
+					Max: placement.Point{XMM: part.bounds.Max.XMM + anchor.XMM, YMM: part.bounds.Max.YMM + anchor.YMM},
+				}
+				if placedBounds.Max.XMM > region.Preferred.Max.XMM+1e-12 ||
+					placedBounds.Max.YMM > region.Preferred.Max.YMM+1e-12 ||
+					!region.Preferred.ContainsPoint(anchor) {
+					fits = false
+					break
+				}
+				candidateAnchors[index] = anchor
+				cursorX = placedBounds.Max.XMM
+				rowMaximumY = max(rowMaximumY, placedBounds.Max.YMM)
+			}
+			if !fits {
+				break
+			}
+			rowStartY = rowMaximumY
+		}
+		if fits {
+			anchors = candidateAnchors
+			break
+		}
+	}
+	if len(anchors) != len(parts) {
+		return nil
+	}
+	rules := make([]placement.RegionRule, 0, len(parts))
+	for index, part := range parts {
+		anchor := anchors[index]
+		rules = append(rules, placement.RegionRule{
+			ID: "explicit.dense.slot." + strings.ToLower(strings.TrimSpace(part.ref)), Source: "derived_package_floorplan", Region: "dense_slot",
+			Refs: []string{part.ref}, Required: true, Weight: 10,
+			Preferred: placement.Rect{
+				Min: anchor,
+				Max: anchor,
+			},
+		})
+	}
+	return rules
+}
+
+// explicitDenseInteriorPlacementRegion reserves the board core required by a
+// cohort of large, front-only movable packages. The bounds are derived from
+// hydrated courtyards, board margins, component spacing, and the shallowest
+// legal orientation of each edge population. This keeps a greedy placement
+// from fragmenting the only rectangle that can hold the large cohort without
+// introducing authored coordinates or weakening any user-owned constraint.
+func explicitDenseInteriorPlacementRegion(request placement.Request) (placement.RegionRule, bool) {
+	if len(request.Components) < 2 || request.Board.WidthMM <= 0 || request.Board.HeightMM <= 0 {
+		return placement.RegionRule{}, false
+	}
+	spacing := max(0, request.Rules.ComponentSpacingMM)
+	usable := placement.BoardUsableRect(request.Board, request.Rules)
+	minimumX, maximumX := usable.Min.XMM, usable.Max.XMM
+	minimumY, maximumY := usable.Min.YMM, usable.Max.YMM
+	maximumArea := 0.0
+	for _, component := range request.Components {
+		area := component.Bounds.WidthMM * component.Bounds.HeightMM
+		maximumArea = max(maximumArea, area)
+		if component.Fixed || component.Edge == placement.EdgeNone || component.Side != placement.SideTop ||
+			component.Bounds.WidthMM <= 0 || component.Bounds.HeightMM <= 0 {
+			continue
+		}
+		width, height := explicitComponentFirstRotationDimensions(component)
+		courtyard := 2 * max(0, component.Bounds.CourtyardMM)
+		depth := min(width, height) + spacing + courtyard
+		switch component.Edge {
+		case placement.EdgeLeft:
+			minimumX = max(minimumX, usable.Min.XMM+width+spacing+courtyard)
+		case placement.EdgeRight:
+			maximumX = min(maximumX, usable.Max.XMM-width-spacing-courtyard)
+		case placement.EdgeTop:
+			minimumY = max(minimumY, usable.Min.YMM+height+spacing+courtyard)
+		case placement.EdgeBottom:
+			maximumY = min(maximumY, usable.Max.YMM-height-spacing-courtyard)
+		case placement.EdgeAny:
+			minimumX = max(minimumX, usable.Min.XMM+depth)
+			maximumX = min(maximumX, usable.Max.XMM-depth)
+			minimumY = max(minimumY, usable.Min.YMM+depth)
+			maximumY = min(maximumY, usable.Max.YMM-depth)
+		}
+	}
+	if maximumArea <= 0 {
+		return placement.RegionRule{}, false
+	}
+	minimumLargeArea := max(maximumArea*.5, request.Board.WidthMM*request.Board.HeightMM*.05)
+	refs := []string{}
+	maximumWidth, maximumHeight := 0.0, 0.0
+	preferWide := request.Board.WidthMM >= request.Board.HeightMM
+	for _, component := range request.Components {
+		area := component.Bounds.WidthMM * component.Bounds.HeightMM
+		if component.Fixed || component.Edge != placement.EdgeNone || component.Side != placement.SideTop ||
+			area < minimumLargeArea {
+			continue
+		}
+		refs = append(refs, component.Ref)
+		width, height := explicitDenseComponentDimensions(component, preferWide)
+		maximumWidth = max(maximumWidth, width+spacing)
+		maximumHeight = max(maximumHeight, height+spacing)
+	}
+	if len(refs) < 2 || maximumWidth <= 0 || maximumHeight <= 0 {
+		return placement.RegionRule{}, false
+	}
+	if maximumX <= minimumX || maximumY <= minimumY {
+		return placement.RegionRule{}, false
+	}
+	columnsFit := false
+	for columns := 1; columns <= len(refs); columns++ {
+		rows := (len(refs) + columns - 1) / columns
+		if float64(columns)*maximumWidth <= maximumX-minimumX+1e-12 &&
+			float64(rows)*maximumHeight <= maximumY-minimumY+1e-12 {
+			columnsFit = true
+			break
+		}
+	}
+	if !columnsFit {
+		return placement.RegionRule{}, false
+	}
+	slices.Sort(refs)
+	return placement.RegionRule{
+		ID: "explicit.dense.interior", Source: "derived_package_floorplan", Region: "dense_interior",
+		Refs: refs, Required: true, Weight: 10,
+		Preferred: placement.Rect{
+			Min: placement.Point{XMM: minimumX, YMM: minimumY},
+			Max: placement.Point{XMM: maximumX, YMM: maximumY},
+		},
+	}, true
+}
+
+func explicitDenseComponentDimensions(component placement.Component, preferWide bool) (float64, float64) {
+	rotations := append([]float64(nil), component.Rotation.AllowedDeg...)
+	if component.Rotation.FixedDeg != nil {
+		rotations = []float64{*component.Rotation.FixedDeg}
+	}
+	if len(rotations) == 0 {
+		rotations = []float64{0}
+	}
+	bestWidth, bestHeight := 0.0, 0.0
+	for _, rotation := range rotations {
+		width, height := explicitComponentRotationDimensions(component, rotation)
+		if bestWidth == 0 ||
+			(preferWide && (height < bestHeight || height == bestHeight && width < bestWidth)) ||
+			(!preferWide && (width < bestWidth || width == bestWidth && height < bestHeight)) {
+			bestWidth, bestHeight = width, height
+		}
+	}
+	return bestWidth, bestHeight
+}
+
+func explicitComponentRotationDimensions(component placement.Component, rotation float64) (float64, float64) {
+	width, height := component.Bounds.WidthMM, component.Bounds.HeightMM
+	quarterTurns := int(math.Round(math.Mod(math.Abs(rotation), 180) / 90))
+	if quarterTurns%2 == 1 {
+		width, height = height, width
+	}
+	return width, height
+}
+
+func explicitComponentFirstRotationDimensions(component placement.Component) (float64, float64) {
+	rotation := 0.0
+	if component.Rotation.FixedDeg != nil {
+		rotation = *component.Rotation.FixedDeg
+	} else if len(component.Rotation.AllowedDeg) != 0 {
+		rotation = component.Rotation.AllowedDeg[0]
+	}
+	return explicitComponentRotationDimensions(component, rotation)
+}
+
+func explicitOrientDenseEdgeComponents(request *placement.Request) {
+	if request == nil {
+		return
+	}
+	for index := range request.Components {
+		component := &request.Components[index]
+		if component.Fixed || component.Edge == placement.EdgeNone || component.Edge == placement.EdgeAny ||
+			component.Rotation.FixedDeg != nil || len(component.Rotation.AllowedDeg) == 0 {
+			continue
+		}
+		chosen := component.Rotation.AllowedDeg[0]
+		chosenPerpendicular, chosenParallel := math.Inf(1), math.Inf(1)
+		for _, rotation := range component.Rotation.AllowedDeg {
+			width, height := explicitComponentRotationDimensions(*component, rotation)
+			perpendicular, parallel := width, height
+			if component.Edge == placement.EdgeTop || component.Edge == placement.EdgeBottom {
+				perpendicular, parallel = height, width
+			}
+			if perpendicular < chosenPerpendicular ||
+				(perpendicular == chosenPerpendicular && parallel < chosenParallel) ||
+				(perpendicular == chosenPerpendicular && parallel == chosenParallel && rotation < chosen) {
+				chosen, chosenPerpendicular, chosenParallel = rotation, perpendicular, parallel
+			}
+		}
+		component.Rotation.AllowedDeg = []float64{chosen}
+	}
+}
+
+func explicitOrientDenseInteriorComponents(request *placement.Request, refs []string) {
+	if request == nil || len(refs) == 0 {
+		return
+	}
+	refSet := make(map[string]bool, len(refs))
+	for _, ref := range refs {
+		refSet[strings.ToUpper(strings.TrimSpace(ref))] = true
+	}
+	preferWide := request.Board.WidthMM >= request.Board.HeightMM
+	for index := range request.Components {
+		component := &request.Components[index]
+		if !refSet[strings.ToUpper(strings.TrimSpace(component.Ref))] || component.Rotation.FixedDeg != nil {
+			continue
+		}
+		chosen := 0.0
+		chosenWidth, chosenHeight := 0.0, 0.0
+		for _, rotation := range component.Rotation.AllowedDeg {
+			probe := *component
+			probe.Rotation.AllowedDeg = []float64{rotation}
+			width, height := explicitDenseComponentDimensions(probe, preferWide)
+			if chosenWidth == 0 ||
+				(preferWide && (height < chosenHeight || height == chosenHeight && width < chosenWidth)) ||
+				(!preferWide && (width < chosenWidth || width == chosenWidth && height < chosenHeight)) {
+				chosen, chosenWidth, chosenHeight = rotation, width, height
+			}
+		}
+		if chosenWidth > 0 {
+			component.Rotation.AllowedDeg = []float64{chosen}
+		}
+	}
 }
 
 func explicitBackSidePlacementEligible(component placement.Component) bool {

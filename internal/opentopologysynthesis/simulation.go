@@ -255,7 +255,7 @@ func evaluateAssertionCorner(
 		RequiredMax:   cloneInventoryFloat(assertion.Max),
 		Diagnostics:   []SimulationDiagnostic{},
 	}
-	quantity, scale, supported := directSimulationQuantity(assertion)
+	quantity, scale, supported := directSimulationQuantityForRequirement(requirement, assertion)
 	if !supported {
 		diagnosis := simulationDiagnosis(
 			diagnosisMetricUnsupported,
@@ -515,6 +515,10 @@ func failedSimulationActual(report simmodel.Report, scale float64) (float64, boo
 }
 
 func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, bool) {
+	return directSimulationQuantityForRequirement(Requirement{}, assertion)
+}
+
+func directSimulationQuantityForRequirement(requirement Requirement, assertion BehavioralAssertion) (string, float64, bool) {
 	switch assertion.Metric {
 	case "output_voltage", "output_high_voltage", "output_low_voltage", "on_state_voltage":
 		return simmodel.QuantityVoltageV, 1, true
@@ -544,8 +548,18 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 	case "total_harmonic_distortion":
 		return simmodel.QuantityTHDPercent, 1, true
 	case "rising_threshold":
+		if envelope, required := topologyWindowBehaviorEnvelope(requirement); required && envelope.signed &&
+			assertion.Excitation != nil && assertion.Excitation.ID == envelope.input &&
+			assertion.Observation.ID == envelope.output {
+			return simmodel.QuantityUpperThresholdVoltageV, 1, true
+		}
 		return simmodel.QuantityRisingThresholdVoltageV, 1, true
 	case "falling_threshold":
+		if envelope, required := topologyWindowBehaviorEnvelope(requirement); required && envelope.signed &&
+			assertion.Excitation != nil && assertion.Excitation.ID == envelope.input &&
+			assertion.Observation.ID == envelope.output {
+			return simmodel.QuantityLowerThresholdVoltageV, 1, true
+		}
 		return simmodel.QuantityFallingThresholdVoltageV, 1, true
 	case "lower_threshold":
 		return simmodel.QuantityLowerThresholdVoltageV, 1, true
@@ -903,6 +917,7 @@ func simulationHarnessConditions(
 	operatingCase OperatingCase,
 ) []OperatingCondition {
 	result := append([]OperatingCondition(nil), operatingCase.Conditions...)
+	result = signedWindowStaticHarnessConditions(requirement, assertion, result)
 	seen := map[string]bool{}
 	for _, condition := range result {
 		seen[conditionKey(condition)] = true
@@ -967,6 +982,38 @@ func simulationHarnessConditions(
 	slices.SortFunc(result, func(left, right OperatingCondition) int {
 		return cmp.Or(cmp.Compare(left.Axis, right.Axis), cmp.Compare(left.Target, right.Target))
 	})
+	return result
+}
+
+// signedWindowStaticHarnessConditions separates the two static output states
+// encoded by a default-low bipolar window. The high-voltage assertion is
+// evaluated beyond the positive boundary, while the low-voltage assertion is
+// evaluated between the two boundaries. The paired threshold sweeps retain
+// independent evidence for both signed transitions.
+func signedWindowStaticHarnessConditions(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	conditions []OperatingCondition,
+) []OperatingCondition {
+	envelope, required := topologyWindowBehaviorEnvelope(requirement)
+	if !required || !envelope.signed || assertion.Observation.Kind != "port" ||
+		assertion.Observation.ID != envelope.output ||
+		(assertion.Metric != "output_high_voltage" && assertion.Metric != "output_low_voltage") {
+		return conditions
+	}
+	result := append([]OperatingCondition(nil), conditions...)
+	for index := range result {
+		condition := &result[index]
+		if condition.Axis != "input_voltage" || condition.Target != envelope.input ||
+			condition.Min >= condition.Max {
+			continue
+		}
+		value := (envelope.lowerV + envelope.upperV) / 2
+		if assertion.Metric == "output_high_voltage" {
+			value = condition.Max
+		}
+		condition.Min, condition.Max = value, value
+	}
 	return result
 }
 
@@ -1039,10 +1086,10 @@ func simulationAssertionRequiresActiveControl(requirement Requirement, assertion
 }
 
 // requirementActiveControlValue derives the asserted state of a control from
-// behavior rather than its name. An off-state current requirement identifies
-// the excitation that removes delivered output; a rising event on that same
-// excitation therefore supplies the complementary active state for related
-// steady-state output and circuit assertions.
+// behavior rather than its name. An off/on-state assertion or a startup
+// assertion identifies the controlling excitation; a rising event on that
+// excitation then supplies the active state for related steady-state output
+// and circuit assertions.
 func requirementActiveControlValue(requirement Requirement, controlID string) (float64, bool) {
 	activationControl := false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
@@ -1050,8 +1097,10 @@ func requirementActiveControlValue(requirement Requirement, controlID string) (f
 			assertion.Excitation.ID != controlID {
 			continue
 		}
-		switch assertion.Metric {
-		case "off_state_current", "on_state_voltage":
+		switch {
+		case assertion.Analysis == simmodel.AnalysisStartup:
+			activationControl = true
+		case assertion.Metric == "off_state_current" || assertion.Metric == "on_state_voltage":
 			activationControl = true
 		}
 	}

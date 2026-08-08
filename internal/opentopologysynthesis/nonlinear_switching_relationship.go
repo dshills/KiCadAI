@@ -413,7 +413,7 @@ func topologyStepDownRelationshipSeeds(
 	if !feedbackFound {
 		return nil, Consumption{}, map[string][]string{"dynamic_envelope_unsupported": {"no catalog feedback pair keeps the reviewed controller reference inside the declared output-voltage envelope"}}
 	}
-	if inductor.Key == "" || outputCapacitor.Key == "" || inputCapacitor.Key == "" || feedbackBottom.Key == "" || feedbackTop.Key == "" {
+	if inductor.Key == "" || outputCapacitor.Key == "" || inputCapacitor.Key == "" || feedbackBottom.Key == "" || len(feedbackTop) == 0 {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"step-down energy transfer lacks reviewed magnetics, capacitors, or feedback values derived from its behavior"}}
 	}
 	_ = representatives
@@ -433,7 +433,17 @@ func topologyStepDownRelationshipSeeds(
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, inductor, topologyTwoTerminalPlacement(switchNode, outputNode), &consumption)
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, outputCapacitor, topologyTwoTerminalPlacement(outputNode, references[0]), &consumption)
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, inputCapacitor, topologyTwoTerminalPlacement(highRail, references[0]), &consumption)
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, feedbackTop, topologyTwoTerminalPlacement(outputNode, feedbackNode), &consumption)
+	if len(feedbackTop) == 1 {
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, feedbackTop[0], topologyTwoTerminalPlacement(outputNode, feedbackNode), &consumption)
+	} else {
+		var seriesNode string
+		state, seriesNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+		if seriesNode == "" {
+			return nil, consumption, map[string][]string{"graph_limit": {"compound feedback requires one bounded internal node"}}
+		}
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, feedbackTop[0], topologyTwoTerminalPlacement(outputNode, seriesNode), &consumption)
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, feedbackTop[1], topologyTwoTerminalPlacement(seriesNode, feedbackNode), &consumption)
+	}
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, feedbackBottom, topologyTwoTerminalPlacement(feedbackNode, references[0]), &consumption)
 	return finalizeNonlinearSwitchingRelationship(ctx, requirement, inventory, limits, policy, []topologySearchState{state}, consumption, "regulated step-down energy transfer")
 }
@@ -622,12 +632,12 @@ func topologyStepDownFeedbackPrimitives(
 	inventory PrimitiveInventory,
 	regulator PrimitiveCandidate,
 	outputTarget float64,
-) (PrimitiveCandidate, PrimitiveCandidate, bool) {
+) ([]PrimitiveCandidate, PrimitiveCandidate, bool) {
 	referenceNominal, referenceMinimum, referenceMaximum, found := primitiveModelParameterRange(
 		regulator, simmodel.PrimitiveSynchronousBuckRegulatorV1, "reference_voltage_v",
 	)
 	if !found {
-		return PrimitiveCandidate{}, PrimitiveCandidate{}, false
+		return nil, PrimitiveCandidate{}, false
 	}
 	outputMinimum, outputMaximum := 0.0, 0.0
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
@@ -655,12 +665,28 @@ func topologyStepDownFeedbackPrimitives(
 		outputMaximum,
 		10_000,
 	)
-	if !found {
-		return PrimitiveCandidate{}, PrimitiveCandidate{}, false
+	if found {
+		upper := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", upperValue)
+		lower := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", lowerValue)
+		return []PrimitiveCandidate{upper}, lower, upper.Key != "" && lower.Key != ""
 	}
-	upper := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", upperValue)
-	lower := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", lowerValue)
-	return upper, lower, upper.Key != "" && lower.Key != ""
+	firstValue, secondValue, seriesLowerValue, seriesFound := catalogControllerSeriesFeedbackDivider(
+		requirement,
+		primitiveInventoryByKey(inventory),
+		referenceNominal,
+		referenceMinimum,
+		referenceMaximum,
+		outputMinimum,
+		outputMaximum,
+		10_000,
+	)
+	if !seriesFound {
+		return nil, PrimitiveCandidate{}, false
+	}
+	first := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", firstValue)
+	second := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", secondValue)
+	lower := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", seriesLowerValue)
+	return []PrimitiveCandidate{first, second}, lower, first.Key != "" && second.Key != "" && lower.Key != ""
 }
 
 func primitiveModelParameter(primitive PrimitiveCandidate, modelID, name string) float64 {

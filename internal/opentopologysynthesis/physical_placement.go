@@ -225,11 +225,6 @@ func physicalFunctionalRegions(
 	}
 	slices.SortStableFunc(ordered, physicalCompareRegionSeeds)
 
-	gap := math.Min(1, math.Max(0, board.WidthMM*0.01))
-	if float64(len(ordered)-1)*gap >= board.WidthMM {
-		gap = 0
-	}
-	availableWidth := board.WidthMM - float64(len(ordered)-1)*gap
 	totalWeight := 0.0
 	for _, seed := range ordered {
 		totalWeight += seed.weight
@@ -241,22 +236,62 @@ func physicalFunctionalRegions(
 			seed.weight = physicalRegionMinimumWeight
 		}
 	}
+	bounds := physicalFunctionalRegionBounds(board, ordered)
 	regions := make([]circuitgraph.PCBRegion, 0, len(ordered))
-	x := 0.0
 	for index, seed := range ordered {
-		width := availableWidth * seed.weight / totalWeight
-		if index == len(ordered)-1 {
-			// Consume the exact floating-point remainder so regions end at the board edge.
-			width = math.Max(0, board.WidthMM-x)
-		}
 		region := circuitgraph.PCBRegion{
 			ID: "functional_" + seed.role, Role: seed.role,
-			Bounds: circuitgraph.Bounds{XMM: x, YMM: 0, WidthMM: width, HeightMM: board.HeightMM},
+			Bounds: bounds[index],
 		}
 		regions = append(regions, region)
-		x += width + gap
 	}
 	return regions, regionByComponent
+}
+
+// physicalFunctionalRegionBounds preserves strict left-to-right strips while
+// their package-derived minimum widths fit. When those minima exceed the board
+// width, shrinking every strip makes wide footprints impossible to place. In
+// that dense case, retain each minimum width and allow adjacent preferred
+// regions to overlap; normal placement collision checks still keep components
+// disjoint, while the ordered region centers preserve functional flow.
+func physicalFunctionalRegionBounds(
+	board circuitgraph.Board,
+	ordered []*physicalRegionSeed,
+) []circuitgraph.Bounds {
+	if len(ordered) == 0 {
+		return nil
+	}
+	gap := math.Min(1, math.Max(0, board.WidthMM*.01))
+	if float64(len(ordered)-1)*gap >= board.WidthMM {
+		gap = 0
+	}
+	availableWidth := board.WidthMM - float64(len(ordered)-1)*gap
+	totalWeight := 0.0
+	for _, seed := range ordered {
+		totalWeight += seed.weight
+	}
+	result := make([]circuitgraph.Bounds, 0, len(ordered))
+	if totalWeight <= availableWidth+1e-12 {
+		x := 0.0
+		for index, seed := range ordered {
+			width := availableWidth * seed.weight / totalWeight
+			if index == len(ordered)-1 {
+				width = math.Max(0, board.WidthMM-x)
+			}
+			result = append(result, circuitgraph.Bounds{XMM: x, YMM: 0, WidthMM: width, HeightMM: board.HeightMM})
+			x += width + gap
+		}
+		return result
+	}
+	cumulativeWeight := 0.0
+	for _, seed := range ordered {
+		width := math.Min(board.WidthMM, math.Max(physicalRegionMinimumWeight, seed.weight))
+		center := board.WidthMM * (cumulativeWeight + seed.weight/2) / totalWeight
+		x := math.Max(0, math.Min(board.WidthMM-width, center-width/2))
+		result = append(result, circuitgraph.Bounds{XMM: x, YMM: 0, WidthMM: width, HeightMM: board.HeightMM})
+		cumulativeWeight += seed.weight
+	}
+	return result
 }
 
 func physicalFunctionalRole(component circuitgraph.Component, groupID, groupRole string, groupRank int) string {

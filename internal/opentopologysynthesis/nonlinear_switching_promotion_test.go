@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -183,7 +184,27 @@ func assertNonlinearSwitchingDesignPass(t *testing.T, requirement Requirement, r
 		run.Report.Selected == nil || run.SelectedGraph == nil || run.SelectedTrial == nil ||
 		run.Physical == nil || run.Physical.Status != PhysicalLoweringReady ||
 		len(run.Report.Diagnostics) != 0 {
-		t.Fatalf("nonlinear/switching design status=%s stop=%s selected=%t physical=%#v diagnostics=%#v", run.Report.Status, run.Report.StopReason, run.Report.Selected != nil, run.Physical, run.Report.Diagnostics)
+		physicalStatus := PhysicalLoweringStatus("")
+		if run.Physical != nil {
+			physicalStatus = run.Physical.Status
+		}
+		t.Fatalf(
+			"nonlinear/switching design status=%s stop=%s selected=%t graph=%t trial=%t physical=%t physical_status=%s diagnostics=%#v consumption=%#v search_status=%s search_consumption=%#v search_rejections=%#v failure_candidates=%q failure_diagnoses=%#v",
+			run.Report.Status,
+			run.Report.StopReason,
+			run.Report.Selected != nil,
+			run.SelectedGraph != nil,
+			run.SelectedTrial != nil,
+			run.Physical != nil,
+			physicalStatus,
+			run.Report.Diagnostics,
+			run.Report.Consumption,
+			run.Search.Status,
+			run.Search.Consumption,
+			run.Search.Rejections,
+			nonlinearSwitchingFailureCandidates(run, 16),
+			nonlinearSwitchingFailureDiagnoses(run.Report.Candidates, 16),
+		)
 	}
 	evaluation, found := nonlinearSwitchingSelectedEvaluation(run)
 	if !found || evaluation.Status != SimulationEvaluationPassed {
@@ -219,6 +240,78 @@ func assertNonlinearSwitchingDesignPass(t *testing.T, requirement Requirement, r
 	if len(wantAttempts) != 0 {
 		t.Fatalf("selected simulation omitted exhaustive requirement corners: %v", wantAttempts)
 	}
+}
+
+func nonlinearSwitchingFailureCandidates(run SynthesisRun, limit int) []string {
+	graphs := map[string]CandidateGraph{}
+	evidence := map[string]SynthesisCandidateEvidence{}
+	for _, candidate := range run.Search.Candidates {
+		graphs[candidate.Fingerprint] = candidate.Graph
+	}
+	for _, candidate := range run.Candidates {
+		evidence[candidate.Fingerprint] = candidate
+	}
+	result := make([]string, 0, min(limit, len(run.Report.Candidates)))
+	for candidateIndex := len(run.Report.Candidates) - 1; candidateIndex >= 0 && len(result) < limit; candidateIndex-- {
+		candidate := run.Report.Candidates[candidateIndex]
+		kindCounts := map[string]int{}
+		for _, instance := range graphs[candidate.Fingerprint].Instances {
+			kindCounts[instance.Kind]++
+		}
+		kinds := make([]string, 0, len(kindCounts))
+		for kind, count := range kindCounts {
+			kinds = append(kinds, fmt.Sprintf("%s=%d", kind, count))
+		}
+		slices.Sort(kinds)
+		candidateEvidence := evidence[candidate.Fingerprint]
+		result = append(result, fmt.Sprintf(
+			"%s:status=%s:plan=%s:attempts=%d:kinds=%s:diagnoses=%s:plan_issues=%v",
+			candidate.Fingerprint, candidate.Status, candidateEvidence.ValuePlan.Status,
+			len(candidate.Attempts), strings.Join(kinds, ","), strings.Join(nonlinearSwitchingDiagnosisSummaries(candidate.Attempts, 8), ","), candidateEvidence.ValuePlan.Issues,
+		))
+	}
+	return result
+}
+
+func nonlinearSwitchingDiagnosisSummaries(attempts []Attempt, limit int) []string {
+	result := []string{}
+	seen := map[string]bool{}
+	for _, attempt := range attempts {
+		for _, diagnosis := range attempt.Diagnoses {
+			key := diagnosis.Code + "/" + diagnosis.RequirementID + "/" + diagnosis.OperatingCase
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			result = append(result, key+":"+diagnosis.Message)
+			if len(result) == limit {
+				return result
+			}
+		}
+	}
+	return result
+}
+
+func nonlinearSwitchingFailureDiagnoses(candidates []CandidateReport, limit int) []Diagnosis {
+	var result []Diagnosis
+	seen := map[string]bool{}
+	for candidateIndex := len(candidates) - 1; candidateIndex >= 0 && len(result) < limit; candidateIndex-- {
+		attempts := candidates[candidateIndex].Attempts
+		for attemptIndex := len(attempts) - 1; attemptIndex >= 0 && len(result) < limit; attemptIndex-- {
+			for _, diagnosis := range attempts[attemptIndex].Diagnoses {
+				key := diagnosis.Code + "\x00" + diagnosis.RequirementID + "\x00" + diagnosis.OperatingCase + "\x00" + diagnosis.Metric + "\x00" + diagnosis.Direction
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				result = append(result, diagnosis)
+				if len(result) == limit {
+					break
+				}
+			}
+		}
+	}
+	return result
 }
 
 func nonlinearSwitchingSelectedEvaluation(run SynthesisRun) (SimulationEvaluation, bool) {

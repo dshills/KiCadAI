@@ -3,10 +3,25 @@ package opentopologysynthesis
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
 )
+
+func TestCanonicalExactTwinKeyIgnoresNeighborOrder(t *testing.T) {
+	first := []canonicalVertex{{
+		kind: "instance", label: "instance:resistor",
+		neighbors: []canonicalEdge{{vertex: 2, label: "B"}, {vertex: 1, label: "A"}},
+	}}
+	second := []canonicalVertex{{
+		kind: "instance", label: "instance:resistor",
+		neighbors: []canonicalEdge{{vertex: 1, label: "A"}, {vertex: 2, label: "B"}},
+	}}
+	if firstKey, secondKey := canonicalExactTwinKey(first, 0), canonicalExactTwinKey(second, 0); firstKey != secondKey {
+		t.Fatalf("exact twin key changed with neighbor order: %q != %q", firstKey, secondKey)
+	}
+}
 
 func TestCanonicalGraphHashIgnoresNamesOrderAndPassiveOrientation(t *testing.T) {
 	first := testRCGraph()
@@ -110,6 +125,43 @@ func TestCanonicalGraphHashHandlesSymmetricInternalNodes(t *testing.T) {
 	secondJSON, _ := json.Marshal(again)
 	if !bytes.Equal(firstJSON, secondJSON) {
 		t.Fatalf("graph normalization is not idempotent:\n%s\n%s", firstJSON, secondJSON)
+	}
+}
+
+func TestCanonicalGraphHashPrunesExactParallelTwins(t *testing.T) {
+	parallel := func(prefix string, reverse bool) CandidateGraph {
+		graph := CandidateGraph{
+			Schema: CandidateGraphSchema, Version: CandidateGraphVersion,
+			Nodes: []GraphNode{
+				{ID: prefix + "_in", Scope: "external", SemanticKind: "port", SemanticID: "input", Domain: "ground", Role: "input"},
+				{ID: prefix + "_out", Scope: "external", SemanticKind: "port", SemanticID: "output", Domain: "ground", Role: "output"},
+			},
+		}
+		for index := 0; index < 24; index++ {
+			graph.Instances = append(graph.Instances, testResistorInstance(
+				fmt.Sprintf("%s_r_%02d", prefix, index), graph.Nodes[0].ID, graph.Nodes[1].ID,
+			))
+		}
+		if reverse {
+			slices.Reverse(graph.Instances)
+			slices.Reverse(graph.Nodes)
+		}
+		return graph
+	}
+	first, second := parallel("first", false), parallel("second", true)
+	if mustGraphHash(t, first, false) != mustGraphHash(t, second, false) {
+		t.Fatal("parallel twin graph hash depends on instance names or order")
+	}
+	vertices, _, _, err := graphCanonicalVertices(first, graphHashFull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	branches := 0
+	if _, err := canonicalSearch(vertices, initialCanonicalColors(vertices), &branches); err != nil {
+		t.Fatal(err)
+	}
+	if branches > len(vertices)+1 {
+		t.Fatalf("parallel twin canonical search used %d branches for %d vertices", branches, len(vertices))
 	}
 }
 

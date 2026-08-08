@@ -743,6 +743,107 @@ func TestTransconductanceRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 	}
 }
 
+func TestTransconductanceRelationshipConditionsTransientCommand(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "illumination_proportional_power_control.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := multiStageOODPromotionPolicy()
+	candidates, consumption, rejections := topologyTransconductanceRelationshipSeeds(
+		context.Background(),
+		requirement,
+		inventory,
+		topologyRepresentatives(requirement, inventory),
+		byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		},
+		policy,
+		state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf(
+			"transient transconductance relationship produced no candidates: consumption=%#v rejections=%#v",
+			consumption,
+			rejections,
+		)
+	}
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 {
+			continue
+		}
+		nodes := map[string]GraphNode{}
+		for _, node := range candidate.Graph.Nodes {
+			nodes[node.ID] = node
+		}
+		conditionedNode, resistorID, capacitorID := "", "", ""
+		for _, capacitor := range candidate.Graph.Instances {
+			if capacitor.Kind != "capacitor" || len(capacitor.Terminals) != 2 {
+				continue
+			}
+			first, second := capacitor.Terminals[0].Node, capacitor.Terminals[1].Node
+			if nodes[first].Role == "reference" && nodes[second].Scope == "internal" {
+				conditionedNode, capacitorID = second, capacitor.ID
+			} else if nodes[second].Role == "reference" && nodes[first].Scope == "internal" {
+				conditionedNode, capacitorID = first, capacitor.ID
+			}
+		}
+		for _, resistor := range candidate.Graph.Instances {
+			if resistor.Kind != "resistor" || len(resistor.Terminals) != 2 {
+				continue
+			}
+			first, second := resistor.Terminals[0].Node, resistor.Terminals[1].Node
+			if first == conditionedNode && nodes[second].Scope == "external" && nodes[second].Role == "input" ||
+				second == conditionedNode && nodes[first].Scope == "external" && nodes[first].Role == "input" {
+				resistorID = resistor.ID
+				break
+			}
+		}
+		if conditionedNode == "" || resistorID == "" || capacitorID == "" {
+			continue
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("conditioned transconductance value plan = %s: %#v", plan.Status, plan.Issues)
+		}
+		found := map[string]bool{}
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if scale.Priority == 1 && strings.HasPrefix(scale.ID, "topology:conditioned_transconductance_input:") {
+					found[domain.InstanceID] = true
+				}
+			}
+		}
+		if !found[resistorID] || !found[capacitorID] {
+			t.Fatalf("conditioned transconductance scales missing resistor=%t capacitor=%t: %#v", found[resistorID], found[capacitorID], plan.Domains)
+		}
+		return
+	}
+	t.Fatalf("no zero-gap transient transconductance relationship found: %#v", candidates)
+}
+
 func TestTransimpedanceRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,

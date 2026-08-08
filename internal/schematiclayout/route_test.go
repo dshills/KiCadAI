@@ -385,6 +385,44 @@ func TestRouteUsesOrthogonalEndpointAccessWhenPreferredStubIsBlocked(t *testing.
 	}
 }
 
+func TestLabelStubSearchExtendsBeyondCrowdedNearField(t *testing.T) {
+	grid := kicadfiles.MM(1.27)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(100), Y: kicadfiles.MM(100)}
+	result := Result{}
+	for _, direction := range []kicadfiles.Point{{X: grid}, {X: -grid}, {Y: grid}, {Y: -grid}} {
+		for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
+			result.Labels = append(result.Labels, Label{
+				NetName: "BLOCKER", Text: "TARGET",
+				Position: kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale},
+			})
+		}
+	}
+	position, clean := labelStubPoint(
+		"TARGET", Endpoint{}, anchor, result,
+		Request{Sheet: testSheet()}, normalizeRules(Rules{}),
+	)
+	if !clean {
+		t.Fatalf("extended label search used a crowded fallback at %#v", position)
+	}
+	if distance := manhattan(anchor, position); distance <= grid*16 {
+		t.Fatalf("label distance = %d, want a clean position beyond the occupied near field", distance)
+	}
+}
+
+func TestEndpointLabelFallbackReusesOverlappingSameNetLabel(t *testing.T) {
+	grid := kicadfiles.MM(1.27)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(100), Y: kicadfiles.MM(100)}
+	existing := kicadfiles.Point{X: anchor.X + grid*2, Y: anchor.Y}
+	result := Result{Labels: []Label{{NetName: "SHARED", Text: "SHARED", Position: existing}}}
+	position, reused := reusableOverlappingEndpointLabel(
+		"SHARED", Endpoint{Ref: "U2", Pin: "1"}, anchor, existing,
+		result, Request{Sheet: testSheet()}, normalizeRules(Rules{}),
+	)
+	if !reused || position != existing {
+		t.Fatalf("same-net label reuse position=%#v reused=%t, want existing label", position, reused)
+	}
+}
+
 func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

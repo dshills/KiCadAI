@@ -44,6 +44,131 @@ func TestMultiStageOODEnabledCurrentRegulationOptionalKiCadPromotion(t *testing.
 	testMultiStageOODOptionalKiCadPromotion(t, "enabled_current_regulation")
 }
 
+func TestMultiStageOODBipolarMagnitudeOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "bipolar_magnitude_fault_indicator")
+}
+
+func TestMultiStageOODBoundedAudioPowerOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "bounded_audio_power_transfer")
+}
+
+func TestMultiStageOODIlluminationPowerOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODInfeasibleRequirement(t, "illumination_proportional_power_control")
+}
+
+func TestMultiStageOODInductiveLoadCurrentOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "inductive_load_current_control")
+}
+
+func TestMultiStageOODLowVoltageSoftStartOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "low_voltage_power_with_soft_start")
+}
+
+func TestMultiStageOODAdversarialFailClosedPromotion(t *testing.T) {
+	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
+		t.Skip("set " + openTopologyKiCadPromotionEnv + "=1 to run multi-stage adversarial promotion")
+	}
+	var manifest multiStageOODCorpusManifest
+	decodeFrozenStrict(t, mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "manifest.json")), &manifest)
+	target := strings.TrimSpace(os.Getenv(multiStageOODCaseEnv))
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	ran := 0
+	for _, entry := range manifest.AdversarialCases {
+		if target != "" && target != entry.ID {
+			continue
+		}
+		ran++
+		t.Run(entry.ID, func(t *testing.T) {
+			requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+				t, filepath.Join(multiStageOODCorpusRoot(), entry.RequirementFile),
+			)))
+			if len(issues) != 0 {
+				t.Fatalf("requirement decode issues: %#v", issues)
+			}
+			first := Synthesize(context.Background(), requirement, inventory, environment, multiStageOODPromotionPolicy())
+			second := Synthesize(context.Background(), requirement, inventory, environment, multiStageOODPromotionPolicy())
+			if first.Report.Status == StatusPassed || first.Report.Selected != nil ||
+				first.SelectedGraph != nil || first.Physical != nil || len(first.Report.Diagnostics) == 0 {
+				t.Fatalf(
+					"adversarial design did not fail closed: status=%s stop=%s selected=%t physical=%t diagnostics=%#v",
+					first.Report.Status, first.Report.StopReason, first.Report.Selected != nil,
+					first.Physical != nil, first.Report.Diagnostics,
+				)
+			}
+			if first.Hash == "" || first.Hash != second.Hash || !reflect.DeepEqual(first, second) {
+				t.Fatalf("adversarial replay differs: first=%s second=%s", first.Hash, second.Hash)
+			}
+			safetyEvidence, capabilityEvidence := multiStageOODAdversarialEvidence(first)
+			switch entry.ExpectedFailureKind {
+			case "unsafe_thermal_soa":
+				if !safetyEvidence {
+					t.Fatalf("unsafe adversarial result lacks thermal/SOA evidence: status=%s stop=%s", first.Report.Status, first.Report.StopReason)
+				}
+			case "unsupported_dynamic_envelope", "unsupported_high_energy_domain":
+				if !capabilityEvidence {
+					t.Fatalf("unsupported adversarial result lacks capability-gap evidence: status=%s stop=%s", first.Report.Status, first.Report.StopReason)
+				}
+			default:
+				t.Fatalf("unknown adversarial failure kind %q", entry.ExpectedFailureKind)
+			}
+			assertSynthesisConsumptionMatchesEvidence(t, first)
+			t.Logf(
+				"multi-stage adversarial %s stable fail-closed hash=%s status=%s stop=%s diagnostic=%s",
+				entry.ID, first.Hash, first.Report.Status, first.Report.StopReason,
+				first.Report.Diagnostics[0].Code,
+			)
+		})
+	}
+	if ran == 0 {
+		t.Skip("multi-stage promotion filter excludes adversarial cases")
+	}
+}
+
+func multiStageOODAdversarialEvidence(run SynthesisRun) (bool, bool) {
+	safety, capability := false, false
+	for _, diagnostic := range run.Report.Diagnostics {
+		switch diagnostic.Code {
+		case CodeModelUnavailable, CodePrimitiveUnavailable, CodeValueExhausted:
+			capability = true
+		case CodeRequirementInfeasible:
+			safety = true
+		}
+	}
+	for _, candidate := range run.Candidates {
+		for _, rejection := range candidate.ValuePlan.Rejections {
+			if rejection.Code == "rating_envelope" {
+				safety = true
+			}
+		}
+		for _, issue := range candidate.ValuePlan.Issues {
+			if issue.Code == CodeModelUnavailable || issue.Code == CodePrimitiveUnavailable || issue.Code == CodeValueExhausted {
+				capability = true
+			}
+		}
+		for _, evaluation := range candidate.Evaluations {
+			for _, issue := range evaluation.Issues {
+				if issue.Code == CodeModelUnavailable || issue.Code == CodePrimitiveUnavailable || issue.Code == CodeValueExhausted {
+					capability = true
+				}
+			}
+			for _, diagnosis := range evaluation.Diagnoses {
+				switch diagnosis.Code {
+				case diagnosisMetricUnsupported, diagnosisModelUnavailable, diagnosisThermalUnavailable:
+					capability = true
+				case diagnosisAssertionBelowMinimum, diagnosisAssertionAboveMaximum, diagnosisSimulationInvalid:
+					message := strings.ToLower(diagnosis.RequirementID + " " + diagnosis.Metric + " " + diagnosis.Message)
+					if strings.Contains(message, "thermal") || strings.Contains(message, "temperature") ||
+						strings.Contains(message, "soa") || strings.Contains(message, "safe operating") ||
+						strings.Contains(message, "catalog-backed limit") {
+						safety = true
+					}
+				}
+			}
+		}
+	}
+	return safety, capability
+}
+
 func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 	t.Helper()
 	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
@@ -93,6 +218,11 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 	})
 	if promotion.Status != PhysicalPromotionPassed || !promotion.ReplayIdentical ||
 		promotion.ProjectHash == "" || len(promotion.Runs) != 2 || len(promotion.Issues) != 0 {
+		for _, stage := range promotionRunStages(promotion.Runs) {
+			if stage.Name == designworkflow.StageKiCadChecks || stage.Name == designworkflow.StageWriterCorrect {
+				t.Logf("multi-stage %s status=%s summary=%#v issues=%#v", stage.Name, stage.Status, stage.Summary, stage.Issues)
+			}
+		}
 		placed := designworkflow.PlaceExplicitCircuit(
 			ctx,
 			first.Physical.DesignRequest,
@@ -101,6 +231,10 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 		t.Logf(
 			"multi-stage placement diagnostics status=%s stage=%#v metrics=%#v scoring=%#v",
 			placed.Result.Status, placed.Stage.Summary, placed.Result.Metrics, placed.Result.CandidateScoring,
+		)
+		t.Logf(
+			"multi-stage placement results=%#v regions=%#v",
+			placed.Result.Placements, placed.Request.RegionRules,
 		)
 		t.Fatalf(
 			"multi-stage KiCad promotion status=%s replay=%t project=%s runs=%d issues=%#v stages=%#v board=%#v components=%v routing=%#v",
@@ -123,6 +257,45 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 		first.Physical.Hash,
 		promotion.ProjectHash,
 		promotion.Hash,
+	)
+}
+
+// testMultiStageOODInfeasibleRequirement retains the optional promotion entry
+// point for a frozen positive whose immutable behavior envelope was later
+// proven physically contradictory. A fail-closed result before topology search
+// is the only safe promotion outcome, so KiCad must never receive a project.
+func testMultiStageOODInfeasibleRequirement(t *testing.T, caseName string) {
+	t.Helper()
+	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
+		t.Skip("set " + openTopologyKiCadPromotionEnv + "=1 to run installed-KiCad multi-stage promotion")
+	}
+	if target := strings.TrimSpace(os.Getenv(multiStageOODCaseEnv)); target != "" && target != caseName {
+		t.Skip("multi-stage promotion filter excludes " + caseName)
+	}
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), caseName+".json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := multiStageOODPromotionPolicy()
+	first := Synthesize(context.Background(), requirement, inventory, environment, policy)
+	second := Synthesize(context.Background(), requirement, inventory, environment, policy)
+	if first.Report.Status != StatusInfeasible || first.Report.StopReason != StopRequirementInfeasible ||
+		first.Report.Selected != nil || first.SelectedGraph != nil || first.Physical != nil ||
+		first.Search.Schema != "" || len(first.Report.Diagnostics) != 1 ||
+		first.Report.Diagnostics[0].Code != CodeRequirementInfeasible {
+		t.Fatalf("multi-stage infeasible requirement did not fail closed before search: %#v", first)
+	}
+	if first.Hash == "" || first.Hash != second.Hash || !reflect.DeepEqual(first, second) {
+		t.Fatalf("multi-stage infeasible replay differs: first=%s second=%s", first.Hash, second.Hash)
+	}
+	assertSynthesisConsumptionMatchesEvidence(t, first)
+	t.Logf(
+		"multi-stage %s stable fail-closed hash=%s diagnostic=%s",
+		caseName, first.Hash, first.Report.Diagnostics[0].Message,
 	)
 }
 

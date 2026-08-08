@@ -10,9 +10,12 @@ knowledge plus reusable new capabilities, not recognition of a named circuit.
 ## Frozen Evaluation Envelope
 
 The corpus is frozen against commit `f06a1a62` before production changes. It
-contains nine valid requirements and four unsafe or unsupported requirements.
-Every requirement is independently authored as electrical behavior, operating
-conditions, events, safety bounds, and acceptance gates only.
+contains nine structurally valid intended-positive requirements and four unsafe
+or unsupported requirements. Every requirement is independently authored as
+electrical behavior, operating conditions, events, safety bounds, and
+acceptance gates only. The later [`CORPUS_ERRATUM.md`](CORPUS_ERRATUM.md) proves
+that one immutable intended positive has a contradictory electrical envelope;
+the frozen bytes, manifest, historical target, and baseline remain unchanged.
 
 Requirement inputs may not name or encode expected architectures, parts,
 implementation primitives, device identities, simulation models, equations,
@@ -63,11 +66,16 @@ special schemas, precomputed graphs, and case-selected writer output are
 forbidden. A repair must re-enter the earliest invalidated stage and rerun every
 affected electrical, safety, and physical gate.
 
-## Positive Promotion Contract
+## Supported Promotion Contract
 
-All nine positive cases must pass twice from clean output directories through
-the public CLI and produce identical normalized evidence. Each result must
-prove:
+The eight physically feasible positive cases must pass twice from clean output
+directories through the public CLI and produce identical normalized evidence.
+The frozen illumination-proportional case must instead stop before topology
+search with the stable infeasibility proof in `CORPUS_ERRATUM.md`, emit no
+physical design, and replay identically. This exception is derived only from
+generic voltage/current/load bounds and is not a fixture allowlist.
+
+Each supported design result must prove:
 
 - complete behavioral simulation across all declared cases and corners;
 - reviewed provenance, convergence, thermal limits, and SOA margin;
@@ -77,7 +85,9 @@ prove:
 - clean installed-KiCad ERC and strict DRC; and
 - deterministic reports, generated files, selected architecture, and repairs.
 
-No partial, simulation-only, or mock-KiCad result counts as a design pass.
+No partial, simulation-only, or mock-KiCad result counts as a design pass. A
+contradictory input cannot count as a design pass and may not be made to pass by
+weakening corners, device models, or acceptance tolerances.
 
 ## Fail-Closed Contract
 

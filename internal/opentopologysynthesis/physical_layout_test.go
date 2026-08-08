@@ -187,6 +187,36 @@ func TestPhysicalPrimaryPowerPlaneNetUsesElectricalDemandAndStableTies(t *testin
 	}
 }
 
+func TestPhysicalFunctionalRegionBoundsRetainPackageWidthsWhenDense(t *testing.T) {
+	board := circuitgraph.Board{WidthMM: 20, HeightMM: 30}
+	seeds := []*physicalRegionSeed{
+		{role: physicalRegionInput, weight: 8},
+		{role: physicalRegionControl, weight: 10},
+		{role: physicalRegionPower, weight: 9},
+		{role: physicalRegionOutput, weight: 8},
+	}
+	bounds := physicalFunctionalRegionBounds(board, seeds)
+	if len(bounds) != len(seeds) {
+		t.Fatalf("dense functional bounds = %#v", bounds)
+	}
+	overlap := false
+	for index, bound := range bounds {
+		if bound.WidthMM+1e-12 < seeds[index].weight || bound.XMM < 0 ||
+			bound.XMM+bound.WidthMM > board.WidthMM+1e-12 || bound.HeightMM != board.HeightMM {
+			t.Fatalf("dense functional bound %d lost capacity: %#v seed=%#v", index, bound, seeds[index])
+		}
+		if index > 0 {
+			if bound.XMM < bounds[index-1].XMM {
+				t.Fatalf("dense functional centers lost ordering: %#v", bounds)
+			}
+			overlap = overlap || bound.XMM < bounds[index-1].XMM+bounds[index-1].WidthMM
+		}
+	}
+	if !overlap {
+		t.Fatalf("dense functional regions did not use bounded overlap: %#v", bounds)
+	}
+}
+
 func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *testing.T) {
 	if role := physicalFunctionalRole(circuitgraph.Component{}, "EXTERNAL_INPUTS", "", 0); role != physicalRegionInput {
 		t.Fatalf("case-insensitive external input role = %q", role)

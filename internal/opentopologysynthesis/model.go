@@ -27,6 +27,7 @@ const (
 
 const (
 	CodeRequirementInvalid      reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INVALID"
+	CodeRequirementInfeasible   reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INFEASIBLE"
 	CodePrimitiveUnavailable    reports.Code = "OPEN_TOPOLOGY_PRIMITIVE_UNAVAILABLE"
 	CodeModelUnavailable        reports.Code = "OPEN_TOPOLOGY_MODEL_UNAVAILABLE"
 	CodeSearchExhausted         reports.Code = "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
@@ -195,6 +196,7 @@ const (
 	StatusCanceled    Status = "canceled"
 	StatusInvalid     Status = "invalid"
 	StatusUnsupported Status = "unsupported"
+	StatusInfeasible  Status = "infeasible"
 )
 
 type StopReason string
@@ -202,6 +204,7 @@ type StopReason string
 const (
 	StopPassed                  StopReason = "passed"
 	StopRequirementInvalid      StopReason = "requirement_invalid"
+	StopRequirementInfeasible   StopReason = "requirement_infeasible"
 	StopPrimitiveUnavailable    StopReason = "primitive_unavailable"
 	StopModelUnavailable        StopReason = "model_unavailable"
 	StopSearchExhausted         StopReason = "search_exhausted"

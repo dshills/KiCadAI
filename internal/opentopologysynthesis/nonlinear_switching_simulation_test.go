@@ -162,6 +162,7 @@ func TestIntegratedReferenceRegulatorDerivesCatalogFeedbackDivider(t *testing.T)
 		}
 		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, DefaultPolicy())
 		upper, lower := 0.0, 0.0
+		series := map[string]float64{}
 		for _, domain := range plan.Domains {
 			for _, scale := range domain.AnalyticScales {
 				switch {
@@ -169,7 +170,35 @@ func TestIntegratedReferenceRegulatorDerivesCatalogFeedbackDivider(t *testing.T)
 					upper = scale.ValueSI
 				case strings.HasPrefix(scale.ID, "topology:regulated_feedback_lower:"):
 					lower = scale.ValueSI
+				case strings.HasPrefix(scale.ID, "topology:regulated_feedback_series:"):
+					series[strings.TrimPrefix(scale.ID, "topology:regulated_feedback_series:")] = scale.ValueSI
 				}
+			}
+		}
+		if (upper <= 0 || lower <= 0) && len(series) == 3 {
+			references := topologyNodesByRole(candidate.Graph, "reference")
+			for _, controller := range candidate.Graph.Instances {
+				if primitiveModelParameter(
+					primitiveInventoryByKey(inventory)[controller.PrimitiveKey],
+					simmodel.PrimitiveSynchronousBuckRegulatorV1,
+					"reference_voltage_v",
+				) <= 0 || len(references) != 1 {
+					continue
+				}
+				feedback := topologyTerminalNodes(controller)["FB"]
+				for _, resistor := range candidate.Graph.Instances {
+					value, found := series[resistor.ID]
+					if !found || len(resistor.Terminals) != 2 {
+						continue
+					}
+					first, second := resistor.Terminals[0].Node, resistor.Terminals[1].Node
+					if first == feedback && second == references[0] || first == references[0] && second == feedback {
+						lower = value
+					} else {
+						upper += value
+					}
+				}
+				break
 			}
 		}
 		if upper <= 0 || lower <= 0 {

@@ -77,6 +77,18 @@ func Synthesize(
 		appendSynthesisDiagnostics(&run.Report, issues)
 		return finalizeSynthesisRun(run)
 	}
+	if issues := requirementFeasibilityIssues(requirement); len(issues) != 0 {
+		run.Report.Status = StatusInfeasible
+		run.Report.StopReason = StopRequirementInfeasible
+		appendSynthesisDiagnostics(&run.Report, issues)
+		return finalizeSynthesisRun(run)
+	}
+	if issues := requirementCapabilityIssues(requirement, inventory); len(issues) != 0 {
+		run.Report.Status = StatusUnsupported
+		run.Report.StopReason = StopModelUnavailable
+		appendSynthesisDiagnostics(&run.Report, issues)
+		return finalizeSynthesisRun(run)
+	}
 	if err := ctx.Err(); err != nil {
 		run.Report.Status = StatusCanceled
 		run.Report.StopReason = StopCanceled
@@ -150,7 +162,7 @@ func Synthesize(
 	for _, trials := range valueTrials {
 		maximumTrialCount = max(maximumTrialCount, len(trials))
 	}
-	candidateOrder := synthesisCandidateEvaluationOrder(run.Search.Candidates)
+	candidateOrder := synthesisCandidateEvaluationOrder(requirement, inventory, run.Search.Candidates)
 	initialEvaluationPolicy := synthesisInitialEvaluationPolicy(policy, len(candidateOrder))
 	simulationStopped := false
 	rankingWindowComplete := false
@@ -402,13 +414,36 @@ func synthesisInitialBudgetShare(total int, retainedCandidates int, repairSlots 
 }
 
 func synthesisCandidateEvaluationOrder(
+	requirement Requirement,
+	inventory PrimitiveInventory,
 	candidates []TopologyCandidate,
 ) []int {
 	order := make([]int, len(candidates))
 	for index := range candidates {
 		order[index] = index
 	}
+	stressSharedPower := synthesisRequiresStressSharedPowerOrder(requirement, inventory)
+	priorities := make([]synthesisPowerPriority, len(candidates))
+	if stressSharedPower {
+		// Sorting compares each candidate O(log n) times. Derive the graph-wide
+		// priority once so comparator cost remains constant and deterministic.
+		for index := range candidates {
+			priorities[index] = synthesisStressSharedPowerPriority(candidates[index].Graph)
+		}
+	}
 	slices.SortStableFunc(order, func(left, right int) int {
+		if stressSharedPower {
+			leftPriority := priorities[left]
+			rightPriority := priorities[right]
+			if comparison := cmp.Or(
+				cmp.Compare(rightPriority.capacity, leftPriority.capacity),
+				cmp.Compare(rightPriority.biasDepth, leftPriority.biasDepth),
+				cmp.Compare(rightPriority.compensated, leftPriority.compensated),
+				cmp.Compare(leftPriority.imbalance, rightPriority.imbalance),
+			); comparison != 0 {
+				return comparison
+			}
+		}
 		if candidates[left].Repairable != candidates[right].Repairable {
 			if candidates[left].Repairable {
 				return -1
@@ -418,6 +453,64 @@ func synthesisCandidateEvaluationOrder(
 		return cmp.Compare(left, right)
 	})
 	return order
+}
+
+type synthesisPowerPriority struct {
+	capacity    int
+	biasDepth   int
+	compensated int
+	imbalance   int
+}
+
+func synthesisRequiresStressSharedPowerOrder(requirement Requirement, inventory PrimitiveInventory) bool {
+	hasPower, hasDistortion := false, false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		hasPower = hasPower || assertion.Metric == "output_power" && assertion.Min != nil && *assertion.Min > 0
+		hasDistortion = hasDistortion || slices.Contains([]string{"thd", "total_harmonic_distortion"}, assertion.Metric)
+	}
+	if !hasPower || !hasDistortion {
+		return false
+	}
+	npn := topologyRatedPowerPrimitive(requirement, inventory, "npn_bjt")
+	pnp := topologyRatedPowerPrimitive(requirement, inventory, "pnp_bjt")
+	if npn.Key == "" || pnp.Key == "" {
+		return false
+	}
+	return max(
+		topologyPowerParallelDeviceCount(requirement, npn),
+		topologyPowerParallelDeviceCount(requirement, pnp),
+	) > 1
+}
+
+func synthesisStressSharedPowerPriority(graph CandidateGraph) synthesisPowerPriority {
+	npnTrackers, pnpTrackers := 0, 0
+	npnDriven, pnpDriven := 0, 0
+	compensated := 0
+	for _, instance := range graph.Instances {
+		terminals := topologyTerminalNodes(instance)
+		switch instance.Kind {
+		case "npn_bjt":
+			if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+				npnTrackers++
+			} else {
+				npnDriven++
+			}
+		case "pnp_bjt":
+			if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+				pnpTrackers++
+			} else {
+				pnpDriven++
+			}
+		case "capacitor":
+			compensated = 1
+		}
+	}
+	return synthesisPowerPriority{
+		capacity:    min(npnDriven, pnpDriven),
+		biasDepth:   min(npnTrackers, pnpTrackers),
+		compensated: compensated,
+		imbalance:   max(npnDriven-pnpDriven, pnpDriven-npnDriven) + max(npnTrackers-pnpTrackers, pnpTrackers-npnTrackers),
+	}
 }
 
 const synthesisSelectionRankingPolicy = "worst_normalized_requirement_margin_desc,topology_repairs_asc,component_count_asc,internal_nodes_asc,active_structure_hash_asc,topology_hash_asc,evaluation_hash_asc,value_hash_asc"
@@ -434,6 +527,10 @@ func selectRankedSynthesisResult(run SynthesisRun, passes []synthesisPassingCand
 	run.Physical = &physicalCopy
 	run.Report.Status = StatusPassed
 	run.Report.StopReason = StopPassed
+	// Candidate-local failures remain available through the retained attempts
+	// and selection rejections below. They are not run-level diagnostics once
+	// an independently passing, physically ready candidate has been selected.
+	run.Report.Diagnostics = []Diagnostic{}
 	run.Report.Candidates[selected.candidateIndex].Status = StatusPassed
 	alternatives := make([]RankedSelectionCandidate, 0, len(passes))
 	for index, candidate := range passes {

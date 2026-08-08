@@ -1105,10 +1105,12 @@ type windowBehaviorEnvelope struct {
 	output string
 	lowerV float64
 	upperV float64
+	signed bool
 }
 
 func topologyWindowThresholdEnvelope(requirement Requirement) (windowBehaviorEnvelope, bool) {
 	envelope := windowBehaviorEnvelope{}
+	signedLower, signedUpper := false, false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
 			assertion.Observation.Kind != "port" {
@@ -1127,13 +1129,54 @@ func topologyWindowThresholdEnvelope(requirement Requirement) (windowBehaviorEnv
 			envelope.input = assertion.Excitation.ID
 			envelope.output = assertion.Observation.ID
 			envelope.upperV = assertionTarget(assertion)
+		case "falling_threshold":
+			target, bounded := signedAssertionTarget(assertion)
+			if !bounded || target >= 0 {
+				continue
+			}
+			if envelope.input != "" && (envelope.input != assertion.Excitation.ID ||
+				envelope.output != assertion.Observation.ID) {
+				return windowBehaviorEnvelope{}, false
+			}
+			envelope.input = assertion.Excitation.ID
+			envelope.output = assertion.Observation.ID
+			envelope.lowerV = target
+			signedLower = true
+		case "rising_threshold":
+			target, bounded := signedAssertionTarget(assertion)
+			if !bounded || target <= 0 {
+				continue
+			}
+			if envelope.input != "" && (envelope.input != assertion.Excitation.ID ||
+				envelope.output != assertion.Observation.ID) {
+				return windowBehaviorEnvelope{}, false
+			}
+			envelope.input = assertion.Excitation.ID
+			envelope.output = assertion.Observation.ID
+			envelope.upperV = target
+			signedUpper = true
 		}
 	}
-	if envelope.input == "" || envelope.output == "" || envelope.lowerV <= 0 ||
-		envelope.upperV <= envelope.lowerV {
+	envelope.signed = signedLower && signedUpper
+	if envelope.input == "" || envelope.output == "" || envelope.upperV <= envelope.lowerV ||
+		(!envelope.signed && envelope.lowerV <= 0) ||
+		(envelope.signed && (envelope.lowerV >= 0 || envelope.upperV <= 0)) {
 		return windowBehaviorEnvelope{}, false
 	}
 	return envelope, true
+}
+
+func signedAssertionTarget(assertion BehavioralAssertion) (float64, bool) {
+	switch {
+	case assertion.Min != nil && assertion.Max != nil:
+		return (*assertion.Min + *assertion.Max) / 2, true
+	case assertion.Min != nil:
+		return *assertion.Min, true
+	case assertion.Max != nil:
+		return *assertion.Max, true
+	default:
+		return 0, false
+	}
 }
 
 func topologyWindowBehaviorEnvelope(requirement Requirement) (windowBehaviorEnvelope, bool) {
@@ -1144,6 +1187,31 @@ func topologyWindowBehaviorEnvelope(requirement Requirement) (windowBehaviorEnve
 	caseByID := map[string]OperatingCase{}
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		caseByID[operatingCase.ID] = operatingCase
+	}
+	if envelope.signed {
+		defaultLow := false
+		for _, port := range requirement.Requirements.Ports {
+			if port.ID == envelope.output {
+				defaultLow = port.Electrical.DefaultState == "low"
+				break
+			}
+		}
+		hasHigh, hasLow, spansWindow := false, false, false
+		for _, assertion := range requirement.Requirements.BehavioralRequirements {
+			if assertion.Observation.Kind != "port" || assertion.Observation.ID != envelope.output {
+				continue
+			}
+			hasHigh = hasHigh || (assertion.Metric == "output_high_voltage" && assertion.Min != nil)
+			hasLow = hasLow || (assertion.Metric == "output_low_voltage" && assertion.Max != nil)
+			for _, caseID := range assertion.OperatingCases {
+				for _, condition := range caseByID[caseID].Conditions {
+					spansWindow = spansWindow || (condition.Axis == "input_voltage" &&
+						condition.Target == envelope.input && condition.Min < envelope.lowerV &&
+						condition.Max > envelope.upperV)
+				}
+			}
+		}
+		return envelope, defaultLow && hasHigh && hasLow && spansWindow
 	}
 	highBelow, highAbove, lowInside := false, false, false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
@@ -1193,6 +1261,11 @@ func topologyWindowRelationshipSeeds(
 	envelope, required := topologyWindowBehaviorEnvelope(requirement)
 	if !required {
 		return nil, Consumption{}, map[string][]string{}
+	}
+	if envelope.signed {
+		return topologySignedWindowRelationshipSeeds(
+			ctx, requirement, inventory, representatives, inventoryByKey, limits, policy, initial, envelope,
+		)
 	}
 	var comparator, opamp, resistor, capacitor PrimitiveCandidate
 	for _, primitive := range representatives {
@@ -1343,6 +1416,169 @@ func topologyWindowRelationshipSeeds(
 		states = append(states, bypassed)
 	}
 	result := make([]TopologyCandidate, 0, len(states))
+	for _, candidateState := range states {
+		if len(candidateState.graph.Instances) > limits.MaxPrimitiveInstances {
+			rejections["graph_limit"] = append(rejections["graph_limit"], candidateState.hash+":primitive instance limit exceeded")
+			continue
+		}
+		if issues := ValidateCompleteGraph(candidateState.graph, inventory, limits); len(issues) != 0 {
+			for _, issue := range issues {
+				rejections[string(issue.Code)] = append(rejections[string(issue.Code)], issue.Path+":"+issue.Message)
+			}
+			continue
+		}
+		if candidateState.score.BehaviorGap != 0 {
+			rejections["relationship_gap"] = append(rejections["relationship_gap"], fmt.Sprintf("%s:gap=%d", candidateState.hash, candidateState.score.BehaviorGap))
+			continue
+		}
+		normalized, err := NormalizeGraph(candidateState.graph)
+		if err != nil {
+			rejections["canonical_normalization_failed"] = append(rejections["canonical_normalization_failed"], err.Error())
+			continue
+		}
+		topologyHash, err := TopologyHash(normalized)
+		if err != nil {
+			rejections["canonical_topology_hash_failed"] = append(rejections["canonical_topology_hash_failed"], err.Error())
+			continue
+		}
+		consumption.CompleteGraphs++
+		result = append(result, TopologyCandidate{
+			Fingerprint: candidateState.hash, TopologyHash: topologyHash, Score: candidateState.score,
+			Graph: normalized, Operations: cloneGraphOperations(candidateState.operations),
+		})
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+// topologySignedWindowRelationshipSeeds realizes an outside-high decision for
+// a bipolar input without naming a circuit family. Two open-collector
+// comparators share a pulled-up node that is high only while the input remains
+// between the declared negative and positive thresholds. That node controls a
+// reviewed high-side device, so the external output is low inside the window
+// and high outside it. Divider and pull values are derived later from the
+// signed threshold and rail bounds.
+func topologySignedWindowRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+	envelope windowBehaviorEnvelope,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	var comparator, opamp, resistor, capacitor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "comparator":
+			comparator = primitive
+		case "opamp":
+			opamp = primitive
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		}
+	}
+	pmos := topologyRatedPowerPrimitive(requirement, inventory, "p_channel_mosfet")
+	stableReference := topologyStableReferencePrimitive(requirement, inventory)
+	if comparator.Key == "" || opamp.Key == "" || resistor.Key == "" || capacitor.Key == "" ||
+		pmos.Key == "" || stableReference.Key == "" {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"signed outside-window transfer requires reviewed comparator, amplifier, reference, high-side switch, passive, thermal, and SOA relationships"},
+		}
+	}
+	positiveRail, negativeRail := "", ""
+	positiveVoltage, negativeVoltage := math.Inf(-1), math.Inf(1)
+	for _, node := range topologyNodesByRole(initial.graph, "supply") {
+		voltage, found := topologyNodeNominalVoltage(requirement, initial.graph, node)
+		if !found {
+			continue
+		}
+		if voltage > positiveVoltage {
+			positiveRail, positiveVoltage = node, voltage
+		}
+		if voltage < negativeVoltage {
+			negativeRail, negativeVoltage = node, voltage
+		}
+	}
+	references := topologyNodesByRole(initial.graph, "reference")
+	if positiveRail == "" || negativeRail == "" || positiveVoltage <= 0 || negativeVoltage >= 0 || len(references) != 1 {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"signed outside-window transfer requires ordered positive and negative rails plus one reference"},
+		}
+	}
+	input, output, reference := "port_"+envelope.input, "port_"+envelope.output, references[0]
+	consumption := Consumption{ExpandedStates: 1}
+	state := initial
+	internal := make([]string, 0, 5)
+	for range 5 {
+		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			break
+		}
+		var node string
+		state, node = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+		if node == "" {
+			break
+		}
+		internal = append(internal, node)
+	}
+	if len(internal) != 5 || internalNodeCount(state.graph) > limits.MaxInternalNodes {
+		return nil, consumption, map[string][]string{
+			"graph_limit": {"signed outside-window transfer exceeds the internal-node limit"},
+		}
+	}
+	absoluteReference, lowerSum, lowerReference := internal[0], internal[1], internal[2]
+	upperReference, insideNode := internal[3], internal[4]
+	state = addRelationshipPrimitive(state, requirement, inventoryByKey, stableReference, []TerminalConnection{
+		{Terminal: "ANODE", Node: reference}, {Terminal: "CATHODE", Node: absoluteReference},
+	}, &consumption)
+	state = addRelationshipPrimitive(state, requirement, inventoryByKey, opamp, []TerminalConnection{
+		{Terminal: "IN_PLUS", Node: reference}, {Terminal: "IN_MINUS", Node: lowerSum},
+		{Terminal: "OUT", Node: lowerReference}, {Terminal: "V_MINUS", Node: negativeRail},
+		{Terminal: "V_PLUS", Node: positiveRail},
+	}, &consumption)
+	for _, placement := range [][]TerminalConnection{
+		{
+			{Terminal: "IN_PLUS", Node: input}, {Terminal: "IN_MINUS", Node: lowerReference},
+			{Terminal: "OUT", Node: insideNode}, {Terminal: "V_MINUS", Node: negativeRail},
+			{Terminal: "V_PLUS", Node: positiveRail},
+		},
+		{
+			{Terminal: "IN_PLUS", Node: upperReference}, {Terminal: "IN_MINUS", Node: input},
+			{Terminal: "OUT", Node: insideNode}, {Terminal: "V_MINUS", Node: negativeRail},
+			{Terminal: "V_PLUS", Node: positiveRail},
+		},
+	} {
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, comparator, placement, &consumption)
+	}
+	state = addRelationshipPrimitive(state, requirement, inventoryByKey, pmos, []TerminalConnection{
+		{Terminal: "GATE", Node: insideNode}, {Terminal: "SOURCE", Node: positiveRail},
+		{Terminal: "DRAIN", Node: output},
+	}, &consumption)
+	for _, edge := range [][2]string{
+		{positiveRail, absoluteReference},
+		{absoluteReference, lowerSum}, {lowerReference, lowerSum},
+		{absoluteReference, upperReference}, {upperReference, reference},
+		{positiveRail, insideNode}, {output, reference},
+	} {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, resistor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+	states := []topologySearchState{state}
+	bypassed := addRelationshipPrimitive(
+		state, requirement, inventoryByKey, capacitor,
+		topologyTwoTerminalPlacement(positiveRail, reference), &consumption,
+	)
+	if bypassed.hash != state.hash {
+		states = append(states, bypassed)
+	}
+	result := make([]TopologyCandidate, 0, len(states))
+	rejections := map[string][]string{}
 	for _, candidateState := range states {
 		if len(candidateState.graph.Instances) > limits.MaxPrimitiveInstances {
 			rejections["graph_limit"] = append(rejections["graph_limit"], candidateState.hash+":primitive instance limit exceeded")
@@ -5904,11 +6140,13 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	if !requireTransconductance {
 		return nil, Consumption{}, map[string][]string{}
 	}
-	var resistor PrimitiveCandidate
+	var resistor, capacitor PrimitiveCandidate
 	for _, primitive := range representatives {
 		switch primitive.Kind {
 		case "resistor":
 			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
 		}
 	}
 	requiredAnalyses := requirementAnalysisSet(requirement)
@@ -5978,7 +6216,15 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	for _, relationship := range relationships {
 		controlledSupply := relationship.activation != ""
 		faultProtected := relationship.fault != ""
+		conditionInput := transconductanceInputConditioningRequired(requirement, relationship)
 		if relationship.direction != "source" || (faultProtected && !controlledSupply) {
+			continue
+		}
+		if conditionInput && capacitor.Key == "" {
+			rejections["current_source_primitives_unavailable"] = append(
+				rejections["current_source_primitives_unavailable"],
+				relationship.output+": transient startup or ripple bounds require a reviewed reactive primitive",
+			)
 			continue
 		}
 		input := externalRelationshipNode(initial.graph, relationship.input)
@@ -6042,6 +6288,29 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							state, requirement, inventoryByKey, &consumption,
 						)
 						return node
+					}
+					controllerInput := input
+					if conditionInput {
+						controllerInput = nextNode()
+						if controllerInput == "" {
+							continue
+						}
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							resistor,
+							topologyTwoTerminalPlacement(input, controllerInput),
+							&consumption,
+						)
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							capacitor,
+							topologyTwoTerminalPlacement(controllerInput, reference),
+							&consumption,
+						)
 					}
 					switchedSupply := loadSupply
 					if controlledSupply {
@@ -6163,7 +6432,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 					if controlOutput == "" {
 						continue
 					}
-					controllerMinus, controllerPlus := input, senseOutput
+					controllerMinus, controllerPlus := controllerInput, senseOutput
 					if bufferedDrive {
 						driverBase := nextNode()
 						if driverBase == "" {
@@ -6178,7 +6447,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							{Terminal: "COLLECTOR", Node: passBase},
 							{Terminal: "EMITTER", Node: reference},
 						}, &consumption)
-						controllerMinus, controllerPlus = senseOutput, input
+						controllerMinus, controllerPlus = senseOutput, controllerInput
 					} else {
 						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
 							topologyTwoTerminalPlacement(controlOutput, passBase), &consumption)

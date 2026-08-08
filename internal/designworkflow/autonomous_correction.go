@@ -263,9 +263,13 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 
 func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {
 	actionableNets := map[string]struct{}{}
+	actionableRoutingRoot := false
 	for _, diagnostic := range diagnostics {
 		if !diagnostic.AutomaticAction || len(diagnostic.Nets) == 0 {
 			continue
+		}
+		if diagnostic.IssueCode == reports.CodeRouteCopperConflict {
+			actionableRoutingRoot = true
 		}
 		for _, net := range diagnostic.Nets {
 			actionableNets[net] = struct{}{}
@@ -273,7 +277,7 @@ func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrec
 	}
 	result := make([]AutonomousCorrectionDiagnostic, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
-		if autonomousCorrectionTerminalDiagnosticCovered(diagnostic, actionableNets) {
+		if autonomousCorrectionTerminalDiagnosticCovered(diagnostic, actionableNets, actionableRoutingRoot) {
 			continue
 		}
 		result = append(result, diagnostic)
@@ -281,7 +285,7 @@ func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrec
 	return result
 }
 
-func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrectionDiagnostic, actionableNets map[string]struct{}) bool {
+func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrectionDiagnostic, actionableNets map[string]struct{}, actionableRoutingRoot bool) bool {
 	if diagnostic.AutomaticAction || len(diagnostic.Nets) == 0 {
 		return false
 	}
@@ -296,8 +300,17 @@ func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrecti
 	if len(diagnostic.Refs) != 0 {
 		return false
 	}
+	// An explicit-net validation emitted after a blocking copper conflict is a
+	// terminal symptom of the aborted sequential route pass. It must remain in
+	// the plan evidence, but it cannot veto the bounded correction authorized by
+	// the structured root cause. Every such constraint is evaluated again after
+	// rerouting, so an independent length or return-path violation still fails
+	// closed on the next attempt.
+	if actionableRoutingRoot && autonomousCorrectionIncompleteExplicitNetDiagnostic(diagnostic) {
+		return true
+	}
 	terminal := diagnostic.IssueCode == reports.CodeDisconnectedPad ||
-		diagnostic.IssueCode == reports.CodeValidationFailed && strings.HasPrefix(diagnostic.Path, "explicit_circuit.nets.")
+		autonomousCorrectionIncompleteExplicitNetDiagnostic(diagnostic)
 	if !terminal {
 		return false
 	}
@@ -307,6 +320,22 @@ func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrecti
 		}
 	}
 	return true
+}
+
+// autonomousCorrectionIncompleteExplicitNetDiagnostic recognizes only the
+// terminal issue emitted by explicitRequiredRouteIssues. More specific net
+// paths (for example length or return-path constraints) are independent
+// validation failures and must continue to veto automatic correction.
+func autonomousCorrectionIncompleteExplicitNetDiagnostic(diagnostic AutonomousCorrectionDiagnostic) bool {
+	if diagnostic.IssueCode != reports.CodeValidationFailed || len(diagnostic.Refs) != 0 {
+		return false
+	}
+	for _, net := range diagnostic.Nets {
+		if diagnostic.Path == "explicit_circuit.nets."+net {
+			return true
+		}
+	}
+	return false
 }
 
 func blockingAutonomousCorrectionDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {

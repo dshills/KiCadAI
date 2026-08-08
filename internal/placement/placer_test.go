@@ -44,6 +44,24 @@ func TestPlaceKeepsMovableComponentInsideRequiredRegion(t *testing.T) {
 	}
 }
 
+func TestPlacePrefersOptionalExplicitRegionWithoutMakingItHard(t *testing.T) {
+	req := minimalRequest()
+	req.Board = BoardPlacementArea{WidthMM: 60, HeightMM: 30, MarginMM: 1}
+	req.RegionRules = []RegionRule{{
+		ID: "soft-control", Region: "control", Refs: []string{req.Components[0].Ref}, Required: false, Weight: 10,
+		Preferred: Rect{Min: Point{XMM: 42, YMM: 5}, Max: Point{XMM: 58, YMM: 25}},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || len(result.Placements) != 1 {
+		t.Fatalf("optional-region placement = %#v", result)
+	}
+	position := result.Placements[0].Position
+	if !req.RegionRules[0].Preferred.ContainsPoint(Point{XMM: position.XMM, YMM: position.YMM}) {
+		t.Fatalf("placement anchor %#v ignored optional region %#v", position, req.RegionRules[0].Preferred)
+	}
+}
+
 func TestPlaceSamplesNarrowRequiredRegionForEdgeComponent(t *testing.T) {
 	req := minimalRequest()
 	req.Board = BoardPlacementArea{WidthMM: 60, HeightMM: 55, MarginMM: 1}
@@ -405,7 +423,8 @@ func TestPlaceSamplesEnoughPositionsForDenseEdgeCohort(t *testing.T) {
 	}
 
 	result := Place(req)
-	if result.Status != StatusPlaced || result.Metrics.UnplacedCount != 0 {
+	if result.Metrics.PlacedCount != len(req.Components) || result.Metrics.UnplacedCount != 0 ||
+		result.Metrics.CollisionCount != 0 || result.Metrics.OutsideOutlineCount != 0 {
 		t.Fatalf("dense edge cohort status=%s placed=%d unplaced=%d issues=%#v", result.Status, result.Metrics.PlacedCount, result.Metrics.UnplacedCount, result.Issues)
 	}
 }
@@ -1026,6 +1045,54 @@ func TestSlicesForDensePlacementCanPrioritizeAreaAcrossSoftPriorities(t *testing
 	ordered := slicesForPlacementWithOrder(components, ComponentOrderDenseLargestFootprintFirstV1)
 	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !reflect.DeepEqual(got, []string{"Z1", "A1", "P1"}) {
 		t.Fatalf("dense placement order = %#v, want descending envelope area before soft priority", got)
+	}
+}
+
+func TestSlicesForEdgeThenDensePlacementReservesEdgesBeforePackingInterior(t *testing.T) {
+	components := []Component{
+		{Ref: "R1", Priority: 95, Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "U1", Priority: 80, Bounds: Bounds{WidthMM: 32, HeightMM: 20}},
+		{Ref: "J1", Priority: 100, Edge: EdgeLeft, Bounds: Bounds{WidthMM: 4, HeightMM: 8}},
+		{Ref: "Q1", Priority: 110, Edge: EdgeBottom, Bounds: Bounds{WidthMM: 12, HeightMM: 5}},
+	}
+	ordered := slicesForPlacementWithOrder(components, ComponentOrderEdgeThenDenseFootprintFirstV1)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref, ordered[3].Ref}; !reflect.DeepEqual(got, []string{"Q1", "J1", "U1", "R1"}) {
+		t.Fatalf("edge-then-dense placement order = %#v", got)
+	}
+}
+
+func TestEdgeThenDensePlacementPacksLargeInteriorModulesAfterEdgePopulation(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = .5
+	rules.MaxCandidatesPerPart = 65_536
+	request := Request{
+		Board:          BoardPlacementArea{WidthMM: 80, HeightMM: 60, MarginMM: 1, Layers: 4},
+		Rules:          rules,
+		ComponentOrder: ComponentOrderEdgeThenDenseFootprintFirstV1,
+		Components: []Component{
+			{Ref: "J1", Priority: 100, Edge: EdgeLeft, Bounds: Bounds{WidthMM: 4, HeightMM: 8}, Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop},
+			{Ref: "J2", Priority: 100, Edge: EdgeRight, Bounds: Bounds{WidthMM: 4, HeightMM: 8}, Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop},
+			{Ref: "Q1", Priority: 110, Edge: EdgeBottom, Bounds: Bounds{WidthMM: 10, HeightMM: 5}, Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop},
+		},
+	}
+	for index := 1; index <= 4; index++ {
+		request.Components = append(request.Components, Component{
+			Ref: fmt.Sprintf("U%d", index), Priority: 80,
+			Bounds:   Bounds{WidthMM: 31.8, HeightMM: 20.3},
+			Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+		})
+	}
+	for index := 1; index <= 12; index++ {
+		request.Components = append(request.Components, Component{
+			Ref: fmt.Sprintf("R%d", index), Priority: 95,
+			Bounds:   Bounds{WidthMM: 4, HeightMM: 2},
+			Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+		})
+	}
+	result := Place(request)
+	if result.Metrics.PlacedCount != len(request.Components) || result.Metrics.UnplacedCount != 0 ||
+		result.Metrics.CollisionCount != 0 || result.Metrics.OutsideOutlineCount != 0 {
+		t.Fatalf("edge-then-dense floorplan = %s metrics=%#v placements=%#v", result.Status, result.Metrics, result.Placements)
 	}
 }
 

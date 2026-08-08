@@ -180,6 +180,44 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 	}
 }
 
+func TestHierarchyRootSheetStepXReservesFacingLabelWidths(t *testing.T) {
+	sheets := []SchematicSheet{{ID: "left"}, {ID: "right"}}
+	interfaces := map[string][]hierarchySheetInterface{
+		"left":  {{Name: "INTERNAL_001", Side: hierarchyInterfaceRight}},
+		"right": {{Name: "SUPPORT_PRIMITIVE_000_RT", Side: hierarchyInterfaceLeft}},
+	}
+	got := hierarchyRootSheetStepX(sheets, interfaces, 2)
+	want := hierarchySheetWidth + 2*hierarchyInterfaceStubMM +
+		float64(len("INTERNAL_001")+len("SUPPORT_PRIMITIVE_000_RT"))*hierarchyDefaultTextCharacterMM +
+		hierarchyInterfacePitchMM
+	if got != want {
+		t.Fatalf("hierarchy sheet step = %.2f mm, want %.2f mm", got, want)
+	}
+	labelChannel := got - hierarchySheetWidth - 2*hierarchyInterfaceStubMM
+	labelWidths := want - hierarchySheetWidth - 2*hierarchyInterfaceStubMM - hierarchyInterfacePitchMM
+	if labelChannel-labelWidths+1e-9 < hierarchyInterfacePitchMM {
+		t.Fatalf("hierarchy label channel = %.2f mm for %.2f mm text, want at least %.2f mm clearance", labelChannel, labelWidths, hierarchyInterfacePitchMM)
+	}
+}
+
+func TestHierarchyRootSheetStepXReservesUnpairedLabelWidths(t *testing.T) {
+	const longUnpairedLabel = "UNPAIRED_INTERFACE_LABEL_THAT_EXTENDS_ACROSS_THE_CHANNEL"
+	sheets := []SchematicSheet{{ID: "left"}, {ID: "right"}}
+	interfaces := map[string][]hierarchySheetInterface{
+		"left": {
+			{Name: "SHORT", Side: hierarchyInterfaceRight},
+			{Name: longUnpairedLabel, Side: hierarchyInterfaceRight},
+		},
+		"right": {{Name: "OTHER", Side: hierarchyInterfaceLeft}},
+	}
+	got := hierarchyRootSheetStepX(sheets, interfaces, 2)
+	want := hierarchySheetWidth + 2*hierarchyInterfaceStubMM +
+		float64(len(longUnpairedLabel))*hierarchyDefaultTextCharacterMM + hierarchyInterfacePitchMM
+	if got != want {
+		t.Fatalf("hierarchy sheet step with unpaired label = %.2f mm, want %.2f mm", got, want)
+	}
+}
+
 func TestHierarchyBindsFootprintsToDeterministicSymbolInstancePaths(t *testing.T) {
 	builder, err := New(Options{
 		Name: "hierarchy_paths", Seed: "hierarchy_paths",

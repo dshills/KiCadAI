@@ -320,6 +320,34 @@ func TestPowerTransferBaseStopSizedWithoutQuiescentCurrentAssertion(t *testing.T
 	}
 }
 
+func TestStressSharedPowerEvaluationOrderPrioritizesCompoundCapacity(t *testing.T) {
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("decode issues: %#v", issues)
+	}
+	if !synthesisRequiresStressSharedPowerOrder(requirement, inventory) {
+		t.Fatal("bounded power intent did not activate stress-shared evaluation order")
+	}
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	order := synthesisCandidateEvaluationOrder(requirement, inventory, search.Candidates)
+	if len(order) == 0 {
+		t.Fatalf("stress-shared search status=%s rejections=%#v", search.Status, search.Rejections)
+	}
+	priority := synthesisStressSharedPowerPriority(search.Candidates[order[0]].Graph)
+	npn := topologyRatedPowerPrimitive(requirement, inventory, "npn_bjt")
+	pnp := topologyRatedPowerPrimitive(requirement, inventory, "pnp_bjt")
+	wantCapacity := max(
+		topologyPowerParallelDeviceCount(requirement, npn),
+		topologyPowerParallelDeviceCount(requirement, pnp),
+	) + 1
+	if priority.capacity < wantCapacity || priority.biasDepth < 2 || priority.compensated != 1 || priority.imbalance != 0 {
+		t.Fatalf("first stress-shared priority=%#v, want capacity >= %d, symmetric compound bias, and compensation", priority, wantCapacity)
+	}
+}
+
 func TestPowerTransferPeakHeadroomBiasCompositionAvoidsNominalClipping(t *testing.T) {
 	inventory, environment := testHeldOutSynthesisEnvironment(t)
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(

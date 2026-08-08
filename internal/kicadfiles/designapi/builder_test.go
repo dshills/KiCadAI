@@ -70,6 +70,18 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	if err := kicaddesign.Validate(design); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
 	}
+	if len(design.PCB.Zones) != 1 {
+		t.Fatalf("zones = %d, want 1", len(design.PCB.Zones))
+	}
+	if got := design.PCB.Zones[0].Fill.ThermalGap; got != kicadfiles.MM(0.5) {
+		t.Fatalf("default zone thermal gap = %v, want 0.5 mm", got)
+	}
+	if got := design.PCB.Zones[0].Fill.ThermalBridgeWidth; got != kicadfiles.MM(0.5) {
+		t.Fatalf("default zone thermal bridge width = %v, want 0.5 mm", got)
+	}
+	if got := design.PCB.Zones[0].Fill.IslandRemovalMode; got != 0 {
+		t.Fatalf("default zone island removal mode = %d, want always-remove mode 0", got)
+	}
 	if len(design.Schematic.Wires) != 1 {
 		t.Fatalf("schematic wires = %d, want 1", len(design.Schematic.Wires))
 	}
@@ -115,7 +127,7 @@ func TestSafeSchematicLabelStubOffsetMatchesLayoutSearchEnvelope(t *testing.T) {
 	builder := newTestBuilder(t)
 	anchor := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}
 	grid := kicadfiles.MM(1.27)
-	for _, scale := range []kicadfiles.IU{1, 2, 3, 4} {
+	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
 		for _, direction := range []kicadfiles.Point{{X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}} {
 			builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.Label{
 				Position: kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale},
@@ -123,7 +135,7 @@ func TestSafeSchematicLabelStubOffsetMatchesLayoutSearchEnvelope(t *testing.T) {
 		}
 	}
 	preferred := kicadfiles.Point{X: grid}
-	if got, want := builder.safeSchematicLabelStubOffset("NEW_LABEL", anchor, preferred, true), (kicadfiles.Point{X: grid * 6}); got != want {
+	if got, want := builder.safeSchematicLabelStubOffset("NEW_LABEL", anchor, preferred, true), (kicadfiles.Point{X: grid * 24}); got != want {
 		t.Fatalf("crowded label offset = %#v, want %#v", got, want)
 	}
 }

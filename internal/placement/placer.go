@@ -16,6 +16,7 @@ const (
 	groupAnchorScoreWeight       = 5.0
 	groupKeepTogetherScoreWeight = 8.0
 	netConnectivityScoreWeight   = 3.0
+	optionalRegionScoreWeight    = 1.0
 	seedTieBreakScoreWeight      = 0.0001
 	placementCompareEpsilon      = 1e-9
 	maxDenseGridCandidates       = 65_536
@@ -422,7 +423,14 @@ func slicesForPlacementWithOrder(components []Component, componentOrder string) 
 		if ordered[i].Fixed != ordered[j].Fixed {
 			return ordered[i].Fixed
 		}
-		if componentOrder == ComponentOrderDenseLargestFootprintFirstV1 {
+		if componentOrder == ComponentOrderEdgeThenDenseFootprintFirstV1 {
+			leftConstrained := ordered[i].Edge != EdgeNone
+			rightConstrained := ordered[j].Edge != EdgeNone
+			if leftConstrained != rightConstrained {
+				return leftConstrained
+			}
+		}
+		if densePlacementOrder(componentOrder) {
 			leftArea := ordered[i].Bounds.WidthMM * ordered[i].Bounds.HeightMM
 			rightArea := ordered[j].Bounds.WidthMM * ordered[j].Bounds.HeightMM
 			if comparison := compareFloat64(leftArea, rightArea); comparison != 0 {
@@ -442,6 +450,11 @@ func slicesForPlacementWithOrder(components []Component, componentOrder string) 
 		return ordered[i].Ref < ordered[j].Ref
 	})
 	return ordered
+}
+
+func densePlacementOrder(componentOrder string) bool {
+	return componentOrder == ComponentOrderDenseLargestFootprintFirstV1 ||
+		componentOrder == ComponentOrderEdgeThenDenseFootprintFirstV1
 }
 
 func orderComponentsForRequiredProximity(components []Component, rules []ProximityRule) []Component {
@@ -764,7 +777,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		requiredRegions, usable, grid, xCount, yCount, axisSamples, xIndices, yIndices,
 	)
 	denseCandidateCount := xCount * yCount * variantsPerPoint
-	if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 &&
+	if densePlacementOrder(request.ComponentOrder) &&
 		denseCandidateCount <= maxDenseGridCandidates {
 		xIndices = denseGridIndices(xCount)
 		yIndices = denseGridIndices(yCount)
@@ -877,7 +890,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		if scoringEnabled && scored[i].Total != scored[j].Total {
 			return scored[i].Total > scored[j].Total
 		}
-		if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 && component.Side != SideAny {
+		if densePlacementOrder(request.ComponentOrder) && component.Side != SideAny {
 			left := candidates[scored[i].CandidateIndex].Placement.Bounds
 			right := candidates[scored[j].CandidateIndex].Placement.Bounds
 			if comparison := compareFloat64(left.Min.YMM, right.Min.YMM); comparison != 0 {
@@ -1928,9 +1941,34 @@ func placementScore(component Component, placement Placement, request Request, a
 	if component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
 		score += boardDistance(placement.XMM-component.Position.XMM, placement.YMM-component.Position.YMM)
 	}
+	score += optionalRegionPlacementDistance(component.Ref, placement, request) * optionalRegionScoreWeight
 	score += netDistanceScore(placement, netTargets, rotatedPadsByRotation[rotationKey(placement.RotationDeg)]) * netConnectivityScoreWeight
 	score += seedTieBreak(seedBase, placement) * seedTieBreakScoreWeight
 	return score
+}
+
+func optionalRegionPlacementDistance(componentRef string, candidate Placement, request Request) float64 {
+	componentRef = normalizeRef(componentRef)
+	distance := 0.0
+	for _, rule := range request.RegionRules {
+		if rule.Required || rule.Preferred.IsZero() {
+			continue
+		}
+		applies := false
+		for _, ref := range rule.Refs {
+			if normalizeRef(ref) == componentRef {
+				applies = true
+				break
+			}
+		}
+		if !applies {
+			continue
+		}
+		dx := max(rule.Preferred.Min.XMM-candidate.XMM, 0, candidate.XMM-rule.Preferred.Max.XMM)
+		dy := max(rule.Preferred.Min.YMM-candidate.YMM, 0, candidate.YMM-rule.Preferred.Max.YMM)
+		distance += boardDistance(dx, dy) * float64(max(1, rule.Weight))
+	}
+	return distance
 }
 
 func keepTogetherPeersByComponent(request Request) map[string][]string {

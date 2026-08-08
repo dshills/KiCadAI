@@ -1324,7 +1324,7 @@ func (builder *Builder) safeSchematicLabelStubOffset(netName string, anchor kica
 	}
 	// Match the schematic layout search envelope so transaction replay does not
 	// collapse a previously readable endpoint label back into crowded geometry.
-	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
+	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64} {
 		for _, direction := range directions {
 			candidate := kicadfiles.Point{X: direction.X * scale, Y: direction.Y * scale}
 			labelPoint := kicadfiles.Point{X: anchor.X + candidate.X, Y: anchor.Y + candidate.Y}
@@ -2377,9 +2377,9 @@ func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, opti
 		FilledAreasThickness: options.FilledAreasThickness,
 		Priority:             options.Priority,
 		Fill: pcb.ZoneFillSettings{
-			ThermalGap:         options.ThermalGap,
-			ThermalBridgeWidth: options.ThermalBridgeWidth,
-			IslandRemovalMode:  1,
+			ThermalGap:         defaultIU(options.ThermalGap, kicadfiles.MM(0.5)),
+			ThermalBridgeWidth: defaultIU(options.ThermalBridgeWidth, kicadfiles.MM(0.5)),
+			IslandRemovalMode:  0,
 		},
 	})
 	builder.syncPCBNets()

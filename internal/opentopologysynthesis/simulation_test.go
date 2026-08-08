@@ -15,6 +15,19 @@ import (
 	"kicadai/internal/simmodel"
 )
 
+func TestActiveControlValueUsesRisingStartupExcitation(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "low_voltage_power_with_soft_start.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	active, found := requirementActiveControlValue(requirement, "enable")
+	if !found || active != 5 {
+		t.Fatalf("active enable = %.12g, %t; want 5 V inferred from the rising startup excitation", active, found)
+	}
+}
+
 func TestPowerTransferDistortionExcitationUsesFeasiblePowerLoadIntersection(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),

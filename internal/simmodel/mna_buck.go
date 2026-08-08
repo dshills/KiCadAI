@@ -292,7 +292,7 @@ func synchronousBuckPeriodicNodeResults(
 		capacitance := 0.0
 		parallelESRConductance := 0.0
 		zeroESRBranch := false
-		capacitorESRProven := true
+		capacitorEvidenceInvalid := false
 		capacitors := 0
 		for _, candidate := range plan.Devices {
 			candidateTerminals := terminalMap(candidate)
@@ -308,24 +308,28 @@ func synchronousBuckPeriodicNodeResults(
 				if candidate.ValueSI != nil &&
 					((candidateTerminals["A"] == output && candidateTerminals["B"] == terminals["PGND"]) ||
 						(candidateTerminals["B"] == output && candidateTerminals["A"] == terminals["PGND"])) {
-					capacitance += *candidate.ValueSI
-					capacitors++
 					esr, found := deviceParameterMap(candidate)["series_resistance_ohm"]
 					if !found || esr < 0 || !finite(esr) {
-						capacitorESRProven = false
-					} else if esr == 0 {
+						// An external capacitive load may have no reviewed ESR.
+						// Ignoring it is conservative for ripple and must not
+						// erase evidence from an explicit ESR-proven output cap.
+						continue
+					}
+					capacitance += *candidate.ValueSI
+					capacitors++
+					if esr == 0 {
 						zeroESRBranch = true
 					} else {
 						conductance := 1 / esr
 						parallelESRConductance += conductance
 						if !finite(conductance) || !finite(parallelESRConductance) {
-							capacitorESRProven = false
+							capacitorEvidenceInvalid = true
 						}
 					}
 				}
 			}
 		}
-		if inductors != 1 || inductance <= 0 || capacitors == 0 || capacitance <= 0 || !capacitorESRProven {
+		if inductors != 1 || inductance <= 0 || capacitors == 0 || capacitance <= 0 || capacitorEvidenceInvalid {
 			continue
 		}
 		effectiveCapacitorESR := 0.0

@@ -190,6 +190,29 @@ func TestMNASynchronousBuckTransientEfficiencyUsesResolvedOutputBoundary(t *test
 	if len(parallelPeriodic) != 1 || math.Abs(parallelPeriodic[0].VoltageRippleVPP-ripple/2) > 1e-12 {
 		t.Fatalf("two identical parallel output capacitors produced periodic evidence %#v, want half the single-capacitor ripple %.12g", parallelPeriodic, ripple/2)
 	}
+	withUnprovenLoad := ClonePlan(plan)
+	for _, device := range withUnprovenLoad.Devices {
+		if device.PrimitiveModel != PrimitiveCapacitorTransientV1 {
+			continue
+		}
+		load := device
+		load.Component += "_unproven_load"
+		parameters := []NamedValue{}
+		for _, parameter := range load.ModelParameters {
+			if parameter.Name != "series_resistance_ohm" {
+				parameters = append(parameters, parameter)
+			}
+		}
+		load.ModelParameters = parameters
+		load.parameterIndex = nil
+		withUnprovenLoad.Devices = append(withUnprovenLoad.Devices, load)
+		break
+	}
+	withUnprovenLoad = indexMNAPlanDevices(withUnprovenLoad)
+	unprovenLoadPeriodic := synchronousBuckPeriodicNodeResults(withUnprovenLoad, result)
+	if len(unprovenLoadPeriodic) != 1 || math.Abs(unprovenLoadPeriodic[0].VoltageRippleVPP-ripple) > 1e-12 {
+		t.Fatalf("unproven parallel load capacitance changed ESR-proven output ripple evidence: %#v, want %.12g", unprovenLoadPeriodic, ripple)
+	}
 	withoutESR := ClonePlan(plan)
 	for deviceIndex := range withoutESR.Devices {
 		device := &withoutESR.Devices[deviceIndex]
@@ -208,6 +231,38 @@ func TestMNASynchronousBuckTransientEfficiencyUsesResolvedOutputBoundary(t *test
 	withoutESR = indexMNAPlanDevices(withoutESR)
 	if periodic := synchronousBuckPeriodicNodeResults(withoutESR, result); len(periodic) != 0 {
 		t.Fatalf("unproven output-capacitor ESR produced trusted ripple evidence: %#v", periodic)
+	}
+}
+
+func TestMNASynchronousBuckTransientEfficiencyWithCurrentLoad(t *testing.T) {
+	components, nodes := synchronousBuckEvidence()
+	components[len(components)-1] = ComponentEvidence{
+		InstanceID: "load", CatalogID: "current_load", Family: "current_source",
+		ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentSourceV1}},
+		Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "OUT"}, {Function: "NEGATIVE", Net: "GND"}},
+	}
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "efficiency", Kind: AnalysisTransient, DurationS: .02, TimeStepS: .00002,
+			Excitations: []SourceExcitation{{Component: "input_supply", DCValue: 18}, {Component: "enable", DCValue: 5}, {Component: "load", DCValue: .45}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "efficiency", Component: "load", Components: []string{"input_supply"},
+			Quantity: QuantityConversionEfficiencyPct, Min: 0, Max: 100,
+		}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "buck-catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve synchronous buck current-load efficiency: %#v", diagnostics)
+	}
+	result, diagnostics := solveTransientAnalysis(plan, plan.Analyses[0])
+	if len(diagnostics) != 0 {
+		t.Fatalf("evaluate synchronous buck current-load efficiency: %#v", diagnostics)
+	}
+	actual, diagnostic := transientDerivedValue(result, intent.Assertions[0])
+	if diagnostic != nil || actual < 81.9 || actual > 82.5 || math.IsNaN(actual) {
+		t.Fatalf("current-load conversion efficiency = %.12g, want the reviewed 82%% boundary; diagnostic=%#v", actual, diagnostic)
 	}
 }
 

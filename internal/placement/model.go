@@ -95,8 +95,9 @@ type Request struct {
 }
 
 const (
-	ComponentOrderLargestFootprintFirstV1      = "largest_footprint_first_v1"
-	ComponentOrderDenseLargestFootprintFirstV1 = "dense_largest_footprint_first_v1"
+	ComponentOrderLargestFootprintFirstV1       = "largest_footprint_first_v1"
+	ComponentOrderDenseLargestFootprintFirstV1  = "dense_largest_footprint_first_v1"
+	ComponentOrderEdgeThenDenseFootprintFirstV1 = "edge_then_dense_footprint_first_v1"
 )
 
 type BoardPlacementArea struct {

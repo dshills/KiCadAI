@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -13,6 +14,64 @@ import (
 	"kicadai/internal/modelprovenance"
 	"kicadai/internal/simmodel"
 )
+
+func TestControllerFeedbackDividerComposesSparseReviewedValues(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "low_voltage_power_with_soft_start.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	behavior, found := topologyStepDownBehavior(requirement)
+	if !found {
+		t.Fatal("frozen requirement does not expose the expected generic step-down envelope")
+	}
+	selected := topologyStepDownPrimitive(
+		requirement, inventory,
+		behavior.inputMinimumV, behavior.inputMaximumV,
+		behavior.outputVoltageV, behavior.outputCurrentA,
+		behavior.minimumEfficiencyPct,
+	)
+	if selected.Key == "" {
+		t.Fatal("catalog-scale controller-divider search rejected every reviewed step-down primitive")
+	}
+	referenceNominal, referenceMinimum, referenceMaximum, referenceFound := primitiveModelParameterRange(
+		selected, simmodel.PrimitiveSynchronousBuckRegulatorV1, "reference_voltage_v",
+	)
+	uppers, lower, dividerFound := topologyStepDownFeedbackPrimitives(requirement, inventory, selected, behavior.outputVoltageV)
+	if !referenceFound || !dividerFound {
+		t.Fatalf("selected controller reference/divider found = %t/%t", referenceFound, dividerFound)
+	}
+	if len(uppers) != 2 {
+		t.Fatalf("sparse catalog feedback upper legs = %d, want bounded two-part series composition", len(uppers))
+	}
+	upperNominal, upperMinimum, upperMaximum := 0.0, 0.0, 0.0
+	for _, upper := range uppers {
+		value := primitiveSeedValueOrZero(upper)
+		tolerance, proven := primitiveTolerancePercent(upper, "resistance")
+		if !proven {
+			t.Fatalf("feedback resistor %s lacks reviewed tolerance", upper.Key)
+		}
+		upperNominal += value
+		upperMinimum += value * (1 - tolerance/100)
+		upperMaximum += value * (1 + tolerance/100)
+	}
+	lowerNominal := primitiveSeedValueOrZero(lower)
+	lowerTolerance, proven := primitiveTolerancePercent(lower, "resistance")
+	if !proven {
+		t.Fatalf("feedback resistor %s lacks reviewed tolerance", lower.Key)
+	}
+	if nominal := referenceNominal * (1 + upperNominal/lowerNominal); nominal < 4.85 || nominal > 5.15 {
+		t.Fatalf("nominal controller-divider output %.12g V is outside 4.85..5.15 V", nominal)
+	}
+	if minimum := referenceMinimum * (1 + upperMinimum/(lowerNominal*(1+lowerTolerance/100))); minimum < 4.85 {
+		t.Fatalf("minimum controller-divider output %.12g V is below 4.85 V", minimum)
+	}
+	if maximum := referenceMaximum * (1 + upperMaximum/(lowerNominal*(1-lowerTolerance/100))); maximum > 5.15 {
+		t.Fatalf("maximum controller-divider output %.12g V exceeds 5.15 V", maximum)
+	}
+}
 
 func TestCombinationCountWithinBudget(t *testing.T) {
 	for _, test := range []struct {
@@ -28,6 +87,24 @@ func TestCombinationCountWithinBudget(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := combinationCountWithinBudget(test.values, test.branches, test.max); got != test.want {
 				t.Fatalf("combinationCountWithinBudget(%d, %d, %d) = %v, want %v", test.values, test.branches, test.max, got, test.want)
+			}
+		})
+	}
+}
+
+func TestCatalogSeriesFeedbackDividerSearchBudgetCountsDistinctLowerLeg(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		values, budget int
+		want           bool
+	}{
+		{name: "exact budget", values: 8, budget: 8 * 36, want: true},
+		{name: "one below exact budget", values: 8, budget: 8*36 - 1, want: false},
+		{name: "empty catalog", values: 0, budget: 4_096, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := catalogSeriesFeedbackDividerSearchWithinBudget(test.values, test.budget); got != test.want {
+				t.Fatalf("catalogSeriesFeedbackDividerSearchWithinBudget(%d, %d) = %t, want %t", test.values, test.budget, got, test.want)
 			}
 		})
 	}

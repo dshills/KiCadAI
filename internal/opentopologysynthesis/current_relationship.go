@@ -704,6 +704,27 @@ func regulatedCurrentRelationships(requirement Requirement) []regulatedCurrentRe
 	return result
 }
 
+func transconductanceInputConditioningRequired(
+	requirement Requirement,
+	relationship regulatedCurrentRelationship,
+) bool {
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Observation.Kind != "port" || assertion.Observation.ID != relationship.output {
+			continue
+		}
+		switch assertion.Metric {
+		case "startup_current", "output_ripple":
+			return true
+		case "settling_time":
+			if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
+				assertion.Excitation.ID == relationship.input {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // regulatedCurrentControlActsAsEnable distinguishes a normal active-high
 // permission from an independently asserted shutdown/fault input using only
 // the transfer behavior. A control is an enable when the regulated transfer

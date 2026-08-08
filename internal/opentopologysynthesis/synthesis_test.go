@@ -144,6 +144,10 @@ func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives
 		Schema: SynthesisRunSchema, Version: SynthesisRunVersion,
 		Report: Report{
 			Schema: ReportSchema, Version: ReportVersion,
+			Diagnostics: []Diagnostic{{
+				Code: CodeSearchExhausted, Path: "simulation.policy",
+				Message: "an unselected candidate exhausted its local budget",
+			}},
 			Candidates: []CandidateReport{
 				{Fingerprint: "simple", ActiveStructureHash: baseActive},
 				{Fingerprint: "wide-margin", ActiveStructureHash: complexActive},
@@ -190,6 +194,9 @@ func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives
 	}
 	if selected.Report.Selected.SelectionSummary == "" || selected.SelectedGraph == nil || selected.Physical == nil {
 		t.Fatalf("selection explanation or bound artifacts missing: %#v", selected)
+	}
+	if len(selected.Report.Diagnostics) != 0 {
+		t.Fatalf("passing selection retained candidate-local diagnostics: %#v", selected.Report.Diagnostics)
 	}
 }
 

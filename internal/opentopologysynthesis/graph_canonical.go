@@ -308,13 +308,17 @@ func sameCanonicalPartition(left, right []int) bool {
 	if len(left) != len(right) {
 		return false
 	}
-	for first := range left {
-		for second := first + 1; second < len(left); second++ {
-			if (left[first] == left[second]) !=
-				(right[first] == right[second]) {
-				return false
-			}
+	forward := make(map[int]int, len(left))
+	reverse := make(map[int]int, len(right))
+	for index := range left {
+		if mapped, ok := forward[left[index]]; ok && mapped != right[index] {
+			return false
 		}
+		if mapped, ok := reverse[right[index]]; ok && mapped != left[index] {
+			return false
+		}
+		forward[left[index]] = right[index]
+		reverse[right[index]] = left[index]
 	}
 	return true
 }
@@ -352,7 +356,17 @@ func canonicalSearch(vertices []canonicalVertex, colors []int, branches *int) (c
 		}
 	}
 	best := canonicalResult{}
+	twinClasses := map[string]struct{}{}
 	for _, vertex := range class {
+		// Vertices with identical labels and exact labeled neighbors are true
+		// twins: transposing them is a graph automorphism. Exploring every order
+		// of a parallel component bank is factorial work but cannot produce a
+		// different canonical encoding, so keep one proven representative.
+		twinKey := canonicalExactTwinKey(vertices, vertex)
+		if _, duplicate := twinClasses[twinKey]; duplicate {
+			continue
+		}
+		twinClasses[twinKey] = struct{}{}
 		next := append([]int(nil), colors...)
 		next[vertex] = maxColor + 1
 		candidate, err := canonicalSearch(vertices, next, branches)
@@ -364,6 +378,27 @@ func canonicalSearch(vertices []canonicalVertex, colors []int, branches *int) (c
 		}
 	}
 	return best, nil
+}
+
+func canonicalExactTwinKey(vertices []canonicalVertex, vertex int) string {
+	var builder strings.Builder
+	builder.WriteString(vertices[vertex].kind)
+	builder.WriteByte('|')
+	builder.WriteString(vertices[vertex].label)
+	// graphCanonicalVertices normalizes neighbor order, but keep the pruning
+	// key independently order-invariant so future callers cannot make exact
+	// twin detection depend on construction order.
+	neighbors := slices.Clone(vertices[vertex].neighbors)
+	slices.SortFunc(neighbors, func(left, right canonicalEdge) int {
+		return cmp.Or(cmp.Compare(left.label, right.label), cmp.Compare(left.vertex, right.vertex))
+	})
+	for _, edge := range neighbors {
+		builder.WriteByte('|')
+		builder.WriteString(edge.label)
+		builder.WriteByte(':')
+		builder.WriteString(strconv.Itoa(edge.vertex))
+	}
+	return builder.String()
 }
 
 func firstAmbiguousCanonicalClass(colors []int) []int {

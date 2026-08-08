@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
@@ -40,6 +41,7 @@ const hierarchyBusGridMM = 1.27
 const hierarchyInterfaceMarginMM = 10.16
 const hierarchyInterfacePitchMM = 5.08
 const hierarchyInterfaceStubMM = 5.08
+const hierarchyDefaultTextCharacterMM = 1.27
 
 type hierarchyInterfaceSide uint8
 
@@ -129,6 +131,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	if kicadfiles.MM(sheetHeight+hierarchySheetStepY-hierarchySheetHeight) > schematiclayout.UsableSheet(landscapeA0).Height()/2 {
 		columns = len(builder.hierarchy.Sheets)
 	}
+	sheetStepX := hierarchyRootSheetStepX(builder.hierarchy.Sheets, interfacesBySheet, columns)
 	for index, spec := range builder.hierarchy.Sheets {
 		filename := strings.TrimSpace(spec.Filename)
 		if filename == "" {
@@ -176,7 +179,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		children = append(children, child)
 
 		position := kicadfiles.Point{
-			X: kicadfiles.MM(hierarchySheetOrigin + float64(index%columns)*hierarchySheetStepX),
+			X: kicadfiles.MM(hierarchySheetOrigin + float64(index%columns)*sheetStepX),
 			Y: kicadfiles.MM(hierarchySheetOrigin + float64(index/columns)*(sheetHeight+hierarchySheetStepY-hierarchySheetHeight)),
 		}
 		sheet := schematic.NewSheet(
@@ -202,6 +205,47 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	}
 	design.SheetFiles = children
 	return bindHierarchyFootprintPaths(design)
+}
+
+// hierarchyRootSheetStepX reserves the channel between adjacent sheet symbols
+// from the actual opposing boundary-label envelopes. Fixed sheet spacing is
+// insufficient when independently generated net names are longer than the
+// channel; widening the whole column lattice keeps placement deterministic and
+// avoids circuit-identity-specific label rules.
+func hierarchyRootSheetStepX(sheets []SchematicSheet, interfacesBySheet map[string][]hierarchySheetInterface, columns int) float64 {
+	step := hierarchySheetStepX
+	if columns < 2 {
+		return step
+	}
+	interfaceNames := func(sheetID string, side hierarchyInterfaceSide) []string {
+		names := []string{}
+		for _, item := range interfacesBySheet[sheetID] {
+			if item.Side == side {
+				names = append(names, item.Name)
+			}
+		}
+		return names
+	}
+	for leftIndex := 0; leftIndex+1 < len(sheets); leftIndex++ {
+		if (leftIndex+1)%columns == 0 {
+			continue
+		}
+		left := interfaceNames(sheets[leftIndex].ID, hierarchyInterfaceRight)
+		right := interfaceNames(sheets[leftIndex+1].ID, hierarchyInterfaceLeft)
+		for row := 0; row < max(len(left), len(right)); row++ {
+			leftName, rightName := "", ""
+			if row < len(left) {
+				leftName = left[row]
+			}
+			if row < len(right) {
+				rightName = right[row]
+			}
+			labelWidth := float64(utf8.RuneCountInString(leftName)+utf8.RuneCountInString(rightName)) * hierarchyDefaultTextCharacterMM
+			required := hierarchySheetWidth + 2*hierarchyInterfaceStubMM + labelWidth + hierarchyInterfacePitchMM
+			step = max(step, required)
+		}
+	}
+	return step
 }
 
 func bindHierarchyFootprintPaths(design *kicaddesign.Design) error {
@@ -989,7 +1033,7 @@ func fitHierarchyRoot(root *schematic.SchematicFile) error {
 		maxPoint.Y = max(maxPoint.Y, label.Position.Y)
 		maximumLabelRunes = max(maximumLabelRunes, len([]rune(label.Text)))
 	}
-	textMargin := kicadfiles.MM(10.16 + float64(maximumLabelRunes)*1.27)
+	textMargin := kicadfiles.MM(10.16 + float64(maximumLabelRunes)*hierarchyDefaultTextCharacterMM)
 	minPoint.X -= textMargin
 	maxPoint.X += textMargin
 	minPoint.Y -= kicadfiles.MM(10.16)

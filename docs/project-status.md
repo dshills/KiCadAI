@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified: 2026-08-05 by the complete bounded local suite, focused
+Last verified: 2026-08-08 by the complete bounded local suite, focused
 scheduler/race/preservation suites, and installed-KiCad lanes. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
@@ -16,6 +16,15 @@ power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
+
+The independently frozen multi-stage out-of-distribution corpus now closes the
+next bounded generalization step. Eight unfamiliar behavior-only combinations
+of sensing, decision, feedback, nonlinear transfer, switching power, and
+protection pass two-run installed-KiCad promotion. One immutable contradictory
+input fails before search with a generic electrical bound, and four unsafe or
+unsupported adversarial cases fail closed with stable evidence. The protected
+USB-C LED and I2C sensor fixtures remain green. See the [specification](../specs/multi-stage-out-of-distribution-synthesis/SPEC.md)
+and [completion audit](../specs/multi-stage-out-of-distribution-synthesis/AUDIT.md).
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

@@ -399,13 +399,20 @@ func appendEndpointLabel(result *Result, seen map[string]kicadfiles.Point, netNa
 		return position
 	}
 	position, clean := labelStubPoint(netName, endpoint, anchor, *result, request, rules)
+	reused := false
+	if !clean {
+		position, reused = reusableOverlappingEndpointLabel(netName, endpoint, anchor, position, *result, request, rules)
+		clean = reused
+	}
 	seen[key] = position
 	rotation := kicadfiles.Angle(0)
 	justifyRight := false
 	if rules.OrientEndpointLabels {
 		rotation, justifyRight = labelOrientationForStub(anchor, position)
 	}
-	result.Labels = append(result.Labels, Label{NetName: netName, Text: netName, Position: position, Rotation: rotation, JustifyRight: justifyRight})
+	if !reused {
+		result.Labels = append(result.Labels, Label{NetName: netName, Text: netName, Position: position, Rotation: rotation, JustifyRight: justifyRight})
+	}
 	if anchor != position {
 		result.Wires = append(result.Wires, WireSegment{NetName: netName, From: anchor, To: position})
 	}
@@ -413,6 +420,35 @@ func appendEndpointLabel(result *Result, seen map[string]kicadfiles.Point, netNa
 		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "label_placement_fallback", Ref: endpoint.Ref, NetName: netName, Message: "label stub required crowded fallback placement"})
 	}
 	return position
+}
+
+// reusableOverlappingEndpointLabel collapses only a duplicate same-net label
+// at the crowded fallback location. Unlike a general same-net shortcut, this
+// keeps endpoint access local and cannot reserve a long conductor through the
+// rest of the schematic before other nets are routed.
+func reusableOverlappingEndpointLabel(netName string, endpoint Endpoint, anchor, fallback kicadfiles.Point, result Result, request Request, rules Rules) (kicadfiles.Point, bool) {
+	rotation, justifyRight := kicadfiles.Angle(0), false
+	if rules.OrientEndpointLabels {
+		rotation, justifyRight = labelOrientationForStub(anchor, fallback)
+	}
+	fallbackBox := TextEstimateOriented(netName, fallback, rotation, justifyRight)
+	for labelIndex, label := range result.Labels {
+		if label.NetName != netName || label.Text != netName || label.RouteAnnotation ||
+			(anchor.X != label.Position.X && anchor.Y != label.Position.Y) ||
+			!fallbackBox.Intersects(TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight)) {
+			continue
+		}
+		stub := WireSegment{NetName: netName, From: anchor, To: label.Position}
+		withoutLabel := result
+		withoutLabel.Labels = make([]Label, 0, len(result.Labels)-1)
+		withoutLabel.Labels = append(withoutLabel.Labels, result.Labels[:labelIndex]...)
+		withoutLabel.Labels = append(withoutLabel.Labels, result.Labels[labelIndex+1:]...)
+		box := TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight)
+		if UsableSheet(request.Sheet).ContainsRect(box) && !labelPlacementCollides(box, stub, endpoint, withoutLabel, request) {
+			return label.Position, true
+		}
+	}
+	return fallback, false
 }
 
 func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, result Result, request Request, rules Rules) (kicadfiles.Point, bool) {
@@ -473,8 +509,9 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		}
 	}
 	usable := UsableSheet(request.Sheet)
+	stubScales := []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64}
 	for _, direction := range directions {
-		for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
+		for _, scale := range stubScales {
 			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
 			segment := WireSegment{NetName: netName, From: anchor, To: position}
 			rotation := kicadfiles.Angle(0)
