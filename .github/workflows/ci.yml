@@ -13,7 +13,7 @@ jobs:
   offline-quality:
     name: Offline quality gates
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 70
     env:
       KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     steps:
@@ -41,16 +41,15 @@ jobs:
           args: --timeout=5m ./...
 
       - name: Verify clean-checkout promotion contract
-        run: go test ./internal/promotionrunner -run '^(TestCleanCheckoutPromotionCommandContract|TestPromotionWorkflowContractAndPinnedActions)$'
+        timeout-minutes: 10
+        run: go test -timeout 9m ./internal/promotionrunner -run '^(TestCleanCheckoutPromotionCommandContract|TestPromotionWorkflowContractAndPinnedActions)$'
 
-      # Frozen end-to-end promotion corpora run in independent jobs below.
-      - name: Run bounded test suite
-        run: make GO_TEST_FLAGS=-short test
-
-      # Coverage uses the same bounded tier; promotion jobs exercise the long
-      # end-to-end gates without instrumenting them a second time.
-      - name: Enforce coverage floor
-        run: make COVER_TEST_FLAGS=-short coverage-check
+      # Coverage executes the bounded suite, so keep one instrumented pass here.
+      # Makefile maps GO_TEST_TIMEOUT to go test -timeout; frozen end-to-end
+      # promotion corpora run in independent jobs below.
+      - name: Run bounded test suite and enforce coverage floor
+        timeout-minutes: 45
+        run: make GO_TEST_TIMEOUT=30m COVER_TEST_FLAGS=-short coverage-check
 
   offline-promotion:
     name: Offline promotion corpus (${{ matrix.name }})

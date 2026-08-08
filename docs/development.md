@@ -226,6 +226,12 @@ make COVER_TEST_FLAGS=-short coverage-check
 make race-short
 ```
 
+The Makefile's local per-package timeout remains 20 minutes. GitHub's slower
+hosted Linux quality job runs the bounded tier once through `coverage-check`,
+which already executes the tests, with a 30-minute Go package limit, a
+45-minute step limit, and a 70-minute enclosing job ceiling. This changes only
+execution headroom and avoids duplicating the full bounded suite.
+
 `make race-short` is intentionally local-only. It runs the race detector over
 the concurrent IPC, atomic locking, provider, and transaction trust boundary
 without adding GitHub execution to acceptance.
