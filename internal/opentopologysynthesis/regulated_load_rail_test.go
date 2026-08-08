@@ -73,3 +73,24 @@ func TestLoadRailEnvelopeTreatsReferencesAsOneSourceBoundary(t *testing.T) {
 		)
 	}
 }
+
+func TestOutputCurrentEnvelopeIncludesBoundedSwitchedPeakCurrent(t *testing.T) {
+	peakMinimum, peakMaximum := .5, 1.2
+	otherMinimum, otherMaximum := .7, 1.5
+	requirement := Requirement{Requirements: Requirements{
+		BehavioralRequirements: []BehavioralAssertion{
+			{
+				Metric: "peak_current", Observation: Observation{Kind: "port", ID: "load"},
+				Min: &peakMinimum, Max: &peakMaximum,
+			},
+			{
+				Metric: "output_current", Observation: Observation{Kind: "port", ID: "other"},
+				Min: &otherMinimum, Max: &otherMaximum,
+			},
+		},
+	}}
+	minimum, maximum, found := topologyOutputCurrentEnvelope(requirement, "load")
+	if !found || minimum != peakMinimum || maximum != peakMaximum {
+		t.Fatalf("switched peak-current envelope = %g..%g found=%t", minimum, maximum, found)
+	}
+}

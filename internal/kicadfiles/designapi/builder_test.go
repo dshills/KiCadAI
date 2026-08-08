@@ -787,6 +787,49 @@ func TestBuilderConnectRelocatesConflictingExplicitLabelStub(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectSuppressesLabelStubOverlappingExistingSameNetWire(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	from := Endpoint{Reference: "R1", Pin: "2"}
+	to := Endpoint{Reference: "R2", Pin: "1"}
+	start, _ := builder.pinAnchor(from)
+	end, _ := builder.pinAnchor(to)
+	wireEnd := kicadfiles.Point{X: start.X + kicadfiles.MM(10.16), Y: start.Y}
+	builder.addSchematicWirePoints("SIG", from, Endpoint{}, []kicadfiles.Point{start, wireEnd})
+	requested := kicadfiles.Point{X: start.X + kicadfiles.MM(5.08), Y: start.Y}
+	toLabel := kicadfiles.Point{X: end.X - kicadfiles.MM(5.08), Y: end.Y}
+	useLabels := true
+	if err := builder.ConnectWithOptions(from, to, "SIG", ConnectOptions{UseLabels: &useLabels, FromLabelAt: &requested, ToLabelAt: &toLabel}); err != nil {
+		t.Fatalf("connect labeled branch: %v", err)
+	}
+	for _, label := range builder.design.Schematic.Labels {
+		if label.Position == requested {
+			t.Fatalf("redundant label retained on existing same-net wire: %#v", label)
+		}
+	}
+	if len(builder.design.Schematic.Wires) != 2 {
+		t.Fatalf("wires = %#v, want existing conductor plus remote label stub", builder.design.Schematic.Wires)
+	}
+}
+
+func TestBuilderLabelStubSuppressesInternalDoglegLabels(t *testing.T) {
+	builder := newTestBuilder(t)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)}
+	offset := kicadfiles.Point{X: kicadfiles.MM(5.08), Y: kicadfiles.MM(5.08)}
+	builder.addSchematicLabelStubWithOrientation("SIG", Endpoint{}, anchor, offset, false)
+	if len(builder.design.Schematic.Wires) != 2 {
+		t.Fatalf("dogleg wires = %#v, want two orthogonal segments", builder.design.Schematic.Wires)
+	}
+	if len(builder.design.Schematic.Labels) != 1 {
+		t.Fatalf("dogleg labels = %#v, want only the endpoint label", builder.design.Schematic.Labels)
+	}
+	want := kicadfiles.Point{X: anchor.X + offset.X, Y: anchor.Y + offset.Y}
+	if builder.design.Schematic.Labels[0].Position != want {
+		t.Fatalf("dogleg label position = %v, want %v", builder.design.Schematic.Labels[0].Position, want)
+	}
+}
+
 func TestBuilderIndexesForeignWireLabelStubConflicts(t *testing.T) {
 	builder := newTestBuilder(t)
 	wireStart := kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(20.32)}

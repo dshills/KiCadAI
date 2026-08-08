@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	"kicadai/internal/circuitgraph"
@@ -164,6 +165,28 @@ func TestPhysicalMultilayerIntentReservesReferenceAndPowerLayers(t *testing.T) {
 	}
 }
 
+func TestPhysicalPrimaryPowerPlaneNetUsesElectricalDemandAndStableTies(t *testing.T) {
+	nets := []circuitgraph.Net{
+		{Name: "CONTROL", Role: circuitgraph.NetRolePower, CurrentMA: 50, Endpoints: make([]circuitgraph.Endpoint, 5)},
+		{Name: "LOAD", Role: circuitgraph.NetRolePowerPos, CurrentMA: 2_000, Endpoints: make([]circuitgraph.Endpoint, 2)},
+		{Name: "AUXILIARY", Role: circuitgraph.NetRolePower, CurrentMA: 50, Endpoints: make([]circuitgraph.Endpoint, 3)},
+		{Name: "GROUND", Role: circuitgraph.NetRoleGround, CurrentMA: 10_000, Endpoints: make([]circuitgraph.Endpoint, 20)},
+	}
+	if got := physicalPrimaryPowerPlaneNet(nets); got != "CONTROL" {
+		t.Fatalf("primary power plane = %q, want highest-fanout CONTROL domain", got)
+	}
+	nets[1].Endpoints = make([]circuitgraph.Endpoint, 5)
+	if got := physicalPrimaryPowerPlaneNet(nets); got != "LOAD" {
+		t.Fatalf("primary power plane = %q, want highest-current LOAD fanout tie", got)
+	}
+	nets[1].CurrentMA = 50
+	nets[0].Endpoints = nets[0].Endpoints[:3]
+	nets[1].Endpoints = nets[1].Endpoints[:3]
+	if got := physicalPrimaryPowerPlaneNet(nets); got != "AUXILIARY" {
+		t.Fatalf("primary power plane = %q, want lexical AUXILIARY tie-break", got)
+	}
+}
+
 func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *testing.T) {
 	if role := physicalFunctionalRole(circuitgraph.Component{}, "EXTERNAL_INPUTS", "", 0); role != physicalRegionInput {
 		t.Fatalf("case-insensitive external input role = %q", role)
@@ -177,6 +200,11 @@ func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *t
 	}}
 	if physicalRequiresExternalThermalPath(freeAirRecord) {
 		t.Fatal("junction-to-case capability alone became an external thermal-path requirement")
+	}
+	freeAirRecord.ID = "test.free_air_power_device"
+	pathID, pathCPerW, found := physicalIntrinsicAmbientThermalPath(freeAirRecord)
+	if !found || pathID != "test.free_air_power_device.power_semiconductor_junction_to_ambient" || pathCPerW != junctionToAmbient {
+		t.Fatalf("intrinsic ambient thermal path = %q %.3f found=%t", pathID, pathCPerW, found)
 	}
 	caseReferencedRecord := freeAirRecord
 	caseReferencedRecord.SimulationModels = []simmodel.CatalogEvidence{{
@@ -249,6 +277,41 @@ func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *t
 	second := physicalPCBIntent(board, componentList, nil, schematic, catalog)
 	if !reflect.DeepEqual(first, second) {
 		t.Fatalf("functional placement is not deterministic:\nfirst=%#v\nsecond=%#v", first, second)
+	}
+	thermalCohort := make([]circuitgraph.Component, 0, 6)
+	thermalMembers := make([]string, 0, 6)
+	for index := 0; index < 6; index++ {
+		id := fmt.Sprintf("parallel_heat_%d", index)
+		thermalMembers = append(thermalMembers, id)
+		thermalCohort = append(thermalCohort, circuitgraph.Component{
+			ID: id, Role: circuitgraph.RoleBJT, Usage: "power_output",
+			ComponentID: "bjt.onsemi.njw0302g.to3p", VariantID: "to3p_3",
+		})
+	}
+	cohortComponents := append([]circuitgraph.Component{
+		{ID: "cohort_input", Role: circuitgraph.RoleInputConnector},
+		{ID: "cohort_output", Role: circuitgraph.RoleOutputConnector},
+	}, thermalCohort...)
+	cohortIntent := physicalPCBIntent(
+		board,
+		cohortComponents,
+		nil,
+		circuitgraph.SchematicIntent{Groups: []circuitgraph.SchematicGroup{
+			{ID: "external_inputs", Role: "input_boundary", Members: []string{"cohort_input"}, Rank: 0},
+			{ID: "power_stage", Role: "processing_stage", Members: thermalMembers, Rank: 3},
+			{ID: "external_outputs", Role: "output_boundary", Members: []string{"cohort_output"}, Rank: 4},
+		}},
+		catalog,
+	)
+	edgeCounts := map[circuitgraph.Side]int{}
+	for _, placement := range cohortIntent.Placements {
+		if !strings.HasPrefix(placement.Component, "parallel_heat_") {
+			continue
+		}
+		edgeCounts[placement.Edge]++
+	}
+	if edgeCounts[circuitgraph.SideTop] != 3 || edgeCounts[circuitgraph.SideBottom] != 3 {
+		t.Fatalf("capacity-aware thermal cohort edges = %#v, want balanced top/bottom access", edgeCounts)
 	}
 	wantRoles := []string{
 		physicalRegionInput, physicalRegionInputProtection, physicalRegionSensing, physicalRegionControl,

@@ -272,6 +272,33 @@ func TestPlaceSamplesFixedOrientationEdgeAnchorFromPhysicalBounds(t *testing.T) 
 	}
 }
 
+func TestPlaceSamplesEnoughPositionsForDenseEdgeCohort(t *testing.T) {
+	rotation := 0.0
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 100, HeightMM: 75, MarginMM: 1},
+		Rules: Rules{
+			GridMM:               0.5,
+			BoardEdgeClearanceMM: 1,
+			ComponentSpacingMM:   0.5,
+			MaxCandidatesPerPart: 64,
+		},
+		Seed: "dense-edge-cohort",
+	}
+	for index := 0; index < 10; index++ {
+		req.Components = append(req.Components, Component{
+			Ref: fmt.Sprintf("Q%d", index+1), FootprintID: "Test:TO-3P",
+			Bounds: Bounds{WidthMM: 15.8, HeightMM: 5, Source: BoundsLibraryCourtyard},
+			Edge:   EdgeRight, Side: SideTop,
+			Rotation: RotationConstraint{FixedDeg: &rotation},
+		})
+	}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || result.Metrics.UnplacedCount != 0 {
+		t.Fatalf("dense edge cohort status=%s placed=%d unplaced=%d issues=%#v", result.Status, result.Metrics.PlacedCount, result.Metrics.UnplacedCount, result.Issues)
+	}
+}
+
 func TestPlaceEdgeCandidateRespectsGeneratedCopperClearance(t *testing.T) {
 	req := minimalRequest()
 	req.Board.WidthMM = 100

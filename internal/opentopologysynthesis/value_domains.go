@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -108,6 +109,13 @@ func BuildValueSearchPlan(
 			domain.Unit = original.ValueDomain.Unit
 		}
 		variants := compatibleValueVariants(original, inventory, requiredAnalyses)
+		variants = slices.DeleteFunc(variants, func(variant PrimitiveCandidate) bool {
+			if primitiveSupplySpanCoversConnectedRails(requirement, normalizedGraph, instance, variant) {
+				return false
+			}
+			rejections["supply_span_envelope"] = append(rejections["supply_span_envelope"], instance.ID+":"+variant.Key)
+			return true
+		})
 		variants = slices.DeleteFunc(variants, func(variant PrimitiveCandidate) bool {
 			return !stepDownOutputCapacitorVariantAllowed(
 				requirement, normalizedGraph, instance, variant, inventoryByKey,
@@ -962,6 +970,12 @@ func deriveTopologyAnalyticScales(
 	); len(scales) != 0 {
 		return scales
 	}
+	if scales := deriveCurrentLimitedSwitchTopologyScales(
+		graph,
+		instance,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := deriveControlledSwitchTopologyScales(
 		requirement,
 		graph,
@@ -1333,6 +1347,156 @@ func deriveTopologyAnalyticScales(
 	return nil
 }
 
+// deriveCurrentLimitedSwitchTopologyScales preserves the catalog values that
+// jointly define a source shunt and the two reference dividers in a
+// current-limited switch. The topology is recognized structurally by two
+// open-collector decisions sharing a MOSFET gate, with one decision observing
+// the MOSFET source. Gate pull values remain owned by the ordinary controlled
+// switch derivation so device gate limits continue to set that network.
+func deriveCurrentLimitedSwitchTopologyScales(
+	graph CandidateGraph,
+	instance GraphInstance,
+) []AnalyticScale {
+	if instance.Kind != "resistor" || instance.ValueSI == nil ||
+		*instance.ValueSI <= 0 || !finite(*instance.ValueSI) {
+		return nil
+	}
+	for _, controlled := range graph.Instances {
+		if controlled.Kind != "n_channel_mosfet" {
+			continue
+		}
+		controlledTerminals := topologyTerminalNodes(controlled)
+		gate, sense := controlledTerminals["GATE"], controlledTerminals["SOURCE"]
+		if gate == "" || sense == "" {
+			continue
+		}
+		decisions := []GraphInstance{}
+		for _, decision := range graph.Instances {
+			if decision.Kind == "comparator" && topologyTerminalNodes(decision)["OUT"] == gate {
+				decisions = append(decisions, decision)
+			}
+		}
+		if len(decisions) != 2 {
+			continue
+		}
+		thresholds := map[string]bool{}
+		currentThreshold := ""
+		currentDecisionFound, commandDecisionFound := false, false
+		for _, decision := range decisions {
+			terminals := topologyTerminalNodes(decision)
+			switch {
+			case terminals["IN_MINUS"] == sense:
+				currentThreshold = terminals["IN_PLUS"]
+				thresholds[currentThreshold] = true
+				currentDecisionFound = true
+			case terminals["IN_PLUS"] == sense:
+				currentThreshold = terminals["IN_MINUS"]
+				thresholds[currentThreshold] = true
+				currentDecisionFound = true
+			default:
+				for _, input := range []string{terminals["IN_PLUS"], terminals["IN_MINUS"]} {
+					for _, node := range graph.Nodes {
+						if node.ID == input && node.Scope == "external" &&
+							(node.Role == "control" || node.Role == "input") {
+							other := terminals["IN_PLUS"]
+							if other == input {
+								other = terminals["IN_MINUS"]
+							}
+							thresholds[other] = true
+							commandDecisionFound = true
+						}
+					}
+				}
+			}
+		}
+		if !currentDecisionFound || !commandDecisionFound {
+			continue
+		}
+		feedbackPath := topologyInternalResistorPath(graph, gate, currentThreshold)
+		if slices.Contains(feedbackPath, instance.ID) {
+			return []AnalyticScale{{
+				ID:         "topology:current_limited_switch_hysteresis:" + instance.ID,
+				Kind:       "resistance",
+				ValueSI:    *instance.ValueSI,
+				Unit:       "ohm",
+				Derivation: "catalog-selected positive feedback keeps the current decision bistable below the bounded peak-current limit",
+				SourceKind: "candidate_topology",
+				SourceID:   controlled.ID,
+				Priority:   1,
+			}}
+		}
+		first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+		if first != sense && second != sense && !thresholds[first] && !thresholds[second] {
+			continue
+		}
+		if first == gate || second == gate {
+			continue
+		}
+		return []AnalyticScale{{
+			ID:         "topology:current_limited_switch_role:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    *instance.ValueSI,
+			Unit:       "ohm",
+			Derivation: "catalog-selected current shunt and decision-reference values realize the bounded peak-current relationship",
+			SourceKind: "candidate_topology",
+			SourceID:   controlled.ID,
+			Priority:   1,
+		}}
+	}
+	return nil
+}
+
+func topologyInternalResistorPath(graph CandidateGraph, start, end string) []string {
+	if start == "" || end == "" || start == end {
+		return nil
+	}
+	internal := map[string]bool{start: true, end: true}
+	for _, node := range graph.Nodes {
+		if node.Scope == "internal" {
+			internal[node.ID] = true
+		}
+	}
+	type step struct {
+		node      string
+		instances []string
+	}
+	adjacency := map[string][]step{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
+			continue
+		}
+		left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+		if !internal[left] || !internal[right] {
+			continue
+		}
+		adjacency[left] = append(adjacency[left], step{node: right, instances: []string{instance.ID}})
+		adjacency[right] = append(adjacency[right], step{node: left, instances: []string{instance.ID}})
+	}
+	for node := range adjacency {
+		slices.SortFunc(adjacency[node], func(left, right step) int {
+			return cmp.Or(cmp.Compare(left.node, right.node), cmp.Compare(left.instances[0], right.instances[0]))
+		})
+	}
+	queue := []step{{node: start}}
+	visited := map[string]bool{start: true}
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, edge := range adjacency[current.node] {
+			if visited[edge.node] {
+				continue
+			}
+			path := append(append([]string(nil), current.instances...), edge.instances[0])
+			if edge.node == end {
+				return path
+			}
+			visited[edge.node] = true
+			queue = append(queue, step{node: edge.node, instances: path})
+		}
+	}
+	return nil
+}
+
 func deriveAutonomousPeriodicTopologyScales(
 	requirement Requirement,
 	graph CandidateGraph,
@@ -1653,6 +1817,52 @@ func topologyDeclaredNodeVoltageRange(
 		return minimum, maximum, haveMinimum && haveMaximum && maximum >= minimum
 	}
 	return 0, 0, false
+}
+
+// primitiveSupplySpanCoversConnectedRails rejects a catalog variant when its
+// reviewed supply model cannot cover the full declared voltage difference
+// between the instance's positive and negative supply terminals. Components
+// without that terminal contract or without supply bounds remain eligible.
+func primitiveSupplySpanCoversConnectedRails(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	primitive PrimitiveCandidate,
+) bool {
+	terminals := topologyTerminalNodes(instance)
+	negativeNode, haveNegative := terminals["V_MINUS"]
+	positiveNode, havePositive := terminals["V_PLUS"]
+	if !haveNegative || !havePositive {
+		return true
+	}
+	negativeMinimum, negativeMaximum, negativeOK := topologyDeclaredNodeVoltageRange(requirement, graph, negativeNode)
+	positiveMinimum, positiveMaximum, positiveOK := topologyDeclaredNodeVoltageRange(requirement, graph, positiveNode)
+	if !negativeOK || !positiveOK {
+		return true
+	}
+	minimumSpan := positiveMinimum - negativeMaximum
+	maximumSpan := positiveMaximum - negativeMinimum
+	if minimumSpan <= 0 || maximumSpan < minimumSpan {
+		return false
+	}
+	modelMinimum, modelMaximum := 0.0, math.Inf(1)
+	haveMinimum, haveMaximum := false, false
+	for _, model := range primitive.Models {
+		for _, parameter := range model.Parameters {
+			switch parameter.Name {
+			case "supply_min_v":
+				modelMinimum = math.Max(modelMinimum, parameter.Value)
+				haveMinimum = true
+			case "supply_max_v":
+				modelMaximum = math.Min(modelMaximum, parameter.Value)
+				haveMaximum = true
+			}
+		}
+	}
+	if !haveMinimum || !haveMaximum {
+		return true
+	}
+	return modelMinimum <= minimumSpan && modelMaximum >= maximumSpan
 }
 
 func primitiveDecisionOutputSwing(
@@ -2208,12 +2418,16 @@ type powerTransferSizingTargets struct {
 	gain              float64
 	bandwidthHz       float64
 	minimumSignalHz   float64
+	distortionMaximum float64
 	loadResistance    float64
+	minimumLoadOhm    float64
+	maximumLoadOhm    float64
 	inputResistance   float64
 	quiescentCurrent  float64
 	quiescentMinimum  float64
 	quiescentMaximum  float64
 	outputPeakVoltage float64
+	drivePeakVoltage  float64
 }
 
 // derivePowerTransferTopologyScales recognizes terminal relationships rather
@@ -2582,11 +2796,66 @@ func derivePowerTransferTopologyScales(
 		terminals := topologyTerminalNodes(active)
 		feedback := terminals["IN_MINUS"]
 		hasExternalFeedbackGain := false
+		seriesFeedbackValues := map[string]float64{}
 		for _, output := range outputs {
 			for _, candidate := range graph.Instances {
 				hasExternalFeedbackGain = hasExternalFeedbackGain ||
 					(candidate.Kind == "resistor" && between(candidate, feedback, output))
 			}
+			if leftValue, rightValue, found := catalogSeriesResistancePair(
+				requirement,
+				inventory,
+				10_000*(targets.gain-1),
+			); found {
+				for _, middle := range graph.Nodes {
+					if middle.Scope != "internal" || middle.ID == feedback || middle.ID == output {
+						continue
+					}
+					incident := []GraphInstance{}
+					for _, candidate := range graph.Instances {
+						for _, terminal := range candidate.Terminals {
+							if terminal.Node == middle.ID {
+								incident = append(incident, candidate)
+								break
+							}
+						}
+					}
+					if len(incident) != 2 || incident[0].Kind != "resistor" || incident[1].Kind != "resistor" {
+						continue
+					}
+					leftID, rightID := "", ""
+					for _, candidate := range incident {
+						if between(candidate, feedback, middle.ID) {
+							if leftID != "" {
+								leftID = ""
+								break
+							}
+							leftID = candidate.ID
+						}
+						if between(candidate, middle.ID, output) {
+							if rightID != "" {
+								rightID = ""
+								break
+							}
+							rightID = candidate.ID
+						}
+					}
+					if leftID != "" && rightID != "" {
+						seriesFeedbackValues[leftID] = leftValue
+						seriesFeedbackValues[rightID] = rightValue
+						hasExternalFeedbackGain = true
+						break
+					}
+				}
+			}
+		}
+		if value, found := seriesFeedbackValues[instance.ID]; found {
+			return makeScale(
+				"topology:power_transfer:series_feedback_gain",
+				"resistance", value, "ohm",
+				"catalog-ranked series feedback composition realizes the bounded non-inverting closed-loop gain",
+				feedback,
+			)
 		}
 		for _, reference := range references {
 			if hasExternalFeedbackGain && instance.Kind == "resistor" && between(instance, feedback, reference) {
@@ -3246,10 +3515,29 @@ func derivePowerTransferTopologyScales(
 				}
 			}
 			if onOutputPath {
+				parallelOutputs := 0
+				activeTerminals := topologyTerminalNodes(active)
+				for _, sibling := range graph.Instances {
+					if sibling.Kind != active.Kind {
+						continue
+					}
+					siblingTerminals := topologyTerminalNodes(sibling)
+					if siblingTerminals["BASE"] != activeTerminals["BASE"] ||
+						siblingTerminals["COLLECTOR"] != activeTerminals["COLLECTOR"] {
+						continue
+					}
+					for _, candidate := range graph.Instances {
+						if candidate.Kind == "resistor" &&
+							between(candidate, siblingTerminals["EMITTER"], output) {
+							parallelOutputs++
+							break
+						}
+					}
+				}
 				return makeScale(
 					"topology:power_transfer:output_degeneration",
-					"resistance", 0.02*targets.loadResistance, "ohm",
-					"R_deg=(0.02*V_peak)/(V_peak/R_load)=0.02*R_load for two-percent peak loss",
+					"resistance", 0.02*targets.loadResistance*float64(max(1, parallelOutputs)), "ohm",
+					"R_each=N*0.02*R_load for N symmetric output branches whose parallel equivalent limits peak loss to two percent",
 					outputTerminal,
 				)
 			}
@@ -3298,10 +3586,36 @@ func derivePowerTransferTopologyScales(
 		if bleedCurrent <= 0 {
 			continue
 		}
+		parallelBleeds := 0
+		for _, sibling := range graph.Instances {
+			if sibling.Kind != active.Kind {
+				continue
+			}
+			siblingTerminals := topologyTerminalNodes(sibling)
+			if siblingTerminals["BASE"] != base || siblingTerminals["COLLECTOR"] != terminals["COLLECTOR"] {
+				continue
+			}
+			siblingOnOutputPath := false
+			for _, output := range outputs {
+				for _, candidate := range graph.Instances {
+					siblingOnOutputPath = siblingOnOutputPath ||
+						(candidate.Kind == "resistor" && between(candidate, siblingTerminals["EMITTER"], output))
+				}
+			}
+			if !siblingOnOutputPath {
+				continue
+			}
+			for _, candidate := range graph.Instances {
+				if candidate.Kind == "resistor" && between(candidate, base, siblingTerminals["EMITTER"]) {
+					parallelBleeds++
+					break
+				}
+			}
+		}
 		return makeScale(
 			"topology:power_transfer:compound_base_emitter_bleed",
-			"resistance", 0.65/bleedCurrent, "ohm",
-			"R_bleed=V_BE/(I_bias-I_q_branch/beta_min), with I_bias=I_q_total/4; the driver-current remainder bypasses the power base while the requested branch idle current remains",
+			"resistance", 0.65/bleedCurrent*float64(max(1, parallelBleeds)), "ohm",
+			"R_each=N*V_BE/(I_bias-I_q_branch/beta_min) for N symmetric bleeds; their parallel equivalent bypasses the driver-current remainder while the requested total branch idle current remains",
 			base,
 		)
 	}
@@ -3328,8 +3642,7 @@ func derivePowerTransferTopologyScales(
 	}
 	var npnBase, pnpBase string
 	transitionFrequency := map[string]float64{}
-	npnBetaProduct, pnpBetaProduct := 1.0, 1.0
-	npnBetaCount, pnpBetaCount := 0, 0
+	forwardBetaByBase := map[string]float64{}
 	for _, active := range graph.Instances {
 		_, _, isBiasTracker := biasJunctionEdge(active)
 		if isBiasTracker && (active.Kind == "npn_bjt" || active.Kind == "pnp_bjt") {
@@ -3357,16 +3670,15 @@ func derivePowerTransferTopologyScales(
 				}
 			}
 			if activeBeta > 0 {
-				if active.Kind == "npn_bjt" {
-					npnBetaProduct *= activeBeta
-					npnBetaCount++
-				} else {
-					pnpBetaProduct *= activeBeta
-					pnpBetaCount++
+				base := topologyTerminalNodes(active)["BASE"]
+				if existing := forwardBetaByBase[base]; existing == 0 || activeBeta < existing {
+					forwardBetaByBase[base] = activeBeta
 				}
 			}
 		}
 	}
+	npnBetaProduct, npnBetaCount := powerTransferSeriesBeta(graph, inventory, "npn_bjt")
+	pnpBetaProduct, pnpBetaCount := powerTransferSeriesBeta(graph, inventory, "pnp_bjt")
 	drive := ""
 	for _, active := range graph.Instances {
 		if active.Kind == "opamp" {
@@ -3414,21 +3726,44 @@ func derivePowerTransferTopologyScales(
 			lowerBias = drive
 		}
 	}
-	if instance.Kind == "resistor" && targets.bandwidthHz > 0 && targets.quiescentCurrent > 0 {
+	if instance.Kind == "resistor" && targets.bandwidthHz > 0 {
 		for _, connection := range [][2]string{{npnBase, upperBias}, {pnpBase, lowerBias}} {
 			base, bias := connection[0], connection[1]
 			if base == "" || bias == "" || base == bias || !between(instance, base, bias) {
 				continue
 			}
-			ft := transitionFrequency[base]
-			branchCurrent := targets.quiescentCurrent / 2
-			if ft <= 0 || branchCurrent <= 0 {
+			maximumResistance := math.Inf(1)
+			limits := []string{}
+			if ft := transitionFrequency[base]; ft > 0 && targets.quiescentCurrent > 0 {
+				branchCurrent := targets.quiescentCurrent / 2
+				maximumResistance = math.Min(
+					maximumResistance,
+					ft*0.02585/(20*targets.bandwidthHz*branchCurrent),
+				)
+				limits = append(limits, "the small-signal base pole stays at least twenty times the requested bandwidth")
+			}
+			if beta := forwardBetaByBase[base]; beta > 0 &&
+				targets.outputPeakVoltage > 0 && targets.loadResistance > 0 {
+				peakBaseCurrent := targets.outputPeakVoltage / (targets.loadResistance * beta)
+				if peakBaseCurrent > 0 {
+					maximumLossFraction := 0.02
+					if targets.distortionMaximum > 0 {
+						maximumLossFraction = math.Min(maximumLossFraction, targets.distortionMaximum)
+					}
+					maximumResistance = math.Min(
+						maximumResistance,
+						maximumLossFraction*targets.outputPeakVoltage/peakBaseCurrent,
+					)
+					limits = append(limits, "peak base-current loss stays within the tighter of two percent of requested output swing and the normalized distortion limit")
+				}
+			}
+			if !finite(maximumResistance) || maximumResistance <= 0 {
 				continue
 			}
 			return makeScale(
 				"topology:power_transfer:base_stop",
-				"resistance", ft*0.02585/(20*targets.bandwidthHz*branchCurrent), "ohm",
-				"R_stop=f_T*V_T/(20*bandwidth*I_q_branch), from C_pi=g_m/(2*pi*f_T), for a base pole twenty times bandwidth",
+				"resistance", maximumResistance, "ohm",
+				"R_stop is the tighter catalog-bound limit so "+strings.Join(limits, " and "),
 				base,
 			)
 		}
@@ -3439,27 +3774,52 @@ func derivePowerTransferTopologyScales(
 		if npnBetaCount > 0 && pnpBetaCount > 0 {
 			minimumDriveBeta = math.Min(npnBetaProduct, pnpBetaProduct)
 		}
-		if minimumDriveBeta > 0 && targets.outputPeakVoltage > 0 && targets.loadResistance > 0 {
+		peakVoltage := targets.drivePeakVoltage
+		if peakVoltage <= 0 {
+			peakVoltage = targets.outputPeakVoltage
+		}
+		peakLoadResistance := targets.loadResistance
+		if npnBetaCount > 1 && pnpBetaCount > 1 && targets.minimumLoadOhm > 0 {
+			peakLoadResistance = targets.minimumLoadOhm
+		}
+		peakBaseCurrent := 0.0
+		if minimumDriveBeta > 0 && peakVoltage > 0 && peakLoadResistance > 0 {
+			peakBaseCurrent = peakVoltage / (peakLoadResistance * minimumDriveBeta)
 			biasCurrent = math.Max(
 				biasCurrent,
-				targets.outputPeakVoltage/(targets.loadResistance*minimumDriveBeta),
+				peakBaseCurrent,
 			)
 		}
 		junctionDrop := 0.65 * float64(max(1, max(upperJunctions, lowerJunctions)))
 		biasResistance := (supplySpan/2 - junctionDrop) / biasCurrent
+		if peakBaseCurrent > 0 {
+			peakHeadroom := minimumSupplySpan/2 - junctionDrop - peakVoltage
+			if peakHeadroom > 0 {
+				biasResistance = math.Min(biasResistance, peakHeadroom/peakBaseCurrent)
+			}
+		}
+		parallelBranches := func(left, right string) int {
+			count := 0
+			for _, candidate := range graph.Instances {
+				if candidate.Kind == "resistor" && between(candidate, left, right) {
+					count++
+				}
+			}
+			return max(1, count)
+		}
 		switch {
 		case between(instance, highRail, upperBias):
 			return makeScale(
 				"topology:power_transfer:bias_chain_upper",
-				"resistance", biasResistance, "ohm",
-				"R_bias=(V_rail-N*0.65V)/I_bias, I_bias=max(0.5mA,I_q/4,V_peak/(R_load*product(beta_path))); matched diode-connected trackers set the compound-stage standing current while furnishing cascaded-device base drive",
+				"resistance", biasResistance*float64(parallelBranches(highRail, upperBias)), "ohm",
+				"parallel R_bias branches realize the tighter of center-bias current and minimum-rail peak-headroom limits; matched diode-connected trackers set standing current while furnishing cascaded-device base drive",
 				upperBias,
 			)
 		case between(instance, lowerBias, lowRail):
 			return makeScale(
 				"topology:power_transfer:bias_chain_lower",
-				"resistance", biasResistance, "ohm",
-				"R_bias=(V_rail-N*0.65V)/I_bias, I_bias=max(0.5mA,I_q/4,V_peak/(R_load*product(beta_path))); matched diode-connected trackers set the compound-stage standing current while furnishing cascaded-device base drive",
+				"resistance", biasResistance*float64(parallelBranches(lowerBias, lowRail)), "ohm",
+				"parallel R_bias branches realize the tighter of center-bias current and minimum-rail peak-headroom limits; matched diode-connected trackers set standing current while furnishing cascaded-device base drive",
 				lowerBias,
 			)
 		}
@@ -3468,8 +3828,100 @@ func derivePowerTransferTopologyScales(
 	return nil
 }
 
+// powerTransferSeriesBeta returns the weakest series current-gain path for one
+// polarity. Parallel output devices are alternative children of the same
+// driver stage and therefore share current; they must not be multiplied as if
+// they were additional cascaded gain stages.
+func powerTransferSeriesBeta(
+	graph CandidateGraph,
+	inventory map[string]PrimitiveCandidate,
+	kind string,
+) (float64, int) {
+	type stage struct {
+		base    string
+		emitter string
+		beta    float64
+	}
+	stages := []stage{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != kind {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if terminals["BASE"] == "" || terminals["BASE"] == terminals["COLLECTOR"] ||
+			terminals["EMITTER"] == "" {
+			continue
+		}
+		beta := 0.0
+		for _, model := range inventory[instance.PrimitiveKey].Models {
+			for _, parameter := range model.Parameters {
+				if parameter.Name == "forward_beta" && parameter.Value > 0 &&
+					(beta == 0 || parameter.Value < beta) {
+					beta = parameter.Value
+				}
+			}
+		}
+		if beta > 0 {
+			stages = append(stages, stage{base: terminals["BASE"], emitter: terminals["EMITTER"], beta: beta})
+		}
+	}
+	if len(stages) == 0 {
+		return 0, 0
+	}
+	drivenBase := map[string]bool{}
+	for _, candidate := range stages {
+		drivenBase[candidate.emitter] = true
+	}
+	bestProduct := math.Inf(1)
+	bestCount := 0
+	var walk func(int, map[int]bool) (float64, int)
+	walk = func(index int, visited map[int]bool) (float64, int) {
+		if visited[index] {
+			return 0, 0
+		}
+		nextVisited := maps.Clone(visited)
+		nextVisited[index] = true
+		childProduct := math.Inf(1)
+		childCount := 0
+		for childIndex, child := range stages {
+			if child.base != stages[index].emitter {
+				continue
+			}
+			product, count := walk(childIndex, nextVisited)
+			if product > 0 && product < childProduct {
+				childProduct, childCount = product, count
+			}
+		}
+		if !finite(childProduct) {
+			return stages[index].beta, 1
+		}
+		return stages[index].beta * childProduct, childCount + 1
+	}
+	for index, candidate := range stages {
+		if drivenBase[candidate.base] {
+			continue
+		}
+		product, count := walk(index, map[int]bool{})
+		if product > 0 && product < bestProduct {
+			bestProduct, bestCount = product, count
+		}
+	}
+	if !finite(bestProduct) {
+		minimumBeta := math.Inf(1)
+		for _, candidate := range stages {
+			minimumBeta = math.Min(minimumBeta, candidate.beta)
+		}
+		if finite(minimumBeta) {
+			return minimumBeta, 1
+		}
+		return 0, 0
+	}
+	return bestProduct, bestCount
+}
+
 func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizingTargets {
 	targets := powerTransferSizingTargets{}
+	minimumOutputPower, maximumOutputPower := 0.0, 0.0
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		target := assertionTarget(assertion)
 		switch assertion.Metric {
@@ -3477,6 +3929,16 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 			targets.gain = math.Max(targets.gain, target)
 		case "bandwidth", "cutoff_frequency":
 			targets.bandwidthHz = math.Max(targets.bandwidthHz, target)
+		case "thd", "total_harmonic_distortion":
+			if assertion.Max != nil && *assertion.Max > 0 {
+				maximum := *assertion.Max
+				if assertion.Metric == "total_harmonic_distortion" {
+					maximum /= 100
+				}
+				if targets.distortionMaximum == 0 || maximum < targets.distortionMaximum {
+					targets.distortionMaximum = maximum
+				}
+			}
 		case "quiescent_current":
 			targets.quiescentCurrent = math.Max(targets.quiescentCurrent, target)
 			if assertion.Min != nil {
@@ -3490,6 +3952,13 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 			targets.outputPeakVoltage = math.Max(targets.outputPeakVoltage, target)
 		case "output_swing":
 			targets.outputPeakVoltage = math.Max(targets.outputPeakVoltage, target/2)
+		case "output_power":
+			if assertion.Min != nil && *assertion.Min > minimumOutputPower {
+				minimumOutputPower = *assertion.Min
+			}
+			if assertion.Max != nil && (maximumOutputPower == 0 || *assertion.Max < maximumOutputPower) {
+				maximumOutputPower = *assertion.Max
+			}
 		}
 		if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 &&
 			(targets.minimumSignalHz == 0 || *assertion.FrequencyHz < targets.minimumSignalHz) {
@@ -3502,6 +3971,12 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 				value := positiveMidpoint(condition.Min, condition.Max)
 				if value > 0 && (targets.loadResistance == 0 || value < targets.loadResistance) {
 					targets.loadResistance = value
+				}
+				if condition.Min > 0 && (targets.minimumLoadOhm == 0 || condition.Min < targets.minimumLoadOhm) {
+					targets.minimumLoadOhm = condition.Min
+				}
+				if condition.Max > targets.maximumLoadOhm {
+					targets.maximumLoadOhm = condition.Max
 				}
 			}
 		}
@@ -3521,7 +3996,65 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 			}
 		}
 	}
+	if minimumOutputPower > 0 && maximumOutputPower > 0 &&
+		targets.minimumLoadOhm > 0 && targets.maximumLoadOhm > 0 {
+		minimumPeak := math.Sqrt(2 * minimumOutputPower * targets.maximumLoadOhm)
+		maximumPeak := math.Sqrt(2 * maximumOutputPower * targets.minimumLoadOhm)
+		if minimumPeak > 0 && minimumPeak <= maximumPeak {
+			targets.drivePeakVoltage = (minimumPeak + maximumPeak) / 2
+		}
+	}
 	return targets
+}
+
+// powerTransferBiasFeedBranchCount determines how many equal catalog resistor
+// branches are required to preserve output-device base drive at the minimum
+// rail while the requested power waveform approaches its peak. The topology
+// generator uses the same behavioral targets and reviewed catalog values as
+// the value planner, so sparse catalogs are composed deterministically rather
+// than silently accepting a center-biased resistor that starves at the peak.
+func powerTransferBiasFeedBranchCount(
+	requirement Requirement,
+	graph CandidateGraph,
+	inventory map[string]PrimitiveCandidate,
+	upper PrimitiveCandidate,
+	lower PrimitiveCandidate,
+) int {
+	targets := derivePowerTransferSizingTargets(requirement)
+	peakVoltage := targets.drivePeakVoltage
+	if peakVoltage <= 0 {
+		peakVoltage = targets.outputPeakVoltage
+	}
+	beta := math.Min(primitiveMinimumForwardBeta(upper), primitiveMinimumForwardBeta(lower))
+	if peakVoltage <= 0 || targets.loadResistance <= 0 || beta <= 0 {
+		return 2
+	}
+	highRail, lowRail := topologyPowerRails(requirement, graph)
+	if highRail == "" || lowRail == "" {
+		return 2
+	}
+	highNominal, highOK := topologyNodeNominalVoltage(requirement, graph, highRail)
+	lowNominal, lowOK := topologyNodeNominalVoltage(requirement, graph, lowRail)
+	highMinimum, _, highRangeOK := topologyNodeVoltageRange(requirement, graph, highRail)
+	_, lowMaximum, lowRangeOK := topologyNodeVoltageRange(requirement, graph, lowRail)
+	if !highOK || !lowOK || !highRangeOK || !lowRangeOK {
+		return 2
+	}
+	nominalHalfSpan := (highNominal - lowNominal) / 2
+	minimumHalfSpan := (highMinimum - lowMaximum) / 2
+	peakBaseCurrent := peakVoltage / (targets.loadResistance * beta)
+	centerHeadroom := nominalHalfSpan - 0.65
+	peakHeadroom := minimumHalfSpan - 0.65 - peakVoltage
+	if peakBaseCurrent <= 0 || centerHeadroom <= 0 || peakHeadroom <= 0 {
+		return 2
+	}
+	centerResistance := centerHeadroom / peakBaseCurrent
+	maximumEffectiveResistance := peakHeadroom / peakBaseCurrent
+	catalogResistance, found := topologyCatalogResistanceClosest(requirement, inventory, centerResistance)
+	if !found || catalogResistance <= 0 || maximumEffectiveResistance <= 0 {
+		return 2
+	}
+	return max(2, int(math.Ceil(catalogResistance/maximumEffectiveResistance)))
 }
 
 // deriveWindowedBallastedSwitchTopologyScales recognizes two passive

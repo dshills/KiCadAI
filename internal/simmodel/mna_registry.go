@@ -1177,7 +1177,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "component-scoped assertion requires a resolved component"})
 		}
 		componentPermitted := componentRequired ||
-			(assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz)
+			assertion.Quantity == QuantityCutoffFrequencyHz ||
+			assertion.Quantity == QuantityBandwidthHz ||
+			quantityPermitsDeviceCurrentWaveform(assertion.Quantity)
 		if !componentPermitted && assertion.Component != "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "assertion quantity does not accept a component scope"})
 		}
@@ -1281,8 +1283,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "DC sweep span/slope assertion requires a bounded DC source sweep"})
 			}
 		case QuantityOutputPowerW:
-			if kind != AnalysisTransient {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "output-power assertion requires transient analysis"})
+			if kind != AnalysisTransient && kind != AnalysisDistortion {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "output-power assertion requires transient or distortion analysis"})
 			}
 		case QuantityConversionEfficiencyPct:
 			if kind != AnalysisTransient {
@@ -1356,13 +1358,15 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "THD assertion frequency must match the resolved distortion sine fundamental"})
 			}
 		}
+		frequencyQualifiedDuty := kind == AnalysisTransient &&
+			assertion.Quantity == QuantityDutyCyclePct && assertion.FrequencyHz > 0
 		if kind != AnalysisACSweep &&
-			!distortionPointQuantity &&
+			!distortionPointQuantity && !frequencyQualifiedDuty &&
 			assertion.FrequencyHz != 0 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "derived and non-frequency assertions cannot specify a frequency"})
 		}
 		if kind == AnalysisTransient {
-			if assertion.FrequencyHz != 0 {
+			if assertion.FrequencyHz != 0 && !frequencyQualifiedDuty {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "transient assertion cannot specify a frequency"})
 			}
 			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)

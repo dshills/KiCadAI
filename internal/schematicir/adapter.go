@@ -828,6 +828,15 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				pairs = append(pairs, endpointPair{from: net.Connect[endpointIndex-1], to: net.Connect[endpointIndex]})
 			}
 		}
+		// Emit visible conductor branches before label-only branches. The
+		// builder can then recognize a shared endpoint as already wired and
+		// avoid adding a redundant label stub that overlaps the conductor.
+		// Stable sorting preserves the layout planner's order within each
+		// branch class.
+		sort.SliceStable(pairs, func(i, j int) bool {
+			return state.netPairEmissionPriority(net.Name, pairs[i].from, pairs[i].to) <
+				state.netPairEmissionPriority(net.Name, pairs[j].from, pairs[j].to)
+		})
 		useLabelsValue := state.netLabelPreferences[net.Name]
 		useLabels := &useLabelsValue
 		hasLayoutRouteAnnotation := layoutHasRouteAnnotation(state.layoutResult, net.Name)
@@ -957,6 +966,14 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func (state *adapterState) netPairEmissionPriority(netName string, from, to EndpointRef) int {
+	hint, exists := state.routesByKey[schematicRouteKey(netName, from, to)]
+	if exists && !hint.UseLabels && len(hint.Points) != 0 {
+		return 0
+	}
+	return 1
 }
 
 func layoutHasRouteAnnotation(result schematiclayout.Result, netName string) bool {
@@ -1321,7 +1338,29 @@ func (state *adapterState) validLabelPointForEndpoint(netName string, endpoint E
 }
 
 func (state *adapterState) labelSegmentConflicts(netName string, endpoint EndpointRef, anchor, label transactions.Point) bool {
-	return state.labelSegmentTouchesForeignPin(netName, endpoint, anchor, label) || state.labelSegmentTouchesOtherNetLabel(netName, anchor, label)
+	return state.labelSegmentTouchesForeignPin(netName, endpoint, anchor, label) ||
+		state.labelSegmentTouchesOtherNetLabel(netName, anchor, label) ||
+		state.labelPointTouchesDirectNetRoute(netName, label)
+}
+
+// labelPointTouchesDirectNetRoute prevents an endpoint-label stub from ending
+// on the interior (or endpoint) of another visible branch of the same net.
+// KiCad treats that geometry as a label connected to multiple wires and emits
+// label_multiple_wires even though the logical net is correct. The fallback
+// label search can then choose an orthogonal, electrically equivalent stub.
+func (state *adapterState) labelPointTouchesDirectNetRoute(netName string, label transactions.Point) bool {
+	point := transactionPointToSchematicPoint(label)
+	for _, route := range state.routesByKey {
+		if route.NetName != netName || route.UseLabels {
+			continue
+		}
+		for index := 1; index < len(route.Points); index++ {
+			if schematicPointOnSegment(point, route.Points[index-1], route.Points[index]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (state *adapterState) labelSegmentTouchesOtherNetLabel(netName string, anchor, label transactions.Point) bool {
@@ -1471,7 +1510,8 @@ func (state *adapterState) fallbackLabelPointForEndpoint(netName string, endpoin
 		return transactions.Point{}, false
 	}
 	dx, dy := anchor.XMM-origin.XMM, anchor.YMM-origin.YMM
-	for _, distance := range []float64{2.54, 1.27, 0} {
+	candidates := make([]transactions.Point, 0, 7)
+	for _, distance := range []float64{2.54, 1.27} {
 		candidate := anchor
 		if math.Abs(dx) >= math.Abs(dy) && dx != 0 {
 			candidate.XMM += math.Copysign(distance, dx)
@@ -1480,6 +1520,25 @@ func (state *adapterState) fallbackLabelPointForEndpoint(netName string, endpoin
 		} else {
 			candidate.YMM -= distance
 		}
+		candidates = append(candidates, candidate)
+	}
+	// A visible same-net branch can legitimately occupy the pin's outward
+	// axis. Try short perpendicular stubs before delegating to the writer's
+	// geometry-unaware fallback, which could place the label back on that
+	// branch and trigger KiCad's label_multiple_wires warning.
+	for _, distance := range []float64{2.54, 1.27} {
+		first, second := anchor, anchor
+		if math.Abs(dx) >= math.Abs(dy) && dx != 0 {
+			first.YMM -= distance
+			second.YMM += distance
+		} else {
+			first.XMM += distance
+			second.XMM -= distance
+		}
+		candidates = append(candidates, first, second)
+	}
+	candidates = append(candidates, anchor)
+	for _, candidate := range candidates {
 		if !state.labelSegmentConflicts(netName, endpoint, anchor, candidate) {
 			return candidate, true
 		}

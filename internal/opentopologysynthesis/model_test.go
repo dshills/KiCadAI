@@ -107,6 +107,9 @@ func TestValidationFailsClosedAndReturnsStableSortedIssues(t *testing.T) {
 
 func TestPolicyAndReportContractsAreDeterministic(t *testing.T) {
 	policy := DefaultPolicy()
+	if policy.MaxCandidateSimulations < 50_000 || policy.MaxCornerEvaluations < 8_192 {
+		t.Fatalf("default policy does not cover established multi-stage qualification bounds: %#v", policy)
+	}
 	first, err := PolicyHash(policy)
 	if err != nil {
 		t.Fatal(err)

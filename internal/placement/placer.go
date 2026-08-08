@@ -729,8 +729,24 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	clusterBlockedCenters := requiredProximityAnchorReservationBlockedCenters(clusterReserve, clusterObstacles, usable, grid, xCount, yCount)
 	variantsPerPoint := max(1, len(rotations)*len(layers))
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
-	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, axisSamples)
-	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, axisSamples)
+	xSamples, ySamples := axisSamples, axisSamples
+	edgeCohort := edgePlacementCohortSize(component, request)
+	// Edge-constrained thermal and connector populations need independent
+	// positions along the edge. Square-root sampling is sufficient for an
+	// unconstrained 2-D search but artificially caps a 1-D edge cohort, even
+	// when the physical span is large enough. Oversampling also replaces the
+	// endpoint candidates rejected by footprint half-extents.
+	switch component.Edge {
+	case EdgeLeft, EdgeRight:
+		ySamples = max(ySamples, 2*edgeCohort+2)
+	case EdgeTop, EdgeBottom:
+		xSamples = max(xSamples, 2*edgeCohort+2)
+	case EdgeAny:
+		xSamples = max(xSamples, edgeCohort+2)
+		ySamples = max(ySamples, edgeCohort+2)
+	}
+	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, xSamples)
+	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, ySamples)
 	denseCandidateCount := xCount * yCount * variantsPerPoint
 	if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 &&
 		denseCandidateCount <= maxDenseGridCandidates {
@@ -865,6 +881,19 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func edgePlacementCohortSize(component Component, request Request) int {
+	if component.Edge == EdgeNone {
+		return 0
+	}
+	count := 0
+	for _, candidate := range request.Components {
+		if candidate.Edge == component.Edge {
+			count++
+		}
+	}
+	return count
 }
 
 func denseGridIndices(count int) []int {

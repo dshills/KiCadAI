@@ -63,6 +63,36 @@ func TestEmptyResultBuildsPassingReport(t *testing.T) {
 	}
 }
 
+func TestNormalizeResultMergesOverlappingSameNetCollinearWires(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(127), Y: kicadfiles.MM(60.96)}
+	result := NormalizeResult(Result{
+		Components: []PlacedComponent{{
+			Component: Component{Ref: "D1", Pins: []Pin{{Number: "2"}}},
+			PlacedAt:  anchor,
+		}},
+		Wires: []WireSegment{
+			{NetName: "SIG", From: kicadfiles.Point{X: kicadfiles.MM(129.54), Y: kicadfiles.MM(60.96)}, To: anchor},
+			{NetName: "SIG", From: kicadfiles.Point{X: kicadfiles.MM(125.73), Y: kicadfiles.MM(60.96)}, To: kicadfiles.Point{X: kicadfiles.MM(129.54), Y: kicadfiles.MM(60.96)}},
+			{NetName: "SIG", From: anchor, To: kicadfiles.Point{X: kicadfiles.MM(128.27), Y: kicadfiles.MM(60.96)}},
+			{NetName: "OTHER", From: anchor, To: kicadfiles.Point{X: kicadfiles.MM(128.27), Y: kicadfiles.MM(60.96)}},
+		},
+	}, DefaultRules(ProfileStandard))
+	if len(result.Wires) != 2 {
+		t.Fatalf("normalized wires = %#v, want one SIG union and OTHER", result.Wires)
+	}
+	want := WireSegment{
+		NetName: "SIG",
+		From:    kicadfiles.Point{X: kicadfiles.MM(125.73), Y: kicadfiles.MM(60.96)},
+		To:      kicadfiles.Point{X: kicadfiles.MM(129.54), Y: kicadfiles.MM(60.96)},
+	}
+	if result.Wires[1] != want {
+		t.Fatalf("merged SIG wire = %#v, want %#v", result.Wires[1], want)
+	}
+	if len(result.Junctions) != 1 || result.Junctions[0].Position != anchor {
+		t.Fatalf("junctions = %#v, want pin-interior junction at %#v", result.Junctions, anchor)
+	}
+}
+
 func TestNormalizeDiagnosticsSortsAndBounds(t *testing.T) {
 	diagnostics := []Diagnostic{
 		{Severity: SeverityInfo, Code: "z", Message: "late"},

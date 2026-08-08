@@ -311,6 +311,12 @@ func TestPeriodicTransientMeasurementsUseSettledTwoCycleWindow(t *testing.T) {
 	if diagnostic != nil || power != 4 {
 		t.Fatalf("output power = %.12g, %#v; want settled 4 W", power, diagnostic)
 	}
+	result.ID = "distortion"
+	result.Kind = AnalysisDistortion
+	power, diagnostic = assertionValue([]AnalysisResult{result}, Assertion{AnalysisID: "distortion", Component: "LOAD", Quantity: QuantityOutputPowerW})
+	if diagnostic != nil || power != 4 {
+		t.Fatalf("distortion output power = %.12g, %#v; want settled 4 W", power, diagnostic)
+	}
 }
 
 func TestTHDFiveHarmonicMeasurementConvergesAtTrustedMinimumGrid(t *testing.T) {

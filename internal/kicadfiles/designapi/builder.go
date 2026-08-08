@@ -886,7 +886,8 @@ func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor
 	if samePoint(position, anchor) {
 		return builder.schematicLabelTextOverlapsExisting(netName, anchor, position, orientOutward)
 	}
-	return builder.schematicStubTouchesForeignWire(netName, anchor, position) ||
+	return schematicStubTouchesExistingWire(anchor, position, builder.design.Schematic.Wires) ||
+		builder.schematicStubTouchesForeignWire(netName, anchor, position) ||
 		builder.schematicSegmentTouchesForeignPinAnchor(netName, anchor, position, anchor) ||
 		builder.schematicStubTouchesVisibleText(anchor, position) ||
 		builder.schematicLabelTextOverlapsExisting(netName, anchor, position, orientOutward)
@@ -1271,7 +1272,7 @@ func (builder *Builder) addSchematicLabelStubWithOrientation(netName string, end
 	}
 	offset = builder.safeSchematicLabelStubOffset(netName, anchor, offset, orientOutward)
 	labelPoint := kicadfiles.Point{X: anchor.X + offset.X, Y: anchor.Y + offset.Y}
-	builder.addSchematicWire(netName, endpoint, endpoint, anchor, labelPoint)
+	builder.addSchematicWireWithOptions(netName, endpoint, endpoint, anchor, labelPoint, true, nil)
 	labelOptions := LabelOptions{}
 	if orientOutward {
 		labelOptions = schematicLabelOptionsForStub(anchor, labelPoint)

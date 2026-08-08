@@ -195,6 +195,9 @@ func lowerCandidateDocument(
 		for _, terminal := range primitive.Terminals {
 			component.RequiredFunctions = append(component.RequiredFunctions, terminal.Function)
 		}
+		for _, endpoint := range packageNoConnects {
+			component.RequiredFunctions = append(component.RequiredFunctions, endpoint.Selector)
+		}
 		parallelRequiredFunctions[instance.ID] = physicalParallelRequiredFunctions(primitive, catalog)
 		for _, endpoints := range parallelRequiredFunctions[instance.ID] {
 			for _, endpoint := range endpoints {
@@ -509,6 +512,39 @@ func physicalPackageCompletion(
 	}
 	noConnects := []circuitgraph.Endpoint{}
 	issues := []reports.Issue{}
+	functions := physicalRecordFunctions(record, primitive.VariantID)
+	for _, companion := range record.Companions {
+		if !companion.Required || len(companion.NoConnects) == 0 || len(companion.AppliesTo) != 0 {
+			continue
+		}
+		for _, function := range companion.NoConnects {
+			binding, exists := functions[strings.ToUpper(strings.TrimSpace(function))]
+			if !exists {
+				issues = append(issues, physicalLoweringError(
+					"physical.components."+componentID+".companions."+companion.ID+".no_connects."+function,
+					"required package no-connect policy references a function unavailable in the selected variant",
+				))
+				continue
+			}
+			if binding.required {
+				issues = append(issues, physicalLoweringError(
+					"physical.components."+componentID+".companions."+companion.ID+".no_connects."+function,
+					"required package no-connect policy conflicts with a required symbol function",
+				))
+				continue
+			}
+			endpoint := circuitgraph.Endpoint{
+				Component: componentID, Unit: binding.unit,
+				SelectorKind: circuitgraph.SelectorFunction, Selector: binding.function,
+			}
+			if !slices.ContainsFunc(noConnects, func(existing circuitgraph.Endpoint) bool {
+				return existing.Component == endpoint.Component && existing.Unit == endpoint.Unit &&
+					existing.SelectorKind == endpoint.SelectorKind && strings.EqualFold(existing.Selector, endpoint.Selector)
+			}) {
+				noConnects = append(noConnects, endpoint)
+			}
+		}
+	}
 	for _, symbol := range record.Symbols {
 		unitID := strings.TrimSpace(symbol.UnitID)
 		if unitID == "" || used[strings.ToUpper(unitID)] {
@@ -538,6 +574,12 @@ func physicalPackageCompletion(
 	}
 	slices.SortFunc(units, func(left, right circuitgraph.ComponentUnit) int {
 		return cmp.Or(cmp.Compare(left.ID, right.ID), cmp.Compare(left.Role, right.Role))
+	})
+	slices.SortFunc(noConnects, func(left, right circuitgraph.Endpoint) int {
+		return cmp.Or(
+			cmp.Compare(left.Unit, right.Unit),
+			cmp.Compare(strings.ToUpper(left.Selector), strings.ToUpper(right.Selector)),
+		)
 	})
 	return units, noConnects, reports.SortedIssues(issues)
 }

@@ -1497,6 +1497,31 @@ func testValueSIEqual(actual, expected float64) bool {
 	return math.Abs(actual-expected) <= tolerance
 }
 
+func TestPowerTransferSeriesFeedbackRequiredForSparseCatalogGap(t *testing.T) {
+	minimum, maximum := 18.0, 22.0
+	requirement := Requirement{Requirements: Requirements{BehavioralRequirements: []BehavioralAssertion{{
+		ID: "gain", Metric: "voltage_gain", Analysis: "ac_sweep", Min: &minimum, Max: &maximum,
+	}}}}
+	fixedResistor := func(key string, value float64) PrimitiveCandidate {
+		return PrimitiveCandidate{
+			Key: key, Kind: "resistor",
+			ValueDomain: &PrimitiveValueDomain{Kind: "resistance", Unit: "ohm", Minimum: &value, Nominal: &value, Maximum: &value},
+			Models:      []PrimitiveModelContract{{AllowedAnalyses: []string{"ac_sweep"}}},
+		}
+	}
+	inventory := map[string]PrimitiveCandidate{
+		"10k":  fixedResistor("10k", 10_000),
+		"169k": fixedResistor("169k", 169_000),
+	}
+	if !powerTransferSeriesFeedbackRequired(requirement, inventory) {
+		t.Fatal("sparse catalog gap below the bounded gain did not request series feedback composition")
+	}
+	inventory["190k"] = fixedResistor("190k", 190_000)
+	if powerTransferSeriesFeedbackRequired(requirement, inventory) {
+		t.Fatal("direct catalog feedback value inside the bounded gain unnecessarily requested composition")
+	}
+}
+
 func testOpenTopologyRequirement(t *testing.T, file string) Requirement {
 	t.Helper()
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(frozenCorpusRoot(), file))))

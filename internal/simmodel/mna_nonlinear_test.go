@@ -223,6 +223,56 @@ func TestNonlinearDCCenteredSeedSupportsMoreThanFourOpAmps(t *testing.T) {
 	}
 }
 
+func TestNonlinearDCSymmetricZeroVoltCenteredSeedReturnsSolvedSystem(t *testing.T) {
+	opAmpParameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 120000},
+		{Name: "gain_bandwidth_hz", Value: 10_000_000},
+		{Name: "output_high_margin_v", Value: .05},
+		{Name: "output_low_margin_v", Value: .05},
+		{Name: "supply_max_v", Value: 36},
+		{Name: "supply_min_v", Value: 4.5},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("positive_supply", "VP", "GND"),
+		voltageSourceEvidence("negative_supply", "VN", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		resistorEvidence("diode_bias", 1000, "VP", "DIODE"),
+		{
+			InstanceID: "diode", CatalogID: "diode.reviewed", Family: "diode",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDiodeShockleyV1, Parameters: diodeParameters(.2, 100)}},
+			Connections: []ConnectionEvidence{{Function: "ANODE", Net: "DIODE"}, {Function: "CATHODE", Net: "GND"}},
+		},
+		{
+			InstanceID: "buffer", CatalogID: "opamp.reviewed", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: opAmpParameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: "OUT"},
+				{Function: "OUT", Net: "OUT"}, {Function: "V_PLUS", Net: "VP"},
+				{Function: "V_MINUS", Net: "VN"},
+			},
+		},
+	}
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "bias", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "positive_supply", DCValue: 5},
+			{Component: "negative_supply", DCValue: -5},
+			{Component: "signal", DCValue: 0},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "bias", Node: "OUT", Quantity: QuantityVoltageV, Min: -.001, Max: .001}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "VN"}, {Name: "IN"}, {Name: "OUT"}, {Name: "DIODE"},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	system, solution, evidence, _, ok := solveNonlinearDCByCenteredOpAmpSeed(plan, plan.Analyses[0], nil)
+	if !ok || len(system.rhs) == 0 || len(solution) != len(system.rhs) {
+		t.Fatalf("zero-volt centered seed ok=%t unknowns=%d solution=%d evidence=%+v", ok, len(system.rhs), len(solution), evidence)
+	}
+}
+
 func TestLinearColdSeedRequiresOpAmpControlledEmitterFollower(t *testing.T) {
 	opamp := ResolvedDevice{
 		Component: "U1", PrimitiveModel: PrimitiveOpAmpV1,

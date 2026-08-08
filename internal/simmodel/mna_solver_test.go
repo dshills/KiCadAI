@@ -1007,6 +1007,81 @@ func TestMNAOpenCollectorComparatorUsesPullupAndCatalogSinkLimits(t *testing.T) 
 	}
 }
 
+func TestMNAOpenCollectorComparatorMaintainsNMOSOffStateAcrossWorstCase(t *testing.T) {
+	intent := Intent{
+		ModelID:  ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "input_low", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source_load_power", DCValue: 24}, {Component: "source_logic_power", DCValue: 3.3}, {Component: "source_pulse_command", DCValue: 0}}}},
+		Assertions: []Assertion{
+			{AnalysisID: "input_low", Node: "GATE", Quantity: QuantityVoltageV, Min: .45, Max: .55},
+			{AnalysisID: "input_low", Node: "DRAIN", Quantity: QuantityVoltageV, Min: 23.9, Max: 24},
+			{AnalysisID: "input_low", Component: "primitive_001", Quantity: QuantityDeviceCurrentA, Min: -1e12, Max: .0001},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source_load_power", "VP", "GND"),
+		voltageSourceEvidence("source_logic_power", "VLOGIC", "GND"),
+		voltageSourceEvidence("source_pulse_command", "IN", "GND"),
+		resistorEvidence("primitive_002", 10_000, "THRESH", "VLOGIC"),
+		resistorEvidence("primitive_003", 10_000, "THRESH", "GND"),
+		resistorEvidence("primitive_004", 10_000, "GATE", "VP"),
+		resistorEvidence("primitive_005", 4_700, "GATE", "GND"),
+		{
+			InstanceID: "load_load_current_load_inductance", CatalogID: "load", Family: "inductor", HasValueSI: true, ValueSI: .045,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveInductorTransientV1, Parameters: []NamedValue{
+				{Name: "series_resistance_ohm", Value: 26.5}, {Name: "rated_current_a", Value: 2}, {Name: "saturation_current_a", Value: 2},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "VP"}, {Function: "B", Net: "DRAIN"}},
+		},
+		{
+			InstanceID: "primitive_006", CatalogID: "diode", Family: "diode",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDiodeShockleyV1, Parameters: []NamedValue{
+				{Name: "saturation_current_a", Value: 66.7e-6}, {Name: "emission_coefficient", Value: 1.7},
+				{Name: "junction_temperature_k", Value: 300.15}, {Name: "max_forward_current_a", Value: 5},
+				{Name: "max_reverse_voltage_v", Value: 60},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "ANODE", Net: "DRAIN"}, {Function: "CATHODE", Net: "VP"}},
+		},
+		{
+			InstanceID: "primitive_000", CatalogID: "comparator", Family: "comparator",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveComparatorOpenCollectorV1, Parameters: comparatorParameters(560e-9)}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: "THRESH"},
+				{Function: "OUT", Net: "GATE"}, {Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "GND"},
+			},
+		},
+		{
+			InstanceID: "primitive_001", CatalogID: "mosfet", Family: "mosfet",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveNMOSSwitchV1, Parameters: []NamedValue{
+				{Name: "gate_on_voltage_v", Value: 4}, {Name: "on_resistance_ohm", Value: .056},
+				{Name: "max_drain_current_a", Value: 16}, {Name: "max_drain_source_voltage_v", Value: 50},
+				{Name: "max_gate_source_voltage_v", Value: 10},
+			}}},
+			Connections: []ConnectionEvidence{
+				{Function: "GATE", Net: "GATE"}, {Function: "DRAIN", Net: "DRAIN"}, {Function: "SOURCE", Net: "GND"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "VLOGIC"}, {Name: "IN"},
+		{Name: "THRESH"}, {Name: "GATE"}, {Name: "DRAIN"},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	plan.WorstCase = true
+	plan.Uncertainties = []Uncertainty{
+		{Target: "devices.primitive_000.model_parameters.input_offset_v", Source: "test", Nominal: 0, Minimum: -.0055, Maximum: .0055},
+		{Target: "devices.primitive_002.value_si", Source: "test", Nominal: 10_000, Minimum: 9_990, Maximum: 10_010},
+		{Target: "devices.primitive_003.value_si", Source: "test", Nominal: 10_000, Minimum: 9_990, Maximum: 10_010},
+		{Target: "devices.primitive_004.value_si", Source: "test", Nominal: 10_000, Minimum: 9_990, Maximum: 10_010},
+		{Target: "devices.primitive_005.value_si", Source: "test", Nominal: 4_700, Minimum: 4_653, Maximum: 4_747},
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestOpenCollectorComparatorRemainsHighImpedanceBelowMinimumSupply(t *testing.T) {
 	device := ResolvedDevice{
 		PrimitiveModel: PrimitiveComparatorOpenCollectorV1,
@@ -1735,6 +1810,25 @@ func TestMNADistortionExtractsDeterministicHarmonics(t *testing.T) {
 	if len(replayDiagnostics) != 0 || replay.Assertions[0].Actual != report.Assertions[0].Actual {
 		t.Fatalf("distortion replay = %#v diagnostics=%#v", replay, replayDiagnostics)
 	}
+	powerIntent := intent
+	powerIntent.Assertions = append(append([]Assertion(nil), intent.Assertions...), Assertion{
+		AnalysisID: "audio_thd", Node: "OUT", Component: "load", Quantity: QuantityOutputPowerW,
+		Min: .00049, Max: .00051,
+	})
+	powerPlan, powerResolutionDiagnostics := ResolveWithTopology(
+		powerIntent,
+		"catalog",
+		"catalog-hash",
+		components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(powerResolutionDiagnostics) != 0 {
+		t.Fatalf("distortion output-power resolution diagnostics = %#v", powerResolutionDiagnostics)
+	}
+	powerReport, powerDiagnostics := Evaluate(powerPlan)
+	if len(powerDiagnostics) != 0 || powerReport.Status != "pass" || len(powerReport.Analyses[0].Points[0].Devices) == 0 {
+		t.Fatalf("distortion output-power report = %#v diagnostics=%#v", powerReport, powerDiagnostics)
+	}
 
 	mismatched := intent
 	mismatched.Assertions = append([]Assertion(nil), intent.Assertions...)
@@ -1953,6 +2047,22 @@ func TestMNARejectsProviderTopologyAndTamperedPlan(t *testing.T) {
 	valid.Devices[0].Terminals[0].Net = "tampered"
 	if diagnostics := ValidatePlan(valid); len(diagnostics) == 0 {
 		t.Fatal("expected tampered topology to fail closed")
+	}
+}
+
+func TestValidateMNASolutionShapeFailsClosed(t *testing.T) {
+	system := mnaSystem{rhs: make([]complex128, 2)}
+	if diagnostic := validateMNASolutionShape(system, make([]complex128, 2)); diagnostic != nil {
+		t.Fatalf("matching solution rejected: %+v", diagnostic)
+	}
+	for _, solution := range [][]complex128{nil, make([]complex128, 1), make([]complex128, 3)} {
+		diagnostic := validateMNASolutionShape(system, solution)
+		if diagnostic == nil || diagnostic.Path != "solution" {
+			t.Fatalf("solution length %d diagnostic = %+v", len(solution), diagnostic)
+		}
+	}
+	if diagnostic := validateMNASolutionShape(mnaSystem{}, nil); diagnostic == nil {
+		t.Fatal("empty MNA system and solution did not fail closed")
 	}
 }
 

@@ -9,7 +9,10 @@ import (
 // maximumTrustedOpenCircuitImpedanceOhm is the finite reporting ceiling used
 // when the solved excitation current is exactly zero. Keeping the sentinel
 // finite preserves canonical JSON and bounds downstream margin arithmetic.
-const maximumTrustedOpenCircuitImpedanceOhm = 1e15
+const (
+	maximumTrustedOpenCircuitImpedanceOhm = 1e15
+	maximumDutyCycleSettlingSpreadPct     = 10.0
+)
 
 // TransientResponseOnsetFraction is the normalized waveform change used to
 // identify the onset of an event response. Synthesis calculations that bound
@@ -438,6 +441,11 @@ func periodicWaveformMetrics(times, values []float64, assertion Assertion) (floa
 	threshold := minimum + .5*span
 	lowerThreshold := minimum + .25*span
 	upperThreshold := minimum + .75*span
+	if assertion.Quantity == QuantityDutyCyclePct && assertion.FrequencyHz > 0 {
+		return periodicDutyAtExpectedFrequency(
+			times, values, lowerThreshold, upperThreshold, assertion,
+		)
+	}
 	edges := periodicHystereticRisingEdges(times, values, lowerThreshold, upperThreshold)
 	if len(edges) < 3 {
 		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires at least two complete measured periods")
@@ -476,6 +484,52 @@ func periodicWaveformMetrics(times, values []float64, assertion Assertion) (floa
 		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform high-time integration is invalid")
 	}
 	return normalizedMNAFloat(1 / averagePeriod), normalizedMNAFloat(100 * highTime / (windowEnd - windowStart)), nil
+}
+
+func periodicDutyAtExpectedFrequency(
+	times, values []float64,
+	lowerThreshold, upperThreshold float64,
+	assertion Assertion,
+) (float64, float64, *Diagnostic) {
+	if !finite(assertion.FrequencyHz) || assertion.FrequencyHz <= 0 {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "frequency-qualified duty assertion requires a finite positive frequency")
+	}
+	period := 1 / assertion.FrequencyHz
+	available := times[len(times)-1] - times[0]
+	completePeriods := int(math.Floor(available/period + 1e-12))
+	if completePeriods < 2 {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "frequency-qualified duty assertion requires at least two complete excitation periods")
+	}
+	const maximumMeasuredPeriods = 8
+	completePeriods = min(completePeriods, maximumMeasuredPeriods)
+	windowEnd := times[len(times)-1]
+	windowStart := windowEnd - float64(completePeriods)*period
+	dutySum := 0.0
+	dutyMinimum, dutyMaximum := math.Inf(1), math.Inf(-1)
+	for index := 0; index < completePeriods; index++ {
+		start := windowStart + float64(index)*period
+		end := start + period
+		highTime := waveformHystereticHighTime(
+			times, values, lowerThreshold, upperThreshold, start, end,
+		)
+		if !finite(highTime) || highTime < 0 || highTime > period {
+			return 0, 0, advancedAssertionDiagnostic(assertion, "frequency-qualified duty high-time integration is invalid")
+		}
+		duty := 100 * highTime / period
+		dutySum += duty
+		dutyMinimum = math.Min(dutyMinimum, duty)
+		dutyMaximum = math.Max(dutyMaximum, duty)
+	}
+	averageDuty := dutySum / float64(completePeriods)
+	// Faster repeatable subcycles remain admissible, but a command-period
+	// envelope that moves by more than ten percentage points is not settled.
+	if dutyMaximum-dutyMinimum > maximumDutyCycleSettlingSpreadPct {
+		return 0, 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf(
+			"frequency-qualified duty does not settle within the trusted %.12g percentage-point spread bound (minimum %.12g%%, maximum %.12g%%, average %.12g%%)",
+			maximumDutyCycleSettlingSpreadPct, dutyMinimum, dutyMaximum, averageDuty,
+		))
+	}
+	return normalizedMNAFloat(assertion.FrequencyHz), normalizedMNAFloat(averageDuty), nil
 }
 
 func periodicHystereticRisingEdges(times, values []float64, lowerThreshold, upperThreshold float64) []float64 {
@@ -956,10 +1010,13 @@ func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64,
 			continue
 		}
 		value, found := analysisNodeReal(point, assertion.Node)
+		if assertion.Component != "" {
+			value, found = analysisDeviceCurrent(point, assertion.Component)
+		}
 		if !found {
 			continue
 		}
-		if assertion.ReferenceNode != "" {
+		if assertion.Component == "" && assertion.ReferenceNode != "" {
 			reference, referenceFound := analysisNodeReal(point, assertion.ReferenceNode)
 			if !referenceFound {
 				return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion reference node is absent from a solved point")
@@ -970,9 +1027,29 @@ func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64,
 		values = append(values, value)
 	}
 	if len(values) < 2 {
-		return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion requires at least two solved node samples")
+		return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion requires at least two solved node or device-current samples")
 	}
 	return times, values, nil
+}
+
+func analysisDeviceCurrent(point AnalysisPoint, component string) (float64, bool) {
+	for _, device := range point.Devices {
+		if device.Component == component {
+			return device.CurrentA, true
+		}
+	}
+	return 0, false
+}
+
+func quantityPermitsDeviceCurrentWaveform(quantity string) bool {
+	switch quantity {
+	case QuantityDutyCyclePct, QuantityOscillationFrequencyHz,
+		QuantityRiseTimeS, QuantityFallTimeS,
+		QuantitySettlingTimeS, QuantityResponseTimeS:
+		return true
+	default:
+		return false
+	}
 }
 
 func pointInAssertionWindow(point AnalysisPoint, assertion Assertion) bool {

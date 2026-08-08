@@ -1637,7 +1637,7 @@ func formatConnectOperationsForTest(t *testing.T, projectName string, plan Block
 			t.Fatalf("decode add_symbol operation %d: %v", index, err)
 		}
 		position := schematicElectricalPoint(payload.At)
-		symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins)
+		symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins, payload.Rotation, payload.Mirror)
 	}
 	var builder strings.Builder
 	for index, operation := range tx.Operations {

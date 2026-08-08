@@ -79,9 +79,9 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 				Unit:       payload.Unit,
 				Value:      payload.Value,
 				Position:   position,
-				PinAnchors: schematicElectricalPinAnchors(position, payload.Pins),
+				PinAnchors: schematicElectricalPinAnchors(position, payload.Pins, payload.Rotation, payload.Mirror),
 			}
-			symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins)
+			symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins, payload.Rotation, payload.Mirror)
 			file.Symbols = append(file.Symbols, symbol)
 			if strings.TrimSpace(payload.Value) != "" || !strings.HasPrefix(strings.TrimSpace(payload.Ref), "#") {
 				opts.ValueChecks = append(opts.ValueChecks, schematicrules.ValueCheck{
@@ -311,25 +311,15 @@ func schematicElectricalSegmentCrossesOtherNetLabel(netName string, start, end k
 		if label.Text == netName {
 			continue
 		}
-		if schematicElectricalPointStrictlyInsideSegment(label.Position, start, end) {
+		// A foreign label at a dogleg vertex is an electrical contact in
+		// KiCad just as surely as one in the middle of a segment. Check the
+		// closed segment so routing cannot hide a cross-net short at an
+		// intermediate endpoint (or at a coincident terminal anchor).
+		if schematicElectricalPointOnSegment(label.Position, start, end) {
 			return true
 		}
 	}
 	return false
-}
-
-func schematicElectricalPointStrictlyInsideSegment(point, start, end kicadfiles.Point) bool {
-	if point == start || point == end {
-		return false
-	}
-	dx1 := int64(end.X) - int64(start.X)
-	dy1 := int64(end.Y) - int64(start.Y)
-	dx2 := int64(point.X) - int64(start.X)
-	dy2 := int64(point.Y) - int64(start.Y)
-	if dx1*dy2 != dy1*dx2 {
-		return false
-	}
-	return schematicElectricalBetween(point.X, start.X, end.X) && schematicElectricalBetween(point.Y, start.Y, end.Y)
 }
 
 func schematicElectricalPointOnSegment(point, start, end kicadfiles.Point) bool {
@@ -403,27 +393,37 @@ func schematicElectricalIntentPointIU(point kicadfiles.Point) schematicrules.Poi
 	return schematicrules.Point{X: int64(point.X), Y: int64(point.Y)}
 }
 
-func schematicElectricalPinAnchors(position kicadfiles.Point, pins []transactions.PinSpec) []kicadfiles.Point {
+func schematicElectricalPinAnchors(position kicadfiles.Point, pins []transactions.PinSpec, rotation float64, mirror string) []kicadfiles.Point {
 	if len(pins) == 0 {
 		return []kicadfiles.Point{position}
 	}
 	anchors := make([]kicadfiles.Point, 0, len(pins))
 	for _, pin := range pins {
-		anchors = append(anchors, kicadfiles.Point{X: position.X + kicadfiles.MM(pin.XMM), Y: position.Y + kicadfiles.MM(pin.YMM)})
+		anchors = append(anchors, schematicElectricalCanonicalPinAnchor(position, pin, rotation, mirror))
 	}
 	return anchors
 }
 
-func schematicElectricalPinMap(position kicadfiles.Point, pins []transactions.PinSpec) map[string]kicadfiles.Point {
+func schematicElectricalPinMap(position kicadfiles.Point, pins []transactions.PinSpec, rotation float64, mirror string) map[string]kicadfiles.Point {
 	anchors := map[string]kicadfiles.Point{}
 	if len(pins) == 0 {
 		anchors[""] = position
 		return anchors
 	}
 	for _, pin := range pins {
-		anchors[strings.TrimSpace(pin.Number)] = kicadfiles.Point{X: position.X + kicadfiles.MM(pin.XMM), Y: position.Y + kicadfiles.MM(pin.YMM)}
+		anchors[strings.TrimSpace(pin.Number)] = schematicElectricalCanonicalPinAnchor(position, pin, rotation, mirror)
 	}
 	return anchors
+}
+
+func schematicElectricalCanonicalPinAnchor(position kicadfiles.Point, pin transactions.PinSpec, rotation float64, mirror string) kicadfiles.Point {
+	canonicalRotation, canonicalMirror := schematic.CanonicalSymbolTransform(kicadfiles.Angle(rotation), schematic.SymbolMirror(mirror))
+	offset := schematic.TransformConnectionAnchor(
+		kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
+		canonicalRotation,
+		canonicalMirror,
+	)
+	return kicadfiles.Point{X: position.X + offset.X, Y: position.Y + offset.Y}
 }
 
 type schematicElectricalSymbolKey struct {

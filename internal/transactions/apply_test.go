@@ -133,6 +133,26 @@ func TestApplyWritesRequestedFourLayerStack(t *testing.T) {
 	}
 }
 
+func TestApplyConnectsNetZonesToPadsByDefault(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "connected-zone")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"connected-zone"},
+	  {"op":"add_zone","name":"power-plane","net_name":"POWER","layers":["In2.Cu"],"polygon":[{"x_mm":1,"y_mm":1},{"x_mm":19,"y_mm":1},{"x_mm":19,"y_mm":19},{"x_mm":1,"y_mm":19}]},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, CopperLayers: 4})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	board, err := pcb.ReadFile(filepath.Join(output, "connected-zone.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(board.Zones) != 1 || board.Zones[0].ConnectPadsMode != "yes" || board.Zones[0].NetName != "POWER" {
+		t.Fatalf("written net zone = %#v", board.Zones)
+	}
+}
+
 func TestApplyPreservesMirroredSymbolConnectionAnchors(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "mirrored")
 	tx := mustParse(t, `{"operations":[

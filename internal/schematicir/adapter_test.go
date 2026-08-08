@@ -1272,6 +1272,81 @@ func TestAppendNetsKeepsLayoutLabelRouteWhenConflictRemovesCoordinates(t *testin
 	t.Fatalf("missing connect operation for net %s", net.Name)
 }
 
+func TestAppendNetsEmitsDirectBranchesBeforeLabelBranches(t *testing.T) {
+	document := validLEDDocument()
+	net := document.Circuit.Nets[1]
+	net.Connect = []EndpointRef{"r_limit.2", "led.1", "vin.1"}
+	document.Circuit.Nets = []Net{net}
+	state, issues := newAdapterState(document, nil)
+	if len(issues) != 0 {
+		t.Fatalf("adapter state issues: %#v", issues)
+	}
+	labeled := schematiclayout.RoutedConnection{
+		NetName:   net.Name,
+		From:      schematiclayout.Endpoint{Ref: "r_limit", Pin: "2"},
+		To:        schematiclayout.Endpoint{Ref: "led", Pin: "1"},
+		UseLabels: true,
+	}
+	direct := schematiclayout.RoutedConnection{
+		NetName: net.Name,
+		From:    schematiclayout.Endpoint{Ref: "led", Pin: "1"},
+		To:      schematiclayout.Endpoint{Ref: "vin", Pin: "1"},
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}
+	state.layoutResult.Connections = []schematiclayout.RoutedConnection{labeled, direct}
+	state.routesByKey = map[string]schematiclayout.RoutedConnection{
+		schematicRouteKey(net.Name, net.Connect[0], net.Connect[1]): labeled,
+		schematicRouteKey(net.Name, net.Connect[1], net.Connect[2]): direct,
+	}
+	transaction := transactions.Transaction{}
+	state.appendNets(&transaction)
+	connects := decodeOperations[transactions.ConnectOperation](t, transaction, transactions.OpConnect)
+	if len(connects) != 2 {
+		t.Fatalf("connect count = %d, want 2", len(connects))
+	}
+	if connects[0].UseLabels == nil || *connects[0].UseLabels || len(connects[0].Waypoints) == 0 {
+		t.Fatalf("first branch = %#v, want visible direct route", connects[0])
+	}
+	if connects[1].UseLabels == nil || !*connects[1].UseLabels {
+		t.Fatalf("second branch = %#v, want label-only route", connects[1])
+	}
+}
+
+func TestLabelPointRejectsVisibleSameNetBranch(t *testing.T) {
+	state := adapterState{routesByKey: map[string]schematiclayout.RoutedConnection{
+		"direct": {
+			NetName: "SIGNAL",
+			Points: []kicadfiles.Point{
+				{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+				{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)},
+			},
+		},
+		"labeled": {
+			NetName: "SIGNAL", UseLabels: true,
+			Points: []kicadfiles.Point{{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		},
+		"foreign": {
+			NetName: "OTHER",
+			Points: []kicadfiles.Point{
+				{X: kicadfiles.MM(10), Y: kicadfiles.MM(30)},
+				{X: kicadfiles.MM(30), Y: kicadfiles.MM(30)},
+			},
+		},
+	}}
+	if !state.labelPointTouchesDirectNetRoute("SIGNAL", transactions.Point{XMM: 20, YMM: 20}) {
+		t.Fatal("same-net label point on a visible branch was accepted")
+	}
+	if state.labelPointTouchesDirectNetRoute("SIGNAL", transactions.Point{XMM: 20, YMM: 30}) {
+		t.Fatal("foreign-net route incorrectly rejected the label point")
+	}
+	if state.labelPointTouchesDirectNetRoute("SIGNAL", transactions.Point{XMM: 20, YMM: 25}) {
+		t.Fatal("clear same-net label point was rejected")
+	}
+}
+
 func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
 	component := Component{ID: "sensor", Symbol: "Test:Sensor", Pins: []Pin{{Number: "1"}}}
 	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
@@ -1306,6 +1381,45 @@ func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
 	}
 	if point == (transactions.Point{XMM: 16, YMM: 28}) {
 		t.Fatalf("diagonal layout hint was retained: %#v", point)
+	}
+}
+
+func TestLabelPointForEndpointUsesPerpendicularStubWhenBranchBlocksOutwardAxis(t *testing.T) {
+	component := Component{ID: "source", Symbol: "Test:Source", Pins: []Pin{{Number: "1"}}}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Test:Source": {
+			LibraryID: "Test:Source",
+			Pins:      []libraryresolver.SymbolPin{{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}}},
+		},
+	}}
+	state := adapterState{
+		document:       Document{Circuit: Circuit{Components: []Component{component}}},
+		componentsByID: map[string]Component{"source": component},
+		libraryIndex:   &index,
+		pointsByID:     map[string]transactions.Point{"source": {XMM: 20, YMM: 30}},
+		rotationByID:   map[string]float64{},
+		mirrorByID:     map[string]Mirror{},
+	}
+	state.indexSchematicCollisionAnchors()
+	anchor, ok := state.portEndpointAnchor("source.1")
+	if !ok {
+		t.Fatal("source pin anchor was not resolved")
+	}
+	state.routesByKey = map[string]schematiclayout.RoutedConnection{
+		"branch": {
+			NetName: "SIGNAL",
+			Points: []kicadfiles.Point{
+				transactionPointToSchematicPoint(anchor),
+				{X: kicadfiles.MM(anchor.XMM - 5.08), Y: kicadfiles.MM(anchor.YMM)},
+			},
+		},
+	}
+	point, ok := state.fallbackLabelPointForEndpoint("SIGNAL", "source.1")
+	if !ok {
+		t.Fatal("perpendicular label fallback was not found")
+	}
+	if point.XMM != anchor.XMM || point.YMM == anchor.YMM {
+		t.Fatalf("label fallback %#v did not leave blocked outward axis at %#v", point, anchor)
 	}
 }
 

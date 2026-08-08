@@ -36,7 +36,7 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 		return nominal, nominalDiagnostics
 	}
 	report := nominal
-	report.Corners = []CornerResult{{ID: "nominal", Assignments: nominalAssignments(plan.Uncertainties), Assertions: nominal.Assertions, Status: nominal.Status}}
+	report.Corners = []CornerResult{normalizedWorstCaseCorner("nominal", nominalAssignments(plan.Uncertainties), nominal.Assertions)}
 
 	corners := deterministicCorners(plan.Uncertainties)
 	evaluations := evaluateWorstCaseCorners(base, corners)
@@ -47,7 +47,7 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 			report.Corners = append(report.Corners, CornerResult{ID: id, Assignments: assignments, Assertions: evaluation.report.Assertions, Status: "blocked"})
 			return report, append([]Diagnostic{{Path: "worst_case", Message: "corner " + id + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, evaluation.diagnostics...)
 		}
-		report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: evaluation.report.Assertions, Status: evaluation.report.Status})
+		report.Corners = append(report.Corners, normalizedWorstCaseCorner(cornerID(assignments), assignments, evaluation.report.Assertions))
 	}
 	if len(groupedUncertainties(plan.Uncertainties)) > maxExhaustiveWorstCaseGroups {
 		directed := assertionDirectedCorners(report.Corners, plan.Uncertainties)
@@ -71,13 +71,13 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 				report.Corners = append(report.Corners, CornerResult{ID: id, Assignments: assignments, Assertions: evaluation.report.Assertions, Status: "blocked"})
 				return report, append([]Diagnostic{{Path: "worst_case", Message: "directed corner " + id + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, evaluation.diagnostics...)
 			}
-			report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: evaluation.report.Assertions, Status: evaluation.report.Status})
+			report.Corners = append(report.Corners, normalizedWorstCaseCorner(cornerID(assignments), assignments, evaluation.report.Assertions))
 		}
 	}
 	report.Sensitivity = sensitivity(report.Corners, plan.Uncertainties)
 	for _, corner := range report.Corners[1:] {
 		for _, assertion := range corner.Assertions {
-			if !assertion.Pass {
+			if !assertionWithinBounds(assertion.Actual, assertion.Min, assertion.Max) {
 				report.Status = "blocked"
 				dominant := dominantSensitivity(report.Sensitivity, assertion)
 				message := fmt.Sprintf("worst-case corner %s measured %.12g outside trusted bounds %.12g..%.12g", corner.ID, assertion.Actual, assertion.Min, assertion.Max)
@@ -92,6 +92,23 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 		report.Status = "blocked"
 	}
 	return report, nominalDiagnostics
+}
+
+// normalizedWorstCaseCorner derives both assertion and corner status from the
+// authoritative numeric evidence. Individual analysis paths may quantize a
+// sampled measurement before it reaches the worst-case report; carrying their
+// earlier boolean verdict would make the same value pass nominal evaluation
+// but fail corner aggregation.
+func normalizedWorstCaseCorner(id string, assignments []NamedValue, assertions []AssertionResult) CornerResult {
+	normalized := append([]AssertionResult(nil), assertions...)
+	status := "pass"
+	for index := range normalized {
+		normalized[index].Pass = assertionWithinBounds(normalized[index].Actual, normalized[index].Min, normalized[index].Max)
+		if !normalized[index].Pass {
+			status = "blocked"
+		}
+	}
+	return CornerResult{ID: id, Assignments: assignments, Assertions: normalized, Status: status}
 }
 
 func hasCornerEvaluationFailure(diagnostics []Diagnostic) bool {

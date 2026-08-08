@@ -355,7 +355,6 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 	var system mnaSystem
 	var solution []complex128
 	centered := cloneOpAmpClamps(activeStates)
-	centerChanged := false
 	emitterFollowerSeeds := map[string]bool{}
 	for _, device := range opAmps {
 		terminals := terminalMap(device)
@@ -392,19 +391,16 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 			break
 		}
 		centered[device.Component] = center
-		centerChanged = centerChanged || math.Abs(center) > nonlinearUpdateTolerance
 	}
-	if centerChanged {
-		centerSystem, centerSolution, centerEvidence, centerDiagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, centered, nil)
-		evidence.SourceStages += centerEvidence.SourceStages
-		evidence.Iterations += centerEvidence.Iterations
-		evidence.TotalIterations = evidence.Iterations
-		if centerDiagnostic != nil {
-			evidence.Method = centerDiagnostic.Message
-			return mnaSystem{}, nil, evidence, nil, false
-		}
-		system, solution = centerSystem, centerSolution
+	centerSystem, centerSolution, centerEvidence, centerDiagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, centered, nil)
+	evidence.SourceStages += centerEvidence.SourceStages
+	evidence.Iterations += centerEvidence.Iterations
+	evidence.TotalIterations = evidence.Iterations
+	if centerDiagnostic != nil {
+		evidence.Method = centerDiagnostic.Message
+		return mnaSystem{}, nil, evidence, nil, false
 	}
+	system, solution = centerSystem, centerSolution
 	if len(emitterFollowerSeeds) != 0 {
 		released := cloneOpAmpClamps(centered)
 		for component := range emitterFollowerSeeds {
@@ -1634,6 +1630,19 @@ func solveNonlinearDCByComparatorActiveSet(plan Plan, analysis Analysis, activeS
 		total.SourceStages += evidence.SourceStages
 		total.Iterations += evidence.Iterations
 		if diagnostic != nil {
+			continue
+		}
+		consistent := true
+		for _, device := range plan.Devices {
+			if device.PrimitiveModel != PrimitiveComparatorOpenCollectorV1 {
+				continue
+			}
+			if (states[device.Component] >= .5) != comparatorOn(device, system, solution) {
+				consistent = false
+				break
+			}
+		}
+		if !consistent {
 			continue
 		}
 		evidence.Method = "bounded_newton_comparator_active_set_fallback_v1"

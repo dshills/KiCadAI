@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestAssertionBoundComparisonAdmitsOnlyNumericalBoundaryNoise(t *testing.T) {
+	for _, test := range []struct {
+		name             string
+		actual, min, max float64
+		want             bool
+	}{
+		{name: "sampled lower edge", actual: 34.999965, min: 35, max: 65, want: true},
+		{name: "materially below", actual: 34.999, min: 35, max: 65, want: false},
+		{name: "sampled upper edge", actual: 65.0001, min: 35, max: 65, want: true},
+		{name: "materially above", actual: 65.001, min: 35, max: 65, want: false},
+		{name: "non-finite", actual: math.NaN(), min: 35, max: 65, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := assertionWithinBounds(test.actual, test.min, test.max); got != test.want {
+				t.Fatalf("assertionWithinBounds(%g, %g, %g) = %t, want %t",
+					test.actual, test.min, test.max, got, test.want)
+			}
+		})
+	}
+}
+
 func TestValueEventOrderUsesNumericTriggerTime(t *testing.T) {
 	if CompareValueEventOrder("load", .0001, "early", "load", .01, "late") >= 0 {
 		t.Fatal("earlier numeric trigger did not sort first")

@@ -778,7 +778,10 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				layers = append(layers, boardLayer(layer))
 			}
 		}
-		_, err := builder.AddZone(*payload.NetName, polygon, designapi.ZoneOptions{Name: payload.Name, Layers: layers, Clearance: kicadfiles.MM(payload.ClearanceMM)})
+		_, err := builder.AddZone(*payload.NetName, polygon, designapi.ZoneOptions{
+			Name: payload.Name, Layers: layers, ConnectPads: true,
+			Clearance: kicadfiles.MM(payload.ClearanceMM),
+		})
 		return nil, err
 	case OpWriteProject:
 		var payload WriteProjectOperation

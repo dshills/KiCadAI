@@ -678,7 +678,7 @@ func evaluateNominal(plan Plan) (Report, []Diagnostic) {
 		if !exists {
 			return report, []Diagnostic{{Path: "assertions." + assertion.Metric, Message: "trusted model did not emit an asserted metric"}}
 		}
-		pass := actual >= assertion.Min && actual <= assertion.Max
+		pass := assertionWithinBounds(actual, assertion.Min, assertion.Max)
 		report.Assertions = append(report.Assertions, AssertionResult{Metric: assertion.Metric, Min: assertion.Min, Max: assertion.Max, Actual: actual, Pass: pass})
 		if !pass {
 			diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.Metric, Message: fmt.Sprintf("measured %.12g is outside trusted bounds %.12g..%.12g", actual, assertion.Min, assertion.Max), Suggestion: "adjust catalog-backed component values or operating conditions"})
@@ -688,6 +688,19 @@ func evaluateNominal(plan Plan) (Report, []Diagnostic) {
 		report.Status = "pass"
 	}
 	return report, diagnostics
+}
+
+// assertionWithinBounds admits only floating-point and sampled-grid noise at
+// a declared boundary. The tolerance is applied independently to each bound
+// so a large open-ended sentinel cannot weaken the opposite finite limit.
+func assertionWithinBounds(actual, minimum, maximum float64) bool {
+	if math.IsNaN(actual) || math.IsInf(actual, 0) {
+		return false
+	}
+	const relativeTolerance = 2e-6
+	lowerTolerance := relativeTolerance * math.Max(1, math.Abs(minimum))
+	upperTolerance := relativeTolerance * math.Max(1, math.Abs(maximum))
+	return actual >= minimum-lowerTolerance && actual <= maximum+upperTolerance
 }
 
 func ValidatePlan(plan Plan) []Diagnostic {

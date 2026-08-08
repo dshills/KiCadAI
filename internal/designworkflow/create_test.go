@@ -198,6 +198,53 @@ func TestSchematicElectricalWireAvoidsUnrelatedNoConnectAnchor(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalWireAvoidsOtherNetLabelAtDoglegVertex(t *testing.T) {
+	candidate := schematicElectricalWireCandidate{
+		NetName: "NET_A",
+		From:    kicadfiles.Point{},
+		To:      kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+	}
+	labels := []schematic.Label{
+		{Text: "NET_B", Position: kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(5)}},
+		{Text: "NET_C", Position: kicadfiles.Point{X: 0, Y: kicadfiles.MM(2.54)}},
+	}
+	wire := schematicElectricalWireForCandidate(candidate, labels, nil)
+	for _, label := range labels {
+		for index := 1; index < len(wire.Points); index++ {
+			if schematicElectricalPointOnSegment(label.Position, wire.Points[index-1], wire.Points[index]) {
+				t.Fatalf("wire %#v touches foreign label %s at %#v", wire.Points, label.Text, label.Position)
+			}
+		}
+	}
+}
+
+func TestSchematicElectricalPinMapAppliesCanonicalSymbolTransform(t *testing.T) {
+	position := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30)}
+	pins := []transactions.PinSpec{{Number: "1", XMM: 1.27, YMM: -3.81}}
+	for _, testCase := range []struct {
+		name     string
+		rotation float64
+		mirror   string
+	}{
+		{name: "rotated", rotation: 90},
+		{name: "mirrored", mirror: "x"},
+		{name: "rotated_and_mirrored", rotation: 270, mirror: "y"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			rotation, mirror := schematic.CanonicalSymbolTransform(kicadfiles.Angle(testCase.rotation), schematic.SymbolMirror(testCase.mirror))
+			offset := schematic.TransformConnectionAnchor(
+				kicadfiles.Point{X: kicadfiles.MM(pins[0].XMM), Y: kicadfiles.MM(pins[0].YMM)},
+				rotation,
+				mirror,
+			)
+			want := kicadfiles.Point{X: position.X + offset.X, Y: position.Y + offset.Y}
+			if got := schematicElectricalPinMap(position, pins, testCase.rotation, testCase.mirror)["1"]; got != want {
+				t.Fatalf("pin anchor = %#v, want canonical %#v", got, want)
+			}
+		})
+	}
+}
+
 func TestSchematicElectricalSafeWiresDoNotInventCrossNetShort(t *testing.T) {
 	candidates := []schematicElectricalWireCandidate{
 		{NetName: "NET_A", From: kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(10)}, To: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}},

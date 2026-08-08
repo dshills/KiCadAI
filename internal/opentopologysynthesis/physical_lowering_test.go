@@ -111,6 +111,52 @@ func TestPhysicalPackageCompletionTerminatesUnusedFunctionalUnits(t *testing.T) 
 	}
 }
 
+func TestPhysicalPackageCompletionAppliesRequiredVariantNoConnectPolicy(t *testing.T) {
+	primitive := PrimitiveCandidate{
+		CatalogID: "test.single_package",
+		VariantID: "dip8",
+		UnitID:    "A",
+		Terminals: []PrimitiveTerminal{
+			{Terminal: "IN", Function: "IN", UnitID: "A", Electrical: "input"},
+			{Terminal: "OUT", Function: "OUT", UnitID: "A", Electrical: "output"},
+		},
+	}
+	catalog := &components.Catalog{Records: []components.ComponentRecord{{
+		ID: primitive.CatalogID,
+		Symbols: []components.SymbolBinding{{
+			UnitID: "A",
+			FunctionPins: []components.FunctionPin{
+				{Function: "IN", Required: true},
+				{Function: "OUT", Required: true},
+				{Function: "STATUS"},
+			},
+		}},
+		Packages: []components.PackageVariant{{
+			ID: primitive.VariantID,
+			PadFunctions: []components.PadFunction{
+				{Function: "IN", Pad: "1"},
+				{Function: "OUT", Pad: "2"},
+				{Function: "STATUS", Pad: "8"},
+			},
+		}},
+		Companions: []components.CompanionRequirement{{
+			ID: "unused_status", Role: "unused_pin_policy", Required: true,
+			NoConnects: []string{"STATUS"},
+		}},
+	}}}
+	units, noConnects, issues := physicalPackageCompletion("controller", primitive, "controller", catalog)
+	if len(issues) != 0 || len(units) != 1 || len(noConnects) != 1 {
+		t.Fatalf("package completion: units=%#v no_connects=%#v issues=%#v", units, noConnects, issues)
+	}
+	want := circuitgraph.Endpoint{
+		Component: "controller", Unit: "A",
+		SelectorKind: circuitgraph.SelectorFunction, Selector: "STATUS",
+	}
+	if !bytes.Equal(mustJSON(t, noConnects[0]), mustJSON(t, want)) {
+		t.Fatalf("package no-connect = %#v, want %#v", noConnects[0], want)
+	}
+}
+
 func TestPhysicalParallelRequiredFunctionsBindsVerifiedAuxiliaryPowerPin(t *testing.T) {
 	primitive := PrimitiveCandidate{
 		CatalogID: "test.parallel_power_pin",

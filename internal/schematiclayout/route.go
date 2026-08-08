@@ -1234,6 +1234,20 @@ func compactPointPath(points []kicadfiles.Point) []kicadfiles.Point {
 			continue
 		}
 		compacted = append(compacted, point)
+		for len(compacted) >= 3 {
+			last := len(compacted) - 1
+			if orientation(compacted[last-2], compacted[last-1], compacted[last]) != 0 {
+				break
+			}
+			// Replace any straight continuation or immediate reversal with its
+			// direct segment. Pin-access offsets can otherwise send a candidate
+			// past the pin and back along the same line, creating a dangling spur.
+			compacted[last-1] = compacted[last]
+			compacted = compacted[:last]
+			if len(compacted) >= 2 && compacted[len(compacted)-1] == compacted[len(compacted)-2] {
+				compacted = compacted[:len(compacted)-1]
+			}
+		}
 	}
 	return compacted
 }

@@ -1,6 +1,7 @@
 package schematiclayout
 
 import (
+	"reflect"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -252,6 +253,25 @@ func TestRouteKeepsLocalTreeVisibleWhenBoundaryUsesLabels(t *testing.T) {
 	}
 }
 
+func TestCompactPointPathRemovesCollinearPinAccessBacktrack(t *testing.T) {
+	y := kicadfiles.MM(40)
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(60), Y: y},
+		{X: kicadfiles.MM(62.54), Y: y},
+		{X: kicadfiles.MM(40), Y: y},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(55)},
+	}
+	got := compactPointPath(points)
+	want := []kicadfiles.Point{
+		{X: kicadfiles.MM(60), Y: y},
+		{X: kicadfiles.MM(40), Y: y},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(55)},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("compact point path = %#v, want %#v", got, want)
+	}
+}
+
 func TestLabelDirectionUsesPlacedBodyEdge(t *testing.T) {
 	body := Rect{MinX: kicadfiles.MM(40), MinY: kicadfiles.MM(40), MaxX: kicadfiles.MM(60), MaxY: kicadfiles.MM(60)}
 	if direction := labelDirectionFromBody(kicadfiles.Point{X: kicadfiles.MM(41), Y: kicadfiles.MM(50)}, body, kicadfiles.MM(1)); direction != (kicadfiles.Point{X: -kicadfiles.MM(1)}) {
@@ -495,8 +515,12 @@ func TestRouteKeepsOrdinaryMultiEndpointPowerNetVisible(t *testing.T) {
 		{Component: Component{Ref: "C1", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}},
 		{Component: Component{Ref: "J1", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)}},
 	}})
-	if len(result.Labels) != 0 || len(result.Wires) < 2 {
+	if len(result.Labels) != 0 || len(result.Wires) == 0 {
 		t.Fatalf("labels=%#v wires=%#v, want a visible routed power tree", result.Labels, result.Wires)
+	}
+	middle := pinAnchors(result.Components)[Endpoint{Ref: "C1", Pin: "1"}]
+	if len(result.Junctions) != 1 || result.Junctions[0].Position != middle {
+		t.Fatalf("junctions=%#v, want the middle power pin preserved on the merged conductor", result.Junctions)
 	}
 }
 

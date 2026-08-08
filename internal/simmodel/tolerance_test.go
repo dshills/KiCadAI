@@ -191,6 +191,26 @@ func TestWorstCaseDistinguishesFailedAssertionsFromIncompleteAnalysis(t *testing
 	}
 }
 
+func TestWorstCaseCornerNormalizesBoundaryVerdictsFromNumericEvidence(t *testing.T) {
+	assignments := []NamedValue{{Name: "devices.r1.value_si", Value: 10_000}}
+	corner := normalizedWorstCaseCorner("lower-bound", assignments, []AssertionResult{
+		{Metric: "duty_cycle", Min: 35, Max: 65, Actual: 34.999965, Pass: false},
+	})
+	if corner.Status != "pass" || len(corner.Assertions) != 1 || !corner.Assertions[0].Pass {
+		t.Fatalf("boundary-noise corner was not normalized: %#v", corner)
+	}
+	if !reflect.DeepEqual(corner.Assignments, assignments) {
+		t.Fatalf("corner assignments changed: got %#v want %#v", corner.Assignments, assignments)
+	}
+
+	outside := normalizedWorstCaseCorner("outside", nil, []AssertionResult{
+		{Metric: "duty_cycle", Min: 35, Max: 65, Actual: 34.999, Pass: true},
+	})
+	if outside.Status != "blocked" || len(outside.Assertions) != 1 || outside.Assertions[0].Pass {
+		t.Fatalf("materially out-of-bounds corner was admitted: %#v", outside)
+	}
+}
+
 func TestCatalogModelUncertaintyControlsRegulatorWorstCase(t *testing.T) {
 	claim := CatalogEvidence{ModelID: ModelLinearRegulatorIdealV1, Parameters: []NamedValue{{Name: "max_load_current_ma", Value: 500}, {Name: "min_headroom_v", Value: 1}, {Name: "output_voltage_v", Value: 3.3}}, Uncertainties: []Uncertainty{{Target: "model_parameters.output_voltage_v", Source: "datasheet:output-accuracy", Nominal: 3.3, Minimum: 3.2, Maximum: 3.4}}}
 	if diagnostics := ValidateCatalogEvidence("regulator", []CatalogEvidence{claim}); len(diagnostics) != 0 {

@@ -169,12 +169,16 @@ type Policy struct {
 
 func DefaultPolicy() Policy {
 	return Policy{
-		MaxExpandedStates:       20_000,
-		MaxGeneratedGraphs:      50_000,
-		MaxPrimitiveInstances:   32,
-		MaxInternalNodes:        32,
-		MaxCandidateSimulations: 512,
-		MaxCornerEvaluations:    8_192,
+		MaxExpandedStates:     20_000,
+		MaxGeneratedGraphs:    50_000,
+		MaxPrimitiveInstances: 32,
+		MaxInternalNodes:      32,
+		// Multi-stage designs evaluate several analyses across every declared
+		// operating corner. These bounds are still finite and caller-overridable,
+		// but large enough for the public policy to reach diagnosis-driven repair
+		// instead of exhausting before its first repair opportunity.
+		MaxCandidateSimulations: 50_000,
+		MaxCornerEvaluations:    65_536,
 		MaxValueTrials:          4_096,
 		MaxTopologyRepairs:      128,
 		MaxRetainedCandidates:   16,

@@ -37,7 +37,7 @@ func TestExplicitThermalPlacementRulePreservesCatalogEvidence(t *testing.T) {
 	rule, ok := explicitThermalPlacementRule(component)
 	if !ok || rule.ID != "explicit.thermal.pass" || rule.Source != "catalog_thermal_path:thermal_path.reviewed" ||
 		!reflect.DeepEqual(rule.Refs, []string{"Q1"}) || rule.ThermalRole != placement.ThermalRolePowerSwitch ||
-		rule.PreferredEdge != placement.EdgeTop || rule.PreferredRegion != "functional_power" ||
+		rule.PreferredEdge != placement.EdgeTop || rule.PreferredRegion != "" ||
 		!reflect.DeepEqual(rule.KeepAwayRoles, []string{"sensor"}) || rule.MinDistanceMM != 7 || !rule.PreferCopper ||
 		rule.Severity != placement.AdvancedRuleSeverityError || rule.Enforcement != placement.AdvancedRuleHard {
 		t.Fatalf("thermal placement rule = %#v, ok=%t", rule, ok)
@@ -64,7 +64,8 @@ func TestExplicitThermalPlacementRulePreservesCatalogEvidence(t *testing.T) {
 	interior.Placement.ThermalClearanceMM = 0
 	interior.Placement.ThermalKeepAwayRole = ""
 	interiorRule, ok := explicitThermalPlacementRule(interior)
-	if !ok || len(interiorRule.KeepAwayRoles) != 0 || interiorRule.PreferredEdge != placement.EdgeNone {
+	if !ok || len(interiorRule.KeepAwayRoles) != 0 || interiorRule.PreferredEdge != placement.EdgeNone ||
+		interiorRule.PreferredRegion != "functional_power" {
 		t.Fatalf("interior thermal rule = %#v, ok=%t", interiorRule, ok)
 	}
 }
@@ -454,5 +455,76 @@ func TestExplicitReturnViaCandidatesFailClosedAtWorkBound(t *testing.T) {
 	}
 	if candidates, complete := explicitReturnViaCandidates(transactions.Point{}, .01, 10); complete || candidates != nil {
 		t.Fatalf("oversized return-via search was accepted: candidates=%d complete=%t", len(candidates), complete)
+	}
+}
+
+func TestMaterializeExplicitZoneAccessViasIsClearanceSafeAndIdempotent(t *testing.T) {
+	layers := []routing.Layer{
+		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+	}
+	routingRequest := routing.Request{
+		Board: routing.Board{WidthMM: 20, HeightMM: 20, Layers: layers, MarginMM: .5},
+		Nets:  []routing.Net{{Name: "POWER", Role: routing.NetPower}},
+		Rules: routing.DefaultRules(), Strategy: routing.Strategy{Mode: routing.ModeTwoLayer},
+	}
+	routing.NormalizeRequest(&routingRequest)
+	operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "POWER", Layer: "F.Cu", WidthMM: .5,
+		Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 15, YMM: 10}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	zones := []ExplicitZoneSpec{{Net: "POWER", Layers: []string{"In2.Cu"}}}
+	materialized, added, issues := materializeExplicitZoneAccessVias(zones, []transactions.Operation{operation}, routingRequest)
+	if len(issues) != 0 || added != 1 {
+		t.Fatalf("zone access-via materialization added=%d issues=%#v", added, issues)
+	}
+	routes := routingRoutesFromOperations(materialized)
+	if len(routes) != 1 || len(routes[0].Vias) != 1 || routes[0].Vias[0].At != (routing.Point{XMM: 10, YMM: 10}) ||
+		!reflect.DeepEqual(routes[0].Vias[0].Layers, []string{"F.Cu", "B.Cu"}) {
+		t.Fatalf("materialized zone access route=%#v", routes)
+	}
+	repeated, repeatedAdded, repeatedIssues := materializeExplicitZoneAccessVias(zones, materialized, routingRequest)
+	if len(repeatedIssues) != 0 || repeatedAdded != 0 || !reflect.DeepEqual(repeated, materialized) {
+		t.Fatalf("zone access materialization is not idempotent: added=%d issues=%#v", repeatedAdded, repeatedIssues)
+	}
+
+	throughHoleRequest := routingRequest
+	throughHoleRequest.Components = []routing.Component{{
+		Ref: "J1", Pads: []routing.Pad{{
+			Name: "1", Net: "POWER", Type: routing.PadThroughHole,
+			Drill: &routing.Drill{DiameterMM: .8}, Size: routing.Size{WidthMM: 1.6, HeightMM: 1.6},
+		}},
+	}}
+	throughHole, throughHoleAdded, throughHoleIssues := materializeExplicitZoneAccessVias(zones, nil, throughHoleRequest)
+	if len(throughHoleIssues) != 0 || throughHoleAdded != 0 || len(throughHole) != 0 {
+		t.Fatalf("through-hole plane access added redundant via: added=%d issues=%#v operations=%#v", throughHoleAdded, throughHoleIssues, throughHole)
+	}
+
+	_, missingAdded, missingIssues := materializeExplicitZoneAccessVias(zones, nil, routingRequest)
+	if missingAdded != 0 || len(missingIssues) == 0 {
+		t.Fatalf("missing plane access did not fail closed: added=%d issues=%#v", missingAdded, missingIssues)
+	}
+}
+
+func TestExplicitZoneAccessViaCandidatesDeduplicateAtNanometrePrecision(t *testing.T) {
+	near := .1 + .2
+	route := routing.Route{Segments: []routing.Segment{
+		{Layer: "F.Cu", Start: routing.Point{XMM: near, YMM: 1}, End: routing.Point{XMM: 1, YMM: 1}},
+		{Layer: "F.Cu", Start: routing.Point{XMM: .3, YMM: 1}, End: routing.Point{XMM: 2, YMM: 1}},
+	}}
+	candidates := explicitZoneAccessViaCandidates(route, routing.Via{Net: "POWER"})
+	matches := 0
+	for _, candidate := range candidates {
+		if math.Round(candidate.At.XMM*1_000_000) == 300_000 && math.Round(candidate.At.YMM*1_000_000) == 1_000_000 {
+			matches++
+		}
+	}
+	if matches != 1 {
+		t.Fatalf("nanometre-equivalent candidates retained %d times: %#v", matches, candidates)
 	}
 }

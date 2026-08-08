@@ -47,10 +47,14 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	refsByID := make(map[string]string, len(request.ExplicitCircuit.Components))
 	for _, component := range request.ExplicitCircuit.Components {
 		refsByID[component.ID] = component.Reference
+		rotations := []float64{0}
+		if component.Placement.ThermalEdgeRequired {
+			rotations = []float64{0, 90}
+		}
 		placementRequest.Components = append(placementRequest.Components, placement.Component{
 			Ref: component.Reference, Value: component.Value, FootprintID: component.FootprintID,
 			Role: component.Role, Edge: explicitPlacementEdge(component.Placement.Edge), Priority: component.Placement.Priority,
-			Rotation: placement.RotationConstraint{AllowedDeg: []float64{0}},
+			Rotation: placement.RotationConstraint{AllowedDeg: rotations},
 			Side:     placement.SideTop, Mobility: placement.MobilityPolicy{
 				Class: placement.MobilitySoftPreferred, Reason: "catalog-resolved graph placement",
 				OwnerScope: "explicit-circuit", RouteHandling: placement.RouteHandlingInvalidateRebuild,
@@ -70,7 +74,7 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	}
 	regionRefs := map[string][]string{}
 	for _, component := range request.ExplicitCircuit.Components {
-		if component.Placement.Region != "" {
+		if component.Placement.Region != "" && !component.Placement.ThermalEdgeRequired {
 			regionRefs[component.Placement.Region] = append(regionRefs[component.Placement.Region], component.Reference)
 		}
 		if component.Placement.Near != "" {
@@ -154,10 +158,14 @@ func explicitThermalPlacementRule(component ExplicitComponentSpec) (placement.Th
 	if role := strings.TrimSpace(component.Placement.ThermalKeepAwayRole); role != "" {
 		keepAwayRoles = []string{role}
 	}
+	preferredRegion := component.Placement.Region
+	if component.Placement.ThermalEdgeRequired {
+		preferredRegion = ""
+	}
 	return placement.ThermalPlacementRule{
 		ID: "explicit.thermal." + component.ID, Source: "catalog_thermal_path:" + thermalPathID,
 		Refs: []string{component.Reference}, ThermalRole: placement.ThermalRole(thermalRole),
-		PreferredEdge: explicitPlacementEdge(component.Placement.Edge), PreferredRegion: component.Placement.Region,
+		PreferredEdge: explicitPlacementEdge(component.Placement.Edge), PreferredRegion: preferredRegion,
 		KeepAwayRoles: keepAwayRoles, MinDistanceMM: component.Placement.ThermalClearanceMM,
 		PreferCopper: component.Placement.PreferThermalCopper, Severity: placement.AdvancedRuleSeverityError,
 		Enforcement: placement.AdvancedRuleHard,
@@ -368,6 +376,14 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	operations = compactRouteOperationGeometry(operations)
 	operations, danglingRouteViasPruned := pruneRouteViasWithoutTwoLayerContact(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
+	operations, zoneAccessViasAdded, zoneAccessViaIssues := materializeExplicitZoneAccessVias(
+		request.ExplicitCircuit.Zones, operations, routingRequest,
+	)
+	issues = append(issues, zoneAccessViaIssues...)
+	result.Issues = append(result.Issues, zoneAccessViaIssues...)
+	if reports.HasBlockingIssue(zoneAccessViaIssues) {
+		result.Status = routing.StatusBlocked
+	}
 	operations, pairedReturnViasAdded, pairedReturnViaIssues := materializeExplicitReturnTransitionVias(
 		request.ExplicitCircuit.Nets, request.ExplicitCircuit.Zones, operations, routingRequest, request.Board.ThicknessMM,
 	)
@@ -408,6 +424,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		"clearance_mm": clearanceMM, "physical_clearance_before_repair": clearanceBlockersBefore,
 		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
 		"layer_transition_vias_added": layerTransitionViasAdded,
+		"zone_access_vias_added":      zoneAccessViasAdded,
 		"paired_return_vias_added":    pairedReturnViasAdded,
 		"route_endpoint_tail_cleanup": endpointTailCleanup,
 		"dangling_route_vias_pruned":  danglingRouteViasPruned,
@@ -417,6 +434,192 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		stage.Status = StageStatusWarning
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+// materializeExplicitZoneAccessVias ensures every generated inner-layer zone
+// has a plated connection to same-net routed copper or a through-hole pad.
+// Without this invariant KiCad can refill a syntactically valid zone as an
+// electrically isolated copper island. Candidate vias stay on existing
+// same-net segment centerlines and use the exact batch clearance selector.
+func materializeExplicitZoneAccessVias(
+	zones []ExplicitZoneSpec,
+	operations []transactions.Operation,
+	routingRequest routing.Request,
+) ([]transactions.Operation, int, []reports.Issue) {
+	materialized := append([]transactions.Operation(nil), operations...)
+	if len(zones) == 0 || len(routingRequest.Board.Layers) < 3 {
+		return materialized, 0, nil
+	}
+	stack := newCopperLayerStack(routingRequest.Board.Layers, 0)
+	if stack.ambiguous {
+		return materialized, 0, []reports.Issue{{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+			Path: "board.layers", Message: "copper layer names must be unique after case and whitespace normalization",
+		}}
+	}
+	routes := routingRoutesFromOperations(materialized)
+	selector, selectorIssues := routing.NewPhysicalClearanceViaSelector(routingRequest, routes)
+	if reports.HasBlockingIssue(selectorIssues) {
+		return materialized, 0, selectorIssues
+	}
+	selector.SetMinimumHoleToHoleClearanceMM(minimumRouteHoleToHoleClearanceMM)
+
+	routesByNet := make(map[string]routing.Route, len(routes))
+	for _, route := range routes {
+		routesByNet[strings.ToLower(strings.TrimSpace(route.Net))] = route
+	}
+	throughHoleAccessNets := make(map[string]bool)
+	for _, component := range routingRequest.Components {
+		for _, pad := range component.Pads {
+			netKey := strings.ToLower(strings.TrimSpace(pad.Net))
+			if netKey != "" && pad.Type == routing.PadThroughHole && pad.Drill != nil && pad.Drill.DiameterMM > 0 {
+				throughHoleAccessNets[netKey] = true
+			}
+		}
+	}
+	orderedZones := append([]ExplicitZoneSpec(nil), zones...)
+	slices.SortStableFunc(orderedZones, func(left, right ExplicitZoneSpec) int {
+		if order := strings.Compare(strings.ToLower(strings.TrimSpace(left.Net)), strings.ToLower(strings.TrimSpace(right.Net))); order != 0 {
+			return order
+		}
+		return strings.Compare(strings.Join(left.Layers, "\x00"), strings.Join(right.Layers, "\x00"))
+	})
+	seen := map[string]bool{}
+	added := 0
+	issues := append([]reports.Issue(nil), selectorIssues...)
+	for _, zone := range orderedZones {
+		netKey := strings.ToLower(strings.TrimSpace(zone.Net))
+		route := routesByNet[netKey]
+		for _, declaredLayer := range zone.Layers {
+			layer := stack.canonicalName(declaredLayer)
+			layerIndex, known := stack.stackIndexes[strings.ToLower(strings.TrimSpace(layer))]
+			if !known || layerIndex == 0 || layerIndex == len(stack.names)-1 {
+				continue
+			}
+			obligationKey := netKey + "\x00" + strings.ToLower(layer)
+			if seen[obligationKey] {
+				continue
+			}
+			seen[obligationKey] = true
+			if explicitZoneLayerAlreadyAccessible(route, netKey, layerIndex, stack, throughHoleAccessNets) {
+				continue
+			}
+
+			routingNet := routing.Net{Name: zone.Net}
+			for _, candidate := range routingRequest.Nets {
+				if strings.EqualFold(strings.TrimSpace(candidate.Name), strings.TrimSpace(zone.Net)) {
+					routingNet = candidate
+					break
+				}
+			}
+			effectiveRule, ruleIssues := routing.ResolveNetRule(&routingRequest, routingNet)
+			issues = append(issues, ruleIssues...)
+			if reports.HasBlockingIssue(ruleIssues) {
+				return materialized, added, issues
+			}
+			viaTemplate := routing.Via{
+				Net: zone.Net, DiameterMM: effectiveRule.ViaDiameterMM, DrillMM: effectiveRule.ViaDrillMM,
+				Layers: []string{stack.names[0], stack.names[len(stack.names)-1]},
+			}
+			candidates := explicitZoneAccessViaCandidates(route, viaTemplate)
+			selected, found := selector.First(candidates)
+			if !found {
+				issues = append(issues, reports.Issue{
+					Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+					Path:    "explicit_circuit.zones." + zone.Net,
+					Message: "inner-layer zone has no clearance-safe same-net access-via location",
+					Nets:    []string{zone.Net},
+				})
+				return materialized, added, issues
+			}
+			selector.Add(selected)
+			route.Net = zone.Net
+			route.Status = routing.RouteStatusRouted
+			route.Vias = append(route.Vias, selected)
+			routesByNet[netKey] = route
+			operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+				Op: transactions.OpRoute, NetName: zone.Net,
+				Vias: []transactions.RouteViaSpec{{
+					At:         transactions.Point{XMM: selected.At.XMM, YMM: selected.At.YMM},
+					DiameterMM: selected.DiameterMM, DrillMM: selected.DrillMM,
+					Layers: append([]string(nil), selected.Layers...),
+				}},
+			})
+			if err != nil {
+				issues = append(issues, reports.Issue{
+					Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+					Path: "explicit_circuit.zones." + zone.Net, Message: "encode zone access via: " + err.Error(),
+					Nets: []string{zone.Net},
+				})
+				return materialized, added, issues
+			}
+			materialized = append(materialized, operation)
+			added++
+		}
+	}
+	return materialized, added, issues
+}
+
+func explicitZoneLayerAlreadyAccessible(
+	route routing.Route,
+	netKey string,
+	layerIndex int,
+	stack copperLayerStack,
+	throughHoleAccessNets map[string]bool,
+) bool {
+	for _, segment := range route.Segments {
+		if stack.canonicalName(segment.Layer) == stack.names[layerIndex] {
+			return true
+		}
+	}
+	for _, via := range route.Vias {
+		minimum, maximum, valid := viaLayerBounds(via, stack)
+		if valid && minimum <= layerIndex && maximum >= layerIndex {
+			return true
+		}
+	}
+	return throughHoleAccessNets[netKey]
+}
+
+func explicitZoneAccessViaCandidates(route routing.Route, template routing.Via) []routing.Via {
+	segments := append([]routing.Segment(nil), route.Segments...)
+	slices.SortStableFunc(segments, func(left, right routing.Segment) int {
+		if order := strings.Compare(strings.ToLower(left.Layer), strings.ToLower(right.Layer)); order != 0 {
+			return order
+		}
+		for _, pair := range [][2]float64{{left.Start.XMM, right.Start.XMM}, {left.Start.YMM, right.Start.YMM}, {left.End.XMM, right.End.XMM}, {left.End.YMM, right.End.YMM}} {
+			if order := cmp.Compare(pair[0], pair[1]); order != 0 {
+				return order
+			}
+		}
+		return 0
+	})
+	fractions := []float64{.5, .25, .75, 0, 1}
+	candidates := make([]routing.Via, 0, len(segments)*len(fractions))
+	seen := map[routeCoordKey]bool{}
+	for _, segment := range segments {
+		for _, fraction := range fractions {
+			point := routing.Point{
+				XMM: segment.Start.XMM + (segment.End.XMM-segment.Start.XMM)*fraction,
+				YMM: segment.Start.YMM + (segment.End.YMM-segment.Start.YMM)*fraction,
+			}
+			// PCB transaction coordinates serialize at integer nanometre
+			// precision. Deduplicate at that physical identity rather than using
+			// float64 coordinates as exact map keys.
+			key := routeCoordKey{
+				x: int64(math.Round(point.XMM * 1_000_000)),
+				y: int64(math.Round(point.YMM * 1_000_000)),
+			}
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			candidate := template
+			candidate.At = point
+			candidates = append(candidates, candidate)
+		}
+	}
+	return candidates
 }
 
 type ExplicitReturnPathEvidence struct {

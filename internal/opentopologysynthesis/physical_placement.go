@@ -58,6 +58,7 @@ func physicalPCBIntent(
 	for _, region := range regions {
 		regionsByID[region.ID] = region
 	}
+	thermalEdgeLoads := map[circuitgraph.Side]float64{}
 	for _, component := range orderedComponents {
 		regionID := regionByComponent[component.ID]
 		placement := circuitgraph.PCBPlacement{Component: component.ID, Region: regionID, Priority: 80}
@@ -70,6 +71,12 @@ func physicalPCBIntent(
 			placement.Priority = 100
 		}
 		if thermal, ok := physicalThermalPlacement(component, regionsByID[regionID], board, catalog); ok {
+			if thermal.boardEdgeRequired {
+				width, height := physicalPackageDimensions(component, catalog)
+				thermal.edge = physicalCapacityAwareThermalEdge(
+					thermal.edge, board, math.Min(width, height)+physicalRegionPackagePaddingMM, thermalEdgeLoads,
+				)
+			}
 			placement.Edge = thermal.edge
 			placement.Priority = 110
 		}
@@ -85,11 +92,76 @@ func physicalPCBIntent(
 	if reference := physicalPlaneNet(nets, circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn); reference != "" {
 		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: reference, Layers: []string{"In1.Cu"}, ClearanceMM: .2})
 	}
-	powerNets := physicalPlaneNets(nets, circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg)
-	if len(powerNets) == 1 {
-		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: powerNets[0], Layers: []string{"In2.Cu"}, ClearanceMM: .2})
+	if power := physicalPrimaryPowerPlaneNet(nets); power != "" {
+		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: power, Layers: []string{"In2.Cu"}, ClearanceMM: .2})
 	}
 	return intent
+}
+
+func physicalCapacityAwareThermalEdge(
+	preferred circuitgraph.Side,
+	board circuitgraph.Board,
+	spanMM float64,
+	loads map[circuitgraph.Side]float64,
+) circuitgraph.Side {
+	candidates := []circuitgraph.Side{preferred}
+	switch preferred {
+	case circuitgraph.SideLeft, circuitgraph.SideRight:
+		candidates = append(candidates, circuitgraph.SideTop, circuitgraph.SideBottom)
+	case circuitgraph.SideTop:
+		candidates = append(candidates, circuitgraph.SideBottom)
+	case circuitgraph.SideBottom:
+		candidates = append(candidates, circuitgraph.SideTop)
+	}
+	selected := preferred
+	selectedLoad := math.Inf(1)
+	for _, edge := range candidates {
+		capacity := board.WidthMM
+		if edge == circuitgraph.SideLeft || edge == circuitgraph.SideRight {
+			capacity = board.HeightMM
+		}
+		if capacity <= 0 {
+			continue
+		}
+		normalizedLoad := loads[edge] / capacity
+		if normalizedLoad < selectedLoad-1e-12 {
+			selected, selectedLoad = edge, normalizedLoad
+		}
+	}
+	loads[selected] += math.Max(spanMM, physicalMinimumPackageDimensionMM)
+	return selected
+}
+
+// physicalPrimaryPowerPlaneNet selects the power domain that benefits most
+// from a solid distribution plane when a four-layer design contains multiple
+// rails. Endpoint fanout is the primary distribution signal, declared current
+// is the secondary electrical signal, and the normalized name is only a stable
+// final tie-break. This keeps short point-to-point high-current paths as wide
+// outer-layer routes while giving shared rails the continuous plane. Other
+// power domains remain routable on the outer layers.
+func physicalPrimaryPowerPlaneNet(nets []circuitgraph.Net) string {
+	candidates := make([]circuitgraph.Net, 0)
+	for _, net := range nets {
+		switch net.Role {
+		case circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg:
+			if strings.TrimSpace(net.Name) != "" {
+				candidates = append(candidates, net)
+			}
+		}
+	}
+	slices.SortStableFunc(candidates, func(left, right circuitgraph.Net) int {
+		if order := cmp.Compare(len(right.Endpoints), len(left.Endpoints)); order != 0 {
+			return order
+		}
+		if order := cmp.Compare(right.CurrentMA, left.CurrentMA); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Name, right.Name)
+	})
+	if len(candidates) == 0 {
+		return ""
+	}
+	return candidates[0].Name
 }
 
 func physicalFunctionalRegions(
@@ -329,11 +401,14 @@ func physicalCatalogVariant(component circuitgraph.Component, catalog *component
 }
 
 type physicalThermalPlacementDecision struct {
-	role        string
-	packageType string
-	path        components.ThermalPathRecord
-	edge        circuitgraph.Side
-	clearanceMM float64
+	role              string
+	packageType       string
+	pathID            string
+	pathCPerW         float64
+	edge              circuitgraph.Side
+	clearanceMM       float64
+	boardEdgeRequired bool
+	rationale         string
 }
 
 func physicalThermalPlacement(
@@ -343,8 +418,22 @@ func physicalThermalPlacement(
 	catalog *components.Catalog,
 ) (physicalThermalPlacementDecision, bool) {
 	record, variant, ok := physicalCatalogVariant(component, catalog)
-	if !ok || !physicalRequiresExternalThermalPath(record) || strings.TrimSpace(variant.PackageType) == "" {
+	if !ok || strings.TrimSpace(variant.PackageType) == "" {
 		return physicalThermalPlacementDecision{}, false
+	}
+	width, height := physicalPackageDimensions(component, catalog)
+	clearance := math.Max(physicalThermalMinimumClearanceMM, math.Hypot(width, height)/2+physicalThermalMinimumClearanceMM)
+	edge := physicalRegionBoardEdge(region, board, component.ID)
+	if !physicalRequiresExternalThermalPath(record) {
+		pathID, pathCPerW, found := physicalIntrinsicAmbientThermalPath(record)
+		if !found {
+			return physicalThermalPlacementDecision{}, false
+		}
+		return physicalThermalPlacementDecision{
+			role: physicalThermalRole(component), packageType: variant.PackageType,
+			pathID: pathID, pathCPerW: pathCPerW, edge: edge, clearanceMM: clearance,
+			rationale: "reviewed package junction-to-ambient evidence selects heat-source separation with thermal-copper preference",
+		}, true
 	}
 	selectedPath := components.ThermalPathRecord{}
 	pathFound := false
@@ -365,12 +454,45 @@ func physicalThermalPlacement(
 	if !pathFound {
 		return physicalThermalPlacementDecision{}, false
 	}
-	width, height := physicalPackageDimensions(component, catalog)
-	clearance := math.Max(physicalThermalMinimumClearanceMM, math.Hypot(width, height)/2+physicalThermalMinimumClearanceMM)
 	return physicalThermalPlacementDecision{
-		role: physicalThermalRole(component), packageType: variant.PackageType, path: selectedPath,
-		edge: physicalRegionBoardEdge(region, board, component.ID), clearanceMM: clearance,
+		role: physicalThermalRole(component), packageType: variant.PackageType,
+		pathID: selectedPath.ID, pathCPerW: selectedPath.CaseToSinkCPerW + selectedPath.NaturalSinkToAmbientCPerW,
+		edge: edge, clearanceMM: clearance, boardEdgeRequired: true,
+		rationale: "reviewed junction-to-case package compatibility selects board-edge heatsink access with sensor keep-away and thermal-copper preference",
 	}, true
+}
+
+func physicalIntrinsicAmbientThermalPath(record components.ComponentRecord) (string, float64, bool) {
+	type candidate struct {
+		id        string
+		pathCPerW *float64
+	}
+	candidates := []candidate{
+		{id: "power_semiconductor_junction_to_ambient", pathCPerW: nil},
+		{id: "component_junction_to_ambient", pathCPerW: nil},
+		{id: "op_amp_junction_to_ambient", pathCPerW: nil},
+	}
+	if record.PowerSemiconductor != nil {
+		candidates[0].pathCPerW = record.PowerSemiconductor.JunctionToAmbientCPerW
+	}
+	if record.Thermal != nil {
+		candidates[1].pathCPerW = record.Thermal.JunctionToAmbientCPerW
+	}
+	if record.OpAmp != nil {
+		candidates[2].pathCPerW = record.OpAmp.JunctionToAmbientCPerW
+	}
+	selected := candidate{}
+	for _, item := range candidates {
+		if !physicalPositiveFloat(item.pathCPerW) ||
+			(selected.pathCPerW != nil && *item.pathCPerW <= *selected.pathCPerW) {
+			continue
+		}
+		selected = item
+	}
+	if selected.pathCPerW == nil {
+		return "", 0, false
+	}
+	return record.ID + "." + selected.id, *selected.pathCPerW, true
 }
 
 func physicalRequiresExternalThermalPath(record components.ComponentRecord) bool {
@@ -486,14 +608,17 @@ func physicalPlacementEvidence(document circuitgraph.Document, catalog *componen
 			}
 			continue
 		}
+		if placement.Edge != "" {
+			thermal.edge = placement.Edge
+		}
 		evidence = append(evidence, finalizePhysicalPlacementEvidence(PhysicalPlacementEvidence{
 			Kind: "thermal_placement", Component: component.ID, Region: placement.Region, Role: thermal.role,
 			Edge: thermal.edge, CatalogID: component.ComponentID, VariantID: component.VariantID,
-			PackageType: thermal.packageType, ThermalPathID: thermal.path.ID,
-			ThermalPathCPerW:   thermal.path.CaseToSinkCPerW + thermal.path.NaturalSinkToAmbientCPerW,
+			PackageType: thermal.packageType, ThermalPathID: thermal.pathID,
+			ThermalPathCPerW:   thermal.pathCPerW,
 			KeepAwayRole:       physicalThermalSensitiveRole,
-			MinimumClearanceMM: thermal.clearanceMM, BoardEdgeRequired: true, PreferThermalCopper: true,
-			Rationale: "reviewed junction-to-case package compatibility selects board-edge heatsink access with sensor keep-away and thermal-copper preference",
+			MinimumClearanceMM: thermal.clearanceMM, BoardEdgeRequired: thermal.boardEdgeRequired, PreferThermalCopper: true,
+			Rationale: thermal.rationale,
 		}))
 	}
 	return evidence, reports.SortedIssues(issues)

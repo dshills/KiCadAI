@@ -484,17 +484,14 @@ func NormalizeResult(result Result, rules Rules) Result {
 			result.Connections[index].ToLabelAt = &point
 		}
 	}
-	for index := range result.Wires {
-		if comparePoints(result.Wires[index].From, result.Wires[index].To) > 0 {
-			result.Wires[index].From, result.Wires[index].To = result.Wires[index].To, result.Wires[index].From
-		}
-	}
 	sort.SliceStable(result.Components, func(i, j int) bool {
 		return compareComponents(result.Components[i].Component, result.Components[j].Component) < 0
 	})
 	sort.SliceStable(result.Wires, func(i, j int) bool {
 		return compareWires(result.Wires[i], result.Wires[j]) < 0
 	})
+	result.Wires = mergeCollinearWireSegments(result.Wires)
+	result.Junctions = append(result.Junctions, pinInteriorJunctions(result.Wires, result.Components)...)
 	sort.SliceStable(result.Connections, func(i, j int) bool {
 		return compareRoutedConnections(result.Connections[i], result.Connections[j]) < 0
 	})
@@ -504,9 +501,109 @@ func NormalizeResult(result Result, rules Rules) Result {
 	sort.SliceStable(result.Junctions, func(i, j int) bool {
 		return comparePoints(result.Junctions[i].Position, result.Junctions[j].Position) < 0
 	})
+	compactedJunctions := result.Junctions[:0]
+	for _, junction := range result.Junctions {
+		if len(compactedJunctions) != 0 && compactedJunctions[len(compactedJunctions)-1].Position == junction.Position {
+			continue
+		}
+		compactedJunctions = append(compactedJunctions, junction)
+	}
+	result.Junctions = compactedJunctions
 	result.Diagnostics = NormalizeDiagnostics(result.Diagnostics, rules.MaxDiagnostics)
 	result.Report = BuildReport(result, rules.Profile)
 	return result
+}
+
+// mergeCollinearWireSegments removes redundant same-net copper-free schematic
+// geometry. Overlapping or touching collinear segments are one continuous
+// conductor in KiCad; retaining each fragment can make a label appear to
+// contact multiple wires and trigger label_multiple_wires ERC findings.
+func mergeCollinearWireSegments(wires []WireSegment) []WireSegment {
+	type lineKey struct {
+		net        string
+		horizontal bool
+		axis       kicadfiles.IU
+	}
+	grouped := map[lineKey][]WireSegment{}
+	other := make([]WireSegment, 0)
+	for _, wire := range wires {
+		if comparePoints(wire.From, wire.To) > 0 {
+			wire.From, wire.To = wire.To, wire.From
+		}
+		switch {
+		case wire.From.Y == wire.To.Y:
+			key := lineKey{net: wire.NetName, horizontal: true, axis: wire.From.Y}
+			grouped[key] = append(grouped[key], wire)
+		case wire.From.X == wire.To.X:
+			key := lineKey{net: wire.NetName, axis: wire.From.X}
+			grouped[key] = append(grouped[key], wire)
+		default:
+			other = append(other, wire)
+		}
+	}
+	keys := make([]lineKey, 0, len(grouped))
+	for key := range grouped {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].net != keys[j].net {
+			return keys[i].net < keys[j].net
+		}
+		if keys[i].horizontal != keys[j].horizontal {
+			return keys[i].horizontal
+		}
+		return keys[i].axis < keys[j].axis
+	})
+	merged := make([]WireSegment, 0, len(wires))
+	for _, key := range keys {
+		segments := grouped[key]
+		sort.Slice(segments, func(i, j int) bool {
+			if comparePoints(segments[i].From, segments[j].From) != 0 {
+				return comparePoints(segments[i].From, segments[j].From) < 0
+			}
+			return comparePoints(segments[i].To, segments[j].To) < 0
+		})
+		current := segments[0]
+		for _, next := range segments[1:] {
+			overlaps := next.From.X <= current.To.X
+			if !key.horizontal {
+				overlaps = next.From.Y <= current.To.Y
+			}
+			if !overlaps {
+				merged = append(merged, current)
+				current = next
+				continue
+			}
+			if key.horizontal && next.To.X > current.To.X {
+				current.To.X = next.To.X
+			}
+			if !key.horizontal && next.To.Y > current.To.Y {
+				current.To.Y = next.To.Y
+			}
+		}
+		merged = append(merged, current)
+	}
+	merged = append(merged, other...)
+	sort.SliceStable(merged, func(i, j int) bool {
+		return compareWires(merged[i], merged[j]) < 0
+	})
+	return merged
+}
+
+func pinInteriorJunctions(wires []WireSegment, components []PlacedComponent) []Junction {
+	var junctions []Junction
+	for _, anchor := range pinAnchors(components) {
+		for _, wire := range wires {
+			if anchor == wire.From || anchor == wire.To {
+				continue
+			}
+			if orientation(wire.From, anchor, wire.To) == 0 && pointOnSegment(wire.From, anchor, wire.To) {
+				junctions = append(junctions, Junction{Position: anchor})
+				break
+			}
+		}
+	}
+	return junctions
 }
 
 func compareRoutedConnections(first, second RoutedConnection) int {

@@ -50,6 +50,365 @@ type currentSenseResistanceNetwork struct {
 	effectiveResistance float64
 }
 
+type currentLimitedSwitchRelationship struct {
+	control        string
+	output         string
+	minimumCurrent float64
+	maximumCurrent float64
+	targetCurrent  float64
+	onVoltageLimit float64
+}
+
+// topologyCurrentLimitedSwitchRelationshipSeeds derives a bang-bang current
+// regulator when a bounded periodic command drives an energy-storing load and
+// behavior requires both low switch loss and bounded peak current. Two
+// open-collector decisions share the gate node: one enforces command state and
+// the other removes drive when a catalog-backed source shunt reaches the
+// derived current threshold. The relationship is selected only from behavior,
+// port roles, reviewed primitive evidence, and catalog values.
+func topologyCurrentLimitedSwitchRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	relationships := currentLimitedSwitchRelationships(requirement)
+	if len(relationships) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var comparator, resistor, nmos PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "comparator":
+			comparator = primitive
+		case "resistor":
+			resistor = primitive
+		case "n_channel_mosfet":
+			nmos = primitive
+		}
+	}
+	if rated := topologyRatedPowerPrimitive(requirement, inventory, "n_channel_mosfet"); rated.Key != "" {
+		nmos = rated
+	}
+	flyback := topologyFlybackDiodePrimitive(requirement, inventory)
+	if comparator.Key == "" || resistor.Key == "" || nmos.Key == "" || flyback.Key == "" {
+		return nil, Consumption{}, map[string][]string{
+			"current_limited_switch_primitives_unavailable": {"reviewed comparator, low-side switch, resistor, and flyback relationships are required"},
+		}
+	}
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(supplies) == 0 || len(references) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, relationship := range relationships {
+		if ctx.Err() != nil || consumption.ExpandedStates >= policy.MaxExpandedStates ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			consumption.BudgetExhausted = true
+			break
+		}
+		control := externalRelationshipNode(initial.graph, relationship.control)
+		output := externalRelationshipNode(initial.graph, relationship.output)
+		if control == "" || output == "" || topologyControlledSwitchHighSideOutput(requirement, initial.graph, output) {
+			continue
+		}
+		loadSupply, found := topologyControlledSwitchLoadSupply(requirement, initial.graph, output, supplies)
+		if !found {
+			rejections["relationship_gap"] = append(rejections["relationship_gap"],
+				relationship.output+": current-limited inductive switching requires one unambiguous load supply")
+			continue
+		}
+		controlSupply := currentLimitedSwitchControlSupply(requirement, initial.graph, supplies)
+		controlSupplyVoltage, controlSupplyOK := topologyNodeNominalVoltage(requirement, initial.graph, controlSupply)
+		if !controlSupplyOK || controlSupplyVoltage <= 0 {
+			continue
+		}
+		senseVoltage := 0.1
+		if relationship.onVoltageLimit > 0 {
+			senseVoltage = math.Min(senseVoltage, relationship.onVoltageLimit*.25)
+		}
+		senseTarget := senseVoltage / relationship.targetCurrent
+		senseMaximum := math.Inf(1)
+		if relationship.onVoltageLimit > 0 {
+			senseMaximum = relationship.onVoltageLimit * .7 / relationship.maximumCurrent
+		}
+		senseNetwork, senseOK := currentSenseSeriesParallelCompositionWithin(
+			ctx, requirement, inventory, senseTarget, 2, 0, senseMaximum,
+		)
+		if !senseOK || senseNetwork.effectiveResistance <= 0 {
+			rejections["current_limited_switch_primitives_unavailable"] = append(
+				rejections["current_limited_switch_primitives_unavailable"],
+				relationship.output+": no reviewed low-ohmic shunt composition satisfies the on-state loss bound",
+			)
+			continue
+		}
+		currentReference := relationship.targetCurrent * senseNetwork.effectiveResistance
+		currentUpper, currentLower, _, currentDividerOK := currentLimitedSwitchDivider(
+			requirement, inventory, controlSupplyVoltage, currentReference,
+		)
+		commandHigh, _, commandHighOK := requirementControlHighVoltageRange(requirement, relationship.control)
+		if !commandHighOK {
+			continue
+		}
+		commandTarget := commandHigh / 2
+		commandUpper, commandLower, _, commandDividerOK := currentLimitedSwitchDivider(
+			requirement, inventory, controlSupplyVoltage, commandTarget,
+		)
+		if !currentDividerOK || !commandDividerOK {
+			rejections["current_limited_switch_primitives_unavailable"] = append(
+				rejections["current_limited_switch_primitives_unavailable"],
+				relationship.output+": reviewed divider values cannot realize command and current thresholds",
+			)
+			continue
+		}
+		currentUpperResistance := *currentUpper.ValueDomain.Nominal
+		currentLowerResistance := *currentLower.ValueDomain.Nominal
+		gateLimit := primitiveModelParameter(
+			nmos,
+			simmodel.PrimitiveNMOSSwitchV1,
+			"max_gate_source_voltage_v",
+		)
+		conservativeUpperSense := .9 * relationship.maximumCurrent * senseNetwork.effectiveResistance
+		dividerConductance := 1/currentUpperResistance + 1/currentLowerResistance
+		feedbackTarget := 0.0
+		if gateLimit > conservativeUpperSense && conservativeUpperSense > currentReference &&
+			dividerConductance > 0 {
+			feedbackTarget = (gateLimit - conservativeUpperSense) /
+				(dividerConductance * (conservativeUpperSense - currentReference))
+		}
+		feedbackNetwork, feedbackOK := currentSenseSeriesParallelCompositionWithin(
+			ctx,
+			requirement,
+			inventory,
+			feedbackTarget,
+			5,
+			0,
+			math.Inf(1),
+		)
+		if !feedbackOK {
+			rejections["current_limited_switch_primitives_unavailable"] = append(
+				rejections["current_limited_switch_primitives_unavailable"],
+				fmt.Sprintf("%s: reviewed resistor values cannot realize %.6g ohm tolerance-bounded current-control hysteresis",
+					relationship.output, feedbackTarget),
+			)
+			continue
+		}
+		consumption.ExpandedStates++
+		state := initial
+		senseIntermediateCount := len(senseNetwork.segments) - 1
+		feedbackIntermediateCount := len(feedbackNetwork.segments) - 1
+		internalCount := 4 + senseIntermediateCount + feedbackIntermediateCount
+		internal := make([]string, 0, internalCount)
+		for len(internal) < internalCount {
+			var node string
+			state, node = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+			if node == "" {
+				break
+			}
+			internal = append(internal, node)
+		}
+		if len(internal) != internalCount || internalNodeCount(state.graph) > limits.MaxInternalNodes {
+			continue
+		}
+		gate, commandThreshold, currentThreshold, sense := internal[0], internal[1], internal[2], internal[3]
+		reference := references[0]
+		for _, placement := range [][]TerminalConnection{
+			{
+				{Terminal: "IN_MINUS", Node: commandThreshold}, {Terminal: "IN_PLUS", Node: control},
+				{Terminal: "OUT", Node: gate}, {Terminal: "V_MINUS", Node: reference},
+				{Terminal: "V_PLUS", Node: loadSupply},
+			},
+			{
+				{Terminal: "IN_MINUS", Node: sense}, {Terminal: "IN_PLUS", Node: currentThreshold},
+				{Terminal: "OUT", Node: gate}, {Terminal: "V_MINUS", Node: reference},
+				{Terminal: "V_PLUS", Node: loadSupply},
+			},
+		} {
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, comparator, placement, &consumption)
+		}
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, nmos, []TerminalConnection{
+			{Terminal: "DRAIN", Node: output}, {Terminal: "GATE", Node: gate}, {Terminal: "SOURCE", Node: sense},
+		}, &consumption)
+		for _, edge := range []struct {
+			primitive PrimitiveCandidate
+			first     string
+			second    string
+		}{
+			{commandUpper, controlSupply, commandThreshold},
+			{commandLower, commandThreshold, reference},
+			{currentUpper, controlSupply, currentThreshold},
+			{currentLower, currentThreshold, reference},
+			{resistor, loadSupply, gate},
+			{resistor, gate, reference},
+		} {
+			state = addRelationshipPrimitiveAtValue(
+				state, requirement, inventoryByKey, edge.primitive, *edge.primitive.ValueDomain.Nominal,
+				topologyTwoTerminalPlacement(edge.first, edge.second), &consumption,
+			)
+		}
+		senseIntermediateEnd := 4 + senseIntermediateCount
+		senseNodes := append([]string{sense}, internal[4:senseIntermediateEnd]...)
+		senseNodes = append(senseNodes, reference)
+		for index, segment := range senseNetwork.segments {
+			for _, part := range segment {
+				state = addRelationshipPrimitiveAtValue(
+					state, requirement, inventoryByKey, part, *part.ValueDomain.Nominal,
+					topologyTwoTerminalPlacement(senseNodes[index], senseNodes[index+1]), &consumption,
+				)
+			}
+		}
+		feedbackNodes := append([]string{gate}, internal[senseIntermediateEnd:]...)
+		feedbackNodes = append(feedbackNodes, currentThreshold)
+		for index, segment := range feedbackNetwork.segments {
+			for _, part := range segment {
+				state = addRelationshipPrimitiveAtValue(
+					state, requirement, inventoryByKey, part, *part.ValueDomain.Nominal,
+					topologyTwoTerminalPlacement(feedbackNodes[index], feedbackNodes[index+1]), &consumption,
+				)
+			}
+		}
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, flyback, []TerminalConnection{
+			{Terminal: "ANODE", Node: output}, {Terminal: "CATHODE", Node: loadSupply},
+		}, &consumption)
+		retainControlledSwitchRelationshipCandidate(
+			state, inventory, limits, policy, &consumption, retained, rejections,
+		)
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func currentLimitedSwitchRelationships(requirement Requirement) []currentLimitedSwitchRelationship {
+	ports := map[string]Port{}
+	for _, port := range requirement.Requirements.Ports {
+		ports[port.ID] = port
+	}
+	relationships := map[string]currentLimitedSwitchRelationship{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "peak_current" || assertion.Observation.Kind != "port" ||
+			assertion.Min == nil || assertion.Max == nil || *assertion.Min <= 0 || *assertion.Max <= *assertion.Min {
+			continue
+		}
+		output, found := ports[assertion.Observation.ID]
+		if !found || output.Kind != "controlled_current" {
+			continue
+		}
+		control := ""
+		for _, candidate := range requirement.Requirements.BehavioralRequirements {
+			if candidate.Observation.Kind != "port" || candidate.Observation.ID != assertion.Observation.ID ||
+				candidate.Excitation == nil || candidate.Excitation.Kind != "port" ||
+				!requirementPortIsControl(requirement, candidate.Excitation.ID) ||
+				!slices.Contains([]string{"duty_cycle", "off_state_current"}, candidate.Metric) {
+				continue
+			}
+			if control == "" || candidate.Excitation.ID < control {
+				control = candidate.Excitation.ID
+			}
+		}
+		if control == "" || !currentLimitedSwitchHasInductiveLoad(requirement, assertion.Observation.ID) {
+			continue
+		}
+		relationships[assertion.Observation.ID] = currentLimitedSwitchRelationship{
+			control: control, output: assertion.Observation.ID,
+			minimumCurrent: *assertion.Min, maximumCurrent: *assertion.Max,
+			targetCurrent: *assertion.Min + .65*(*assertion.Max-*assertion.Min),
+		}
+	}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "on_state_voltage" || assertion.Max == nil ||
+			assertion.Observation.Kind != "port" {
+			continue
+		}
+		relationship := relationships[assertion.Observation.ID]
+		relationship.onVoltageLimit = *assertion.Max
+		relationships[assertion.Observation.ID] = relationship
+	}
+	result := make([]currentLimitedSwitchRelationship, 0, len(relationships))
+	for _, relationship := range relationships {
+		if relationship.control != "" {
+			result = append(result, relationship)
+		}
+	}
+	slices.SortFunc(result, func(left, right currentLimitedSwitchRelationship) int {
+		return cmp.Or(cmp.Compare(left.output, right.output), cmp.Compare(left.control, right.control))
+	})
+	return result
+}
+
+func currentLimitedSwitchHasInductiveLoad(requirement Requirement, output string) bool {
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Target == output && condition.Axis == "load_inductance" && condition.Max > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func currentLimitedSwitchControlSupply(requirement Requirement, graph CandidateGraph, supplies []string) string {
+	best, bestVoltage := "", math.Inf(1)
+	for _, supply := range supplies {
+		voltage, found := topologyNodeNominalVoltage(requirement, graph, supply)
+		if found && voltage > 0 && (voltage < bestVoltage || voltage == bestVoltage && supply < best) {
+			best, bestVoltage = supply, voltage
+		}
+	}
+	return best
+}
+
+func currentLimitedSwitchDivider(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	supplyVoltage float64,
+	targetVoltage float64,
+) (PrimitiveCandidate, PrimitiveCandidate, float64, bool) {
+	if supplyVoltage <= 0 || targetVoltage <= 0 || targetVoltage >= supplyVoltage {
+		return PrimitiveCandidate{}, PrimitiveCandidate{}, 0, false
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	choices := []PrimitiveCandidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "resistor" || primitive.ValueDomain == nil || primitive.ValueDomain.Nominal == nil ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		value := *primitive.ValueDomain.Nominal
+		if value >= 100 && value <= 1_000_000 && finite(value) {
+			choices = append(choices, primitive)
+		}
+	}
+	slices.SortFunc(choices, func(left, right PrimitiveCandidate) int { return cmp.Compare(left.Key, right.Key) })
+	bestUpper, bestLower := PrimitiveCandidate{}, PrimitiveCandidate{}
+	bestVoltage, bestError, bestAnchorError, bestKey := 0.0, math.Inf(1), math.Inf(1), ""
+	for _, upper := range choices {
+		for _, lower := range choices {
+			upperValue, lowerValue := *upper.ValueDomain.Nominal, *lower.ValueDomain.Nominal
+			voltage := supplyVoltage * lowerValue / (upperValue + lowerValue)
+			error := math.Abs(voltage-targetVoltage) / targetVoltage
+			anchorError := math.Abs(math.Log((upperValue + lowerValue) / 20_000))
+			key := upper.Key + "|" + lower.Key
+			if error < bestError || error == bestError && (anchorError < bestAnchorError ||
+				anchorError == bestAnchorError && (bestKey == "" || key < bestKey)) {
+				bestUpper, bestLower, bestVoltage = upper, lower, voltage
+				bestError, bestAnchorError, bestKey = error, anchorError, key
+			}
+		}
+	}
+	return bestUpper, bestLower, bestVoltage, bestKey != ""
+}
+
 func topologyTransconductanceRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
@@ -677,6 +1036,14 @@ func requirementControlHighVoltageRange(requirement Requirement, control string)
 			}
 			minimumHigh = math.Min(minimumHigh, condition.Min)
 			maximumHigh = math.Max(maximumHigh, condition.Max)
+		}
+		for _, event := range operatingCase.Events {
+			if event.Target != control || event.Kind != "input_step" ||
+				event.Applied <= event.Initial || event.Applied <= 0 {
+				continue
+			}
+			minimumHigh = math.Min(minimumHigh, event.Applied)
+			maximumHigh = math.Max(maximumHigh, event.Applied)
 		}
 	}
 	if math.IsInf(minimumHigh, 1) || maximumHigh <= 0 {

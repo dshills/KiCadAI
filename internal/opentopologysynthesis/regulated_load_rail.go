@@ -507,23 +507,12 @@ func topologyGraphHasLowSideCurrentRegulation(
 		if terminals["DRAIN"] != output || sense == "" || sense == reference {
 			continue
 		}
-		hasSenseReturn := false
-		for _, candidate := range graph.Instances {
-			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
-				continue
-			}
-			left, right := candidate.Terminals[0].Node, candidate.Terminals[1].Node
-			if left == sense && right == reference || right == sense && left == reference {
-				hasSenseReturn = true
-				break
-			}
-		}
-		if !hasSenseReturn {
+		if !topologyLowSideSwitchReturnsToReference(graph, sense, reference) {
 			continue
 		}
 		gate := terminals["GATE"]
 		for _, controller := range graph.Instances {
-			if controller.Kind != "opamp" {
+			if controller.Kind != "opamp" && controller.Kind != "comparator" {
 				continue
 			}
 			controllerTerminals := topologyTerminalNodes(controller)
@@ -690,7 +679,8 @@ func topologyOutputCurrentEnvelope(
 	minimum, maximum := 0.0, math.Inf(1)
 	foundMinimum, foundMaximum := false, false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
-		if assertion.Metric != "output_current" || assertion.Observation.Kind != "port" ||
+		if (assertion.Metric != "output_current" && assertion.Metric != "peak_current") ||
+			assertion.Observation.Kind != "port" ||
 			assertion.Observation.ID != outputSemanticID {
 			continue
 		}
@@ -713,7 +703,8 @@ func topologySwitchedLoadRail(graph CandidateGraph, output, reference string) (s
 			continue
 		}
 		terminals := topologyTerminalNodes(instance)
-		if terminals["DRAIN"] == output && terminals["SOURCE"] == reference {
+		if terminals["DRAIN"] == output &&
+			topologyLowSideSwitchReturnsToReference(graph, terminals["SOURCE"], reference) {
 			controlled = true
 			break
 		}
@@ -736,4 +727,15 @@ func topologySwitchedLoadRail(graph CandidateGraph, output, reference string) (s
 		rail = terminals["CATHODE"]
 	}
 	return rail, rail != ""
+}
+
+// topologyLowSideSwitchReturnsToReference recognizes both a direct source
+// return and the passive series return used by source-shunt current sensing.
+// Restricting the path to resistors keeps supply and signal bias networks from
+// being mistaken for the load-current return path.
+func topologyLowSideSwitchReturnsToReference(graph CandidateGraph, source, reference string) bool {
+	if source == "" || reference == "" {
+		return false
+	}
+	return source == reference || len(topologyResistorPath(graph, source, reference)) != 0
 }

@@ -329,6 +329,26 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 			retainedTopology[candidate.TopologyHash] = candidate
 		}
 	}
+	currentLimitedSwitchCandidates, currentLimitedSwitchConsumption, currentLimitedSwitchRejections := topologyCurrentLimitedSwitchRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, currentLimitedSwitchConsumption)
+	for code, samples := range currentLimitedSwitchRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range currentLimitedSwitchCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
 	switchCandidates, switchConsumption, switchRejections := topologyControlledSwitchRelationshipSeeds(
 		ctx,
 		requirement,
@@ -3559,6 +3579,7 @@ func topologyPowerTransferRelationshipSeeds(
 			}
 
 			if powerController.Key != "" && len(supplyNodes) >= 2 && highRail != lowRail {
+				composeFeedback := powerTransferSeriesFeedbackRequired(requirement, inventoryByKey)
 				for _, pair := range [][2]string{
 					{"npn_bjt", "pnp_bjt"},
 					{"n_channel_mosfet", "p_channel_mosfet"},
@@ -3593,6 +3614,39 @@ func topologyPowerTransferRelationshipSeeds(
 					})
 					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, reference))
 					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, output))
+					retainFeedbackVariants := func(candidate topologySearchState) {
+						if !composeFeedback {
+							retain(candidate)
+							return
+						}
+						seriesCandidate, join, ok := addNode(candidate)
+						if !ok {
+							retain(candidate)
+							return
+						}
+						feedbackResistor, outputTerminal := "", ""
+						for _, placed := range seriesCandidate.graph.Instances {
+							if placed.Kind != "resistor" || len(placed.Terminals) != 2 {
+								continue
+							}
+							first, second := placed.Terminals[0], placed.Terminals[1]
+							if first.Node == feedback && second.Node == output {
+								feedbackResistor, outputTerminal = placed.ID, second.Terminal
+								break
+							}
+							if second.Node == feedback && first.Node == output {
+								feedbackResistor, outputTerminal = placed.ID, first.Terminal
+								break
+							}
+						}
+						if feedbackResistor == "" {
+							retain(candidate)
+							return
+						}
+						seriesCandidate = redirect(seriesCandidate, feedbackResistor, outputTerminal, join)
+						seriesCandidate = add(seriesCandidate, resistor, topologyTwoTerminalPlacement(join, output))
+						retain(seriesCandidate)
+					}
 					for _, edge := range [][2]string{
 						{upperOutput, output},
 						{lowerOutput, output},
@@ -3618,7 +3672,7 @@ func topologyPowerTransferRelationshipSeeds(
 							{Terminal: "COLLECTOR", Node: lowRail},
 							{Terminal: "EMITTER", Node: lowerOutput},
 						})
-						retain(direct)
+						retainFeedbackVariants(direct)
 						// A controller-to-load ballast path turns the same pair into
 						// a current booster: the controller owns the zero-crossing and
 						// the power devices take over once roughly one base-emitter
@@ -3629,19 +3683,19 @@ func topologyPowerTransferRelationshipSeeds(
 							resistor,
 							topologyTwoTerminalPlacement(drive, output),
 						)
-						retain(boosted)
+						retainFeedbackVariants(boosted)
 						directCompensated := add(
 							direct,
 							capacitor,
 							topologyTwoTerminalPlacement(controllerOutput, feedback),
 						)
-						retain(directCompensated)
+						retainFeedbackVariants(directCompensated)
 						boostedCompensated := add(
 							boosted,
 							capacitor,
 							topologyTwoTerminalPlacement(controllerOutput, feedback),
 						)
-						retain(boostedCompensated)
+						retainFeedbackVariants(boostedCompensated)
 
 						// A compound complementary follower trades two additional
 						// active devices and two junction drops for beta multiplication.
@@ -3689,30 +3743,123 @@ func topologyPowerTransferRelationshipSeeds(
 									{Terminal: "COLLECTOR", Node: highRail},
 									{Terminal: "EMITTER", Node: upperPowerBase},
 								})
-								compound = add(compound, upper, []TerminalConnection{
-									{Terminal: "BASE", Node: upperPowerBase},
-									{Terminal: "COLLECTOR", Node: highRail},
-									{Terminal: "EMITTER", Node: upperOutput},
-								})
 								compound = add(compound, lower, []TerminalConnection{
 									{Terminal: "BASE", Node: lowerControl},
 									{Terminal: "COLLECTOR", Node: lowRail},
 									{Terminal: "EMITTER", Node: lowerPowerBase},
 								})
-								compound = add(compound, lower, []TerminalConnection{
-									{Terminal: "BASE", Node: lowerPowerBase},
-									{Terminal: "COLLECTOR", Node: lowRail},
-									{Terminal: "EMITTER", Node: lowerOutput},
-								})
-								compound = add(compound, resistor, topologyTwoTerminalPlacement(upperPowerBase, upperOutput))
-								compound = add(compound, resistor, topologyTwoTerminalPlacement(lowerPowerBase, lowerOutput))
-								retain(compound)
-								compoundCompensated := add(
-									compound,
-									capacitor,
-									topologyTwoTerminalPlacement(controllerOutput, feedback),
+								parallelOutputs := max(
+									topologyPowerParallelDeviceCount(requirement, upper),
+									topologyPowerParallelDeviceCount(requirement, lower),
 								)
-								retain(compoundCompensated)
+								upperOutputs := []string{upperOutput}
+								lowerOutputs := []string{lowerOutput}
+								parallelOK := true
+								for len(upperOutputs) < parallelOutputs {
+									var extraUpperOutput, extraLowerOutput string
+									compound, extraUpperOutput, parallelOK = addNode(compound)
+									if !parallelOK {
+										break
+									}
+									compound, extraLowerOutput, parallelOK = addNode(compound)
+									if !parallelOK {
+										break
+									}
+									upperOutputs = append(upperOutputs, extraUpperOutput)
+									lowerOutputs = append(lowerOutputs, extraLowerOutput)
+								}
+								if parallelOK {
+									for index := range upperOutputs {
+										compound = add(compound, upper, []TerminalConnection{
+											{Terminal: "BASE", Node: upperPowerBase},
+											{Terminal: "COLLECTOR", Node: highRail},
+											{Terminal: "EMITTER", Node: upperOutputs[index]},
+										})
+										compound = add(compound, lower, []TerminalConnection{
+											{Terminal: "BASE", Node: lowerPowerBase},
+											{Terminal: "COLLECTOR", Node: lowRail},
+											{Terminal: "EMITTER", Node: lowerOutputs[index]},
+										})
+										compound = add(compound, resistor, topologyTwoTerminalPlacement(upperPowerBase, upperOutputs[index]))
+										compound = add(compound, resistor, topologyTwoTerminalPlacement(lowerPowerBase, lowerOutputs[index]))
+										if index > 0 {
+											compound = add(compound, resistor, topologyTwoTerminalPlacement(upperOutputs[index], output))
+											compound = add(compound, resistor, topologyTwoTerminalPlacement(lowerOutputs[index], output))
+										}
+									}
+									retainFeedbackVariants(compound)
+									compoundCompensated := add(
+										compound,
+										capacitor,
+										topologyTwoTerminalPlacement(controllerOutput, feedback),
+									)
+									retainFeedbackVariants(compoundCompensated)
+								}
+							}
+						}
+
+						// A matched-junction bias spreader uses diode-connected
+						// copies of the selected complementary transistor models.
+						// Unlike a generic signal diode, their exponential junction
+						// evidence tracks the output devices at the DC linearization
+						// point, while rail-fed bias current and base-stop values are
+						// still derived from the requested load, swing, and bandwidth.
+						matched := state
+						matchedNodes := make([]string, 0, 2)
+						for len(matchedNodes) < 2 {
+							var node string
+							var matchedOK bool
+							matched, node, matchedOK = addNode(matched)
+							if !matchedOK {
+								break
+							}
+							matchedNodes = append(matchedNodes, node)
+						}
+						if len(matchedNodes) == 2 {
+							upperBase, lowerBase := matchedNodes[0], matchedNodes[1]
+							matched = add(matched, resistor, topologyTwoTerminalPlacement(highRail, upperControl))
+							matched = add(matched, upper, []TerminalConnection{
+								{Terminal: "BASE", Node: upperControl},
+								{Terminal: "COLLECTOR", Node: upperControl},
+								{Terminal: "EMITTER", Node: drive},
+							})
+							matched = add(matched, lower, []TerminalConnection{
+								{Terminal: "EMITTER", Node: drive},
+								{Terminal: "BASE", Node: lowerControl},
+								{Terminal: "COLLECTOR", Node: lowerControl},
+							})
+							matched = add(matched, resistor, topologyTwoTerminalPlacement(lowerControl, lowRail))
+							matched = add(matched, resistor, topologyTwoTerminalPlacement(upperControl, upperBase))
+							matched = add(matched, resistor, topologyTwoTerminalPlacement(lowerControl, lowerBase))
+							matched = add(matched, upper, []TerminalConnection{
+								{Terminal: "BASE", Node: upperBase},
+								{Terminal: "COLLECTOR", Node: highRail},
+								{Terminal: "EMITTER", Node: upperOutput},
+							})
+							matched = add(matched, lower, []TerminalConnection{
+								{Terminal: "BASE", Node: lowerBase},
+								{Terminal: "COLLECTOR", Node: lowRail},
+								{Terminal: "EMITTER", Node: lowerOutput},
+							})
+							parallelFeed := matched
+							branchCount := powerTransferBiasFeedBranchCount(
+								requirement,
+								matched.graph,
+								inventoryByKey,
+								upper,
+								lower,
+							)
+							maximumBranchCount := 1 + (limits.MaxPrimitiveInstances-len(matched.graph.Instances))/2
+							branchCount = min(branchCount, maximumBranchCount)
+							if branchCount <= 1 {
+								retainFeedbackVariants(matched)
+							}
+							for branch := 1; branch < branchCount; branch++ {
+								parallelFeed = add(parallelFeed, resistor, topologyTwoTerminalPlacement(highRail, upperControl))
+								parallelFeed = add(parallelFeed, resistor, topologyTwoTerminalPlacement(lowerControl, lowRail))
+							}
+							if branchCount > 1 {
+								retainFeedbackVariants(parallelFeed)
 							}
 						}
 
@@ -3771,13 +3918,13 @@ func topologyPowerTransferRelationshipSeeds(
 							{Terminal: "SOURCE", Node: lowerOutput},
 						})
 					}
-					retain(state)
+					retainFeedbackVariants(state)
 					compensated := add(
 						state,
 						capacitor,
 						topologyTwoTerminalPlacement(controllerOutput, feedback),
 					)
-					retain(compensated)
+					retainFeedbackVariants(compensated)
 
 					series := state
 					var upperJoin, lowerJoin string
@@ -3817,13 +3964,13 @@ func topologyPowerTransferRelationshipSeeds(
 						series = redirect(series, lowerResistor, lowerTerminal, lowerJoin)
 						series = add(series, resistor, topologyTwoTerminalPlacement(upperJoin, output))
 						series = add(series, resistor, topologyTwoTerminalPlacement(lowerJoin, output))
-						retain(series)
+						retainFeedbackVariants(series)
 						seriesCompensated := add(
 							series,
 							capacitor,
 							topologyTwoTerminalPlacement(controllerOutput, feedback),
 						)
-						retain(seriesCompensated)
+						retainFeedbackVariants(seriesCompensated)
 					}
 				}
 			}
@@ -3859,6 +4006,38 @@ func topologyRequiresPowerTransfer(requirement Requirement) bool {
 		}
 	}
 	return requireGain && requireLoadDrive && requireDynamicQuality
+}
+
+func powerTransferSeriesFeedbackRequired(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+) bool {
+	targets := derivePowerTransferSizingTargets(requirement)
+	if targets.gain <= 1 {
+		return false
+	}
+	const referenceResistance = 10_000.0
+	feedback, found := topologyCatalogResistanceClosest(
+		requirement,
+		inventory,
+		referenceResistance*(targets.gain-1),
+	)
+	if !found {
+		return true
+	}
+	realizedGain := 1 + feedback/referenceResistance
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "voltage_gain" && assertion.Metric != "voltage_gain_at_frequency" {
+			continue
+		}
+		if assertion.Min != nil && realizedGain < *assertion.Min {
+			return true
+		}
+		if assertion.Max != nil && realizedGain > *assertion.Max {
+			return true
+		}
+	}
+	return false
 }
 
 func topologyRatedPowerPrimitive(
@@ -3996,6 +4175,24 @@ func topologyPowerDCSoaMargin(requirement Requirement, primitive PrimitiveCandid
 		return 0, false
 	}
 	return allowedCurrentA / stressCurrentA, true
+}
+
+// topologyPowerParallelDeviceCount converts the topology-independent DC SOA
+// prior into the minimum symmetric output-device count required by the
+// declared margin. Trusted electrothermal simulation remains authoritative,
+// but the grammar must first expose an architecture capable of sharing stress.
+func topologyPowerParallelDeviceCount(requirement Requirement, primitive PrimitiveCandidate) int {
+	requiredMargin := 1.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "soa_margin" && assertion.Min != nil && *assertion.Min > 0 {
+			requiredMargin = math.Max(requiredMargin, *assertion.Min)
+		}
+	}
+	margin, found := topologyPowerDCSoaMargin(requirement, primitive)
+	if !found || margin <= 0 || margin >= requiredMargin {
+		return 1
+	}
+	return max(1, int(math.Ceil(requiredMargin/margin)))
 }
 
 func topologyPowerControllerPrimitive(

@@ -62,3 +62,22 @@ func TestExplicitRightAnglePlacementFallbackAlignsMovableFootprintsToBoard(t *te
 		t.Fatalf("fallback mutated original request: %#v", request.Components[2].Rotation)
 	}
 }
+
+func TestExplicitThermalEdgeRuleDoesNotRequireFunctionalRegionContainment(t *testing.T) {
+	component := ExplicitComponentSpec{
+		ID: "power_device", Reference: "Q1",
+		Placement: ExplicitPlacementSpec{
+			Region: "functional_power", Edge: "bottom", ThermalRole: "power_switch",
+			ThermalPathID: "reviewed_sink", ThermalEdgeRequired: true,
+		},
+	}
+	rule, ok := explicitThermalPlacementRule(component)
+	if !ok || rule.PreferredRegion != "" || rule.PreferredEdge != placement.EdgeBottom {
+		t.Fatalf("board-edge thermal rule = %#v ok=%t", rule, ok)
+	}
+	component.Placement.ThermalEdgeRequired = false
+	rule, ok = explicitThermalPlacementRule(component)
+	if !ok || rule.PreferredRegion != "functional_power" {
+		t.Fatalf("intrinsic thermal rule lost its functional region: %#v ok=%t", rule, ok)
+	}
+}

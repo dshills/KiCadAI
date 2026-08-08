@@ -70,6 +70,61 @@ func TestPeriodicWaveformMetricsIgnoreBriefSwitchingOvershoot(t *testing.T) {
 	}
 }
 
+func TestPeriodicWaveformMetricsMeasureSelectedDeviceCurrent(t *testing.T) {
+	result := AnalysisResult{ID: "load-duty", Kind: AnalysisTransient}
+	for index := 0; index <= 50; index++ {
+		timeS := float64(index) * .0001
+		current := 0.0
+		if math.Mod(timeS, .001) < .0002 {
+			current = 1
+		}
+		result.Points = append(result.Points, AnalysisPoint{
+			TimeS: timeS,
+			Nodes: []NodeResult{{Node: "SWITCH", Real: 15}},
+			Devices: []DeviceResult{
+				{Component: "load_inductor", CurrentA: current},
+			},
+		})
+	}
+	actual, diagnostic := transientDerivedValue(result, Assertion{
+		AnalysisID: "load-duty", Node: "SWITCH", Component: "load_inductor",
+		Quantity: QuantityDutyCyclePct,
+	})
+	if diagnostic != nil || math.Abs(actual-20) > 1e-6 {
+		t.Fatalf("device-current duty cycle = %.12g, want 20; diagnostic=%#v", actual, diagnostic)
+	}
+}
+
+func TestFrequencyQualifiedDutyIgnoresRepeatableRegulatorSubcycles(t *testing.T) {
+	const stepS = 10e-6
+	times := make([]float64, 0, 501)
+	values := make([]float64, 0, 501)
+	for index := 0; index <= 500; index++ {
+		timeS := float64(index) * stepS
+		phase := math.Mod(timeS, .001)
+		value := 0.0
+		if phase < .0005 {
+			value = 24
+			if phase >= .0002 && phase < .00022 {
+				value = 0
+			}
+		}
+		times = append(times, timeS)
+		values = append(values, value)
+	}
+	assertion := Assertion{
+		AnalysisID: "regulated-duty", Node: "SWITCH",
+		Quantity: QuantityDutyCyclePct, FrequencyHz: 1000,
+	}
+	frequency, duty, diagnostic := periodicWaveformMetrics(times, values, assertion)
+	if diagnostic != nil {
+		t.Fatalf("frequency-qualified duty diagnostic = %#v", diagnostic)
+	}
+	if frequency != 1000 || math.Abs(duty-48) > .5 {
+		t.Fatalf("frequency-qualified metrics = %.12g Hz %.12g%%, want 1000 Hz about 48%%", frequency, duty)
+	}
+}
+
 func TestTransientOutputRippleUsesLastTwoKnownCycles(t *testing.T) {
 	result := AnalysisResult{ID: "ripple", Kind: AnalysisTransient, FundamentalFrequencyHz: 1000}
 	for index := 0; index <= 40; index++ {

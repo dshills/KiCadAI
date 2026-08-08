@@ -145,6 +145,7 @@ func EvaluateCandidate(
 		)
 	})
 	nominalRejected := false
+	cornerRejected := false
 	for phaseIndex, workItems := range [][]simulationWorkItem{nominalWork, cornerWork} {
 		for _, work := range workItems {
 			if nominalRejected && !work.assertion.Critical {
@@ -181,7 +182,18 @@ func EvaluateCandidate(
 			}
 			if phaseIndex == 0 && attempt.Status != SimulationEvaluationPassed {
 				nominalRejected = true
+			} else if phaseIndex == 1 && attempt.Status != SimulationEvaluationPassed {
+				cornerRejected = true
+				break
 			}
+		}
+		if nominalRejected || cornerRejected {
+			// A rejected candidate cannot become passing by collecting more
+			// stress-corner failures. Complete the nominal phase so critical
+			// evidence survives noncritical failures, then preserve the first
+			// deterministic non-nominal diagnosis for repair. Passing candidates
+			// still traverse every declared operating corner.
+			break
 		}
 	}
 	slices.SortFunc(result.Diagnoses, compareDiagnoses)
@@ -941,10 +953,67 @@ func simulationHarnessConditions(
 			seen[conditionKey(condition)] = true
 		}
 	}
+	if forced, found := onStateCurrentHarnessCondition(requirement, assertion); found {
+		filtered := result[:0]
+		for _, condition := range result {
+			if condition.Target == forced.Target &&
+				slices.Contains([]string{"load_capacitance", "load_current", "load_inductance", "load_resistance"}, condition.Axis) {
+				continue
+			}
+			filtered = append(filtered, condition)
+		}
+		result = append(filtered, forced)
+	}
 	slices.SortFunc(result, func(left, right OperatingCondition) int {
 		return cmp.Or(cmp.Compare(left.Axis, right.Axis), cmp.Compare(left.Target, right.Target))
 	})
 	return result
+}
+
+// onStateCurrentHarnessCondition separates a switch's conductive-state drop
+// from its switching regulator's average-current behavior. For a controlled
+// current port, the midpoint of the declared bounded current requirement is a
+// deterministic DC test current that remains below the controller's upper
+// regulation threshold while still exercising the power path.
+func onStateCurrentHarnessCondition(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+) (OperatingCondition, bool) {
+	if assertion.Metric != "on_state_voltage" || assertion.Analysis != simmodel.AnalysisDCOperatingPoint ||
+		assertion.Observation.Kind != "port" {
+		return OperatingCondition{}, false
+	}
+	controlled := false
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == assertion.Observation.ID && port.Kind == "controlled_current" {
+			controlled = true
+			break
+		}
+	}
+	if !controlled {
+		return OperatingCondition{}, false
+	}
+	minimum, maximum := math.Inf(-1), math.Inf(1)
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Observation != assertion.Observation ||
+			!slices.Contains([]string{"output_current", "peak_current"}, candidate.Metric) {
+			continue
+		}
+		if candidate.Min != nil && finite(*candidate.Min) {
+			minimum = math.Max(minimum, *candidate.Min)
+		}
+		if candidate.Max != nil && finite(*candidate.Max) {
+			maximum = math.Min(maximum, *candidate.Max)
+		}
+	}
+	if !finite(minimum) || !finite(maximum) || minimum <= 0 || maximum < minimum {
+		return OperatingCondition{}, false
+	}
+	testCurrent := (minimum + maximum) / 2
+	return OperatingCondition{
+		Axis: "load_current", Target: assertion.Observation.ID,
+		Min: testCurrent, Max: testCurrent, Unit: "A",
+	}, true
 }
 
 func simulationAssertionRequiresActiveControl(requirement Requirement, assertion BehavioralAssertion) bool {
@@ -1115,11 +1184,16 @@ func simulationThermalBoundary(
 		}
 		packageTypes[strings.ToLower(strings.TrimSpace(primitive.PackageType))] = true
 	}
-	paths := []components.ThermalPathRecord{}
+	type thermalPathSelection struct {
+		Path            components.ThermalPathRecord `json:"path"`
+		AssemblyCount   int                          `json:"assembly_count"`
+		DevicesPerBatch int                          `json:"devices_per_assembly"`
+	}
+	paths := []thermalPathSelection{}
 	for _, path := range catalog.ThermalPaths {
 		if path.ReviewStatus != "reviewed" || strings.ToLower(path.Lifecycle) != "active" ||
 			!acceptedConfidence(path.Verification.Confidence) ||
-			path.MaximumSharedDevices < len(junctionToCaseInstances) ||
+			path.MaximumSharedDevices <= 0 ||
 			path.CaseToSinkCPerW < 0 || path.NaturalSinkToAmbientCPerW <= 0 {
 			continue
 		}
@@ -1132,13 +1206,21 @@ func simulationThermalBoundary(
 			compatible = compatible && matched
 		}
 		if compatible {
-			paths = append(paths, path)
+			paths = append(paths, thermalPathSelection{
+				Path:            path,
+				AssemblyCount:   (len(junctionToCaseInstances) + path.MaximumSharedDevices - 1) / path.MaximumSharedDevices,
+				DevicesPerBatch: path.MaximumSharedDevices,
+			})
 		}
 	}
-	slices.SortFunc(paths, func(left, right components.ThermalPathRecord) int {
-		leftResistance := left.CaseToSinkCPerW + left.NaturalSinkToAmbientCPerW
-		rightResistance := right.CaseToSinkCPerW + right.NaturalSinkToAmbientCPerW
-		return cmp.Or(cmp.Compare(leftResistance, rightResistance), cmp.Compare(left.ID, right.ID))
+	slices.SortFunc(paths, func(left, right thermalPathSelection) int {
+		leftResistance := left.Path.CaseToSinkCPerW + left.Path.NaturalSinkToAmbientCPerW
+		rightResistance := right.Path.CaseToSinkCPerW + right.Path.NaturalSinkToAmbientCPerW
+		return cmp.Or(
+			cmp.Compare(leftResistance, rightResistance),
+			cmp.Compare(left.AssemblyCount, right.AssemblyCount),
+			cmp.Compare(left.Path.ID, right.Path.ID),
+		)
 	})
 	if len(paths) == 0 {
 		return nil, nil, []SimulationDiagnostic{{
@@ -1148,7 +1230,8 @@ func simulationThermalBoundary(
 			Suggestion: "select fewer shared devices or onboard a compatible thermal assembly",
 		}}
 	}
-	path := paths[0]
+	selection := paths[0]
+	path := selection.Path
 	targets := derivePowerTransferSizingTargets(requirement)
 	railMagnitude := 0.0
 	for _, node := range graph.Nodes {
@@ -1204,7 +1287,12 @@ func simulationThermalBoundary(
 			Suggestion: "declare the operating envelope needed to size the cooling assembly",
 		}}
 	}
-	caseTemperature := ambient + totalDissipation*(path.CaseToSinkCPerW+path.NaturalSinkToAmbientCPerW)
+	// Repeating a reviewed assembly partitions the symmetric stage's aggregate
+	// dissipation. The device evaluator still adds each component's own
+	// junction-to-case trajectory, so this division affects only the shared
+	// sink boundary and does not hide local device stress.
+	perAssemblyDissipation := totalDissipation / float64(selection.AssemblyCount)
+	caseTemperature := ambient + perAssemblyDissipation*(path.CaseToSinkCPerW+path.NaturalSinkToAmbientCPerW)
 	if !finite(caseTemperature) || caseTemperature < -100 || caseTemperature > 300 {
 		return nil, nil, []SimulationDiagnostic{{
 			Code:    diagnosisThermalUnavailable,
@@ -1213,7 +1301,7 @@ func simulationThermalBoundary(
 		}}
 	}
 	conditions = append(conditions, simmodel.NamedValue{Name: "case_temperature_c", Value: caseTemperature})
-	return conditions, []string{hashJSON(path)}, nil
+	return conditions, []string{hashJSON(selection)}, nil
 }
 
 // thermalBehavioralTransferDissipation derives a conservative linear-transfer
@@ -1453,14 +1541,6 @@ func simulationIntentParts(
 		frequency := assertionFrequencyScale(requirement, assertion)
 		analysis.DurationS = 4 / frequency
 		analysis.TimeStepS = 1 / (frequency * 64)
-		effectiveExcitation := simulationEffectiveExcitation(assertion, graph)
-		for index := range analysis.Excitations {
-			if effectiveExcitation != nil &&
-				analysis.Excitations[index].Component == sourceInstanceForObservation(graph, *effectiveExcitation) {
-				analysis.Excitations[index].SineAmplitude = excitationAmplitude(requirement, *effectiveExcitation)
-				analysis.Excitations[index].SineFrequencyHz = frequency
-			}
-		}
 	case simmodel.AnalysisThermal:
 		analysis.Conditions = append([]simmodel.NamedValue(nil), thermalConditions...)
 	}
@@ -1534,6 +1614,11 @@ func simulationIntentParts(
 				quantity == simmodel.QuantityInputImpedanceOhm)) ||
 			(assertion.Analysis == simmodel.AnalysisDistortion && quantity == simmodel.QuantityTHDPercent)
 	if assertion.FrequencyHz != nil && frequencyPointAssertion {
+		simulationAssertion.FrequencyHz = *assertion.FrequencyHz
+	} else if assertion.FrequencyHz != nil && quantity == simmodel.QuantityDutyCyclePct {
+		// Measure transfer duty over its declared excitation period. Faster
+		// regulator subcycles on the observed switching node are not the
+		// transfer frequency.
 		simulationAssertion.FrequencyHz = *assertion.FrequencyHz
 	} else if quantity == simmodel.QuantityVoltageGainRatio {
 		simulationAssertion.FrequencyHz = assertionFrequencyScale(requirement, assertion)
@@ -2075,7 +2160,8 @@ func loadHarnessNodes(
 			continue
 		}
 		terminals := topologyTerminalNodes(instance)
-		if terminals["DRAIN"] != target.ID || terminals["SOURCE"] != reference {
+		if terminals["DRAIN"] != target.ID ||
+			!topologyLowSideSwitchReturnsToReference(graph, terminals["SOURCE"], reference) {
 			continue
 		}
 		if rail, found := topologySwitchedLoadRail(graph, target.ID, reference); found {
@@ -2204,10 +2290,45 @@ func simulationExcitations(
 		periodicPulse := assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 &&
 			(transientPeriodicPulseMetric(assertion.Metric) ||
 				periodicControlPulseRequired(requirement, assertion, effectiveExcitation))
-		if (assertion.Analysis == simmodel.AnalysisTransient || assertion.Analysis == simmodel.AnalysisElectrothermal) &&
+		if (assertion.Analysis == simmodel.AnalysisTransient ||
+			assertion.Analysis == simmodel.AnalysisDistortion ||
+			assertion.Analysis == simmodel.AnalysisElectrothermal) &&
 			effectiveExcitation != nil &&
 			observationMatchesNode(node, *effectiveExcitation) &&
-			(!operatingCaseHasSourceEvent(operatingCase, graph, node) || periodicPulse) {
+			(!operatingCaseHasSourceEvent(operatingCase, graph, node) || periodicPulse ||
+				assertion.Analysis == simmodel.AnalysisDistortion) {
+			if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 && !periodicPulse {
+				// Frequency metadata defines the observation window for many
+				// transient output metrics; it does not turn a typed digital
+				// control into an analog sine. Start a digital active-state check
+				// from its stable inactive state, then hold the requested active
+				// value for the rest of the window. This also avoids requiring a
+				// switching regulator to have an impossible static DC initial
+				// condition at its hysteretic current threshold.
+				if node.Role == "control" || node.SemanticKind == "digital" || node.SemanticKind == "control" {
+					active := excitation.DCValue
+					inactive, maximum, bounded := periodicControlRange(requirement, node.SemanticID)
+					if bounded {
+						if active <= inactive {
+							active = maximum
+						}
+						duration := dynamicDurationForRequirement(requirement, assertion, operatingCase)
+						excitation.DCValue = 0
+						excitation.PulseInitialValue = inactive
+						excitation.PulseValue = active
+						excitation.PulseDelayS = duration / 100
+						excitation.PulseWidthS = duration
+						excitation.PulsePeriodS = duration * 2
+					}
+					result = append(result, excitation)
+					continue
+				}
+				excitation.DCValue = periodicExcitationBias(requirement, operatingCase, node)
+				excitation.SineAmplitude = excitationAmplitude(requirement, *effectiveExcitation)
+				excitation.SineFrequencyHz = *assertion.FrequencyHz
+				result = append(result, excitation)
+				continue
+			}
 			configuredPulse := false
 			configurePulse := func(initial, applied float64) {
 				duration := dynamicDurationForRequirement(requirement, assertion, operatingCase)
@@ -2250,10 +2371,6 @@ func simulationExcitations(
 				if initial, applied, found := periodicControlRange(requirement, node.SemanticID); found {
 					configurePulse(initial, applied)
 				}
-			}
-			if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 && !periodicPulse {
-				excitation.SineAmplitude = excitationAmplitude(requirement, *effectiveExcitation)
-				excitation.SineFrequencyHz = *assertion.FrequencyHz
 			}
 		}
 		if assertion.Analysis == simmodel.AnalysisACSweep && effectiveExcitation != nil &&
@@ -2834,8 +2951,12 @@ func excitationAmplitude(requirement Requirement, observation Observation) float
 		}
 	}
 	targets := derivePowerTransferSizingTargets(requirement)
-	if targets.outputPeakVoltage > 0 && targets.gain > 0 {
-		target := targets.outputPeakVoltage / targets.gain
+	drivePeakVoltage := targets.drivePeakVoltage
+	if drivePeakVoltage <= 0 {
+		drivePeakVoltage = targets.outputPeakVoltage
+	}
+	if drivePeakVoltage > 0 && targets.gain > 0 {
+		target := drivePeakVoltage / targets.gain
 		if target > 0 && (portLimit == 0 || target < portLimit) {
 			return target
 		}
@@ -2844,6 +2965,49 @@ func excitationAmplitude(requirement Requirement, observation Observation) float
 		return portLimit
 	}
 	return 1
+}
+
+// periodicExcitationBias separates a periodic signal's quiescent operating
+// point from the operating-corner endpoints that bound its waveform. A fixed
+// condition remains an explicit bias. For a ranged signal, the declared port
+// nominal is authoritative when it lies inside the range; otherwise the range
+// midpoint is the only deterministic bias implied by the requirement.
+func periodicExcitationBias(
+	requirement Requirement,
+	operatingCase OperatingCase,
+	node GraphNode,
+) float64 {
+	for _, condition := range operatingCase.Conditions {
+		if (condition.Target != node.SemanticID && condition.Target != node.Domain) ||
+			(condition.Axis != "input_voltage" &&
+				condition.Axis != "control_voltage" &&
+				condition.Axis != "input_current") {
+			continue
+		}
+		if condition.Min == condition.Max {
+			return condition.Min
+		}
+		if condition.Axis != "input_current" {
+			if nominal, found := portNominalVoltage(requirement, node.SemanticID); found &&
+				nominal >= condition.Min && nominal <= condition.Max {
+				return nominal
+			}
+		}
+		return (condition.Min + condition.Max) / 2
+	}
+	if nominal, found := portNominalVoltage(requirement, node.SemanticID); found {
+		return nominal
+	}
+	return 0
+}
+
+func portNominalVoltage(requirement Requirement, portID string) (float64, bool) {
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == portID && port.Electrical.NominalVoltageV != nil {
+			return *port.Electrical.NominalVoltageV, true
+		}
+	}
+	return 0, false
 }
 
 func dynamicDuration(assertion BehavioralAssertion, operatingCase OperatingCase) float64 {

@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -333,6 +334,196 @@ func TestLowSideTransconductanceRelationshipBuildsRegulatedProtectedPath(t *test
 		if senseScales != 2 || controlScales != 5 {
 			t.Fatalf("role-aware current value scales: sense=%d control=%d", senseScales, controlScales)
 		}
+	}
+}
+
+func TestCurrentLimitedSwitchRelationshipBuildsFeedbackProtectedPath(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "inductive_load_current_control.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	relationships := currentLimitedSwitchRelationships(requirement)
+	if len(relationships) != 1 || relationships[0].control != "pulse_command" ||
+		relationships[0].output != "load_current" || math.Abs(relationships[0].targetCurrent-.955) > 1e-12 ||
+		relationships[0].onVoltageLimit != .5 {
+		t.Fatalf("current-limited relationships = %#v", relationships)
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyCurrentLimitedSwitchRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf("current-limited switch produced no candidates: consumption=%#v rejections=%#v", consumption, rejections)
+	}
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		gateDecisions := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+			if instance.Kind == "comparator" {
+				gateDecisions[topologyTerminalNodes(instance)["OUT"]]++
+			}
+		}
+		sharedGate := false
+		for _, count := range gateDecisions {
+			sharedGate = sharedGate || count == 2
+		}
+		if candidate.Score.BehaviorGap != 0 || counts["comparator"] != 2 ||
+			counts["n_channel_mosfet"] != 1 || counts["resistor"] != 13 ||
+			counts["signal_diode"] != 1 || !sharedGate {
+			t.Fatalf("current-limited graph score=%#v counts=%v topology=%s",
+				candidate.Score, counts, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("current-limited value plan = %#v", plan)
+		}
+		roleScales, hysteresisScales, shuntScale := 0, 0, false
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if strings.HasPrefix(scale.ID, "topology:current_limited_switch_role:") {
+					roleScales++
+					shuntScale = shuntScale || scale.ValueSI == .22
+				}
+				if strings.HasPrefix(scale.ID, "topology:current_limited_switch_hysteresis:") {
+					hysteresisScales++
+				}
+			}
+		}
+		if roleScales != 6 || hysteresisScales != 5 || !shuntScale {
+			t.Fatalf("current-limited analytic scales: roles=%d hysteresis=%d shunt=%t plan=%#v",
+				roleScales, hysteresisScales, shuntScale, plan)
+		}
+		enumeration := EnumerateValueTrials(plan, 1)
+		if len(enumeration.Trials) != 1 {
+			t.Fatalf("current-limited first value trial = %#v", enumeration)
+		}
+		applied, applyErr := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+		if applyErr != nil {
+			t.Fatal(applyErr)
+		}
+		for _, assertion := range requirement.Requirements.BehavioralRequirements {
+			for _, operatingCase := range requirement.Requirements.OperatingCases {
+				if !slices.Contains(assertion.OperatingCases, operatingCase.ID) {
+					continue
+				}
+				for _, corner := range operatingCaseCorners(operatingCase) {
+					attempt, diagnoses := evaluateAssertionCorner(
+						requirement,
+						assertion,
+						operatingCase,
+						corner,
+						applied,
+						inventory,
+						environment,
+					)
+					if len(diagnoses) != 0 {
+						t.Fatalf("current-limited first-trial %s %s/%s attempt=%#v diagnoses=%#v",
+							assertion.ID, operatingCase.ID, corner.ID, attempt, diagnoses)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestCurrentLimitedSwitchRelationshipIsRetainedByDefaultSearch(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "inductive_load_current_control.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(
+		context.Background(), requirement, inventory, DefaultPolicy(),
+	)
+	if search.Status != TopologySearchCandidates {
+		t.Fatalf("default search status=%s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+	}
+	regulatorIndex := -1
+	for index, candidate := range search.Candidates {
+		output := externalRelationshipNode(candidate.Graph, "load_current")
+		references := topologyNodesByRole(candidate.Graph, "reference")
+		if output != "" && len(references) != 0 &&
+			topologyGraphHasLowSideCurrentRegulation(candidate.Graph, output, references[0]) {
+			regulatorIndex = index
+			break
+		}
+	}
+	if regulatorIndex < 0 {
+		t.Fatalf("default search omitted behavior-compatible current regulation: candidates=%d", len(search.Candidates))
+	}
+	order := synthesisCandidateEvaluationOrder(search.Candidates)
+	if len(order) == 0 || order[0] != regulatorIndex {
+		t.Fatalf("behavior-compatible current regulator evaluated at index %d through order %v", regulatorIndex, order)
+	}
+}
+
+func TestDefaultSearchCurrentLimitedFirstTrialIsPhysicallyReady(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "inductive_load_current_control.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	order := synthesisCandidateEvaluationOrder(search.Candidates)
+	if search.Status != TopologySearchCandidates || len(order) == 0 {
+		t.Fatalf("default search status=%s candidates=%d issues=%#v", search.Status, len(search.Candidates), search.Issues)
+	}
+	candidate := search.Candidates[order[0]]
+	plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+	enumeration := EnumerateValueTrials(plan, 1)
+	if plan.Status != ValuePlanReady || len(enumeration.Trials) != 1 {
+		t.Fatalf("first candidate value plan=%#v enumeration=%#v", plan, enumeration)
+	}
+	graph, err := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluation := EvaluateCandidate(
+		context.Background(), requirement, graph, nil, inventory, environment, policy,
+	)
+	if evaluation.Status != SimulationEvaluationPassed {
+		t.Fatalf("default-search first trial status=%s consumption=%#v issues=%#v diagnoses=%#v",
+			evaluation.Status, evaluation.Consumption, evaluation.Issues, evaluation.Diagnoses)
+	}
+	physical := LowerPassingCandidate(
+		context.Background(), requirement, graph, evaluation, inventory, environment,
+	)
+	if physical.Status != PhysicalLoweringReady {
+		t.Fatalf("default-search first trial physical status=%s issues=%#v", physical.Status, physical.Issues)
 	}
 }
 

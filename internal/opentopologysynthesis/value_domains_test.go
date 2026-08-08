@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
 	"kicadai/internal/modelprovenance"
+	"kicadai/internal/simmodel"
 )
 
 func TestCombinationCountWithinBudget(t *testing.T) {
@@ -557,5 +558,37 @@ func TestRatingsCoverRequirementRejectsPropagationDelayOutsideDynamicEnvelope(t 
 	primitive.Ratings[0].Maximum = &maximumDelayNS
 	if !ratingsCoverRequirement(requirement, primitive) {
 		t.Fatal("two-nanosecond primitive did not cover a five-nanosecond, fifty-megahertz dynamic envelope")
+	}
+}
+
+func TestPrimitiveSupplySpanCoversConnectedDeclaredRails(t *testing.T) {
+	negativeMinimum, negativeNominal, negativeMaximum := -28.0, -24.0, -20.0
+	positiveMinimum, positiveNominal, positiveMaximum := 20.0, 24.0, 28.0
+	requirement := Requirement{Requirements: Requirements{Domains: []Domain{
+		{ID: "negative", MinVoltageV: &negativeMinimum, NominalVoltageV: &negativeNominal, MaxVoltageV: &negativeMaximum},
+		{ID: "positive", MinVoltageV: &positiveMinimum, NominalVoltageV: &positiveNominal, MaxVoltageV: &positiveMaximum},
+	}}}
+	graph := CandidateGraph{Nodes: []GraphNode{
+		{ID: "negative_rail", Domain: "negative"},
+		{ID: "positive_rail", Domain: "positive"},
+	}}
+	instance := GraphInstance{Terminals: []TerminalConnection{
+		{Terminal: "V_MINUS", Node: "negative_rail"},
+		{Terminal: "V_PLUS", Node: "positive_rail"},
+	}}
+	primitive := func(maximum float64) PrimitiveCandidate {
+		return PrimitiveCandidate{Models: []PrimitiveModelContract{{Parameters: []simmodel.NamedValue{
+			{Name: "supply_min_v", Value: 5},
+			{Name: "supply_max_v", Value: maximum},
+		}}}}
+	}
+	if primitiveSupplySpanCoversConnectedRails(requirement, graph, instance, primitive(40)) {
+		t.Fatal("40 V reviewed model covered a declared 40..56 V connected rail span")
+	}
+	if !primitiveSupplySpanCoversConnectedRails(requirement, graph, instance, primitive(60)) {
+		t.Fatal("60 V reviewed model did not cover a declared 40..56 V connected rail span")
+	}
+	if !primitiveSupplySpanCoversConnectedRails(requirement, graph, GraphInstance{}, primitive(40)) {
+		t.Fatal("primitive without the positive/negative supply terminal contract was constrained")
 	}
 }

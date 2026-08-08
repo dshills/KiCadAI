@@ -535,7 +535,7 @@ func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
 			})
 			continue
 		}
-		pass := actual >= assertion.Min && actual <= assertion.Max
+		pass := assertionWithinBounds(actual, assertion.Min, assertion.Max)
 		report.Assertions = append(report.Assertions, AssertionResult{
 			AnalysisID: assertion.AnalysisID, Node: assertion.Node, Component: assertion.Component, Components: append([]string(nil), assertion.Components...), ReferenceNode: assertion.ReferenceNode, Quantity: assertion.Quantity, FrequencyHz: assertion.FrequencyHz, TimeS: assertion.TimeS,
 			Min: assertion.Min, Max: assertion.Max, Actual: actual, Pass: pass,
@@ -1126,6 +1126,20 @@ func validateMNASystemBounds(system mnaSystem) *Diagnostic {
 		}
 		if !boundedComplex(system.rhs[row], maxMNAMatrixValue) {
 			return &Diagnostic{Path: fmt.Sprintf("rhs[%d]", row), Message: "trusted stamp produced a non-finite or unbounded right-hand side", Suggestion: "reduce source or component dynamic range, or select catalog models appropriate for the operating range"}
+		}
+	}
+	return nil
+}
+
+func validateMNASolutionShape(system mnaSystem, solution []complex128) *Diagnostic {
+	if len(system.rhs) == 0 || len(solution) != len(system.rhs) {
+		return &Diagnostic{
+			Path: "solution",
+			Message: fmt.Sprintf(
+				"trusted MNA solver returned %d solution values for %d unknowns",
+				len(solution), len(system.rhs),
+			),
+			Suggestion: "reject the candidate or correct the bounded nonlinear initialization path",
 		}
 	}
 	return nil
@@ -1726,6 +1740,9 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		}
 		if result.Kind == AnalysisDistortion && assertion.Quantity == QuantityTHDPercent {
 			return totalHarmonicDistortion(result, assertion)
+		}
+		if result.Kind == AnalysisDistortion && assertion.Quantity == QuantityOutputPowerW {
+			return transientDerivedValue(result, assertion)
 		}
 		if (result.Kind == AnalysisThermal || result.Kind == AnalysisElectrothermal) &&
 			(assertion.Quantity == QuantityDeviceDissipationW ||

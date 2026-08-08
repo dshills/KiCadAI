@@ -573,8 +573,14 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			wire.To,
 		))
 	}
+	child.Junctions = make([]schematic.Junction, 0, len(result.Junctions))
+	for index, junction := range result.Junctions {
+		child.Junctions = append(child.Junctions, schematic.Junction{
+			UUID:     builder.generator.New("hierarchy.local_junction", sheetID, strconv.Itoa(index)),
+			Position: junction.Position,
+		})
+	}
 	child.Labels = preservedLabels
-	child.Junctions = nil
 	child.Buses = nil
 	child.BusEntries = nil
 	child.Polylines = nil

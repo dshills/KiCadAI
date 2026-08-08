@@ -3,10 +3,13 @@ package opentopologysynthesis
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -21,6 +24,7 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 		requiredKinds        []string
 		minimumArchitectures int
 		requiredScaleIDs     []string
+		requireMatchedBias   bool
 	}{
 		{
 			file:              "continuous_conduction_audio_stage.json",
@@ -44,6 +48,7 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 				"p_channel_mosfet", "pnp_bjt", "resistor", "signal_diode",
 			},
 			minimumArchitectures: 2,
+			requireMatchedBias:   true,
 			requiredScaleIDs: []string{
 				"topology:power_transfer:bias_chain_lower",
 				"topology:power_transfer:feedback_gain",
@@ -109,16 +114,55 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 			allKinds := map[string]bool{}
 			analyticScales := map[string]AnalyticScale{}
 			readyValuePlans := 0
+			seriesFeedbackRequired := powerTransferSeriesFeedbackRequired(requirement, byKey)
+			seriesFeedbackValues := []float64{}
+			matchedBiasFound := false
+			matchedParallelBiasFound := false
 			for _, candidate := range candidates {
 				activeKinds := []string{}
+				npnTrackers, pnpTrackers, npnOutputs, pnpOutputs := 0, 0, 0, 0
+				resistorEdges := map[string]int{}
 				for _, instance := range candidate.Graph.Instances {
 					allKinds[instance.Kind] = true
 					if topologyActiveKind(instance.Kind) {
 						activeKinds = append(activeKinds, instance.Kind)
 					}
+					terminals := topologyTerminalNodes(instance)
+					switch instance.Kind {
+					case "npn_bjt":
+						if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+							npnTrackers++
+						} else {
+							npnOutputs++
+						}
+					case "pnp_bjt":
+						if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+							pnpTrackers++
+						} else {
+							pnpOutputs++
+						}
+					case "resistor":
+						if len(instance.Terminals) == 2 {
+							nodes := []string{instance.Terminals[0].Node, instance.Terminals[1].Node}
+							slices.Sort(nodes)
+							resistorEdges[strings.Join(nodes, "|")]++
+						}
+					}
+				}
+				matchedBias := npnTrackers > 0 && pnpTrackers > 0 && npnOutputs > 0 && pnpOutputs > 0
+				matchedBiasFound = matchedBiasFound || matchedBias
+				if matchedBias {
+					for _, count := range resistorEdges {
+						matchedParallelBiasFound = matchedParallelBiasFound || count > 1
+					}
 				}
 				slices.Sort(activeKinds)
 				architectures[strings.Join(activeKinds, "+")] = true
+				if seriesFeedbackRequired &&
+					((slices.Contains(activeKinds, "npn_bjt") && slices.Contains(activeKinds, "pnp_bjt")) ||
+						(slices.Contains(activeKinds, "n_channel_mosfet") && slices.Contains(activeKinds, "p_channel_mosfet"))) {
+					assertSeriesFeedbackComposition(t, candidate.Graph)
+				}
 				if candidate.Score.BehaviorGap != 0 {
 					t.Fatalf("candidate %s behavior gap = %d", candidate.TopologyHash, candidate.Score.BehaviorGap)
 				}
@@ -128,6 +172,9 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 					for _, domain := range plan.Domains {
 						for _, scale := range domain.AnalyticScales {
 							analyticScales[scale.ID] = scale
+							if scale.ID == "topology:power_transfer:series_feedback_gain" {
+								seriesFeedbackValues = append(seriesFeedbackValues, scale.ValueSI)
+							}
 						}
 					}
 				}
@@ -143,6 +190,25 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 			if readyValuePlans == 0 {
 				t.Fatal("no generated architecture has a ready value-search plan")
 			}
+			if test.requireMatchedBias && !matchedBiasFound {
+				t.Fatal("generated power-transfer alternatives lack a matched complementary junction-bias path")
+			}
+			if test.requireMatchedBias && !matchedParallelBiasFound {
+				t.Fatal("generated matched-junction alternatives lack a catalog-composed parallel bias feed")
+			}
+			if seriesFeedbackRequired {
+				targets := derivePowerTransferSizingTargets(requirement)
+				realizable := false
+				for left := range seriesFeedbackValues {
+					for right := left + 1; right < len(seriesFeedbackValues); right++ {
+						gain := 1 + (seriesFeedbackValues[left]+seriesFeedbackValues[right])/10_000
+						realizable = realizable || math.Abs(gain-targets.gain) <= targets.gain*.05
+					}
+				}
+				if !realizable {
+					t.Fatalf("series feedback scales %v do not realize target gain %.12g", seriesFeedbackValues, targets.gain)
+				}
+			}
 			for _, scaleID := range test.requiredScaleIDs {
 				scale, found := analyticScales[scaleID]
 				if !found {
@@ -155,6 +221,303 @@ func TestBehaviorDrivenPowerTransferGrammarEmitsDistinctArchitectures(t *testing
 			}
 		})
 	}
+}
+
+func assertSeriesFeedbackComposition(t *testing.T, graph CandidateGraph) {
+	t.Helper()
+	betweenNodes := func(instance GraphInstance, first, second string) bool {
+		if len(instance.Terminals) != 2 {
+			return false
+		}
+		left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+		return (left == first && right == second) || (left == second && right == first)
+	}
+	outputs := topologyNodesByRole(graph, "output")
+	if len(outputs) != 1 {
+		t.Fatalf("power-transfer candidate outputs = %v, want one", outputs)
+	}
+	feedback := ""
+	for _, instance := range graph.Instances {
+		if instance.Kind == "opamp" {
+			feedback = topologyTerminalNodes(instance)["IN_MINUS"]
+			break
+		}
+	}
+	if feedback == "" {
+		t.Fatal("power-transfer candidate lacks an op-amp feedback node")
+	}
+	output := outputs[0]
+	for _, instance := range graph.Instances {
+		if instance.Kind == "resistor" && betweenNodes(instance, feedback, output) {
+			t.Fatalf("series-required candidate retained direct feedback resistor %s", instance.ID)
+		}
+	}
+	for _, node := range graph.Nodes {
+		if node.Scope != "internal" || node.ID == feedback || node.ID == output {
+			continue
+		}
+		left, right := false, false
+		for _, instance := range graph.Instances {
+			if instance.Kind != "resistor" {
+				continue
+			}
+			left = left || betweenNodes(instance, feedback, node.ID)
+			right = right || betweenNodes(instance, node.ID, output)
+		}
+		if left && right {
+			return
+		}
+	}
+	t.Fatal("series-required candidate lacks a two-resistor feedback path")
+}
+
+func TestPowerTransferBaseStopSizedWithoutQuiescentCurrentAssertion(t *testing.T) {
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("decode issues: %#v", issues)
+	}
+	targets := derivePowerTransferSizingTargets(requirement)
+	if targets.quiescentCurrent != 0 {
+		t.Fatalf("fixture unexpectedly declares quiescent current %.12g", targets.quiescentCurrent)
+	}
+	if targets.distortionMaximum != 0.005 {
+		t.Fatalf("normalized maximum distortion = %.12g, want 0.005", targets.distortionMaximum)
+	}
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	found := false
+	for _, candidate := range search.Candidates {
+		hasNPN, hasPNP := false, false
+		for _, instance := range candidate.Graph.Instances {
+			hasNPN = hasNPN || instance.Kind == "npn_bjt"
+			hasPNP = hasPNP || instance.Kind == "pnp_bjt"
+		}
+		if !hasNPN || !hasPNP {
+			continue
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, DefaultPolicy())
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if scale.ID != "topology:power_transfer:base_stop" {
+					continue
+				}
+				found = true
+				maximumFromDistortion := targets.distortionMaximum * targets.loadResistance * 75
+				if scale.ValueSI <= 0 || scale.ValueSI > maximumFromDistortion {
+					t.Errorf(
+						"peak-drive base-stop scale = %.12g ohm, want a positive value no greater than %.12g ohm from the distortion budget",
+						scale.ValueSI,
+						maximumFromDistortion,
+					)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no complementary power candidate received a peak-drive base-stop scale: status=%s rejections=%#v", search.Status, search.Rejections)
+	}
+}
+
+func TestPowerTransferPeakHeadroomBiasCompositionAvoidsNominalClipping(t *testing.T) {
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("decode issues: %#v", issues)
+	}
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	var selected *TopologyCandidate
+	selectedParallelBranches := 0
+	for index := range search.Candidates {
+		npnTrackers, pnpTrackers, npnOutputs, pnpOutputs := 0, 0, 0, 0
+		resistorEdges := map[string]int{}
+		for _, instance := range search.Candidates[index].Graph.Instances {
+			terminals := topologyTerminalNodes(instance)
+			switch instance.Kind {
+			case "npn_bjt":
+				if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+					npnTrackers++
+				} else {
+					npnOutputs++
+				}
+			case "pnp_bjt":
+				if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+					pnpTrackers++
+				} else {
+					pnpOutputs++
+				}
+			case "resistor":
+				if len(instance.Terminals) == 2 {
+					nodes := []string{instance.Terminals[0].Node, instance.Terminals[1].Node}
+					slices.Sort(nodes)
+					resistorEdges[strings.Join(nodes, "|")]++
+				}
+			}
+		}
+		if npnTrackers != 1 || pnpTrackers != 1 || npnOutputs != 1 || pnpOutputs != 1 {
+			continue
+		}
+		maximumParallel := 0
+		for _, count := range resistorEdges {
+			maximumParallel = max(maximumParallel, count)
+		}
+		if maximumParallel > selectedParallelBranches {
+			selected = &search.Candidates[index]
+			selectedParallelBranches = maximumParallel
+		}
+	}
+	if selected == nil || selectedParallelBranches < 4 {
+		t.Fatalf(
+			"matched power stage has %d peak-headroom bias branches; want at least four: candidates=%d rejections=%#v",
+			selectedParallelBranches,
+			len(search.Candidates),
+			search.Rejections,
+		)
+	}
+	policy := DefaultPolicy()
+	plan := BuildValueSearchPlan(requirement, selected.Graph, inventory, policy)
+	trials := EnumerateValueTrials(plan, 1).Trials
+	if plan.Status != ValuePlanReady || len(trials) != 1 {
+		t.Fatalf("value plan status=%s trials=%d issues=%#v rejections=%#v", plan.Status, len(trials), plan.Issues, plan.Rejections)
+	}
+	graph, err := ApplyValueTrial(selected.Graph, trials[0], inventory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluation := EvaluateCandidate(context.Background(), requirement, graph, nil, inventory, environment, policy)
+	distortionPassed := false
+	for _, attempt := range evaluation.Attempts {
+		if attempt.RequirementID != "harmonic_limit" || attempt.OperatingCase != "nominal_audio" {
+			continue
+		}
+		if attempt.Actual == nil || *attempt.Actual > 0.5 || !attempt.AssertionPass {
+			t.Fatalf(
+				"peak-headroom distortion=%#v spectrum=%s branches=%d values=%s diagnoses=%#v",
+				attempt.Actual,
+				humanQualityDistortionSpectrum(attempt),
+				selectedParallelBranches,
+				testValueTrialSummary(plan, 0),
+				evaluation.Diagnoses,
+			)
+		}
+		distortionPassed = true
+	}
+	if !distortionPassed {
+		t.Fatalf("peak-headroom candidate produced no passing nominal harmonic-limit attempt: status=%s diagnoses=%#v", evaluation.Status, evaluation.Diagnoses)
+	}
+}
+
+func TestPowerTransferCompoundFollowerReachesBoundedAudioEnvelope(t *testing.T) {
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("decode issues: %#v", issues)
+	}
+	npn := topologyRatedPowerPrimitive(requirement, inventory, "npn_bjt")
+	pnp := topologyRatedPowerPrimitive(requirement, inventory, "pnp_bjt")
+	parallelOutputs := max(
+		topologyPowerParallelDeviceCount(requirement, npn),
+		topologyPowerParallelDeviceCount(requirement, pnp),
+	)
+	if parallelOutputs <= 1 {
+		t.Fatalf("declared SOA envelope derived %d output branch, want stress sharing", parallelOutputs)
+	}
+	wantNonTrackerPerPolarity := parallelOutputs + 1 // one driver plus N output devices
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	var selected *TopologyCandidate
+	for index := range search.Candidates {
+		npnTrackers, pnpTrackers, npnOutputs, pnpOutputs := 0, 0, 0, 0
+		for _, instance := range search.Candidates[index].Graph.Instances {
+			terminals := topologyTerminalNodes(instance)
+			switch instance.Kind {
+			case "npn_bjt":
+				if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+					npnTrackers++
+				} else {
+					npnOutputs++
+				}
+			case "pnp_bjt":
+				if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+					pnpTrackers++
+				} else {
+					pnpOutputs++
+				}
+			}
+		}
+		if npnTrackers != 2 || pnpTrackers != 2 ||
+			npnOutputs != wantNonTrackerPerPolarity || pnpOutputs != wantNonTrackerPerPolarity {
+			continue
+		}
+		if selected == nil || len(search.Candidates[index].Graph.Instances) < len(selected.Graph.Instances) {
+			selected = &search.Candidates[index]
+		}
+	}
+	if selected == nil {
+		t.Fatalf("no compound complementary follower among %d candidates", len(search.Candidates))
+	}
+	policy := DefaultPolicy()
+	plan := BuildValueSearchPlan(requirement, selected.Graph, inventory, policy)
+	trials := EnumerateValueTrials(plan, 1).Trials
+	if plan.Status != ValuePlanReady || len(trials) != 1 {
+		t.Fatalf("value plan status=%s trials=%d issues=%#v", plan.Status, len(trials), plan.Issues)
+	}
+	graph, err := ApplyValueTrial(selected.Graph, trials[0], inventory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluation := EvaluateCandidate(context.Background(), requirement, graph, nil, inventory, environment, policy)
+	if evaluation.Status != SimulationEvaluationPassed {
+		actuals := []string{}
+		failures := []string{}
+		topology := []string{}
+		for _, instance := range graph.Instances {
+			topology = append(topology, instance.ID+":"+instance.Kind+fmt.Sprint(topologyTerminalNodes(instance)))
+		}
+		for _, attempt := range evaluation.Attempts {
+			if attempt.Actual != nil {
+				actuals = append(actuals, attempt.RequirementID+"="+strconv.FormatFloat(*attempt.Actual, 'g', 6, 64))
+			}
+			if attempt.AssertionPass || attempt.Report == nil {
+				continue
+			}
+			failure := attempt.RequirementID + "/" + attempt.OperatingCase + "/" + attempt.CornerID
+			if spectrum := humanQualityDistortionSpectrum(attempt); spectrum != "" {
+				failure += "/" + spectrum
+			}
+			for _, corner := range attempt.Report.Corners {
+				if corner.Status != "pass" {
+					failure += "/assignments=" + fmt.Sprint(corner.Assignments)
+				}
+			}
+			if len(attempt.Diagnostics) != 0 {
+				failure += "/diagnostics=" + fmt.Sprint(attempt.Diagnostics)
+			}
+			failures = append(failures, failure)
+		}
+		t.Fatalf(
+			"compound follower status=%s values=%s topology=%v actuals=%v failures=%v diagnoses=%#v",
+			evaluation.Status,
+			testValueTrialSummary(plan, 0),
+			topology,
+			actuals,
+			failures,
+			evaluation.Diagnoses,
+		)
+	}
+	physical := LowerPassingCandidate(context.Background(), requirement, graph, evaluation, inventory, environment)
+	if physical.Status != PhysicalLoweringReady || physical.DesignRequest.ExplicitCircuit == nil {
+		t.Fatalf("compound follower physical lowering status=%s issues=%#v", physical.Status, physical.Issues)
+	}
+	placements := []string{}
+	for _, component := range physical.DesignRequest.ExplicitCircuit.Components {
+		placements = append(placements, component.Reference+":"+component.Placement.Region+":"+component.Placement.Edge)
+	}
+	t.Logf("compound follower physical regions=%#v placements=%v", physical.DesignRequest.ExplicitCircuit.Regions, placements)
 }
 
 func TestPowerTransferCandidatesReachTrustedSimulation(t *testing.T) {

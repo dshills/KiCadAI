@@ -114,6 +114,10 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		}
 		initialEvidence.InitialCondition = "bounded_nonlinear_dc_v1"
 	}
+	if shapeDiagnostic := validateMNASolutionShape(system, solution); shapeDiagnostic != nil {
+		shapeDiagnostic.Path = "analyses." + analysis.ID + ".initial_condition." + shapeDiagnostic.Path
+		return result, []Diagnostic{*shapeDiagnostic}
+	}
 	initialEvidence.TotalIterations = initialEvidence.Iterations
 	initialEvidence.MaxIterationsPerStep = transientMaxNewtonIterations
 	initialEvidence.MaxTotalIterations = maxTransientWork
@@ -405,7 +409,16 @@ func transientObservationDeviceResults(
 	history [][]complex128,
 ) []DeviceResult {
 	if observation.Kind == AnalysisDistortion {
-		return nil
+		needsDeviceEvidence := false
+		for _, assertion := range plan.Assertions {
+			if assertion.AnalysisID == observation.ID && assertion.Quantity == QuantityOutputPowerW {
+				needsDeviceEvidence = true
+				break
+			}
+		}
+		if !needsDeviceEvidence {
+			return nil
+		}
 	}
 	var digitalOutputStates map[string]bool
 	var digitalOutputEnabled map[string]bool

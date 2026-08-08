@@ -15,6 +15,79 @@ import (
 	"kicadai/internal/simmodel"
 )
 
+func TestPowerTransferDistortionExcitationUsesFeasiblePowerLoadIntersection(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	targets := derivePowerTransferSizingTargets(requirement)
+	amplitude := excitationAmplitude(requirement, Observation{Kind: "port", ID: "audio_input"})
+	peak := amplitude * targets.gain
+	minimumPeak := math.Sqrt(2 * 8 * 8)
+	maximumPeak := math.Sqrt(2 * 20 * 4)
+	if peak < minimumPeak || peak > maximumPeak {
+		t.Fatalf("drive peak %.12g V from amplitude %.12g is outside feasible power/load interval %.12g..%.12g V", peak, amplitude, minimumPeak, maximumPeak)
+	}
+	if amplitude >= .8 {
+		t.Fatalf("bounded power stimulus %.12g V reused the port ceiling instead of an interior feasible target", amplitude)
+	}
+}
+
+func TestDistortionExcitationUsesNominalBiasAcrossSignalCorners(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	var assertion BehavioralAssertion
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.ID == "harmonic_limit" {
+			assertion = candidate
+			break
+		}
+	}
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "nominal_audio" {
+			operatingCase = candidate
+			break
+		}
+	}
+	if assertion.ID == "" || operatingCase.ID == "" {
+		t.Fatal("bounded audio requirement lacks its distortion assertion or nominal case")
+	}
+	graph := CandidateGraph{Nodes: []GraphNode{
+		{ID: "port_audio_input", Scope: "external", Role: "input", SemanticKind: "port", SemanticID: "audio_input", Domain: "ground"},
+		{ID: "port_audio_output", Scope: "external", Role: "output", SemanticKind: "port", SemanticID: "audio_output", Domain: "ground"},
+		{ID: "port_ground", Scope: "external", Role: "reference", SemanticKind: "port", SemanticID: "ground", Domain: "ground"},
+	}}
+	var corner operatingCorner
+	for _, candidate := range operatingCaseCorners(operatingCase) {
+		if candidate.ID == "bounds_00" {
+			corner = candidate
+			break
+		}
+	}
+	if corner.ID == "" {
+		t.Fatal("nominal audio case lacks its lower signal corner")
+	}
+	for _, excitation := range simulationExcitations(requirement, assertion, operatingCase, corner, graph) {
+		if excitation.Component != "source_port_audio_input" {
+			continue
+		}
+		wantAmplitude := excitationAmplitude(requirement, Observation{Kind: "port", ID: "audio_input"})
+		if excitation.DCValue != 0 || excitation.SineFrequencyHz != 1000 ||
+			excitation.SineAmplitude != wantAmplitude || excitation.PulseWidthS != 0 {
+			t.Fatalf("distortion input excitation = %#v, want zero-bias declared sine", excitation)
+		}
+		return
+	}
+	t.Fatal("distortion input excitation is missing")
+}
+
 func TestOutputCurrentAssertionUsesImpliedTransconductanceCommand(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,
@@ -441,6 +514,54 @@ func TestPeriodicAssertionsOverrideOneShotSourceEvents(t *testing.T) {
 	}
 }
 
+func TestFrequencyBoundedActiveMetricUsesHeldDigitalActiveStep(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "inductive_load_current_control.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("inductive-control requirement issues: %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("inductive-control graph issues: %#v", graphIssues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.ID == "active_current" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "stress_corners" {
+			operatingCase = candidate
+			break
+		}
+	}
+	excitations := simulationExcitations(
+		requirement,
+		assertion,
+		operatingCase,
+		operatingCaseCorners(operatingCase)[0],
+		graph,
+	)
+	for _, excitation := range excitations {
+		if excitation.Component != "source_port_pulse_command" {
+			continue
+		}
+		if excitation.DCValue != 0 || excitation.PulseInitialValue != 0 ||
+			excitation.PulseValue != 3.3 || excitation.PulseDelayS <= 0 ||
+			excitation.PulseWidthS <= 0 || excitation.PulsePeriodS <= excitation.PulseWidthS ||
+			excitation.SineAmplitude != 0 || excitation.SineFrequencyHz != 0 {
+			t.Fatalf("frequency-bounded digital active-state excitation = %#v", excitation)
+		}
+		return
+	}
+	t.Fatalf("digital active-state excitation is missing: %#v", excitations)
+}
+
 func TestTransientOffStateCurrentUsesPostEventPeakWithoutSyntheticPulse(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t, filepath.Join(protectedCurrentOutputCorpusRoot(), "fault_protected_low_side_current_sink.json"),
@@ -705,6 +826,9 @@ func TestCriticalSimulationEvidenceContinuesAfterNoncriticalNominalFailure(t *te
 	foundNoncriticalFailure := false
 	foundCriticalEvidence := false
 	for _, attempt := range evaluation.Attempts {
+		if attempt.CornerID != "nominal" {
+			t.Fatalf("nominally rejected candidate continued into stress corners: %#v", evaluation.Attempts)
+		}
 		if attempt.RequirementID == "disabled_leakage" && attempt.Status == SimulationEvaluationFailed {
 			foundNoncriticalFailure = true
 		}
@@ -1245,6 +1369,60 @@ func TestControlledCurrentSinkLoadHarnessUsesDominantExternalSupply(t *testing.T
 		return
 	}
 	t.Fatalf("controlled-current load harness %q is missing: %#v", loadID, harness)
+}
+
+func TestLoadHarnessRecognizesLowSideSwitchThroughCurrentShunt(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	targetID, found := ExternalNodeForObservation(
+		graph,
+		requirement,
+		Observation{Kind: "port", ID: "load_return"},
+	)
+	if !found {
+		t.Fatal("load-return graph node is missing")
+	}
+	reference := referenceNodeForDomain(graph, Observation{Kind: "port", ID: "load_return"})
+	if reference == "" {
+		t.Fatal("reference graph node is missing")
+	}
+	var target GraphNode
+	for _, node := range graph.Nodes {
+		if node.ID == targetID {
+			target = node
+			break
+		}
+	}
+	// Suppress the controlled-current-port fallback so this regression proves
+	// that the topology itself identifies the load-side harness orientation.
+	target.SemanticID = ""
+	graph.Nodes = append(graph.Nodes, GraphNode{ID: "internal_current_sense", Scope: "internal", Role: "signal"})
+	graph.Instances = append(graph.Instances,
+		GraphInstance{
+			ID:   "switch",
+			Kind: "n_channel_mosfet",
+			Terminals: []TerminalConnection{
+				{Terminal: "DRAIN", Node: targetID},
+				{Terminal: "GATE", Node: "internal_gate"},
+				{Terminal: "SOURCE", Node: "internal_current_sense"},
+			},
+		},
+		GraphInstance{
+			ID:   "current_shunt",
+			Kind: "resistor",
+			Terminals: []TerminalConnection{
+				{Terminal: "1", Node: "internal_current_sense"},
+				{Terminal: "2", Node: reference},
+			},
+		},
+	)
+	positive, negative := loadHarnessNodes(requirement, graph, target, reference)
+	if positive != "port_load_power" || negative != targetID {
+		t.Fatalf("shunt-sensed low-side harness = %q -> %q", positive, negative)
+	}
 }
 
 func TestInductiveHarnessUsesBoundedExternalLoadAndBehavioralWindingResistance(t *testing.T) {
