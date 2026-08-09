@@ -1,0 +1,49 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_010",
+    "role": "discovery",
+    "domain": "sensor",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "unsafe",
+  "stop_reason": "requirement_infeasible",
+  "requirement_hash": "108635a2bbc28c7da8414deb1602f9880a0c044d44c92770da597a1f132fd79c",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "81fa1d6512885e3628e44d34f249cd1525c956e9931a5fb4196da4003de52c42",
+  "analysis_kinds": [
+    "dc_sweep",
+    "electrothermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 0,
+    "generated_graphs": 0,
+    "complete_graphs": 0,
+    "candidate_simulations": 0,
+    "corner_evaluations": 0,
+    "value_trials": 0,
+    "topology_repairs": 0,
+    "maximum_frontier": 0,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "requirement",
+      "scope": "verification",
+      "capability": "behavioral_feasibility",
+      "code": "OPEN_TOPOLOGY_REQUIREMENT_INFEASIBLE",
+      "required_evidence": [
+        "behavioral_feasibility: passing writer, installed-KiCad, round-trip, and replay evidence"
+      ],
+      "evidence_hashes": [
+        "81fa1d6512885e3628e44d34f249cd1525c956e9931a5fb4196da4003de52c42"
+      ]
+    }
+  ],
+  "hash": "72bc3fef71aa6c56c3b924ecd9578a976b33737fb77f0045bd481288ccaea137"
+}

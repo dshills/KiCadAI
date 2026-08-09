@@ -1,0 +1,63 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_001",
+    "role": "discovery",
+    "domain": "analog",
+    "safety_impact": "non_safety"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "no_passing_graph",
+  "requirement_hash": "e5d6b737639d95788b731a1590a237e5ac230a4d2f534300ae54b2702fbe5974",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "22f8182e6e6accb7172d60bcdc638d76405ee670dea915f11198e731a147a725",
+  "analysis_kinds": [
+    "ac_sweep",
+    "dc_sweep",
+    "distortion",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 961,
+    "generated_graphs": 6000,
+    "complete_graphs": 16,
+    "candidate_simulations": 64,
+    "corner_evaluations": 64,
+    "value_trials": 64,
+    "topology_repairs": 0,
+    "maximum_frontier": 192,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "ac_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "response_band"
+      ],
+      "operating_cases": [
+        "temperate/nominal"
+      ],
+      "analysis_kinds": [
+        "ac_sweep"
+      ],
+      "required_evidence": [
+        "ac_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "22f8182e6e6accb7172d60bcdc638d76405ee670dea915f11198e731a147a725",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+      ]
+    }
+  ],
+  "hash": "3f7d00bb9b94eb2191168b9a4a3df476bf0babf0b963432f130b34bca1541a4d"
+}

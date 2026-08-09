@@ -18,7 +18,7 @@ const (
 	closedLoopV2BaselineVersion         = 2
 	closedLoopV2CorpusFreezeCommit      = "cea6040301230d16372aa1c390acb36903a0e711"
 	closedLoopV2BaselineRoot            = "testdata/closed_loop_open_set_v2_baseline"
-	closedLoopV2DiscoveryBaselineFrozen = false
+	closedLoopV2DiscoveryBaselineFrozen = true
 )
 
 type closedLoopV2DiscoveryBaselineReport struct {

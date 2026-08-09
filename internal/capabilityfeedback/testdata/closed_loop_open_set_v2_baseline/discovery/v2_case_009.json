@@ -1,0 +1,63 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_009",
+    "role": "discovery",
+    "domain": "sensor",
+    "safety_impact": "review_required"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "no_passing_graph",
+  "requirement_hash": "5a7944143d9c3d2ba1ef0c8f0f74d15f59b7bc80317ac4c9a1dfdb01a6a460ac",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "11798636e351d73704491e1fa08258845029f4f3083065a24310d0beae43b4db",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "noise",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 259,
+    "generated_graphs": 1690,
+    "complete_graphs": 87,
+    "candidate_simulations": 64,
+    "corner_evaluations": 64,
+    "value_trials": 64,
+    "topology_repairs": 0,
+    "maximum_frontier": 192,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_operating_point_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "input_loading"
+      ],
+      "operating_cases": [
+        "range/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "11798636e351d73704491e1fa08258845029f4f3083065a24310d0beae43b4db",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+      ]
+    }
+  ],
+  "hash": "447b1379de110c2eb3665d36fa8b31a805aaefa57d9dec1407c8d575ef4c2cb0"
+}

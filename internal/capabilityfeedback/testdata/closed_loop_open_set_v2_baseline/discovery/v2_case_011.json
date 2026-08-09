@@ -1,0 +1,50 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_011",
+    "role": "discovery",
+    "domain": "mixed_signal",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "no_complete_graph",
+  "requirement_hash": "dcd4b0a49ac0826c6bd2a870e57a8ae75c18dc7948135331690651c94a234d50",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "1329efd301e50ff645c7b96bf3cab192eb069c413b965950048ef3be71b4c50d",
+  "analysis_kinds": [
+    "ac_sweep",
+    "distortion",
+    "stability",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 805,
+    "generated_graphs": 8000,
+    "complete_graphs": 0,
+    "candidate_simulations": 0,
+    "corner_evaluations": 0,
+    "value_trials": 0,
+    "topology_repairs": 0,
+    "maximum_frontier": 1052,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "topology_search",
+      "scope": "topology",
+      "capability": "complete_topology",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "required_evidence": [
+        "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "1329efd301e50ff645c7b96bf3cab192eb069c413b965950048ef3be71b4c50d"
+      ]
+    }
+  ],
+  "hash": "0b9c965902c4d5b8244d8c877b29ef4db21f0201656e5baed1e2b70a5c3af6d3"
+}

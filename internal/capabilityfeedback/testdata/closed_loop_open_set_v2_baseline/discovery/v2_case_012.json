@@ -1,0 +1,50 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_012",
+    "role": "discovery",
+    "domain": "mixed_signal",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "no_complete_graph",
+  "requirement_hash": "dc9eff5abdecfbe0861daabf66c791fb3c661f746c7167e1002cba1983d8f8a0",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "fdb8f7ae9dccaa893fdaae186d22a58856066f5d88f376f15a1dc2700febcf28",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "electrothermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 116,
+    "generated_graphs": 8000,
+    "complete_graphs": 0,
+    "candidate_simulations": 0,
+    "corner_evaluations": 0,
+    "value_trials": 0,
+    "topology_repairs": 0,
+    "maximum_frontier": 2601,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "topology_search",
+      "scope": "topology",
+      "capability": "complete_topology",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "required_evidence": [
+        "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "fdb8f7ae9dccaa893fdaae186d22a58856066f5d88f376f15a1dc2700febcf28"
+      ]
+    }
+  ],
+  "hash": "c33cd1d3b8f7b9c2d8ac03054e24de5ba7595e13e08a2b4f022cb8730132df6e"
+}

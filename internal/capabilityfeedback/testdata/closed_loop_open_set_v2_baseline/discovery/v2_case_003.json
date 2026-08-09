@@ -1,0 +1,114 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "v2_case_003",
+    "role": "discovery",
+    "domain": "power",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "no_passing_graph",
+  "requirement_hash": "27c43cadb8829ab46d4413f66064b181c1cef6d41bf1cce5543b2e976df9284f",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "2cd54588f7fa95dca6cc59e30248a841e34edb73460f43578ce5d6ab4db72426",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "electrothermal",
+    "startup",
+    "thermal"
+  ],
+  "consumption": {
+    "expanded_states": 271,
+    "generated_graphs": 1752,
+    "complete_graphs": 105,
+    "candidate_simulations": 64,
+    "corner_evaluations": 64,
+    "value_trials": 22,
+    "topology_repairs": 0,
+    "maximum_frontier": 192,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "line_hold"
+      ],
+      "operating_cases": [
+        "working/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "2cd54588f7fa95dca6cc59e30248a841e34edb73460f43578ce5d6ab4db72426",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "startup_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "arrival_peak"
+      ],
+      "operating_cases": [
+        "awakening/nominal"
+      ],
+      "analysis_kinds": [
+        "startup"
+      ],
+      "required_evidence": [
+        "startup_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "2cd54588f7fa95dca6cc59e30248a841e34edb73460f43578ce5d6ab4db72426",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "thermal_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "temperature_limit"
+      ],
+      "operating_cases": [
+        "working/nominal"
+      ],
+      "analysis_kinds": [
+        "thermal"
+      ],
+      "required_evidence": [
+        "thermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "2cd54588f7fa95dca6cc59e30248a841e34edb73460f43578ce5d6ab4db72426",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "fe69fc85306236219d45a5759c91d4e19e21895cc509c5adcf76a8d14cb02a05"
+}
