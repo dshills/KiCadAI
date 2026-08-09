@@ -1,0 +1,299 @@
+{
+  "schema": "kicadai.closed-loop-open-set-corpus.v2",
+  "version": 2,
+  "starting_commit": "8bdc31e668152b7324066bd75182d86d7320d3f8",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "evaluator_policy": "closed-loop-capability-policy-v1",
+  "impact_registry": {
+    "version": "closed-loop-open-set-impact-v1",
+    "records": [
+      {
+        "capability": "primitive_inventory",
+        "consumers": [
+          "catalog_value_domain",
+          "physical_realization",
+          "trusted_simulation_model"
+        ]
+      },
+      {
+        "capability": "complete_topology",
+        "consumers": [
+          "passing_behavioral_evidence",
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "catalog_value_domain",
+        "consumers": [
+          "passing_behavioral_evidence",
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "trusted_simulation_model",
+        "consumers": [
+          "passing_behavioral_evidence"
+        ]
+      },
+      {
+        "capability": "passing_behavioral_evidence",
+        "consumers": [
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "physical_realization",
+        "consumers": [
+          "route_completion"
+        ]
+      },
+      {
+        "capability": "route_completion",
+        "consumers": [
+          "installed_kicad_verification",
+          "round_trip_fidelity"
+        ]
+      }
+    ]
+  },
+  "impact_registry_hash": "07cdad8298dfcec17fa56f46094cddbb0033f0b809868cfe720ca40663d5cffd",
+  "synthesis_policy": {
+    "max_expanded_states": 4000,
+    "max_generated_graphs": 8000,
+    "max_primitive_instances": 24,
+    "max_internal_nodes": 24,
+    "max_candidate_simulations": 128,
+    "max_corner_evaluations": 2048,
+    "max_value_trials": 128,
+    "max_topology_repairs": 16,
+    "max_retained_candidates": 8,
+    "max_diagnostic_samples": 32
+  },
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "environment": {
+    "go_minimum": "1.23",
+    "kicad": "10.0.3",
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "author_manifest_sha256": "626dc9ba6db6217a26ba0aeb73f670b0a02c513c2034cc9b1509d1a95904fecb",
+  "authorship_record_sha256": "4f7cfd39f5ce5367a92c2d62143dfd181a63d486a709b3fd64a1d09155584961",
+  "entries": [
+    {
+      "id": "v2_case_001",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_001",
+      "requirement_file": "discovery/request_001.json",
+      "requirement_sha256": "218e3b93b7a3f2bec94528ace6ba4b96af55581ac1cfdc0ea82dd9d1b2f9e26e"
+    },
+    {
+      "id": "v2_case_002",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_002",
+      "requirement_file": "discovery/request_002.json",
+      "requirement_sha256": "9758cbf6552f3547dc30042d1290e76307f92d318dd8610ed5eee91b386c9efe"
+    },
+    {
+      "id": "v2_case_003",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_003",
+      "requirement_file": "discovery/request_003.json",
+      "requirement_sha256": "245470611407ea240ade1523d28d5b4cb19c573ec9c8d64778083a7729490fc1"
+    },
+    {
+      "id": "v2_case_004",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "source_id": "v2_source_004",
+      "requirement_file": "discovery/request_004.json",
+      "requirement_sha256": "1c3c2c25f3f01c79b966f76ec38e1fb45d1677c506f55e8a5cf819fd7f6c165e"
+    },
+    {
+      "id": "v2_case_005",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_005",
+      "requirement_file": "discovery/request_005.json",
+      "requirement_sha256": "901cf49a94f70f552a400ce5d4d3fca49b25848e8fdffd5081ecd274e21f82dc"
+    },
+    {
+      "id": "v2_case_006",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_006",
+      "requirement_file": "discovery/request_006.json",
+      "requirement_sha256": "80f86fb3f73e3f900efc60f389baa84b66ded2fcddf614b2214a90e35cf74cff"
+    },
+    {
+      "id": "v2_case_007",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_007",
+      "requirement_file": "discovery/request_007.json",
+      "requirement_sha256": "440a409e104e3a7615d9bcb2efe625d3958f68ac024956714bce84cc673dac8b"
+    },
+    {
+      "id": "v2_case_008",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_008",
+      "requirement_file": "discovery/request_008.json",
+      "requirement_sha256": "14757e0ebd17f6c7f4f6f9b1d73c358074b3242d9ba6eeeade9f01790893e9d4"
+    },
+    {
+      "id": "v2_case_009",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_009",
+      "requirement_file": "discovery/request_009.json",
+      "requirement_sha256": "668dd050e509a228973be4752b88217a75f382dd49a797b99512cc210d73df37"
+    },
+    {
+      "id": "v2_case_010",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_010",
+      "requirement_file": "discovery/request_010.json",
+      "requirement_sha256": "a5fc22713841612424728c238baa42c3f2d2e1c31e2d043f1f26d9cce0189ee7"
+    },
+    {
+      "id": "v2_case_011",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_011",
+      "requirement_file": "discovery/request_011.json",
+      "requirement_sha256": "e9c353853046e97dfa5ac493ef1d1e857ec0e25fb4e56f2f03ada6d125cc91c7"
+    },
+    {
+      "id": "v2_case_012",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_012",
+      "requirement_file": "discovery/request_012.json",
+      "requirement_sha256": "1f120349e9ef779ab2ef3e3701bba2a32992f3123d8cdbd7f1388f9c596ec46e"
+    },
+    {
+      "id": "v2_case_013",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_013",
+      "requirement_file": "held_out/request_013.json",
+      "requirement_sha256": "34cbcbdc68317f1cd7bfa618d76bf1e6226149180d43a53f554456ad33ab7661"
+    },
+    {
+      "id": "v2_case_014",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_014",
+      "requirement_file": "held_out/request_014.json",
+      "requirement_sha256": "8e11344f97910b4615c4b2b5362f4ca2a958bf20979b7b71f14f66ba8847f025"
+    },
+    {
+      "id": "v2_case_015",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_015",
+      "requirement_file": "held_out/request_015.json",
+      "requirement_sha256": "e6a0bbe4c016af6867c2eacbb4c0cbeb324890609b4667d9494e16b7a7096adf"
+    },
+    {
+      "id": "v2_case_016",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "source_id": "v2_source_016",
+      "requirement_file": "held_out/request_016.json",
+      "requirement_sha256": "28694180c4071a052569c503247c6b9c94cb9cf3c05832b47af48687a5f01b2c"
+    },
+    {
+      "id": "v2_case_017",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_017",
+      "requirement_file": "held_out/request_017.json",
+      "requirement_sha256": "7439662a659a03122e997029754cd0b70767b376217a2c4efed2c9a978372e1f"
+    },
+    {
+      "id": "v2_case_018",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_018",
+      "requirement_file": "held_out/request_018.json",
+      "requirement_sha256": "c9747b7ec9224b19c35b606cb6c271c73a19699c80bc54dffc66691da25062c9"
+    },
+    {
+      "id": "v2_case_019",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "non_safety",
+      "source_id": "v2_source_019",
+      "requirement_file": "held_out/request_019.json",
+      "requirement_sha256": "0511ea8b0bc703a0cead8c8bb99b030a691f72ed7e3fc09ca71c7d5f86f77da5"
+    },
+    {
+      "id": "v2_case_020",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_020",
+      "requirement_file": "held_out/request_020.json",
+      "requirement_sha256": "45d3cfba855c9397983bf3b2b5efc8398a7a19e521e456d57df657167a0cf780"
+    },
+    {
+      "id": "v2_case_021",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_021",
+      "requirement_file": "held_out/request_021.json",
+      "requirement_sha256": "260e3bf3c8fd0205e71a03aec807ee17796ae7aad10bb43aeeb3970cf89c2f1b"
+    },
+    {
+      "id": "v2_case_022",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "source_id": "v2_source_022",
+      "requirement_file": "held_out/request_022.json",
+      "requirement_sha256": "6f1255bfa57f3775e375c3a6811a1be3d441af6294c3b83f794c61c371d0b691"
+    },
+    {
+      "id": "v2_case_023",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "review_required",
+      "source_id": "v2_source_023",
+      "requirement_file": "held_out/request_023.json",
+      "requirement_sha256": "d967c155728f2a1b71c9e620ed1127d4b10277c4cbe4a85ecbfdef4c62ce95a6"
+    },
+    {
+      "id": "v2_case_024",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "source_id": "v2_source_024",
+      "requirement_file": "held_out/request_024.json",
+      "requirement_sha256": "69a4633ce0ac82d52f1ea990a31baad018bbd0ff10634e6b2b646428605d49a3"
+    }
+  ]
+}

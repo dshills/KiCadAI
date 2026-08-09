@@ -1,0 +1,21 @@
+{
+  "schema":"kicadai.open-topology-requirement.v1","version":1,
+  "project":{"name":"willow_glass","title":"Willow Glass","description":"A bounded external-behavior study designated Willow Glass."},
+  "requirements":{
+    "domains":[{"id":"ref","kind":"reference","min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0,"source":"external"},{"id":"feed","kind":"supply","min_voltage_v":8.5,"nominal_voltage_v":9,"max_voltage_v":9.5,"max_current_a":0.055,"source":"external"}],
+    "ports":[{"id":"feed_in","kind":"power","direction":"sink","domain":"feed","electrical":{"min_voltage_v":8.5,"nominal_voltage_v":9,"max_voltage_v":9.5,"max_current_a":0.055}},{"id":"sample_in","kind":"analog_voltage","direction":"sink","domain":"ref","electrical":{"min_voltage_v":-0.12,"nominal_voltage_v":0,"max_voltage_v":0.12,"input_impedance_min_ohm":1000000}},{"id":"read_out","kind":"analog_voltage","direction":"source","domain":"ref","electrical":{"min_voltage_v":-3,"nominal_voltage_v":0,"max_voltage_v":3,"max_current_a":0.002}}],
+    "operating_cases":[
+      {"id":"precision","conditions":[{"axis":"supply_voltage","target":"feed","min":8.5,"max":9.5,"unit":"V"},{"axis":"input_voltage","target":"sample_in","min":-0.1,"max":0.1,"unit":"V"},{"axis":"load_resistance","target":"read_out","min":50000,"max":1000000,"unit":"ohm"},{"axis":"ambient_temperature","target":"ref","min":-40,"max":85,"unit":"degC"}]},
+      {"id":"overrange","conditions":[{"axis":"supply_voltage","target":"feed","min":8.8,"max":9.2,"unit":"V"},{"axis":"input_voltage","target":"sample_in","min":-0.12,"max":0.12,"unit":"V"},{"axis":"ambient_temperature","target":"ref","min":60,"max":85,"unit":"degC"}],"events":[{"id":"sample_change","kind":"input_step","target":"sample_in","trigger_time_s":0.004,"initial":-0.1,"applied":0.1,"unit":"V"}]}
+    ],
+    "behavioral_requirements":[
+      {"id":"reading_gain","metric":"voltage_gain","analysis":"dc_sweep","excitation":{"kind":"port","id":"sample_in"},"observation":{"kind":"port","id":"read_out"},"min":24,"max":26,"unit":"ratio","operating_cases":["precision"]},
+      {"id":"reading_noise","metric":"output_noise_rms","analysis":"noise","observation":{"kind":"port","id":"read_out"},"max":0.001,"unit":"V_rms","frequency_hz":1000,"operating_cases":["precision"]},
+      {"id":"overrange_peak","metric":"peak_voltage","analysis":"transient","observation":{"kind":"port","id":"read_out"},"max":3.2,"unit":"V","operating_cases":["overrange"],"critical":true},
+      {"id":"overrange_margin","metric":"soa_margin","analysis":"electrothermal","observation":{"kind":"port","id":"read_out"},"min":1.25,"unit":"ratio","operating_cases":["overrange"],"critical":true},
+      {"id":"settling_bound","metric":"settling_time","analysis":"transient","excitation":{"kind":"port","id":"sample_in"},"observation":{"kind":"port","id":"read_out"},"max":0.0015,"unit":"s","operating_cases":["overrange"]}
+    ],
+    "constraints":{"max_components":20,"max_width_mm":53,"max_height_mm":43}
+  },
+  "acceptance":{"require_primitive_only":true,"require_topology_search":true,"require_simulation":true,"require_all_corners":true,"require_model_provenance":true,"require_closed_loop_evidence":true,"require_complete_routing":true,"require_connectivity":true,"require_writer_correctness":true,"require_round_trip_zero_diff":true,"require_erc":true,"require_strict_drc":true,"require_deterministic_replay":true,"require_fail_closed":true}
+}

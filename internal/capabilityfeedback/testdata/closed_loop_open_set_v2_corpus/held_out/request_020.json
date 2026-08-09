@@ -1,0 +1,21 @@
+{
+  "schema":"kicadai.open-topology-requirement.v1","version":1,
+  "project":{"name":"golden_rill","title":"Golden Rill","description":"A bounded external-behavior study designated Golden Rill."},
+  "requirements":{
+    "domains":[{"id":"ref","kind":"reference","min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0,"source":"external"},{"id":"near_feed","kind":"supply","min_voltage_v":1.1,"nominal_voltage_v":1.2,"max_voltage_v":1.3,"max_current_a":0.012,"source":"external"},{"id":"far_feed","kind":"supply","min_voltage_v":3,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.018,"source":"external"}],
+    "ports":[{"id":"near_in","kind":"power","direction":"sink","domain":"near_feed","electrical":{"min_voltage_v":1.1,"nominal_voltage_v":1.2,"max_voltage_v":1.3,"max_current_a":0.012}},{"id":"far_in","kind":"power","direction":"sink","domain":"far_feed","electrical":{"min_voltage_v":3,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.018}},{"id":"signal_in","kind":"digital","direction":"sink","domain":"ref","electrical":{"min_voltage_v":0,"nominal_voltage_v":0.6,"max_voltage_v":1.2,"default_state":"low"}},{"id":"signal_out","kind":"digital","direction":"source","domain":"ref","electrical":{"min_voltage_v":0,"nominal_voltage_v":1.65,"max_voltage_v":3.3,"max_current_a":0.004,"default_state":"low"}}],
+    "operating_cases":[
+      {"id":"transfer","conditions":[{"axis":"supply_voltage","target":"near_feed","min":1.1,"max":1.3,"unit":"V"},{"axis":"supply_voltage","target":"far_feed","min":3,"max":3.6,"unit":"V"},{"axis":"load_capacitance","target":"signal_out","min":0.000000000005,"max":0.00000000005,"unit":"F"},{"axis":"ambient_temperature","target":"ref","min":-25,"max":85,"unit":"degC"}]},
+      {"id":"far_loss","conditions":[{"axis":"supply_voltage","target":"near_feed","min":1.15,"max":1.25,"unit":"V"},{"axis":"supply_voltage","target":"far_feed","min":3.2,"max":3.4,"unit":"V"}],"events":[{"id":"loss","kind":"rail_loss","target":"far_in","trigger_time_s":0.002,"initial":3.3,"applied":0,"unit":"V"}]}
+    ],
+    "behavioral_requirements":[
+      {"id":"transfer_delay","metric":"propagation_delay","analysis":"transient","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"signal_out"},"max":0.0000005,"unit":"s","operating_cases":["transfer"]},
+      {"id":"high_level","metric":"output_high_voltage","analysis":"dc_operating_point","observation":{"kind":"port","id":"signal_out"},"min":2.75,"unit":"V","operating_cases":["transfer"]},
+      {"id":"low_level","metric":"output_low_voltage","analysis":"dc_operating_point","observation":{"kind":"port","id":"signal_out"},"max":0.35,"unit":"V","operating_cases":["transfer"]},
+      {"id":"loss_leakage","metric":"off_state_current","analysis":"transient","observation":{"kind":"port","id":"signal_out"},"max":0.000004,"unit":"A","operating_cases":["far_loss"],"critical":true},
+      {"id":"back_current","metric":"off_state_current","analysis":"transient","observation":{"kind":"port","id":"far_in"},"max":0.00001,"unit":"A","operating_cases":["far_loss"],"critical":true}
+    ],
+    "constraints":{"max_components":17,"max_width_mm":45,"max_height_mm":37}
+  },
+  "acceptance":{"require_primitive_only":true,"require_topology_search":true,"require_simulation":true,"require_all_corners":true,"require_model_provenance":true,"require_closed_loop_evidence":true,"require_complete_routing":true,"require_connectivity":true,"require_writer_correctness":true,"require_round_trip_zero_diff":true,"require_erc":true,"require_strict_drc":true,"require_deterministic_replay":true,"require_fail_closed":true}
+}
