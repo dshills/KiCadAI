@@ -1,0 +1,267 @@
+{
+  "schema": "kicadai.closed-loop-open-set-corpus.v3",
+  "version": 3,
+  "starting_commit": "859c8df068db8254b715042b691c441a0d135fab",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "evaluator_policy": "closed-loop-capability-policy-v2-realizability",
+  "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "environment": {
+    "go_minimum": "1.23",
+    "kicad": "10.0.3",
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "packet_manifest_sha256": "2466e72d035525f63c397f4c1f5e714f2843d24473011bbe73debed1e94afdd4",
+  "author_manifest_sha256": "35f333908407094c7126497b0eacd87ae28828d9535047e8d06d9fe34fe26a86",
+  "authorship_record_sha256": "1a87bb5f7c81e2b8ed58948ba1024464b61b741e57ae8d004e442995db7771c2",
+  "held_out_source_seal": {
+    "algorithm": "AES-256-GCM/HMAC-SHA-256-payload-bound-nonce",
+    "file": "held_out_requirements.sealed",
+    "payload_sha256": "cf2fc67e2a4b1168cc99e548ff3fc46085688ba325616b2dcc882a31ed8f8f81",
+    "ciphertext_sha256": "97049f5b3de49d6fd6c3d404ea2db0783d7b7f0396dbe77f8fc6d679ee00968b",
+    "case_count": 12
+  },
+  "entries": [
+    {
+      "id": "v3_case_001",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_001",
+      "requirement_file": "discovery/request_001.json",
+      "requirement_sha256": "f7ce3e1fe8435024ae3d295745a5d490a3bb195954ce8094bae25e08d3477b86",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_002",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_002",
+      "requirement_file": "discovery/request_002.json",
+      "requirement_sha256": "b0943ee26ebda91cb6ac598589806f775b793675d9b7d104c308233887ec2105",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_003",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_003",
+      "requirement_file": "discovery/request_003.json",
+      "requirement_sha256": "df084b3c0bdefa782ff480d9e7e285e6a28dd56fcfd7d9a695d51aa521798cb1",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_004",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_004",
+      "requirement_file": "discovery/request_004.json",
+      "requirement_sha256": "54cf14de4fae6530e3e4ceed6cf66f605e514e8c1a17f010c2097699afdb0b88",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_005",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_005",
+      "requirement_file": "discovery/request_005.json",
+      "requirement_sha256": "7745b7879827dbae8a89d2b6f3046ee797d492a55a844fa3805653c76abe75c5",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_006",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_006",
+      "requirement_file": "discovery/request_006.json",
+      "requirement_sha256": "f064b8df2e3aeb046ab00257162887b2aad5ca76ff9bbe517379f6993bb3c256",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_007",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_007",
+      "requirement_file": "discovery/request_007.json",
+      "requirement_sha256": "be59d101d8d917d86d363c823fe67fb2dfba29b289654ef28bc75db5776009b8",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_008",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_008",
+      "requirement_file": "discovery/request_008.json",
+      "requirement_sha256": "912c08f83f7092c23d19ddb1282d30bf84aa1f3814cfa5978eb411cdb7ea3267",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_009",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_009",
+      "requirement_file": "discovery/request_009.json",
+      "requirement_sha256": "ef0c1fb9f1fb68142a4d18b69a51cf900f7b01b3ae7f2e3ce312ab4b152244ca",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_010",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_010",
+      "requirement_file": "discovery/request_010.json",
+      "requirement_sha256": "a533d9fd4fa99b5b7163bf3bf14f47c3919981a4cfc27cbd810652366df67ea2",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_011",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_011",
+      "requirement_file": "discovery/request_011.json",
+      "requirement_sha256": "63ea918153b97f9570aa6000b8f7ba6dcba91fecaea1c9aae289cd8ad7d5fd04",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_012",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_012",
+      "requirement_file": "discovery/request_012.json",
+      "requirement_sha256": "f805b29ae293527d26d0ab537eab1d8b45e91640d38f85bd6118ce7b8ed7486f",
+      "sealed": false
+    },
+    {
+      "id": "v3_case_013",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_013",
+      "requirement_file": "held_out/request_013.json",
+      "requirement_sha256": "2f92e84098fb5ee96bd30a0f7884c8a3e6b7e44aa8b120d8f6f1c0690999d8a4",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_014",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_014",
+      "requirement_file": "held_out/request_014.json",
+      "requirement_sha256": "130fa533e4dbc292472b96f0a675f9ee10c4bcca5ce7ff9cb86f4d251f81461f",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_015",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_015",
+      "requirement_file": "held_out/request_015.json",
+      "requirement_sha256": "182b8af2ebc3c1b89d0f44c43d5ec3b95402a32ffd63272100ed30ad931d1640",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_016",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_016",
+      "requirement_file": "held_out/request_016.json",
+      "requirement_sha256": "355716c94daeb1194f2b1cf74315604b48210ccd272593163f69e7e9d1c0979c",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_017",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_017",
+      "requirement_file": "held_out/request_017.json",
+      "requirement_sha256": "33ba4e8efd73f076b485de3d86e26a260ba467c78c7ab96335568cbfba8d7d8d",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_018",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_018",
+      "requirement_file": "held_out/request_018.json",
+      "requirement_sha256": "fb9b6f691cd1d9cc2a6cf1deb2e966342b048b9ffedffb2f8a06336ddedab1b3",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_019",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "non_safety",
+      "source_id": "v3_source_019",
+      "requirement_file": "held_out/request_019.json",
+      "requirement_sha256": "14a1c001a9c53e9ed0b9913d43ae54ec149cc3a322cd96be110cfe111ba9c729",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_020",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_020",
+      "requirement_file": "held_out/request_020.json",
+      "requirement_sha256": "c10810c30077e6d0f9d073d3fea437e5e824744a41275b25e522bcd19a751bb9",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_021",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "source_id": "v3_source_021",
+      "requirement_file": "held_out/request_021.json",
+      "requirement_sha256": "6b6214cd32059c0d8031654f1cf2ded039d0473a405cb6ca5e2e9611073b67b2",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_022",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_022",
+      "requirement_file": "held_out/request_022.json",
+      "requirement_sha256": "40fb31cf8f7a8c7233dc569684514ca760047de50a49cb1ac795c0208c1654c2",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_023",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "review_required",
+      "source_id": "v3_source_023",
+      "requirement_file": "held_out/request_023.json",
+      "requirement_sha256": "6d5ffcedcfa546dea3567e85a045d2e8d24e37b2908b7236d74591be96a8d1aa",
+      "sealed": true
+    },
+    {
+      "id": "v3_case_024",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "source_id": "v3_source_024",
+      "requirement_file": "held_out/request_024.json",
+      "requirement_sha256": "56057a82acc16fa487afd99fa60600e21bfb27d2e238d1cd8db76b3d10c84e6d",
+      "sealed": true
+    }
+  ]
+}

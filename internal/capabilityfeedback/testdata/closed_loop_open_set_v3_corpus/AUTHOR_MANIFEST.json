@@ -1,0 +1,30 @@
+{
+  "schema": "kicadai.closed-loop-open-set-author-manifest.v3",
+  "version": 3,
+  "entries": [
+    {"id":"v3_case_001","role":"discovery","domain":"analog","safety_impact":"non_safety","source_id":"v3_source_001","requirement_file":"discovery/request_001.json"},
+    {"id":"v3_case_002","role":"discovery","domain":"analog","safety_impact":"review_required","source_id":"v3_source_002","requirement_file":"discovery/request_002.json"},
+    {"id":"v3_case_003","role":"discovery","domain":"power","safety_impact":"safety_relevant","source_id":"v3_source_003","requirement_file":"discovery/request_003.json"},
+    {"id":"v3_case_004","role":"discovery","domain":"power","safety_impact":"safety_critical","source_id":"v3_source_004","requirement_file":"discovery/request_004.json"},
+    {"id":"v3_case_005","role":"discovery","domain":"digital","safety_impact":"non_safety","source_id":"v3_source_005","requirement_file":"discovery/request_005.json"},
+    {"id":"v3_case_006","role":"discovery","domain":"digital","safety_impact":"safety_relevant","source_id":"v3_source_006","requirement_file":"discovery/request_006.json"},
+    {"id":"v3_case_007","role":"discovery","domain":"mcu","safety_impact":"non_safety","source_id":"v3_source_007","requirement_file":"discovery/request_007.json"},
+    {"id":"v3_case_008","role":"discovery","domain":"mcu","safety_impact":"review_required","source_id":"v3_source_008","requirement_file":"discovery/request_008.json"},
+    {"id":"v3_case_009","role":"discovery","domain":"sensor","safety_impact":"safety_relevant","source_id":"v3_source_009","requirement_file":"discovery/request_009.json"},
+    {"id":"v3_case_010","role":"discovery","domain":"sensor","safety_impact":"safety_critical","source_id":"v3_source_010","requirement_file":"discovery/request_010.json"},
+    {"id":"v3_case_011","role":"discovery","domain":"mixed_signal","safety_impact":"review_required","source_id":"v3_source_011","requirement_file":"discovery/request_011.json"},
+    {"id":"v3_case_012","role":"discovery","domain":"mixed_signal","safety_impact":"safety_critical","source_id":"v3_source_012","requirement_file":"discovery/request_012.json"},
+    {"id":"v3_case_013","role":"held_out","domain":"analog","safety_impact":"non_safety","source_id":"v3_source_013","requirement_file":"held_out/request_013.json"},
+    {"id":"v3_case_014","role":"held_out","domain":"analog","safety_impact":"review_required","source_id":"v3_source_014","requirement_file":"held_out/request_014.json"},
+    {"id":"v3_case_015","role":"held_out","domain":"power","safety_impact":"safety_relevant","source_id":"v3_source_015","requirement_file":"held_out/request_015.json"},
+    {"id":"v3_case_016","role":"held_out","domain":"power","safety_impact":"safety_critical","source_id":"v3_source_016","requirement_file":"held_out/request_016.json"},
+    {"id":"v3_case_017","role":"held_out","domain":"digital","safety_impact":"non_safety","source_id":"v3_source_017","requirement_file":"held_out/request_017.json"},
+    {"id":"v3_case_018","role":"held_out","domain":"digital","safety_impact":"safety_relevant","source_id":"v3_source_018","requirement_file":"held_out/request_018.json"},
+    {"id":"v3_case_019","role":"held_out","domain":"mcu","safety_impact":"non_safety","source_id":"v3_source_019","requirement_file":"held_out/request_019.json"},
+    {"id":"v3_case_020","role":"held_out","domain":"mcu","safety_impact":"review_required","source_id":"v3_source_020","requirement_file":"held_out/request_020.json"},
+    {"id":"v3_case_021","role":"held_out","domain":"sensor","safety_impact":"safety_relevant","source_id":"v3_source_021","requirement_file":"held_out/request_021.json"},
+    {"id":"v3_case_022","role":"held_out","domain":"sensor","safety_impact":"safety_critical","source_id":"v3_source_022","requirement_file":"held_out/request_022.json"},
+    {"id":"v3_case_023","role":"held_out","domain":"mixed_signal","safety_impact":"review_required","source_id":"v3_source_023","requirement_file":"held_out/request_023.json"},
+    {"id":"v3_case_024","role":"held_out","domain":"mixed_signal","safety_impact":"safety_critical","source_id":"v3_source_024","requirement_file":"held_out/request_024.json"}
+  ]
+}
