@@ -1,0 +1,50 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v1",
+  "version": 1,
+  "corpus_manifest_hash": "c86d9bef8c8cc97bde4389109ffa4e6140c31d61394295d02fdec37e9cd5117a",
+  "freeze_commit": "8ce268fb5acb2cb64d3fd26888f2abec38f150e9",
+  "evaluator_policy": "closed-loop-capability-policy-v1",
+  "impact_registry_hash": "07cdad8298dfcec17fa56f46094cddbb0033f0b809868cfe720ca40663d5cffd",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "baseline_report_hash": "4e7bdd4c1eb330af14ac328f18c3fb7256a295bb0e4a5af4b6970da2fa9d4e05",
+  "cluster": {
+    "rank": 1,
+    "key": "exhausted:topology_repair:topology:causal_topology_repair:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+    "outcome": "exhausted",
+    "stage": "topology_repair",
+    "scope": "topology",
+    "capability": "causal_topology_repair",
+    "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+    "case_count": 2,
+    "domain_count": 2,
+    "analysis_count": 7,
+    "safety_score": 6,
+    "reuse_score": 0,
+    "cases": [
+      "case_001",
+      "case_003"
+    ],
+    "domains": [
+      "analog",
+      "power"
+    ],
+    "analysis_kinds": [
+      "ac_sweep",
+      "dc_operating_point",
+      "dc_sweep",
+      "electrothermal",
+      "noise",
+      "startup",
+      "transient"
+    ],
+    "required_evidence": [
+      "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+    ],
+    "evidence_hashes": [
+      "4a94b6908ac5559d7b7b20c5f55207f8cec3678ab413b184da1e504b90250926",
+      "ed041009045749b92d930db61749330d5791610694769926e6aa213bb87261a8"
+    ]
+  },
+  "expansion_plan_hash": "2efca89055a231923de3d109140cb28979a49b259803dda4978594ee1b46cec7",
+  "hash": "e245fdb3f95e1294e470ffaa872893480a23716c38d055cd82432c83727eb0a5"
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_020",
+    "role": "held_out",
+    "domain": "mcu",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "e8037859cfa970cfa7ec4740c08c792c35f36815f4454c2bb87f48b9192cd090",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "260ee16249e45f4bd8e81e6d5baa702d1148076da49ac75e6ca32048644b44d0",
+  "analysis_kinds": [
+    "dc_sweep",
+    "startup",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 250,
+    "generated_graphs": 2691,
+    "complete_graphs": 9,
+    "candidate_simulations": 128,
+    "corner_evaluations": 813,
+    "value_trials": 31,
+    "topology_repairs": 13,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "falling_threshold_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "requirement_ids": [
+        "reject_level"
+      ],
+      "operating_cases": [
+        "request_sweep/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "falling_threshold_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "03ff02855451b270640c34418a081b05f645d001dd623f31f5f34e30779c51f7",
+        "157ddf65efa1be3a3d25257c7d776771c2c56efef3cbf3199e06e91e39b0a6aa",
+        "1d18adc29bba4ab197ad1cf06ca46d4fcc54d9e8c50e5a4aa523ae13b8154da3",
+        "260ee16249e45f4bd8e81e6d5baa702d1148076da49ac75e6ca32048644b44d0",
+        "543ac7988fdcc3743a3f73a772aae603f45530f45fc647366662398451bad438",
+        "7d17c3e8fca1b12d1267c35eb6f1fdbc5d84eeb63edbcf6f461ae49687f65a6d",
+        "873e3444dc8729a37093a5ca4cb3ea1b4381cf5a5a7997ef881bc8af9d56e49a",
+        "a8ef2ce4f7fab45f1a253b42fa439dd233f33f8023d8147830c182d777a48a79",
+        "e0e4ceba1f57f1f351d90e0de2988c1694e3c47168dd3c43bf4ec987235ad179"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "rising_threshold_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "requirement_ids": [
+        "accept_level"
+      ],
+      "operating_cases": [
+        "request_sweep/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "rising_threshold_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "049d84158970e8f0bdcf377366d9221da8774bfe6ad86d6c996171474f457ac5",
+        "1dcc3a7f114f3a949a3f916e5943599fac4c9dd172825f084388e1d324756dfe",
+        "260ee16249e45f4bd8e81e6d5baa702d1148076da49ac75e6ca32048644b44d0",
+        "3c8b41d7dddddde65f22f6d548be14c4ccf64360e07372cb4f25c80fbb0151ce",
+        "62111ccdd5df8d37ec827d635fd7cb5b82402279e0fdaa2f570b2ae34ec92f08",
+        "79fa21a5b3be44e734f2299cd7078634c11d01e9b9ab72ea54cb0278955f47a4",
+        "a2bf23ba94a414a1319185954b808d85da01b59fa84b4026dc66da06f19237d8",
+        "cdf3817cecc41c562ab73c4a9d0d285f7d3ae0db7753783fd52f730c86c1774b",
+        "f96bbda5b5bed67dd8444509004bc8bce7db3b1b482052da0f4271189a27a450"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "d32ea8d3f6162a6babb61f4ffcfd21a932d2ddf8784e7446e5636d5769527d43"
+}

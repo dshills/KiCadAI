@@ -1,0 +1,49 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_019",
+    "role": "held_out",
+    "domain": "mcu",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "value_exhausted",
+  "requirement_hash": "99c353aecf9fa178f3261c1be559dba637b581be299c2c33dff1820a27ed7cef",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "9a509ffa7a29ad367aa6fd13630276f2e847441691f10e53d0e09addfc208aea",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "startup",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 260,
+    "generated_graphs": 3123,
+    "complete_graphs": 28,
+    "candidate_simulations": 0,
+    "corner_evaluations": 0,
+    "value_trials": 0,
+    "topology_repairs": 0,
+    "maximum_frontier": 192,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "value_search",
+      "scope": "component",
+      "capability": "catalog_value_domain",
+      "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "required_evidence": [
+        "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+      ],
+      "evidence_hashes": [
+        "9a509ffa7a29ad367aa6fd13630276f2e847441691f10e53d0e09addfc208aea"
+      ]
+    }
+  ],
+  "hash": "58b6116b1397540e996d36261be8b00a64d9439df8540d6f87620616c0d25765"
+}

@@ -1,0 +1,94 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_004",
+    "role": "discovery",
+    "domain": "power",
+    "safety_impact": "safety_critical"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "7e8dacd89a62299ea8391ada9c132f340009675cb0c38ce298e51af50ee9af96",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "bc17633424e9fd336115d7f5b337c74a8eca63f21e6d87737f8e7ca1a1a3c0b3",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "electrothermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 2,
+    "generated_graphs": 35,
+    "complete_graphs": 4,
+    "candidate_simulations": 128,
+    "corner_evaluations": 1280,
+    "value_trials": 18,
+    "topology_repairs": 2,
+    "maximum_frontier": 0,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "model",
+      "capability": "electrothermal_model",
+      "code": "THERMAL_MODEL_UNAVAILABLE",
+      "requirement_ids": [
+        "area_margin",
+        "thermal_limit"
+      ],
+      "operating_cases": [
+        "bidirectional_load/nominal"
+      ],
+      "analysis_kinds": [
+        "electrothermal"
+      ],
+      "required_evidence": [
+        "electrothermal_model: reviewed model provenance and applicability bounds"
+      ],
+      "evidence_hashes": [
+        "88999f5f8159ce70ed1f3599a362d71265fab522cbb4bac571144d5831ffd2a3",
+        "bc17633424e9fd336115d7f5b337c74a8eca63f21e6d87737f8e7ca1a1a3c0b3"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "load_regulation_evidence",
+      "code": "NONCONVERGENT",
+      "requirement_ids": [
+        "load_change"
+      ],
+      "operating_cases": [
+        "bidirectional_load/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "load_regulation_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "55a56a09b21f16800a31442786ecd5ada7c66fda7d815d4628e160821f4a825c",
+        "7a0dd70f5e72ae923288d28dd86bdf79f681729cd9285e2ca66501f387e01954",
+        "9802f4a611f9e56dfe40ed8e133db22530f68bcd41446728e8fb75e0715fce6e",
+        "bc17633424e9fd336115d7f5b337c74a8eca63f21e6d87737f8e7ca1a1a3c0b3",
+        "fc85c46634a248dd101aafe326e88a8b59cc126a22f9f646c2c71405b4ead748"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "b91efc562b30f3f8afe4318672bc73f2e9df90f39b4de31d30df4e008b47a04e"
+}

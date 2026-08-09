@@ -1,0 +1,71 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_012",
+    "role": "discovery",
+    "domain": "mixed_signal",
+    "safety_impact": "safety_critical"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "9fe51e3e9d77167200b41f2a48858fcfbfd32754f9cd0e3ee07da062cba1b0db",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "57ac454cb7cc2fced1b81854f0a075670273d653a749aa512c119826075dfaaa",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "electrothermal",
+    "startup",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 251,
+    "generated_graphs": 2881,
+    "complete_graphs": 66,
+    "candidate_simulations": 128,
+    "corner_evaluations": 1124,
+    "value_trials": 16,
+    "topology_repairs": 10,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "output_current_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "requirement_ids": [
+        "requested_current"
+      ],
+      "operating_cases": [
+        "permission_change/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "output_current_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "3b46dfe502109ac5a1072bf52af5ed3cde1a110899578be2bd69c5bb316a5ee1",
+        "405680fc74730d0881386815e56ec5f3fd60f36ea0dd1f929893f4639049ec1d",
+        "52785476439f077cb91f0dba02eaf67c981e20b92473e41361f4877332f760b2",
+        "57ac454cb7cc2fced1b81854f0a075670273d653a749aa512c119826075dfaaa",
+        "86e1bbb03456aef5ea1bd5ef14aef6ecd1bb66c780fcc3711e1bb9da92b22a58",
+        "ceb79483451e7eeb27bd0510109c05060f7dadde878e0bad8e1e1ba8cc504b5d",
+        "dadc7a9d7a2f74285e5b9f62da9b85ed7e8a555c129e1d973c575fcc0e43c11a",
+        "ec8b95b01ae52ddaed716ccb3f987cc05123dfe2e29a43573af6c9a770d8e343",
+        "f19d332aadb83b3d18a6352aadca1fd8a9cbcf278d1aa56d3165c8f3e0e67c8d"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "0c146974a065ec5af2bf5956dc9a00bf500614c9317f6e392289586a695726ef"
+}

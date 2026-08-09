@@ -1,0 +1,89 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_011",
+    "role": "discovery",
+    "domain": "mixed_signal",
+    "safety_impact": "safety_critical"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "d861a3b445e8e54b866fc0dd6a2f1a8c209dff0807c40e84498f08a80b92054e",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "88d60a4f7f98b20d602b4599464fea222e6f73ba60e88ee3f9caf7bc26f1ebc3",
+  "analysis_kinds": [
+    "electrothermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 282,
+    "generated_graphs": 7506,
+    "complete_graphs": 8,
+    "candidate_simulations": 128,
+    "corner_evaluations": 128,
+    "value_trials": 20,
+    "topology_repairs": 6,
+    "maximum_frontier": 963,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "electrothermal_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "area_margin",
+        "thermal"
+      ],
+      "operating_cases": [
+        "commanded/nominal"
+      ],
+      "analysis_kinds": [
+        "electrothermal"
+      ],
+      "required_evidence": [
+        "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "88d60a4f7f98b20d602b4599464fea222e6f73ba60e88ee3f9caf7bc26f1ebc3",
+        "ea2a4b8c22d18236f6048502b93365d21dd31488f4b7bb61e015460b780adde3"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "transient_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "average"
+      ],
+      "operating_cases": [
+        "commanded/nominal"
+      ],
+      "analysis_kinds": [
+        "transient"
+      ],
+      "required_evidence": [
+        "transient_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "88d60a4f7f98b20d602b4599464fea222e6f73ba60e88ee3f9caf7bc26f1ebc3",
+        "ea2a4b8c22d18236f6048502b93365d21dd31488f4b7bb61e015460b780adde3"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "06df448017c590d16ce554ed68edbef46ba0561bd1fdbcb747b5cd8714535cb4"
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_014",
+    "role": "held_out",
+    "domain": "analog",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "776c0ae4d21b218881ab27e9d90a39aa1344caf5ce1a76092c88c8a98d4e46b6",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "52c62465c98e95d349e29ced2de2011a3b3914c6c0593d9a6c36994ed2e0216c",
+  "analysis_kinds": [
+    "dc_sweep",
+    "noise",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 37,
+    "generated_graphs": 366,
+    "complete_graphs": 49,
+    "candidate_simulations": 128,
+    "corner_evaluations": 152,
+    "value_trials": 48,
+    "topology_repairs": 16,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "scale"
+      ],
+      "operating_cases": [
+        "bipolar_range/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "52c62465c98e95d349e29ced2de2011a3b3914c6c0593d9a6c36994ed2e0216c",
+        "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "fcb53d6d58cb43b82e9c97181966eb1ac64e7a4dc9f5a57c6f9aa09a9bdfc8e3"
+}

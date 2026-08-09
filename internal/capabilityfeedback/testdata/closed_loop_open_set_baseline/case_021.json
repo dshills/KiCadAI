@@ -1,0 +1,64 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_021",
+    "role": "held_out",
+    "domain": "sensor",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "9efd65079a6c318cd816b1546bc55486d25dd9398da0c0a3057ff6d42f1b35b9",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "02102cc3634928fa6f59904d8c853be6c7f75066da0214ef7569378de1df2f84",
+  "analysis_kinds": [
+    "ac_sweep",
+    "dc_sweep",
+    "noise",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 1,
+    "generated_graphs": 7,
+    "complete_graphs": 4,
+    "candidate_simulations": 128,
+    "corner_evaluations": 1374,
+    "value_trials": 25,
+    "topology_repairs": 12,
+    "maximum_frontier": 0,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "scale"
+      ],
+      "operating_cases": [
+        "measurement/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "02102cc3634928fa6f59904d8c853be6c7f75066da0214ef7569378de1df2f84",
+        "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "9b96db5c73fa945770a1842f9d9264dbdef23a59e86ace57b0338b86020c3a22"
+}

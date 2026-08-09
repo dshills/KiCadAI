@@ -1,0 +1,49 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_013",
+    "role": "held_out",
+    "domain": "analog",
+    "safety_impact": "non_safety"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "896bc193c2fe80fee97df5d35ba201a64c35dc8d273d11b218b327710fa8b109",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "eeda7a6abfca689cee75ad7be9f16e7568217fc361ee26ca998f058e4f3fcaa6",
+  "analysis_kinds": [
+    "ac_sweep",
+    "distortion",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 229,
+    "generated_graphs": 2214,
+    "complete_graphs": 126,
+    "candidate_simulations": 104,
+    "corner_evaluations": 104,
+    "value_trials": 88,
+    "topology_repairs": 16,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "topology_repair",
+      "scope": "topology",
+      "capability": "causal_topology_repair",
+      "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+      "required_evidence": [
+        "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "eeda7a6abfca689cee75ad7be9f16e7568217fc361ee26ca998f058e4f3fcaa6"
+      ]
+    }
+  ],
+  "hash": "864aa454c391835c75d5119ce5b53469d97f573b7f189923b99eded990e07134"
+}

@@ -1,0 +1,140 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v1",
+  "case": {
+    "id": "case_006",
+    "role": "discovery",
+    "domain": "digital",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "8047936e9e440375ea9c7a1bc952f3c7797accedc71fa62a2b3cee7e30b48f0f",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "57f110a8d3a5c5cce48857f00367614507635d4532d1bbc15f392ece8fa737c2",
+  "analysis_kinds": [
+    "startup",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 1,
+    "generated_graphs": 9,
+    "complete_graphs": 1,
+    "candidate_simulations": 128,
+    "corner_evaluations": 581,
+    "value_trials": 28,
+    "topology_repairs": 4,
+    "maximum_frontier": 0,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "duty_cycle_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "requirement_ids": [
+        "duty"
+      ],
+      "operating_cases": [
+        "corners/nominal"
+      ],
+      "analysis_kinds": [
+        "transient"
+      ],
+      "required_evidence": [
+        "duty_cycle_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "57f110a8d3a5c5cce48857f00367614507635d4532d1bbc15f392ece8fa737c2",
+        "e9fae01e0fbd61faaf20ee075bb3756af2ba924a5bcc5bd35caae3041efc76c7"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "oscillation_frequency_evidence",
+      "code": "ASSERTION_ABOVE_MAXIMUM",
+      "requirement_ids": [
+        "rate"
+      ],
+      "operating_cases": [
+        "enabled/nominal"
+      ],
+      "analysis_kinds": [
+        "transient"
+      ],
+      "required_evidence": [
+        "oscillation_frequency_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "4fe66aa128efdee0318f3e30f48d7b685da329ec5d22119524bbd7a6d853f4e4",
+        "57f110a8d3a5c5cce48857f00367614507635d4532d1bbc15f392ece8fa737c2"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "oscillation_frequency_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "requirement_ids": [
+        "rate"
+      ],
+      "operating_cases": [
+        "corners/nominal"
+      ],
+      "analysis_kinds": [
+        "transient"
+      ],
+      "required_evidence": [
+        "oscillation_frequency_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "1faf041c7b4a286fc5ebe6de72a3587d1059da96cf93220b84a007b8e1687695",
+        "57f110a8d3a5c5cce48857f00367614507635d4532d1bbc15f392ece8fa737c2"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "startup_output_voltage_evidence",
+      "code": "ASSERTION_ABOVE_MAXIMUM",
+      "requirement_ids": [
+        "start"
+      ],
+      "operating_cases": [
+        "enabled/nominal"
+      ],
+      "analysis_kinds": [
+        "startup"
+      ],
+      "required_evidence": [
+        "startup_output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "57f110a8d3a5c5cce48857f00367614507635d4532d1bbc15f392ece8fa737c2",
+        "cf69fe6dcca51be4fbe1a70f9bf943a9b771d1aef16e8ab8b5e4c7f5e34b569e"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "58e49c0b0d3a35925c6baa16141e583f830f7e5eb54179dc466bfb78b8fe6a35"
+}
