@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-held-out-baseline-seal.v3",
+  "version": 3,
+  "algorithm": "AES-256-GCM/HMAC-SHA-256-payload-bound-nonce",
+  "corpus_manifest_hash": "f721b8abc859a47030d17f92ea86dc301a3d3817b1cc52bd32261b54bb79c49e",
+  "freeze_commit": "99d1c33a9ad6a2967a110935ff69999f81193835",
+  "selection_hash": "82798387cb85e6af912a1f1ff135c1a4e21d4f76251f2f9e56985732584d904c",
+  "payload_hash": "8d5ac890b06b5fb4529848ce61c6ad8463fc36289a169699ab7a52d9291074aa",
+  "ciphertext_sha256": "d30b689cb044bcffff7b6daa38703c4d005f1f5030350c766bfc67fa133735aa",
+  "case_count": 12,
+  "hash": "851b30821128f6c70702ffabc4f5cfbf21e95f8f90e6c7affbd13d5b817cd867"
+}

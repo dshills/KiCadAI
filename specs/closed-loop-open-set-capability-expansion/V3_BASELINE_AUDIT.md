@@ -1,6 +1,6 @@
 # Closed-Loop Open-Set V3 Baseline Audit
 
-Status: discovery baseline complete and rank-one selection sealed; held-out baseline pending
+Status: discovery baseline and rank-one selection complete; held-out baseline authenticated and sealed
 
 ## Bound inputs
 
@@ -68,7 +68,37 @@ behavior in production code.
 ## Blind-boundary statement
 
 No held-out requirement was decrypted, classified, synthesized, observed, or
-used in clustering, ranking, or planning. Held-out source remains authenticated
-ciphertext with its key outside the repository. Phase 3 may now produce the
-encrypted held-out baseline using the already sealed discovery selection; no
-held-out result may alter that selection.
+used in clustering, ranking, or planning before the selection was committed.
+No held-out result altered the selection.
+
+After selection commit `99d1c33a9ad6a2967a110935ff69999f81193835`, the
+sealed harness authenticated and decrypted the held-out source internally,
+executed all 12 cases in manifest order through the same two-run synthesis,
+policy-v2 observation, and held-out-only aggregation path, and suppressed
+per-case requirements, diagnostics, outcomes, and logs. Any passing synthesis
+was required to pass the physical promotion lane's two clean-root replays.
+
+The complete normalized held-out baseline payload was authenticated-encrypted
+under a fresh 32-byte key distinct from the source-corpus key and stored outside
+the repository. The repository records only:
+
+- case count: 12;
+- algorithm: `AES-256-GCM/HMAC-SHA-256-payload-bound-nonce`;
+- payload SHA-256:
+  `8d5ac890b06b5fb4529848ce61c6ad8463fc36289a169699ab7a52d9291074aa`;
+- ciphertext SHA-256:
+  `d30b689cb044bcffff7b6daa38703c4d005f1f5030350c766bfc67fa133735aa`;
+  and
+- seal content hash:
+  `851b30821128f6c70702ffabc4f5cfbf21e95f8f90e6c7affbd13d5b817cd867`.
+
+A keyed mechanical check authenticated and decoded the encrypted payload,
+reproduced its content hash, verified 12 policy-v2 held-out evidence records,
+and confirmed the held-out aggregate exposes no rankable clusters. It printed
+no case content or outcome. Normal tests reproduce all public commitments
+without either external key.
+
+Phase 4 may now implement only the already sealed
+`dc_operating_point_solver` capability. The held-out source and baseline
+contents remain unavailable to the implementation context until the reviewed
+production diff is sealed and discovery uplift passes.
