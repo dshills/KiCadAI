@@ -1,6 +1,6 @@
 {
   "schema": "kicadai.closed-loop-open-set-corpus.v1",
-  "version": 1,
+  "version": 2,
   "requirement_schema": "kicadai.open-topology-requirement.v1",
   "evaluator_policy": "closed-loop-capability-policy-v1",
   "impact_registry": {
@@ -57,18 +57,18 @@
   },
   "impact_registry_hash": "07cdad8298dfcec17fa56f46094cddbb0033f0b809868cfe720ca40663d5cffd",
   "synthesis_policy": {
-    "max_expanded_states": 20000,
-    "max_generated_graphs": 50000,
-    "max_primitive_instances": 32,
-    "max_internal_nodes": 32,
-    "max_candidate_simulations": 50000,
-    "max_corner_evaluations": 65536,
-    "max_value_trials": 4096,
-    "max_topology_repairs": 128,
-    "max_retained_candidates": 16,
+    "max_expanded_states": 4000,
+    "max_generated_graphs": 8000,
+    "max_primitive_instances": 24,
+    "max_internal_nodes": 24,
+    "max_candidate_simulations": 128,
+    "max_corner_evaluations": 2048,
+    "max_value_trials": 128,
+    "max_topology_repairs": 16,
+    "max_retained_candidates": 8,
     "max_diagnostic_samples": 32
   },
-  "synthesis_policy_hash": "845eac6effae6f369bdf7a3eb1832ca37e3db248f2d454687b58f3d3c129274a",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
   "environment": {
     "go_minimum": "1.23",
     "kicad": "10.0.3",

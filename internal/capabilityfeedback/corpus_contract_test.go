@@ -22,7 +22,7 @@ import (
 
 const (
 	closedLoopCorpusSchema      = "kicadai.closed-loop-open-set-corpus.v1"
-	closedLoopCorpusVersion     = 1
+	closedLoopCorpusVersion     = 2
 	closedLoopCorpusSize        = 24
 	closedLoopCorpusRoot        = "testdata/closed_loop_open_set_corpus"
 	frozenGoMinimum             = "1.23"
@@ -143,7 +143,7 @@ func buildClosedLoopManifest(t *testing.T) closedLoopManifest {
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy := ots.DefaultPolicy()
+	policy := closedLoopSynthesisPolicy()
 	policyHash, err := digest(policy)
 	if err != nil {
 		t.Fatal(err)
@@ -153,8 +153,8 @@ func buildClosedLoopManifest(t *testing.T) closedLoopManifest {
 		RequirementSchema: ots.RequirementSchema, EvaluatorPolicy: PolicyVersion,
 		ImpactRegistry: registry, ImpactRegistryHash: registryHash,
 		SynthesisPolicy: policy, SynthesisPolicyHash: policyHash,
-		// These identify the version-1 reference environment. Regeneration is
-		// deliberately host-independent; changing them creates corpus version 2.
+		// The reference environment is host-independent; changing it requires a
+		// corpus version bump.
 		Environment:          closedLoopEnvironment{GoMinimum: frozenGoMinimum, KiCad: frozenKiCadVersion, OS: frozenOperatingSystem, Arch: frozenProcessorArchitecture},
 		IndependentAuthoring: "Behavior-only electrical requirements were authored from public interface and analysis vocabulary before production outcomes were observed; no expected implementation or outcome was supplied.",
 	}
@@ -166,6 +166,16 @@ func buildClosedLoopManifest(t *testing.T) closedLoopManifest {
 		})
 	}
 	return manifest
+}
+
+func closedLoopSynthesisPolicy() ots.Policy {
+	return ots.Policy{
+		MaxExpandedStates: 4000, MaxGeneratedGraphs: 8000,
+		MaxPrimitiveInstances: 24, MaxInternalNodes: 24,
+		MaxCandidateSimulations: 128, MaxCornerEvaluations: 2048,
+		MaxValueTrials: 128, MaxTopologyRepairs: 16,
+		MaxRetainedCandidates: 8, MaxDiagnosticSamples: 32,
+	}
 }
 
 func closedLoopImpactRegistry() capabilityevaluation.ImpactRegistry {

@@ -1,6 +1,6 @@
 # Closed-Loop Open-Set Corpus Authorship Record
 
-Status: version-1 corpus authored and frozen; production outcomes have not been
+Status: version-2 corpus authored and frozen; production outcomes have not been
 recorded
 
 Date: 2026-08-09
@@ -28,7 +28,7 @@ frozen in `dde76b3b`.
 
 ## Corpus Composition
 
-Version 1 contains 12 discovery and 12 held-out cases. Within each role there
+Version 2 contains 12 discovery and 12 held-out cases. Within each role there
 are exactly two cases in each reporting domain:
 
 - analog;
@@ -67,7 +67,24 @@ selection record created by the untouched baseline.
 
 ## Freeze Boundary
 
-After the corpus-freeze commit, any change to a requirement byte, entry order,
-role, reporting domain, safety level, evaluator policy, impact registry,
-synthesis policy, or environment contract creates corpus version 2. Expected
-outcomes are deliberately absent from this record and from the manifest.
+After the version-2 corpus-freeze commit, any change to a requirement byte,
+entry order, role, reporting domain, safety level, evaluator policy, impact
+registry, synthesis policy, or environment contract creates corpus version 3.
+Expected outcomes are deliberately absent from this record and from the
+manifest.
+
+## Version 2 Budget Correction
+
+Corpus version 1 was committed in `3813489d` with the production default search
+policy. The first untouched execution reached the Go test runner's ten-minute
+ceiling during the first replay of discovery case 3 while evaluating bounded
+electrothermal corners. It produced no baseline report, selection, expected
+outcome file, or capability implementation.
+
+Version 2 preserves all 24 requirement files byte-for-byte, their order, roles,
+domains, safety declarations, evaluator policy, impact registry, and reference
+environment. It changes only the explicit finite synthesis work budget to make
+the required 48 synthesis runs locally reproducible. This is recorded as a new
+corpus version rather than a silent budget change, as required by
+`CORPUS_RULES.md`. Version 1 is superseded and must not be used for baseline or
+uplift claims.
