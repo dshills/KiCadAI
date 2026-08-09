@@ -35,8 +35,8 @@ func DecodeAggregateReport(reader io.Reader, registry capabilityevaluation.Impac
 }
 
 func ValidateCaseEvidence(evidence CaseEvidence) error {
-	if evidence.Schema != CaseEvidenceSchema || evidence.PolicyVersion != PolicyVersion {
-		return fmt.Errorf("unsupported case-evidence schema or policy")
+	if evidence.Schema != CaseEvidenceSchema || !supportedPolicyVersion(evidence.PolicyVersion) {
+		return fmt.Errorf("unsupported case-evidence schema %q or policy %q", evidence.Schema, evidence.PolicyVersion)
 	}
 	if err := validateCaseMeta(evidence.Case); err != nil {
 		return err
@@ -88,10 +88,24 @@ func ValidateCaseEvidence(evidence CaseEvidence) error {
 }
 
 func ValidateAggregateReport(report AggregateReport, registry capabilityevaluation.ImpactRegistry) error {
-	if report.Schema != AggregateSchema || report.PolicyVersion != PolicyVersion || report.RankingPolicy != RankingPolicy {
-		return fmt.Errorf("unsupported aggregate-report schema or policy")
+	if report.Schema != AggregateSchema || !supportedPolicyVersion(report.PolicyVersion) || report.RankingPolicy != RankingPolicy {
+		return fmt.Errorf(
+			"unsupported aggregate-report schema %q, policy %q, or ranking policy %q",
+			report.Schema, report.PolicyVersion, report.RankingPolicy,
+		)
 	}
-	rebuilt, err := Evaluate(report.CorpusRole, report.Cases, registry)
+	var (
+		rebuilt AggregateReport
+		err     error
+	)
+	switch report.PolicyVersion {
+	case PolicyVersion:
+		rebuilt, err = Evaluate(report.CorpusRole, report.Cases, registry)
+	case RealizabilityPolicyVersion:
+		rebuilt, err = EvaluateRealizabilityAware(report.CorpusRole, report.Cases, registry)
+	default:
+		return fmt.Errorf("unsupported aggregate-report policy %q", report.PolicyVersion)
+	}
 	if err != nil {
 		return err
 	}
@@ -107,6 +121,10 @@ func ValidateAggregateReport(report AggregateReport, registry capabilityevaluati
 		return fmt.Errorf("aggregate report does not reproduce from case evidence and impact registry")
 	}
 	return nil
+}
+
+func supportedPolicyVersion(value string) bool {
+	return value == PolicyVersion || value == RealizabilityPolicyVersion
 }
 
 func decodeStrict(reader io.Reader, target any) error {

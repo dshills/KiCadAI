@@ -124,6 +124,90 @@ func Observe(
 	return evidence, nil
 }
 
+// ObserveRealizabilityAware preserves the legacy observation contract while
+// refining only otherwise-generic terminal topology failures with deterministic
+// requirement realizability evidence. V1/V2 frozen artifacts continue to use
+// Observe and PolicyVersion unchanged.
+func ObserveRealizabilityAware(
+	meta CaseMeta,
+	requirement opentopologysynthesis.Requirement,
+	run opentopologysynthesis.SynthesisRun,
+	promotion *opentopologysynthesis.PhysicalPromotionResult,
+) (CaseEvidence, error) {
+	evidence, err := Observe(meta, requirement, run, promotion)
+	if err != nil {
+		return CaseEvidence{}, err
+	}
+	if topologyFailureCanBeRefined(evidence, run) {
+		assessment := opentopologysynthesis.AssessRequirementRealizability(requirement)
+		if len(assessment.Issues) != 0 {
+			return CaseEvidence{}, fmt.Errorf("case %q realizability assessment rejected validated requirement", meta.ID)
+		}
+		if gaps := realizabilityFindingGaps(assessment.Findings, evidence.Gaps, run.Hash); len(gaps) != 0 {
+			evidence.Gaps = normalizeGaps(gaps)
+		}
+	}
+	evidence.PolicyVersion = RealizabilityPolicyVersion
+	evidence.Hash = ""
+	evidence.Hash, err = caseEvidenceHash(evidence)
+	if err != nil {
+		return CaseEvidence{}, err
+	}
+	if err := ValidateCaseEvidence(evidence); err != nil {
+		return CaseEvidence{}, fmt.Errorf("case %q produced invalid realizability-aware evidence: %w", meta.ID, err)
+	}
+	return evidence, nil
+}
+
+func topologyFailureCanBeRefined(evidence CaseEvidence, run opentopologysynthesis.SynthesisRun) bool {
+	if run.Report.StopReason != opentopologysynthesis.StopSearchExhausted &&
+		run.Report.StopReason != opentopologysynthesis.StopNoCompleteGraph {
+		return false
+	}
+	if len(evidence.Gaps) == 0 {
+		return false
+	}
+	for _, gap := range evidence.Gaps {
+		if gap.Stage != "topology_search" || gap.Scope != ScopeTopology || gap.Capability != "complete_topology" {
+			return false
+		}
+	}
+	return true
+}
+
+func realizabilityFindingGaps(
+	findings []opentopologysynthesis.RequirementRealizabilityFinding,
+	terminal []Gap,
+	evidenceHash string,
+) []Gap {
+	symptoms := make([]string, 0, len(terminal))
+	for _, gap := range terminal {
+		symptoms = append(symptoms, gap.Code)
+	}
+	gaps := make([]Gap, 0, len(findings))
+	for _, finding := range findings {
+		capability := ""
+		switch finding.Code {
+		case opentopologysynthesis.CodeEnergyDomainCreationRequired:
+			capability = "energy_domain_creation"
+		case opentopologysynthesis.CodeMultiOutputCompositionRequired,
+			opentopologysynthesis.CodeMultiControlCompositionRequired:
+			capability = "multi_obligation_composition"
+		default:
+			continue
+		}
+		gaps = append(gaps, Gap{
+			Stage: "requirement_realizability", Scope: ScopeTopology,
+			Capability: capability, Code: string(finding.Code),
+			RequirementIDs: finding.RequirementIDs, OperatingCases: finding.OperatingCases,
+			AnalysisKinds:    finding.AnalysisKinds,
+			RequiredEvidence: requiredEvidence(ScopeTopology, capability),
+			EvidenceHashes:   []string{evidenceHash}, DownstreamSymptoms: symptoms,
+		})
+	}
+	return gaps
+}
+
 func validateSynthesisEnvelope(run opentopologysynthesis.SynthesisRun) error {
 	if !validSHA256(run.Report.PolicyHash) || !validSHA256(run.Report.RequirementHash) ||
 		!validSHA256(run.Report.PrimitiveInventoryHash) || !validSHA256(run.Report.CatalogHash) ||

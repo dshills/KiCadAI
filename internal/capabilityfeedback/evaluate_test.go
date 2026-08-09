@@ -96,6 +96,49 @@ func TestEvaluateRejectsImpactCyclesAndEvidenceDrift(t *testing.T) {
 	}
 }
 
+func TestEvaluateRealizabilityAwareSeparatesPreviouslyConflatedTopologyGaps(t *testing.T) {
+	energy := feedbackSealedCaseForPolicy(
+		t, RealizabilityPolicyVersion, "case-energy", RoleDiscovery,
+		capabilityevaluation.DomainAnalog, capabilityevaluation.SafetyRelevant,
+		[]string{"dc_operating_point"},
+		Gap{
+			Stage: "requirement_realizability", Scope: ScopeTopology,
+			Capability: "energy_domain_creation", Code: "OPEN_TOPOLOGY_ENERGY_DOMAIN_CREATION_REQUIRED",
+			RequiredEvidence: requiredEvidence(ScopeTopology, "energy_domain_creation"),
+			EvidenceHashes:   []string{feedbackHash("energy")},
+		},
+	)
+	composition := feedbackSealedCaseForPolicy(
+		t, RealizabilityPolicyVersion, "case-composition", RoleDiscovery,
+		capabilityevaluation.DomainMixedSignal, capabilityevaluation.SafetyReviewRequired,
+		[]string{"dc_sweep", "transient"},
+		Gap{
+			Stage: "requirement_realizability", Scope: ScopeTopology,
+			Capability: "multi_obligation_composition", Code: "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+			RequiredEvidence: requiredEvidence(ScopeTopology, "multi_obligation_composition"),
+			EvidenceHashes:   []string{feedbackHash("composition")},
+		},
+	)
+	registry := capabilityevaluation.ImpactRegistry{Version: "realizability-test-v1", Records: []capabilityevaluation.ImpactRecord{
+		{Capability: "energy_domain_creation", Consumers: []string{"passing_behavioral_evidence"}},
+		{Capability: "multi_obligation_composition", Consumers: []string{"passing_behavioral_evidence"}},
+	}}
+	report, err := EvaluateRealizabilityAware(RoleDiscovery, []CaseEvidence{composition, energy}, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.PolicyVersion != RealizabilityPolicyVersion || len(report.Clusters) != 2 ||
+		report.Clusters[0].Capability == report.Clusters[1].Capability {
+		t.Fatalf("realizability clusters = %#v", report.Clusters)
+	}
+	if _, err := Evaluate(RoleDiscovery, []CaseEvidence{energy}, registry); err == nil {
+		t.Fatal("legacy evaluator accepted realizability-policy evidence")
+	}
+	if err := ValidateAggregateReport(report, registry); err != nil {
+		t.Fatalf("realizability aggregate did not reproduce: %v", err)
+	}
+}
+
 func feedbackSealedCase(
 	t *testing.T,
 	id string,
@@ -105,9 +148,22 @@ func feedbackSealedCase(
 	analyses []string,
 	gap Gap,
 ) CaseEvidence {
+	return feedbackSealedCaseForPolicy(t, PolicyVersion, id, role, domain, safety, analyses, gap)
+}
+
+func feedbackSealedCaseForPolicy(
+	t *testing.T,
+	policyVersion string,
+	id string,
+	role CorpusRole,
+	domain capabilityevaluation.Domain,
+	safety capabilityevaluation.SafetyImpact,
+	analyses []string,
+	gap Gap,
+) CaseEvidence {
 	t.Helper()
 	current := CaseEvidence{
-		Schema: CaseEvidenceSchema, PolicyVersion: PolicyVersion,
+		Schema: CaseEvidenceSchema, PolicyVersion: policyVersion,
 		Case:    CaseMeta{ID: id, Role: role, Domain: domain, SafetyImpact: safety},
 		Outcome: OutcomeUnsupported, StopReason: "model_unavailable",
 		RequirementHash: feedbackHash(id + "-requirement"), InventoryHash: feedbackHash("inventory"),

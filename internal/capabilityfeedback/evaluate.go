@@ -26,6 +26,24 @@ func Evaluate(
 	cases []CaseEvidence,
 	registry capabilityevaluation.ImpactRegistry,
 ) (AggregateReport, error) {
+	return evaluateWithPolicy(PolicyVersion, role, cases, registry)
+}
+
+// EvaluateRealizabilityAware aggregates only v2 realizability-aware evidence.
+func EvaluateRealizabilityAware(
+	role CorpusRole,
+	cases []CaseEvidence,
+	registry capabilityevaluation.ImpactRegistry,
+) (AggregateReport, error) {
+	return evaluateWithPolicy(RealizabilityPolicyVersion, role, cases, registry)
+}
+
+func evaluateWithPolicy(
+	policyVersion string,
+	role CorpusRole,
+	cases []CaseEvidence,
+	registry capabilityevaluation.ImpactRegistry,
+) (AggregateReport, error) {
 	if role != RoleDiscovery && role != RoleHeldOut {
 		return AggregateReport{}, fmt.Errorf("unsupported corpus role %q", role)
 	}
@@ -43,6 +61,9 @@ func Evaluate(
 		if current.Case.Role != role {
 			return AggregateReport{}, fmt.Errorf("case %q role %q does not match report role %q", current.Case.ID, current.Case.Role, role)
 		}
+		if current.PolicyVersion != policyVersion {
+			return AggregateReport{}, fmt.Errorf("case %q policy %q does not match report policy %q", current.Case.ID, current.PolicyVersion, policyVersion)
+		}
 		if index > 0 && normalizedCases[index-1].Case.ID == current.Case.ID {
 			return AggregateReport{}, fmt.Errorf("duplicate case %q", current.Case.ID)
 		}
@@ -54,7 +75,7 @@ func Evaluate(
 		}
 	}
 	report := AggregateReport{
-		Schema: AggregateSchema, PolicyVersion: PolicyVersion, RankingPolicy: RankingPolicy,
+		Schema: AggregateSchema, PolicyVersion: policyVersion, RankingPolicy: RankingPolicy,
 		CorpusRole: role, ImpactRegistryHash: registryHash, CaseCount: len(normalizedCases), Cases: normalizedCases,
 	}
 	if role == RoleHeldOut {
@@ -129,7 +150,7 @@ func Evaluate(
 }
 
 func BuildRankOneExpansionPlan(report AggregateReport) (capabilityexpansion.ExpansionPlan, error) {
-	if report.Schema != AggregateSchema || report.PolicyVersion != PolicyVersion ||
+	if report.Schema != AggregateSchema || !supportedPolicyVersion(report.PolicyVersion) ||
 		report.CorpusRole != RoleDiscovery || len(report.Clusters) == 0 || report.Clusters[0].Rank != 1 {
 		return capabilityexpansion.ExpansionPlan{}, fmt.Errorf("rank-1 expansion requires a valid discovery report")
 	}

@@ -20,6 +20,14 @@ clean-checkout promotion bundles remain current preservation evidence.
 Focused V2 frozen-baseline, sealed-held-out-commitment, and specification
 contract checks were reproduced locally on 2026-08-09.
 
+The behavioral-contract feasibility and realizability prerequisite is now
+implemented behind a versioned capability-feedback policy. It conservatively
+separates direct-domain topology failures from energy-domain creation,
+multi-output composition, and converging multi-control obligations without
+changing frozen policy-v1 evidence or legacy synthesis behavior. Public
+boundary, deterministic replay, versioned clustering, and broad local
+preservation tests pass. See the [completion audit](../specs/behavioral-contract-feasibility-realizability/AUDIT.md).
+
 The independently frozen multi-stage out-of-distribution corpus now closes the
 next bounded generalization step. Eight unfamiliar behavior-only combinations
 of sensing, decision, feedback, nonlinear transfer, switching power, and
@@ -38,7 +46,9 @@ held-out evidence was decrypted. V2 is closed fail-closed and its sealed
 held-out set is retired. The next prerequisite is a generic
 behavioral-contract feasibility and realizability gate that separates
 impossible or energy-domain-creating requirements from single-topology and
-multi-obligation composition gaps before a fresh V3 corpus is authored. See
+multi-obligation composition gaps before a fresh V3 corpus is authored. That
+gate is now complete; the next action is the independently isolated V3 corpus
+and baseline. See
 the [V2 validation audit](../specs/closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
 
 The scheduler removes the immediate evaluation-scaling bottleneck without

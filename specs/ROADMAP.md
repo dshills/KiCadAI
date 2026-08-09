@@ -83,8 +83,9 @@ from validation feedback to safe automatic repair.
   pass. V2 selected complete-topology search but its generic candidate produced
   zero discovery uplift, so the candidate was removed before held-out
   decryption and the sealed V2 held-out set was retired. Completion is not
-  claimed. The next prerequisite is behavioral-contract feasibility and
-  realizability classification before a fresh V3 experiment. See the V1
+  claimed. Behavioral-contract feasibility and realizability classification is
+  now complete under a versioned policy; the next step is a fresh independently
+  authored V3 experiment. See the V1
   [validation audit](closed-loop-open-set-capability-expansion/V1_VALIDATION_AUDIT.md)
   and [V2 validation audit](closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,

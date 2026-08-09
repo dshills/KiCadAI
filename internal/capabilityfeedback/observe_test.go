@@ -63,6 +63,49 @@ func TestObserveClassifiesAuthoritativeTerminalOutcomes(t *testing.T) {
 	}
 }
 
+func TestObserveRealizabilityAwareRefinesOnlyGenericTopologyFailure(t *testing.T) {
+	requirement := feedbackTestRequirement(t)
+	minimum := 5.0
+	assertion := &requirement.Requirements.BehavioralRequirements[0]
+	assertion.Metric = "output_high_voltage"
+	assertion.Analysis = "dc_operating_point"
+	assertion.Excitation = nil
+	assertion.Min, assertion.Max, assertion.Unit = &minimum, nil, "V"
+	run := feedbackTestRun(t, requirement, opentopologysynthesis.StatusExhausted, opentopologysynthesis.StopNoCompleteGraph)
+	run.Report.Consumption.BudgetExhausted = true
+	run.Report.Diagnostics = []opentopologysynthesis.Diagnostic{{Code: opentopologysynthesis.CodeNoCompleteGraph, Path: "search"}}
+	meta := CaseMeta{ID: "case-realizability", Role: RoleDiscovery, Domain: capabilityevaluation.DomainAnalog, SafetyImpact: capabilityevaluation.SafetyRelevant}
+
+	legacy, err := Observe(meta, requirement, run, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.PolicyVersion != PolicyVersion || len(legacy.Gaps) != 1 || legacy.Gaps[0].Capability != "complete_topology" {
+		t.Fatalf("legacy observation drifted: %#v", legacy)
+	}
+	first, err := ObserveRealizabilityAware(meta, requirement, run, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := ObserveRealizabilityAware(meta, requirement, run, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.PolicyVersion != RealizabilityPolicyVersion || first.Hash == legacy.Hash || !reflect.DeepEqual(first, second) ||
+		len(first.Gaps) != 1 || first.Gaps[0].Capability != "energy_domain_creation" ||
+		first.Gaps[0].Code != string(opentopologysynthesis.CodeEnergyDomainCreationRequired) ||
+		!reflect.DeepEqual(first.Gaps[0].DownstreamSymptoms, []string{string(opentopologysynthesis.CodeNoCompleteGraph)}) {
+		t.Fatalf("realizability-aware observation = %#v", first)
+	}
+
+	modelFailure := feedbackTestRun(t, requirement, opentopologysynthesis.StatusUnsupported, opentopologysynthesis.StopModelUnavailable)
+	modelFailure.Report.Diagnostics = []opentopologysynthesis.Diagnostic{{Code: opentopologysynthesis.CodeModelUnavailable, Path: "simulation"}}
+	preserved, err := ObserveRealizabilityAware(meta, requirement, modelFailure, nil)
+	if err != nil || len(preserved.Gaps) != 1 || preserved.Gaps[0].Capability != "trusted_simulation_model" {
+		t.Fatalf("stronger model root was replaced: %#v err=%v", preserved, err)
+	}
+}
+
 func TestObserveValidatesSeparateTopologyAndFullGraphHashes(t *testing.T) {
 	requirement := feedbackTestRequirement(t)
 	run := feedbackTestRun(t, requirement, opentopologysynthesis.StatusPassed, opentopologysynthesis.StopPassed)

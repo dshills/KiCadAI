@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	CaseEvidenceSchema = "kicadai.closed-loop-capability-case.v1"
-	AggregateSchema    = "kicadai.closed-loop-capability-report.v1"
-	PolicyVersion      = "closed-loop-capability-policy-v1"
-	RankingPolicy      = "case_count,domain_count,analysis_count,safety_score,reuse_score,capability,key"
+	CaseEvidenceSchema         = "kicadai.closed-loop-capability-case.v1"
+	AggregateSchema            = "kicadai.closed-loop-capability-report.v1"
+	PolicyVersion              = "closed-loop-capability-policy-v1"
+	RealizabilityPolicyVersion = "closed-loop-capability-policy-v2-realizability"
+	RankingPolicy              = "case_count,domain_count,analysis_count,safety_score,reuse_score,capability,key"
 )
 
 type CorpusRole string

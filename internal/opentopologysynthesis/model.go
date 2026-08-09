@@ -26,18 +26,21 @@ const (
 )
 
 const (
-	CodeRequirementInvalid      reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INVALID"
-	CodeRequirementInfeasible   reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INFEASIBLE"
-	CodePrimitiveUnavailable    reports.Code = "OPEN_TOPOLOGY_PRIMITIVE_UNAVAILABLE"
-	CodeModelUnavailable        reports.Code = "OPEN_TOPOLOGY_MODEL_UNAVAILABLE"
-	CodeSearchExhausted         reports.Code = "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
-	CodeNoCompleteGraph         reports.Code = "OPEN_TOPOLOGY_NO_COMPLETE_GRAPH"
-	CodeNoPassingGraph          reports.Code = "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
-	CodeValueExhausted          reports.Code = "OPEN_TOPOLOGY_VALUE_EXHAUSTED"
-	CodeRepairUnsupported       reports.Code = "OPEN_TOPOLOGY_REPAIR_UNSUPPORTED"
-	CodeRepairExhausted         reports.Code = "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
-	CodeCanceled                reports.Code = "OPEN_TOPOLOGY_CANCELED"
-	CodePhysicalPromotionFailed reports.Code = "OPEN_TOPOLOGY_PHYSICAL_PROMOTION_FAILED"
+	CodeRequirementInvalid              reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INVALID"
+	CodeRequirementInfeasible           reports.Code = "OPEN_TOPOLOGY_REQUIREMENT_INFEASIBLE"
+	CodePrimitiveUnavailable            reports.Code = "OPEN_TOPOLOGY_PRIMITIVE_UNAVAILABLE"
+	CodeModelUnavailable                reports.Code = "OPEN_TOPOLOGY_MODEL_UNAVAILABLE"
+	CodeSearchExhausted                 reports.Code = "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+	CodeNoCompleteGraph                 reports.Code = "OPEN_TOPOLOGY_NO_COMPLETE_GRAPH"
+	CodeNoPassingGraph                  reports.Code = "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+	CodeValueExhausted                  reports.Code = "OPEN_TOPOLOGY_VALUE_EXHAUSTED"
+	CodeRepairUnsupported               reports.Code = "OPEN_TOPOLOGY_REPAIR_UNSUPPORTED"
+	CodeRepairExhausted                 reports.Code = "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+	CodeCanceled                        reports.Code = "OPEN_TOPOLOGY_CANCELED"
+	CodePhysicalPromotionFailed         reports.Code = "OPEN_TOPOLOGY_PHYSICAL_PROMOTION_FAILED"
+	CodeEnergyDomainCreationRequired    reports.Code = "OPEN_TOPOLOGY_ENERGY_DOMAIN_CREATION_REQUIRED"
+	CodeMultiOutputCompositionRequired  reports.Code = "OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED"
+	CodeMultiControlCompositionRequired reports.Code = "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED"
 )
 
 type Requirement struct {
