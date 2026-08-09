@@ -1,0 +1,227 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "request_005",
+    "title": "Dual-condition permission logic",
+    "description": "Assert a permission output only while both external conditions are valid, with defined inactive startup and bounded decision delay."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "ground",
+        "kind": "reference",
+        "nominal_voltage_v": 0,
+        "source": "external"
+      },
+      {
+        "id": "supply",
+        "kind": "supply",
+        "min_voltage_v": 4.5,
+        "nominal_voltage_v": 5,
+        "max_voltage_v": 5.5,
+        "max_current_a": 0.03,
+        "source": "external"
+      }
+    ],
+    "ports": [
+      {
+        "id": "condition_a",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.001,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "condition_b",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.001,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "ground",
+        "kind": "reference",
+        "direction": "bidirectional",
+        "domain": "ground",
+        "electrical": {}
+      },
+      {
+        "id": "permission",
+        "kind": "digital",
+        "direction": "source",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.01
+        }
+      },
+      {
+        "id": "power",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "supply",
+        "electrical": {}
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "both_valid",
+        "conditions": [
+          {
+            "axis": "supply_voltage",
+            "target": "supply",
+            "min": 4.5,
+            "max": 5.5,
+            "unit": "V"
+          }
+        ],
+        "events": [
+          {
+            "id": "a_valid",
+            "kind": "input_step",
+            "target": "condition_a",
+            "trigger_time_s": 0.001,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          },
+          {
+            "id": "b_valid",
+            "kind": "input_step",
+            "target": "condition_b",
+            "trigger_time_s": 0.002,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          }
+        ]
+      },
+      {
+        "id": "condition_lost",
+        "conditions": [
+          {
+            "axis": "ambient_temperature",
+            "target": "permission",
+            "min": -20,
+            "max": 70,
+            "unit": "degC"
+          }
+        ],
+        "events": [
+          {
+            "id": "a_lost",
+            "kind": "input_step",
+            "target": "condition_a",
+            "trigger_time_s": 0.003,
+            "initial": 5,
+            "applied": 0,
+            "unit": "V"
+          }
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "active_high",
+        "metric": "output_high_voltage",
+        "analysis": "dc_operating_point",
+        "observation": {
+          "kind": "port",
+          "id": "permission"
+        },
+        "min": 4.3,
+        "unit": "V",
+        "operating_cases": [
+          "both_valid"
+        ],
+        "critical": true
+      },
+      {
+        "id": "decision_delay",
+        "metric": "propagation_delay",
+        "analysis": "transient",
+        "excitation": {
+          "kind": "port",
+          "id": "condition_a"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "permission"
+        },
+        "max": 0.00002,
+        "unit": "s",
+        "operating_cases": [
+          "both_valid",
+          "condition_lost"
+        ],
+        "critical": true
+      },
+      {
+        "id": "inactive_low",
+        "metric": "output_low_voltage",
+        "analysis": "dc_operating_point",
+        "observation": {
+          "kind": "port",
+          "id": "permission"
+        },
+        "max": 0.3,
+        "unit": "V",
+        "operating_cases": [
+          "condition_lost"
+        ],
+        "critical": true
+      },
+      {
+        "id": "startup_state",
+        "metric": "startup_output_voltage",
+        "analysis": "startup",
+        "observation": {
+          "kind": "port",
+          "id": "permission"
+        },
+        "max": 0.3,
+        "unit": "V",
+        "operating_cases": [
+          "both_valid"
+        ],
+        "critical": true
+      }
+    ],
+    "constraints": {
+      "max_components": 32,
+      "max_width_mm": 80,
+      "max_height_mm": 60
+    }
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "request_003",
+    "title": "Efficient low-voltage power delivery",
+    "description": "Maintain a low-voltage output across line and load variation with bounded ripple, startup current, temperature, and fault stress."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "ground",
+        "kind": "reference",
+        "nominal_voltage_v": 0,
+        "source": "external"
+      },
+      {
+        "id": "supply",
+        "kind": "supply",
+        "min_voltage_v": 18,
+        "nominal_voltage_v": 24,
+        "max_voltage_v": 30,
+        "max_current_a": 2,
+        "source": "external"
+      }
+    ],
+    "ports": [
+      {
+        "id": "enable",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0,
+          "max_voltage_v": 5,
+          "max_current_a": 0.001,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "ground",
+        "kind": "reference",
+        "direction": "bidirectional",
+        "domain": "ground",
+        "electrical": {}
+      },
+      {
+        "id": "power",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "supply",
+        "electrical": {}
+      },
+      {
+        "id": "regulated_output",
+        "kind": "power",
+        "direction": "source",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 5,
+          "max_voltage_v": 5.6,
+          "max_current_a": 1
+        }
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "fault",
+        "conditions": [
+          {
+            "axis": "supply_voltage",
+            "target": "supply",
+            "min": 24,
+            "max": 24,
+            "unit": "V"
+          }
+        ],
+        "events": [
+          {
+            "id": "output_short",
+            "kind": "short_circuit",
+            "target": "regulated_output",
+            "trigger_time_s": 0.004,
+            "initial": 5,
+            "applied": 0,
+            "unit": "V"
+          }
+        ]
+      },
+      {
+        "id": "line_load",
+        "conditions": [
+          {
+            "axis": "ambient_temperature",
+            "target": "regulated_output",
+            "min": 0,
+            "max": 55,
+            "unit": "degC"
+          },
+          {
+            "axis": "load_current",
+            "target": "regulated_output",
+            "min": 0.1,
+            "max": 1,
+            "unit": "A"
+          },
+          {
+            "axis": "supply_voltage",
+            "target": "supply",
+            "min": 18,
+            "max": 30,
+            "unit": "V"
+          }
+        ]
+      },
+      {
+        "id": "startup",
+        "conditions": [
+          {
+            "axis": "load_resistance",
+            "target": "regulated_output",
+            "min": 5,
+            "max": 50,
+            "unit": "ohm"
+          }
+        ],
+        "events": [
+          {
+            "id": "enable_rise",
+            "kind": "input_step",
+            "target": "enable",
+            "trigger_time_s": 0.001,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          }
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "area_margin",
+        "metric": "soa_margin",
+        "analysis": "electrothermal",
+        "observation": {
+          "kind": "circuit",
+          "id": "minimum_soa_margin"
+        },
+        "min": 1.35,
+        "unit": "ratio",
+        "operating_cases": [
+          "fault",
+          "line_load"
+        ],
+        "critical": true
+      },
+      {
+        "id": "efficiency",
+        "metric": "conversion_efficiency",
+        "analysis": "transient",
+        "observation": {
+          "kind": "port",
+          "id": "regulated_output"
+        },
+        "min": 82,
+        "unit": "%",
+        "operating_cases": [
+          "line_load"
+        ]
+      },
+      {
+        "id": "fault_peak",
+        "metric": "peak_current",
+        "analysis": "transient",
+        "observation": {
+          "kind": "port",
+          "id": "regulated_output"
+        },
+        "max": 1.5,
+        "unit": "A",
+        "operating_cases": [
+          "fault"
+        ],
+        "critical": true
+      },
+      {
+        "id": "ripple",
+        "metric": "output_ripple",
+        "analysis": "transient",
+        "observation": {
+          "kind": "port",
+          "id": "regulated_output"
+        },
+        "max": 0.05,
+        "unit": "V",
+        "operating_cases": [
+          "line_load"
+        ]
+      },
+      {
+        "id": "startup_current",
+        "metric": "startup_current",
+        "analysis": "startup",
+        "observation": {
+          "kind": "port",
+          "id": "power"
+        },
+        "max": 2,
+        "unit": "A",
+        "operating_cases": [
+          "startup"
+        ],
+        "critical": true
+      },
+      {
+        "id": "thermal",
+        "metric": "junction_temperature",
+        "analysis": "electrothermal",
+        "observation": {
+          "kind": "circuit",
+          "id": "maximum_junction_temperature"
+        },
+        "max": 120,
+        "unit": "degC",
+        "operating_cases": [
+          "fault",
+          "line_load"
+        ],
+        "critical": true
+      },
+      {
+        "id": "voltage",
+        "metric": "output_voltage",
+        "analysis": "dc_operating_point",
+        "observation": {
+          "kind": "port",
+          "id": "regulated_output"
+        },
+        "min": 4.9,
+        "max": 5.1,
+        "unit": "V",
+        "operating_cases": [
+          "line_load"
+        ],
+        "critical": true
+      }
+    ],
+    "constraints": {
+      "max_components": 32,
+      "max_width_mm": 80,
+      "max_height_mm": 60
+    }
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

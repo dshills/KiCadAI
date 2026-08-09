@@ -1,0 +1,273 @@
+{
+  "schema": "kicadai.closed-loop-open-set-corpus.v1",
+  "version": 1,
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "evaluator_policy": "closed-loop-capability-policy-v1",
+  "impact_registry": {
+    "version": "closed-loop-open-set-impact-v1",
+    "records": [
+      {
+        "capability": "primitive_inventory",
+        "consumers": [
+          "catalog_value_domain",
+          "physical_realization",
+          "trusted_simulation_model"
+        ]
+      },
+      {
+        "capability": "complete_topology",
+        "consumers": [
+          "passing_behavioral_evidence",
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "catalog_value_domain",
+        "consumers": [
+          "passing_behavioral_evidence",
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "trusted_simulation_model",
+        "consumers": [
+          "passing_behavioral_evidence"
+        ]
+      },
+      {
+        "capability": "passing_behavioral_evidence",
+        "consumers": [
+          "physical_realization"
+        ]
+      },
+      {
+        "capability": "physical_realization",
+        "consumers": [
+          "route_completion"
+        ]
+      },
+      {
+        "capability": "route_completion",
+        "consumers": [
+          "installed_kicad_verification",
+          "round_trip_fidelity"
+        ]
+      }
+    ]
+  },
+  "impact_registry_hash": "07cdad8298dfcec17fa56f46094cddbb0033f0b809868cfe720ca40663d5cffd",
+  "synthesis_policy": {
+    "max_expanded_states": 20000,
+    "max_generated_graphs": 50000,
+    "max_primitive_instances": 32,
+    "max_internal_nodes": 32,
+    "max_candidate_simulations": 50000,
+    "max_corner_evaluations": 65536,
+    "max_value_trials": 4096,
+    "max_topology_repairs": 128,
+    "max_retained_candidates": 16,
+    "max_diagnostic_samples": 32
+  },
+  "synthesis_policy_hash": "845eac6effae6f369bdf7a3eb1832ca37e3db248f2d454687b58f3d3c129274a",
+  "environment": {
+    "go_minimum": "1.23",
+    "kicad": "10.0.3",
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "independent_authoring": "Behavior-only electrical requirements were authored from public interface and analysis vocabulary before production outcomes were observed; no expected implementation or outcome was supplied.",
+  "entries": [
+    {
+      "id": "case_001",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "requirement_file": "discovery/request_001.json",
+      "requirement_sha256": "300bff9b4fb7fc3918743617f2c26602943aa07d055d559d17e128c47de7c930"
+    },
+    {
+      "id": "case_002",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "requirement_file": "discovery/request_002.json",
+      "requirement_sha256": "61c884ff8944c3d82f10cbfa4616cfbf11b644c2289e77589f7ad1abf6ec0b4c"
+    },
+    {
+      "id": "case_003",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "requirement_file": "discovery/request_003.json",
+      "requirement_sha256": "6f79ec89a0facd73f3e424adf9e17007ae1caf948c6d2d1120d53328662e07b0"
+    },
+    {
+      "id": "case_004",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "requirement_file": "discovery/request_004.json",
+      "requirement_sha256": "99679ddef01882d634af7c4e7c7839f47e831071b06dc3c3f956d0c621f02c16"
+    },
+    {
+      "id": "case_005",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "discovery/request_005.json",
+      "requirement_sha256": "095ab2e1a9bc6b4e3e73ab6b8424753eb616061335f5995ce3c22cb02bba6a5d"
+    },
+    {
+      "id": "case_006",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "requirement_file": "discovery/request_006.json",
+      "requirement_sha256": "8c387a412ca6a2921ac4d65bc4e6e748bf67f8e6455ee2e644ac2843183b6ec8"
+    },
+    {
+      "id": "case_007",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "non_safety",
+      "requirement_file": "discovery/request_007.json",
+      "requirement_sha256": "c9e1b4ae3bf8adeb5597eabcdbcb18b36804b9615ed718a91bb7d1d21f3ec8b7"
+    },
+    {
+      "id": "case_008",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "requirement_file": "discovery/request_008.json",
+      "requirement_sha256": "663c194ddd1d18ea680d430f612647396c3f2cbb043408c264f704ced9f082cd"
+    },
+    {
+      "id": "case_009",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "requirement_file": "discovery/request_009.json",
+      "requirement_sha256": "682e1f3136c532493dfce1b416c0fa9f39b356663b226cd3dcd096456c03c0ba"
+    },
+    {
+      "id": "case_010",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "discovery/request_010.json",
+      "requirement_sha256": "f365dfe3ee651a81a716ddbc35619d2342d2ab523391c47c858ca5682ba619f8"
+    },
+    {
+      "id": "case_011",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "requirement_file": "discovery/request_011.json",
+      "requirement_sha256": "af6e08bf1ba00f93edb6f840d6b4d1a9a87144907d54b75e25075f5587f25eb1"
+    },
+    {
+      "id": "case_012",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "requirement_file": "discovery/request_012.json",
+      "requirement_sha256": "eae8c8207d503ba6633aeab64f1df3bf30d8aff41fb67ca1736a2097ee093142"
+    },
+    {
+      "id": "case_013",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "non_safety",
+      "requirement_file": "held_out/request_013.json",
+      "requirement_sha256": "fae235e12ada4bd7679da5d845d3951ae9fa92d23b5efdae8c72da44c5e3ff8d"
+    },
+    {
+      "id": "case_014",
+      "role": "held_out",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "requirement_file": "held_out/request_014.json",
+      "requirement_sha256": "798b3cfb9e5c63cb1ebba5037e421da45e7c65650df447b75c96d8f9899b0343"
+    },
+    {
+      "id": "case_015",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "requirement_file": "held_out/request_015.json",
+      "requirement_sha256": "44c47483ea8e57d04a72f75781a4fba40f62d19ce5172b736d1c3d5229b01978"
+    },
+    {
+      "id": "case_016",
+      "role": "held_out",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "requirement_file": "held_out/request_016.json",
+      "requirement_sha256": "896f2d62c2877008c3fd2d6af072ba6db8a459981029445ad93d2c68365a2289"
+    },
+    {
+      "id": "case_017",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "held_out/request_017.json",
+      "requirement_sha256": "7fc30a8727948bb37f0899736ff54bac724f0945d8811e3bdfa614a8e40f1863"
+    },
+    {
+      "id": "case_018",
+      "role": "held_out",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "held_out/request_018.json",
+      "requirement_sha256": "6fc6a3e823d85648d2b5e5e7e623384ad0131b38aac7aebde67cf7f4f84f158b"
+    },
+    {
+      "id": "case_019",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "held_out/request_019.json",
+      "requirement_sha256": "ba1dfc175d0d8411f538916909775fadcbfaa847ee39c94343730c022ca558b1"
+    },
+    {
+      "id": "case_020",
+      "role": "held_out",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "requirement_file": "held_out/request_020.json",
+      "requirement_sha256": "e7523c30a89bdbd92543fb3ce5a149ee759792821aa976678c4643a65f126b21"
+    },
+    {
+      "id": "case_021",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "requirement_file": "held_out/request_021.json",
+      "requirement_sha256": "bec2a4b0cd998244efb40e2881a99ea6096c79c0c1ab990059b28b405c3db248"
+    },
+    {
+      "id": "case_022",
+      "role": "held_out",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "requirement_file": "held_out/request_022.json",
+      "requirement_sha256": "e02726f69ed8e4dfbfbc488def0020078910fb4406f90ddcbe2a1a966e471935"
+    },
+    {
+      "id": "case_023",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "requirement_file": "held_out/request_023.json",
+      "requirement_sha256": "bc00064f3c3411da1d7c5837edd8d3ff0307a1f0c89896245c7561fcee4c502f"
+    },
+    {
+      "id": "case_024",
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "requirement_file": "held_out/request_024.json",
+      "requirement_sha256": "b43bac35c309f31f4377da7bea39b16b942b5149150e5e5dc94c8e2a5435c7e5"
+    }
+  ]
+}

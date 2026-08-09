@@ -1,0 +1,223 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "request_018",
+    "title": "Inhibitable pulse restoration",
+    "description": "Restore externally timed pulses when permitted, hold a safe inactive level otherwise, and bound delay and transition time."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "ground",
+        "kind": "reference",
+        "nominal_voltage_v": 0,
+        "source": "external"
+      },
+      {
+        "id": "supply",
+        "kind": "supply",
+        "min_voltage_v": 4.5,
+        "nominal_voltage_v": 5,
+        "max_voltage_v": 5.5,
+        "max_current_a": 0.05,
+        "source": "external"
+      }
+    ],
+    "ports": [
+      {
+        "id": "ground",
+        "kind": "reference",
+        "direction": "bidirectional",
+        "domain": "ground",
+        "electrical": {}
+      },
+      {
+        "id": "inhibit",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.001,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "power",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "supply",
+        "electrical": {}
+      },
+      {
+        "id": "pulse_input",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 2.5,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.001,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "pulse_output",
+        "kind": "digital",
+        "direction": "source",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 2.5,
+          "max_voltage_v": 5.5,
+          "max_current_a": 0.01
+        }
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "inhibited",
+        "conditions": [
+          {
+            "axis": "supply_voltage",
+            "target": "supply",
+            "min": 4.5,
+            "max": 5.5,
+            "unit": "V"
+          }
+        ],
+        "events": [
+          {
+            "id": "inhibit_rise",
+            "kind": "input_step",
+            "target": "inhibit",
+            "trigger_time_s": 0.001,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          }
+        ]
+      },
+      {
+        "id": "permitted_pulse",
+        "conditions": [
+          {
+            "axis": "load_capacitance",
+            "target": "pulse_output",
+            "min": 0,
+            "max": 5e-10,
+            "unit": "F"
+          }
+        ],
+        "events": [
+          {
+            "id": "pulse_rise",
+            "kind": "input_step",
+            "target": "pulse_input",
+            "trigger_time_s": 0.001,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          }
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "delay",
+        "metric": "propagation_delay",
+        "analysis": "transient",
+        "excitation": {
+          "kind": "port",
+          "id": "pulse_input"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "pulse_output"
+        },
+        "max": 2e-7,
+        "unit": "s",
+        "operating_cases": [
+          "permitted_pulse"
+        ],
+        "critical": true
+      },
+      {
+        "id": "high",
+        "metric": "output_high_voltage",
+        "analysis": "dc_operating_point",
+        "observation": {
+          "kind": "port",
+          "id": "pulse_output"
+        },
+        "min": 4.3,
+        "unit": "V",
+        "operating_cases": [
+          "permitted_pulse"
+        ]
+      },
+      {
+        "id": "inactive",
+        "metric": "output_low_voltage",
+        "analysis": "dc_operating_point",
+        "excitation": {
+          "kind": "port",
+          "id": "inhibit"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "pulse_output"
+        },
+        "max": 0.3,
+        "unit": "V",
+        "operating_cases": [
+          "inhibited"
+        ],
+        "critical": true
+      },
+      {
+        "id": "rise",
+        "metric": "rise_time",
+        "analysis": "transient",
+        "excitation": {
+          "kind": "port",
+          "id": "pulse_input"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "pulse_output"
+        },
+        "max": 1e-7,
+        "unit": "s",
+        "operating_cases": [
+          "permitted_pulse"
+        ]
+      }
+    ],
+    "constraints": {
+      "max_components": 32,
+      "max_width_mm": 80,
+      "max_height_mm": 60
+    }
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}
