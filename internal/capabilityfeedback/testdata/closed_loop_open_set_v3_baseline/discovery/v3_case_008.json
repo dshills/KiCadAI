@@ -1,0 +1,62 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v3_case_008",
+    "role": "discovery",
+    "domain": "mcu",
+    "safety_impact": "review_required"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "no_passing_graph",
+  "requirement_hash": "7c7c385116db5b037ba7c1401e8bbb74760a63812bb893cc6c7866b935d5c560",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "131d0283fa2a2685c8d5e5650e6f4304df7c32bd95f7d50c1a16b4763cf2f395",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "thermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 24,
+    "generated_graphs": 175,
+    "complete_graphs": 8,
+    "candidate_simulations": 32,
+    "corner_evaluations": 32,
+    "value_trials": 32,
+    "topology_repairs": 0,
+    "maximum_frontier": 29,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_operating_point_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "steady_window"
+      ],
+      "operating_cases": [
+        "corner_service/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "131d0283fa2a2685c8d5e5650e6f4304df7c32bd95f7d50c1a16b4763cf2f395",
+        "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+      ]
+    }
+  ],
+  "hash": "3c61ee7db52e17bdbde2d3906cacc55d8d42bea59aef412b0d69a0fc77237deb"
+}

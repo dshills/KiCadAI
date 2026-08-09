@@ -1,0 +1,63 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v3",
+  "version": 3,
+  "corpus_manifest_hash": "f721b8abc859a47030d17f92ea86dc301a3d3817b1cc52bd32261b54bb79c49e",
+  "freeze_commit": "b222db5aa36c00e0f3bf60a5d1768d02062d2fd7",
+  "evaluator_policy": "closed-loop-capability-policy-v2-realizability",
+  "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "discovery_baseline_hash": "2f4ce67e718f69371000f6a551c93dcd88d73ed611dab7f1b0208570d38104ef",
+  "cluster": {
+    "rank": 1,
+    "key": "unsupported:simulation:simulation:dc_operating_point_solver:SIMULATION_INVALID",
+    "outcome": "unsupported",
+    "stage": "simulation",
+    "scope": "simulation",
+    "capability": "dc_operating_point_solver",
+    "code": "SIMULATION_INVALID",
+    "case_count": 7,
+    "domain_count": 5,
+    "analysis_count": 6,
+    "safety_score": 14,
+    "reuse_score": 0,
+    "cases": [
+      "v3_case_001",
+      "v3_case_005",
+      "v3_case_007",
+      "v3_case_008",
+      "v3_case_009",
+      "v3_case_010",
+      "v3_case_012"
+    ],
+    "domains": [
+      "analog",
+      "digital",
+      "mcu",
+      "mixed_signal",
+      "sensor"
+    ],
+    "analysis_kinds": [
+      "ac_sweep",
+      "dc_operating_point",
+      "noise",
+      "startup",
+      "thermal",
+      "transient"
+    ],
+    "required_evidence": [
+      "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+    ],
+    "evidence_hashes": [
+      "131d0283fa2a2685c8d5e5650e6f4304df7c32bd95f7d50c1a16b4763cf2f395",
+      "447e3c4cb33c69761fcb708f043609831a706588b8f7f61cb37ccb085d530e90",
+      "46291c3a37688438ce2b4f29723b66d65a598acc69bfcb68e250dd77f83a18a6",
+      "bc56adcf9b4838393b2fc44abbc2886427bc56a139ff3b78d2d376f49cb060db",
+      "c9ada731c134120317cad506b9e01119ec938f2fee796abd8124022034125adf",
+      "d9c6cab236be04b8332b754639d2b0e174181b7a7d2ae1d1d5647c09d2605837",
+      "e40af8ae88a2282f55fee24667a3f9522f0928eea38f00b195d347668b701724",
+      "ef7261a2abf99192c7bc5631145cc569e28eaba3cf35ba656379177c5c897524"
+    ]
+  },
+  "expansion_plan_hash": "726b58657399cde0abf0e2e56f6fb7bcf0b2fb81fc86465de0b67a34be6883c3",
+  "hash": "82798387cb85e6af912a1f1ff135c1a4e21d4f76251f2f9e56985732584d904c"
+}
