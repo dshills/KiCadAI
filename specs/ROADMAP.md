@@ -72,6 +72,13 @@ from validation feedback to safe automatic repair.
   connectivity, writer/round-trip checks, and replay; one contradictory input
   and four adversarial inputs fail closed. See the [completion
   audit](multi-stage-out-of-distribution-synthesis/AUDIT.md).
+- Active milestone: closed-loop open-set capability expansion connects current
+  topology, component, model, simulation, physical, routing, writer, and KiCad
+  evidence to deterministic identity-neutral gap clustering and impact ranking.
+  A separately frozen discovery/held-out corpus must select the rank-1 reusable
+  capability before implementation, then prove strict held-out uplift without
+  weakening existing gates. See the
+  [specification](closed-loop-open-set-capability-expansion/SPEC.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic

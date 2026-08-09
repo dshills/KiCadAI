@@ -26,6 +26,14 @@ unsupported adversarial cases fail closed with stable evidence. The protected
 USB-C LED and I2C sensor fixtures remain green. See the [specification](../specs/multi-stage-out-of-distribution-synthesis/SPEC.md)
 and [completion audit](../specs/multi-stage-out-of-distribution-synthesis/AUDIT.md).
 
+The active next milestone is
+[closed-loop open-set capability expansion](../specs/closed-loop-open-set-capability-expansion/SPEC.md).
+It will connect current synthesis and KiCad promotion failures to the existing
+capability-evaluation and quarantined expansion systems, freeze a new
+discovery/held-out corpus, and let deterministic cross-domain impact ranking
+select the next generic capability instead of choosing a circuit family by
+hand. Its corpus and untouched baseline are not yet frozen.
+
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage
 boundaries; selected candidates still prove every required plan and corner.
