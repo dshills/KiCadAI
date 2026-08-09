@@ -204,32 +204,61 @@ func prioritizeOriginalCandidate(
 }
 
 func validateGraphRequirementBinding(graph CandidateGraph, requirement Requirement) []reports.Issue {
-	expected := map[string]Port{}
+	expectedPorts := map[string]Port{}
 	for _, port := range requirement.Requirements.Ports {
-		expected[port.ID] = port
+		expectedPorts[port.ID] = port
 	}
-	seen := map[string]bool{}
+	expectedReferences := map[string]bool{}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			expectedReferences[domain.ID] = true
+		}
+	}
+	seenPorts := map[string]bool{}
+	seenReferences := map[string]bool{}
 	issues := []reports.Issue{}
 	for _, node := range graph.Nodes {
 		if node.Scope != "external" {
 			continue
 		}
-		port, found := expected[node.SemanticID]
+		if node.SemanticKind == "domain" {
+			if !expectedReferences[node.SemanticID] || node.Domain != node.SemanticID || node.Role != "reference" {
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external reference node is not declared by the behavioral requirement", "rebuild the graph from the normalized requirement"))
+				continue
+			}
+			if seenReferences[node.SemanticID] {
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"))
+			}
+			seenReferences[node.SemanticID] = true
+			continue
+		}
+		port, found := expectedPorts[node.SemanticID]
 		if !found {
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external graph node is not declared by the behavioral requirement", "rebuild the graph from the normalized requirement"))
 			continue
 		}
-		if seen[node.SemanticID] {
+		if seenPorts[node.SemanticID] {
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral port is bound more than once", "bind each semantic port exactly once"))
 		}
-		seen[node.SemanticID] = true
+		seenPorts[node.SemanticID] = true
+		if port.Kind == "reference" {
+			if seenReferences[port.Domain] {
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"))
+			}
+			seenReferences[port.Domain] = true
+		}
 		if node.Domain != port.Domain || node.Role != graphRoleForPort(port) {
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external graph-node domain or role differs from its behavioral port", "rebuild the graph from the normalized requirement"))
 		}
 	}
-	for portID := range expected {
-		if !seen[portID] {
+	for portID := range expectedPorts {
+		if !seenPorts[portID] {
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "requirements.ports."+portID, "behavioral port is absent from the candidate graph", "connect every required external interface"))
+		}
+	}
+	for domainID := range expectedReferences {
+		if !seenReferences[domainID] {
+			issues = append(issues, graphIssue(CodeNoCompleteGraph, "requirements.domains."+domainID, "behavioral reference domain is absent from the candidate graph", "materialize every required semantic reference"))
 		}
 	}
 	return reports.SortedIssues(issues)
@@ -2213,7 +2242,7 @@ func deriveBandpassTopologyScales(
 		}
 		return ""
 	}
-	reference := referenceNodeForDomain(graph, envelope.input)
+	reference := referenceNodeForDomain(requirement, graph, envelope.input)
 	const neutralFilterResistanceAnchor = 10_000.0
 	resistanceAnchor := neutralFilterResistanceAnchor
 	for _, port := range requirement.Requirements.Ports {

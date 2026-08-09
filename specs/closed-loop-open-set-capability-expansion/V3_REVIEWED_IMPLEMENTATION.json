@@ -1,0 +1,49 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v3",
+  "version": 3,
+  "selected_capability": "dc_operating_point_solver",
+  "review": "prism_reviewed_no_actionable_findings",
+  "artifacts": [
+    {
+      "path": "internal/capabilityfeedback/v3_final_test.go",
+      "sha256": "49d03bf7c3c252c5fc14334c8c1980106b0a2051d6b1dc00e44e8dc0b57b4665"
+    },
+    {
+      "path": "internal/opentopologysynthesis/dynamic_resolution_test.go",
+      "sha256": "b5ecd1f03cccf8d0b9ff9bc7f1cdd950116e59a64777d12b14caa98942494d1a"
+    },
+    {
+      "path": "internal/opentopologysynthesis/graph.go",
+      "sha256": "1c873c9ef319d80fba7e4c77e79af0682817dc09acd77c5ee5853d096c740c20"
+    },
+    {
+      "path": "internal/opentopologysynthesis/graph_validate.go",
+      "sha256": "a9da2603c7a35a43f6f3c87c6ab74d281671d88c83d69e1ad6eeb7b850a9b410"
+    },
+    {
+      "path": "internal/opentopologysynthesis/logic_level_harness_test.go",
+      "sha256": "cf3fc8df67c8a895bcde748d44b3a01633b14cb9aae298de004993440eff5f4d"
+    },
+    {
+      "path": "internal/opentopologysynthesis/reference_domain_simulation_test.go",
+      "sha256": "173264335ba2e6326d9e77acfa8a09d0bd57d5a2fffe391c89b7f9e0a3731c78"
+    },
+    {
+      "path": "internal/opentopologysynthesis/search.go",
+      "sha256": "98faf4aa29b84772deb8ec9c3125df0327f68190eb3b9ecee41b7754cdbc3ef0"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation.go",
+      "sha256": "ee9add053af7822a9d178f908c0f7f30187e15b2161b5706c29c8751f3e85e62"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation_test.go",
+      "sha256": "30d7887cdd7039347e65bbb6e3cc6ff41ed24c0c4cd3f7c7ca88d115cbf3a176"
+    },
+    {
+      "path": "internal/opentopologysynthesis/value_domains.go",
+      "sha256": "8d4dbb3bf46a9d866229853309540e64fac504addd80ce4cb110f6ebe1953a52"
+    }
+  ],
+  "hash": "29162ccc1272f77a87c251e5c405f451f5a4d3bfddc1d44746fea11740cb5882"
+}

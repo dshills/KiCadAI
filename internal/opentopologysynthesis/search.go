@@ -973,7 +973,7 @@ func topologyBandpassRelationshipSeeds(
 	}
 	input := observationNodeID(initial.graph, requirement, envelope.input)
 	output := observationNodeID(initial.graph, requirement, envelope.output)
-	reference := referenceNodeForDomain(initial.graph, envelope.input)
+	reference := referenceNodeForDomain(requirement, initial.graph, envelope.input)
 	highRail, lowRail := topologyPowerRails(requirement, initial.graph)
 	if input == "" || output == "" || reference == "" || highRail == "" {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"bracketed passband interfaces do not resolve to bounded graph endpoints"}}
@@ -3412,7 +3412,7 @@ func topologyTransimpedanceRelationshipSeeds(
 		}
 		input := observationNodeID(initial.graph, requirement, *assertion.Excitation)
 		output := observationNodeID(initial.graph, requirement, assertion.Observation)
-		reference := referenceNodeForDomain(initial.graph, *assertion.Excitation)
+		reference := referenceNodeForDomain(requirement, initial.graph, *assertion.Excitation)
 		if input == "" || output == "" || reference == "" || input == output {
 			continue
 		}

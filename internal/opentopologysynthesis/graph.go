@@ -55,8 +55,9 @@ func InitialGraph(requirement Requirement) (CandidateGraph, []reports.Issue) {
 	graph := CandidateGraph{
 		Schema:  CandidateGraphSchema,
 		Version: CandidateGraphVersion,
-		Nodes:   make([]GraphNode, 0, len(requirement.Requirements.Ports)),
+		Nodes:   make([]GraphNode, 0, len(requirement.Requirements.Ports)+len(requirement.Requirements.Domains)),
 	}
+	representedReferenceDomains := map[string]bool{}
 	for _, port := range requirement.Requirements.Ports {
 		graph.Nodes = append(graph.Nodes, GraphNode{
 			ID:           "port_" + port.ID,
@@ -65,6 +66,22 @@ func InitialGraph(requirement Requirement) (CandidateGraph, []reports.Issue) {
 			SemanticID:   port.ID,
 			Domain:       port.Domain,
 			Role:         graphRoleForPort(port),
+		})
+		if port.Kind == "reference" {
+			representedReferenceDomains[port.Domain] = true
+		}
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "reference" || representedReferenceDomains[domain.ID] {
+			continue
+		}
+		graph.Nodes = append(graph.Nodes, GraphNode{
+			ID:           "domain_" + domain.ID,
+			Scope:        "external",
+			SemanticKind: "domain",
+			SemanticID:   domain.ID,
+			Domain:       domain.ID,
+			Role:         "reference",
 		})
 	}
 	slices.SortFunc(graph.Nodes, compareGraphNodes)

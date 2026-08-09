@@ -29,6 +29,7 @@ const (
 	diagnosisSimulationInvalid     = "simulation_invalid"
 	maximumHarnessResistanceOhm    = 1e12
 	maximumDynamicTimeSteps        = 1_000_000
+	maximumDynamicDurationS        = 10.0
 )
 
 type SimulationEnvironment struct {
@@ -300,7 +301,7 @@ func evaluateAssertionCorner(
 		attempt.Diagnostics = diagnostics
 		return attempt, []Diagnosis{diagnosisFromSimulationDiagnostics(assertion, operatingCase.ID+"/"+corner.ID, graph, diagnostics)}
 	}
-	nodes := simulationNodeEvidence(graph)
+	nodes := simulationNodeEvidence(requirement, graph)
 	harness, harnessHashes, harnessDiagnostics := simulationHarness(
 		requirement,
 		assertion,
@@ -710,19 +711,32 @@ func simulationComponentEvidence(
 	return result, slices.Compact(hashes), diagnostics
 }
 
-func simulationNodeEvidence(graph CandidateGraph) []simmodel.NodeEvidence {
-	result := make([]simmodel.NodeEvidence, 0, len(graph.Nodes))
+func simulationNodeEvidence(requirement Requirement, graph CandidateGraph) []simmodel.NodeEvidence {
+	result := make([]simmodel.NodeEvidence, 0, len(graph.Nodes)+len(requirement.Requirements.Domains))
+	representedReferences := map[string]bool{}
+	syntheticReferences := syntheticReferenceNodeIDs(requirement, graph)
 	for _, node := range graph.Nodes {
 		role := "signal"
 		switch node.Role {
 		case "reference":
 			role = "ground"
+			if node.Scope == "external" {
+				representedReferences[node.Domain] = true
+			}
 		case "supply":
 			role = "power_pos"
 		case "control":
 			role = "control"
 		}
 		result = append(result, simmodel.NodeEvidence{Name: node.ID, Role: role, VoltageDomain: node.Domain})
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "reference" || representedReferences[domain.ID] {
+			continue
+		}
+		result = append(result, simmodel.NodeEvidence{
+			Name: syntheticReferences[domain.ID], Role: "ground", VoltageDomain: domain.ID,
+		})
 	}
 	slices.SortFunc(result, func(left, right simmodel.NodeEvidence) int {
 		return cmp.Compare(left.Name, right.Name)
@@ -738,7 +752,7 @@ func simulationHarness(
 	graph CandidateGraph,
 	environment SimulationEnvironment,
 ) ([]simmodel.ComponentEvidence, []string, []SimulationDiagnostic) {
-	reference := referenceNodeForDomain(graph, assertion.Observation)
+	reference := referenceNodeForDomain(requirement, graph, assertion.Observation)
 	if reference == "" {
 		return nil, nil, []SimulationDiagnostic{{Code: diagnosisSimulationInvalid, Path: "simulation.reference", Message: "candidate graph has no semantic reference node"}}
 	}
@@ -935,6 +949,7 @@ func simulationHarnessConditions(
 ) []OperatingCondition {
 	result := append([]OperatingCondition(nil), operatingCase.Conditions...)
 	result = signedWindowStaticHarnessConditions(requirement, assertion, result)
+	result = logicLevelStaticHarnessConditions(requirement, assertion, result)
 	seen := map[string]bool{}
 	for _, condition := range result {
 		seen[conditionKey(condition)] = true
@@ -1031,6 +1046,100 @@ func simulationHarnessConditions(
 		return cmp.Or(cmp.Compare(left.Axis, right.Axis), cmp.Compare(left.Target, right.Target))
 	})
 	return result
+}
+
+// logicLevelStaticHarnessConditions supplies the missing state stimulus for a
+// conventional single-input logic-level contract. A paired output-high/output-
+// low requirement describes two static states; evaluating both at the input's
+// nominal midpoint would make those states mutually exclusive. The inference
+// is deliberately narrow and fail-closed: it applies only to DC assertions
+// without an explicit excitation, requires exactly one bounded digital sink,
+// and never replaces an authored input/control condition.
+func logicLevelStaticHarnessConditions(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	conditions []OperatingCondition,
+) []OperatingCondition {
+	if assertion.Analysis != simmodel.AnalysisDCOperatingPoint || assertion.Excitation != nil ||
+		assertion.Observation.Kind != "port" ||
+		(assertion.Metric != "output_high_voltage" && assertion.Metric != "output_low_voltage") {
+		return conditions
+	}
+	var input *Port
+	for index := range requirement.Requirements.Ports {
+		port := &requirement.Requirements.Ports[index]
+		if port.Kind != "digital" || port.Direction != "sink" ||
+			port.Electrical.MinVoltageV == nil || port.Electrical.MaxVoltageV == nil ||
+			!finite(*port.Electrical.MinVoltageV) || !finite(*port.Electrical.MaxVoltageV) ||
+			*port.Electrical.MinVoltageV >= *port.Electrical.MaxVoltageV {
+			continue
+		}
+		if input != nil {
+			return conditions
+		}
+		input = port
+	}
+	if input == nil {
+		return conditions
+	}
+	for _, condition := range conditions {
+		if condition.Target == input.ID &&
+			(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+			return conditions
+		}
+	}
+	nonInverting, polarityKnown := logicLevelPolarity(requirement, input.ID, assertion.Observation.ID)
+	if !polarityKnown {
+		return conditions
+	}
+	value := *input.Electrical.MinVoltageV
+	if (assertion.Metric == "output_high_voltage") == nonInverting {
+		value = *input.Electrical.MaxVoltageV
+	}
+	return append(conditions, OperatingCondition{
+		Axis: "input_voltage", Target: input.ID, Min: value, Max: value, Unit: "V",
+	})
+}
+
+func logicLevelPolarity(requirement Requirement, inputID, outputID string) (bool, bool) {
+	polarityKnown := false
+	nonInverting := false
+	casesByID := make(map[string]OperatingCase, len(requirement.Requirements.OperatingCases))
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		casesByID[operatingCase.ID] = operatingCase
+	}
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Analysis != simmodel.AnalysisTransient || candidate.Observation.Kind != "port" ||
+			candidate.Observation.ID != outputID ||
+			(candidate.Metric != "rise_time" && candidate.Metric != "fall_time") {
+			continue
+		}
+		for _, caseID := range candidate.OperatingCases {
+			operatingCase, found := casesByID[caseID]
+			if !found {
+				continue
+			}
+			matchingTransitions := 0
+			candidateNonInverting := false
+			for _, event := range operatingCase.Events {
+				if event.Kind != "input_step" || event.Target != inputID || event.Initial == event.Applied {
+					continue
+				}
+				matchingTransitions++
+				candidateNonInverting = (candidate.Metric == "rise_time") == (event.Applied > event.Initial)
+			}
+			if matchingTransitions > 1 {
+				return false, false
+			}
+			if matchingTransitions == 1 {
+				if polarityKnown && candidateNonInverting != nonInverting {
+					return false, false
+				}
+				nonInverting, polarityKnown = candidateNonInverting, true
+			}
+		}
+	}
+	return nonInverting, polarityKnown
 }
 
 // signedWindowStaticHarnessConditions separates the two static output states
@@ -1628,7 +1737,20 @@ func simulationIntentParts(
 		}
 		duration := dynamicDurationForRequirement(requirement, assertion, operatingCase)
 		analysis.DurationS = duration
-		analysis.TimeStepS = dynamicTimeStep(duration, operatingCase)
+		analysis.TimeStepS = dynamicTimeStep(duration, operatingCase, dynamicResolutionForAssertion(assertion))
+		if analysis.DurationS <= 0 || analysis.TimeStepS <= 0 {
+			return simmodel.Analysis{}, simmodel.Assertion{}, []SimulationDiagnostic{{
+				Code: diagnosisSimulationInvalid, Path: "simulation.analysis.dynamic_grid",
+				Message: "dynamic analysis duration or time step is outside the deterministic supported grid",
+			}}
+		}
+		stepCount := analysis.DurationS / analysis.TimeStepS
+		if !finite(stepCount) || stepCount > float64(maximumDynamicTimeSteps)*(1+1e-12) {
+			return simmodel.Analysis{}, simmodel.Assertion{}, []SimulationDiagnostic{{
+				Code: diagnosisSimulationInvalid, Path: "simulation.analysis.dynamic_grid",
+				Message: "dynamic analysis duration or time step is outside the deterministic supported grid",
+			}}
+		}
 		if assertion.Analysis == simmodel.AnalysisElectrothermal {
 			analysis.Conditions = append([]simmodel.NamedValue(nil), thermalConditions...)
 		}
@@ -1732,7 +1854,7 @@ func simulationIntentParts(
 			simulationAssertion.ReferenceNode = observationNodeID(graph, requirement, *assertion.Excitation)
 		}
 		if quantity == simmodel.QuantityInputImpedanceOhm {
-			simulationAssertion.ReferenceNode = referenceNodeForDomain(graph, *assertion.Excitation)
+			simulationAssertion.ReferenceNode = referenceNodeForDomain(requirement, graph, *assertion.Excitation)
 		}
 	}
 	if assertion.Metric == "settling_time" {
@@ -2948,8 +3070,39 @@ func observationNodeID(graph CandidateGraph, requirement Requirement, observatio
 	return ""
 }
 
-func referenceNodeForDomain(graph CandidateGraph, observation Observation) string {
+func referenceNodeForDomain(requirement Requirement, graph CandidateGraph, observation Observation) string {
+	domainID := observationDomainID(requirement, observation)
+	if domainID != "" && requirementDomainKind(requirement, domainID) == "reference" {
+		if node := explicitReferenceNodeForDomain(graph, domainID); node != "" {
+			return node
+		}
+		node, found := syntheticReferenceNodeIDs(requirement, graph)[domainID]
+		if !found {
+			return ""
+		}
+		return node
+	}
 	candidates := []string{}
+	declaredReferences := []string{}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			declaredReferences = append(declaredReferences, domain.ID)
+		}
+	}
+	slices.Sort(declaredReferences)
+	if len(declaredReferences) == 1 {
+		if node := explicitReferenceNodeForDomain(graph, declaredReferences[0]); node != "" {
+			return node
+		}
+		node, found := syntheticReferenceNodeIDs(requirement, graph)[declaredReferences[0]]
+		if !found {
+			return ""
+		}
+		return node
+	}
+	if len(declaredReferences) > 1 {
+		return ""
+	}
 	for _, node := range graph.Nodes {
 		if node.Scope == "external" && node.Role == "reference" {
 			candidates = append(candidates, node.ID)
@@ -2960,6 +3113,84 @@ func referenceNodeForDomain(graph CandidateGraph, observation Observation) strin
 		return ""
 	}
 	return candidates[0]
+}
+
+func observationDomainID(requirement Requirement, observation Observation) string {
+	if observation.Kind == "domain" {
+		return observation.ID
+	}
+	if observation.Kind != "port" {
+		return ""
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == observation.ID {
+			return port.Domain
+		}
+	}
+	return ""
+}
+
+func requirementDomainKind(requirement Requirement, domainID string) string {
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == domainID {
+			return domain.Kind
+		}
+	}
+	return ""
+}
+
+func explicitReferenceNodeForDomain(graph CandidateGraph, domainID string) string {
+	candidates := []string{}
+	for _, node := range graph.Nodes {
+		if node.Scope == "external" && node.Role == "reference" && node.Domain == domainID {
+			candidates = append(candidates, node.ID)
+		}
+	}
+	slices.Sort(candidates)
+	if len(candidates) == 0 {
+		return ""
+	}
+	return candidates[0]
+}
+
+func syntheticReferenceNodeIDs(requirement Requirement, graph CandidateGraph) map[string]string {
+	used := map[string]bool{}
+	for _, node := range graph.Nodes {
+		used[node.ID] = true
+	}
+	domains := []string{}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" && explicitReferenceNodeForDomain(graph, domain.ID) == "" {
+			domains = append(domains, domain.ID)
+		}
+	}
+	slices.Sort(domains)
+	result := make(map[string]string, len(domains))
+	for _, domainID := range domains {
+		result[domainID] = reserveSyntheticReferenceNodeID(used, domainID)
+	}
+	return result
+}
+
+func reserveSyntheticReferenceNodeID(used map[string]bool, domainID string) string {
+	base := canonicalIdentifier("reference_" + domainID)
+	if !used[base] {
+		used[base] = true
+		return base
+	}
+	// If every suffix through len(used) is occupied, len(used)+1 is free:
+	// the used set also contains base and cannot contain all of those IDs.
+	freeIndex := len(used) + 1
+	for index := 1; index <= len(used); index++ {
+		candidate := fmt.Sprintf("%s_%03d", base, index)
+		if !used[candidate] {
+			freeIndex = index
+			break
+		}
+	}
+	candidate := fmt.Sprintf("%s_%03d", base, freeIndex)
+	used[candidate] = true
+	return candidate
 }
 
 func externalNodeForSemanticTarget(graph CandidateGraph, target string) (GraphNode, bool) {
@@ -3132,12 +3363,15 @@ func dynamicDurationForRequirement(requirement Requirement, assertion Behavioral
 
 func dynamicDurationAtFrequency(assertion BehavioralAssertion, operatingCase OperatingCase, frequencyHz float64) float64 {
 	duration := 0.0
+	timingBounded := false
 	switch assertion.Metric {
 	case "settling_time", "propagation_delay", "rise_time", "fall_time":
 		duration = assertionTarget(assertion) * 10
+		timingBounded = duration > 0
 	}
+	timingObservationDuration := duration
 	periodicDuration := 0.0
-	if frequencyHz > 0 && finite(frequencyHz) {
+	if dynamicRequiresPeriodicObservation(assertion) && frequencyHz > 0 && finite(frequencyHz) {
 		periodicDuration = 10 / frequencyHz
 		duration = math.Max(duration, periodicDuration)
 	}
@@ -3148,6 +3382,12 @@ func dynamicDurationAtFrequency(assertion BehavioralAssertion, operatingCase Ope
 		// turns ordinary settling into false overshoot.
 		if periodicDuration > 0 {
 			duration = math.Max(duration, event.TriggerTimeS+periodicDuration)
+		} else if timingBounded {
+			// A bounded timing measurement needs its declared observation window
+			// after the event, not an unrelated ten-millisecond floor. Keeping the
+			// complete window compact lets the trusted bounded grid actually
+			// resolve sub-millisecond edges while retaining the event boundary.
+			duration = math.Max(duration, event.TriggerTimeS+timingObservationDuration)
 		} else {
 			duration = math.Max(duration, math.Max(0.01, event.TriggerTimeS*10))
 		}
@@ -3155,15 +3395,42 @@ func dynamicDurationAtFrequency(assertion BehavioralAssertion, operatingCase Ope
 	if duration <= 0 {
 		duration = 0.01
 	}
-	return math.Min(duration, 10)
+	if duration > maximumDynamicDurationS {
+		return 0
+	}
+	return duration
 }
 
-func dynamicTimeStep(duration float64, operatingCase OperatingCase) float64 {
+func dynamicRequiresPeriodicObservation(assertion BehavioralAssertion) bool {
+	if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 {
+		return true
+	}
+	switch assertion.Metric {
+	case "duty_cycle", "oscillation_frequency", "output_ripple":
+		return true
+	default:
+		return false
+	}
+}
+
+func dynamicResolutionForAssertion(assertion BehavioralAssertion) float64 {
+	switch assertion.Metric {
+	case "settling_time", "propagation_delay", "rise_time", "fall_time":
+		return assertionTarget(assertion) / 100
+	default:
+		return 0
+	}
+}
+
+func dynamicTimeStep(duration float64, operatingCase OperatingCase, resolutionS float64) float64 {
 	const ticksPerSecond int64 = 1_000_000_000_000
 	if duration <= 0 || !finite(duration) {
 		return 0
 	}
 	durationTicks := int64(math.Round(duration * float64(ticksPerSecond)))
+	if durationTicks <= 0 {
+		return 0
+	}
 	gridTicks := durationTicks
 	for _, event := range operatingCase.Events {
 		triggerTicks := int64(math.Round(event.TriggerTimeS * float64(ticksPerSecond)))
@@ -3172,6 +3439,10 @@ func dynamicTimeStep(duration float64, operatingCase OperatingCase) float64 {
 		}
 	}
 	targetTicks := max(int64(1), durationTicks/1000)
+	if resolutionS > 0 && finite(resolutionS) {
+		resolutionTicks := max(int64(1), int64(math.Round(resolutionS*float64(ticksPerSecond))))
+		targetTicks = min(targetTicks, resolutionTicks)
+	}
 	divisor := max(int64(1), (gridTicks+targetTicks-1)/targetTicks)
 	alignedStep := float64(gridTicks) / float64(divisor) / float64(ticksPerSecond)
 	// Exact event alignment can require a pathologically fine common grid for

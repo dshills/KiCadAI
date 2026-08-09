@@ -86,8 +86,10 @@ func (validator *graphValidator) validateNodes() {
 		switch node.Scope {
 		case "external":
 			external++
-			if node.SemanticKind != "port" || !validGraphID(node.SemanticID) || !validGraphID(node.Domain) {
-				validator.add(path, "external node requires a semantic port identity and domain", "")
+			validPort := node.SemanticKind == "port"
+			validReferenceDomain := node.SemanticKind == "domain" && node.Role == "reference" && node.SemanticID == node.Domain
+			if (!validPort && !validReferenceDomain) || !validGraphID(node.SemanticID) || !validGraphID(node.Domain) {
+				validator.add(path, "external node requires a semantic port or reference-domain identity", "")
 			}
 		case "internal":
 			internal++

@@ -1302,7 +1302,7 @@ func TestQuiescentCurrentRemovesLoadHarnessAndExcitationTogether(t *testing.T) {
 func TestDynamicTimeStepAlignsEventAndDurationGrid(t *testing.T) {
 	duration := .3
 	operatingCase := OperatingCase{Events: []OperatingEvent{{TriggerTimeS: .001}}}
-	step := dynamicTimeStep(duration, operatingCase)
+	step := dynamicTimeStep(duration, operatingCase, 0)
 	if step <= 0 || step > duration/1000 {
 		t.Fatalf("dynamic time step = %.12g", step)
 	}
@@ -1317,7 +1317,7 @@ func TestDynamicTimeStepAlignsEventAndDurationGrid(t *testing.T) {
 func TestDynamicTimeStepBoundsPathologicalEventGrid(t *testing.T) {
 	duration := .3
 	operatingCase := OperatingCase{Events: []OperatingEvent{{TriggerTimeS: .001000000001}}}
-	step := dynamicTimeStep(duration, operatingCase)
+	step := dynamicTimeStep(duration, operatingCase, 0)
 	minimum := duration / maximumDynamicTimeSteps
 	if step < minimum || duration/step > maximumDynamicTimeSteps*(1+1e-12) {
 		t.Fatalf("dynamic time step = %.12g, minimum %.12g", step, minimum)
@@ -1480,7 +1480,7 @@ func TestLoadHarnessRecognizesLowSideSwitchThroughCurrentShunt(t *testing.T) {
 	if !found {
 		t.Fatal("load-return graph node is missing")
 	}
-	reference := referenceNodeForDomain(graph, Observation{Kind: "port", ID: "load_return"})
+	reference := referenceNodeForDomain(requirement, graph, Observation{Kind: "port", ID: "load_return"})
 	if reference == "" {
 		t.Fatal("reference graph node is missing")
 	}
