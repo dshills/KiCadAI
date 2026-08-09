@@ -1,6 +1,6 @@
 # Closed-Loop Open-Set Capability Expansion V2 Baseline Protocol
 
-Status: corpus and discovery baseline frozen; held-out baseline pending
+Status: baseline complete; held-out evidence sealed pending implementation freeze
 
 ## 1. Preconditions
 

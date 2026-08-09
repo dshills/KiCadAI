@@ -24,7 +24,7 @@ const (
 	closedLoopV2HeldOutSealAlgorithm = "AES-256-GCM/HMAC-SHA-256-payload-bound-nonce"
 	closedLoopV2HeldOutSealKeyEnv    = "KICADAI_V2_HELD_OUT_SEAL_KEY_FILE"
 	closedLoopV2HeldOutSealFile      = "held_out_baseline.sealed"
-	closedLoopV2HeldOutSealFrozen    = false
+	closedLoopV2HeldOutSealFrozen    = true
 )
 
 type closedLoopV2HeldOutPayload struct {

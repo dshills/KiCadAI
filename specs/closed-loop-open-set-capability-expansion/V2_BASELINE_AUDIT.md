@@ -1,6 +1,6 @@
 # V2 Baseline Audit
 
-Status: discovery baseline frozen; held-out baseline not yet executed
+Status: baseline complete; held-out evidence sealed pending implementation freeze
 
 ## Frozen inputs
 
@@ -56,3 +56,20 @@ must be created before held-out synthesis begins. Held-out baseline execution
 will suppress per-case logs and store evidence in a cryptographically sealed
 artifact whose key remains outside the repository until the generic production
 diff is fixed.
+
+The held-out baseline subsequently completed through that sealed harness. The
+repository contains no plaintext held-out outcome, gap, cluster, or promotion
+evidence. Its non-sensitive commitments are:
+
+- `case_count`: 12
+- `selection_hash`:
+  `cbeba9dd6829ad6d9264571b836786cf091995b93ede8259a7742c0e376835c9`
+- `payload_hash`:
+  `8a787936bbde250a5b98b17226adfe676f1eaf1b43d7010e1bc855e41e785252`
+- `ciphertext_sha256`:
+  `8445bb0091110b4f9c4fba9cf114d597a289df5073539a5e5751e00397d170a9`
+- `hash`:
+  `9afac00e87f9af83163ba26adfcbb299db193f9980475fb6c1cc76b8968c0368`
+
+The reveal key remains outside the repository. No held-out result may be
+decrypted before the selected generic production diff is fixed and reviewed.
