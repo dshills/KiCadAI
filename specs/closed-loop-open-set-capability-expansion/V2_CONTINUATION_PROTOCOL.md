@@ -1,6 +1,6 @@
 # Closed-Loop Open-Set Capability Expansion V2 Continuation Protocol
 
-Status: independent corpus authoring authorized; candidate corpus not yet frozen
+Status: historical protocol; V2 closed by [V2_VALIDATION_AUDIT.md](V2_VALIDATION_AUDIT.md)
 
 ## Purpose
 

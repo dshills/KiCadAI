@@ -1,6 +1,6 @@
 # V2 Baseline Audit
 
-Status: baseline complete; held-out evidence sealed pending implementation freeze
+Status: historical baseline; V2 failed discovery uplift and its sealed held-out evidence is retired without decryption
 
 ## Frozen inputs
 

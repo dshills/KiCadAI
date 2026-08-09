@@ -72,7 +72,7 @@ from validation feedback to safe automatic repair.
   connectivity, writer/round-trip checks, and replay; one contradictory input
   and four adversarial inputs fail closed. See the [completion
   audit](multi-stage-out-of-distribution-synthesis/AUDIT.md).
-- Active milestone: closed-loop open-set capability expansion connects current
+- Active program: closed-loop open-set capability expansion connects current
   topology, component, model, simulation, physical, routing, writer, and KiCad
   evidence to deterministic identity-neutral gap clustering and impact ranking.
   A separately frozen discovery/held-out corpus must select the rank-1 reusable
@@ -80,9 +80,13 @@ from validation feedback to safe automatic repair.
   weakening existing gates. See the
   [specification](closed-loop-open-set-capability-expansion/SPEC.md). The V1
   blind run improved discovery from zero to two passes but produced no held-out
-  pass, so completion is not claimed and the consumed validation set will not
-  be tuned against. See the [validation audit](closed-loop-open-set-capability-expansion/V1_VALIDATION_AUDIT.md)
-  and [V2 continuation protocol](closed-loop-open-set-capability-expansion/V2_CONTINUATION_PROTOCOL.md).
+  pass. V2 selected complete-topology search but its generic candidate produced
+  zero discovery uplift, so the candidate was removed before held-out
+  decryption and the sealed V2 held-out set was retired. Completion is not
+  claimed. The next prerequisite is behavioral-contract feasibility and
+  realizability classification before a fresh V3 experiment. See the V1
+  [validation audit](closed-loop-open-set-capability-expansion/V1_VALIDATION_AUDIT.md)
+  and [V2 validation audit](closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic

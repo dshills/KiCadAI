@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified: 2026-08-08 by the complete bounded local suite, focused
+Last full verification: 2026-08-08 by the complete bounded local suite, focused
 scheduler/race/preservation suites, and installed-KiCad lanes. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
@@ -17,6 +17,9 @@ four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
 
+Focused V2 frozen-baseline, sealed-held-out-commitment, and specification
+contract checks were reproduced locally on 2026-08-09.
+
 The independently frozen multi-stage out-of-distribution corpus now closes the
 next bounded generalization step. Eight unfamiliar behavior-only combinations
 of sensing, decision, feedback, nonlinear transfer, switching power, and
@@ -26,13 +29,17 @@ unsupported adversarial cases fail closed with stable evidence. The protected
 USB-C LED and I2C sensor fixtures remain green. See the [specification](../specs/multi-stage-out-of-distribution-synthesis/SPEC.md)
 and [completion audit](../specs/multi-stage-out-of-distribution-synthesis/AUDIT.md).
 
-The active next milestone is
+The active capability-expansion program is
 [closed-loop open-set capability expansion](../specs/closed-loop-open-set-capability-expansion/SPEC.md).
-It will connect current synthesis and KiCad promotion failures to the existing
-capability-evaluation and quarantined expansion systems, freeze a new
-discovery/held-out corpus, and let deterministic cross-domain impact ranking
-select the next generic capability instead of choosing a circuit family by
-hand. Its corpus and untouched baseline are not yet frozen.
+V1 produced two discovery passes but no held-out uplift. The independently
+authored V2 corpus and baseline then selected complete-topology search, but the
+generic candidate produced zero discovery passes and was removed before any
+held-out evidence was decrypted. V2 is closed fail-closed and its sealed
+held-out set is retired. The next prerequisite is a generic
+behavioral-contract feasibility and realizability gate that separates
+impossible or energy-domain-creating requirements from single-topology and
+multi-obligation composition gaps before a fresh V3 corpus is authored. See
+the [V2 validation audit](../specs/closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

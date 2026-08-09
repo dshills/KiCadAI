@@ -1,6 +1,6 @@
 # Closed-Loop Open-Set Capability Expansion V2 Addendum
 
-Status: freeze candidate; independent corpus authored and mechanically validated
+Status: historical frozen contract; V2 closed by [V2_VALIDATION_AUDIT.md](V2_VALIDATION_AUDIT.md)
 
 ## 1. Inherited contract
 
