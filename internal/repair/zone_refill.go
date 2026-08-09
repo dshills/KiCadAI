@@ -101,7 +101,11 @@ func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.
 		}}
 	}
 	if commandResult.Err != nil && commandResult.ExitCode != 1 {
-		return run, fmt.Errorf("zone refill command failed with exit code %d: %s", commandResult.ExitCode, strings.TrimSpace(commandResult.Stderr))
+		detail := strings.TrimSpace(commandResult.Stderr)
+		if detail == "" {
+			detail = commandResult.Err.Error()
+		}
+		return run, fmt.Errorf("zone refill command failed with exit code %d: %s", commandResult.ExitCode, detail)
 	}
 	return run, nil
 }

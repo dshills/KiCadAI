@@ -239,6 +239,142 @@ func TestBehaviorScoringRecognizesGenericBufferedTimeConstant(t *testing.T) {
 	}
 }
 
+func TestAnalogRelationshipSeedsTreatBandwidthAsFrequencyObligation(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
+	for index := range requirement.Requirements.BehavioralRequirements {
+		if requirement.Requirements.BehavioralRequirements[index].Metric == "cutoff_frequency" {
+			requirement.Requirements.BehavioralRequirements[index].Metric = "bandwidth"
+		}
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initialGraph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	initialHash, err := GraphHash(initialGraph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialTopology, err := TopologyHash(initialGraph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventoryByKey := primitiveInventoryByKey(inventory)
+	initial := topologySearchState{
+		graph: initialGraph, hash: initialHash, topology: initialTopology,
+		score: scoreTopologyGraph(requirement, initialGraph, inventoryByKey, initialHash),
+	}
+	policy := DefaultPolicy()
+	candidates, _, rejections := topologyAnalogRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), inventoryByKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, initial,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf("bandwidth relationship produced no candidates: %#v", rejections)
+	}
+	foundClosedLoop := false
+	for _, candidate := range candidates {
+		if topologyGraphHasAnalogFeedback(candidate.Graph) && candidate.Score.BehaviorGap == 0 {
+			foundClosedLoop = true
+			break
+		}
+	}
+	if !foundClosedLoop {
+		t.Fatalf("bandwidth relationship lacks a complete negative-feedback candidate: %#v", candidates)
+	}
+
+	shifted := requirement
+	shifted.Requirements.Ports = append([]Port(nil), requirement.Requirements.Ports...)
+	for index := range shifted.Requirements.Ports {
+		if shifted.Requirements.Ports[index].ID != "output" {
+			continue
+		}
+		minimum, nominal, maximum := 0.0, 6.0, 12.0
+		shifted.Requirements.Ports[index].Electrical.MinVoltageV = &minimum
+		shifted.Requirements.Ports[index].Electrical.NominalVoltageV = &nominal
+		shifted.Requirements.Ports[index].Electrical.MaxVoltageV = &maximum
+	}
+	shiftedInitialGraph, issues := InitialGraph(shifted)
+	if len(issues) != 0 {
+		t.Fatalf("shifted initial graph issues: %#v", issues)
+	}
+	shiftedInitialHash, err := GraphHash(shiftedInitialGraph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shiftedInitialTopology, err := TopologyHash(shiftedInitialGraph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shiftedInitial := topologySearchState{
+		graph: shiftedInitialGraph, hash: shiftedInitialHash, topology: shiftedInitialTopology,
+		score: scoreTopologyGraph(shifted, shiftedInitialGraph, inventoryByKey, shiftedInitialHash),
+	}
+	shiftedCandidates, _, shiftedRejections := topologyAnalogRelationshipSeeds(
+		context.Background(), shifted, inventory,
+		topologyRepresentatives(shifted, inventory), inventoryByKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, shiftedInitial,
+	)
+	var biased *TopologyCandidate
+	for index := range shiftedCandidates {
+		candidate := &shiftedCandidates[index]
+		for _, instance := range candidate.Graph.Instances {
+			for _, scale := range deriveAnalogTransferTopologyScales(
+				shifted, candidate.Graph, instance, inventoryByKey,
+			) {
+				if strings.HasPrefix(scale.ID, "topology:affine_transfer:") {
+					biased = candidate
+					break
+				}
+			}
+			if biased != nil {
+				break
+			}
+		}
+	}
+	if biased == nil {
+		t.Fatalf("bipolar-to-unipolar behavior lacks a rail-biased affine transfer: %#v", shiftedRejections)
+	}
+	scales := map[string]float64{}
+	for _, instance := range biased.Graph.Instances {
+		for _, scale := range deriveAnalogTransferTopologyScales(shifted, biased.Graph, instance, inventoryByKey) {
+			scales[scale.ID] = scale.ValueSI
+		}
+	}
+	for _, id := range []string{
+		"topology:affine_transfer:input",
+		"topology:affine_transfer:bias_lower",
+		"topology:affine_transfer:bias_upper",
+		"topology:affine_transfer:bias_bypass",
+	} {
+		if scales[id] <= 0 {
+			t.Fatalf("biased affine transfer lacks %s scale: %#v", id, scales)
+		}
+	}
+	feedback := scales["topology:affine_transfer:feedback"] +
+		scales["topology:affine_transfer:series_feedback_input_side"] +
+		scales["topology:affine_transfer:series_feedback_output_side"]
+	if feedback <= 0 {
+		t.Fatalf("biased affine transfer lacks direct or composed feedback scales: %#v", scales)
+	}
+	shiftedGain := 0.0
+	for _, assertion := range shifted.Requirements.BehavioralRequirements {
+		if assertion.Metric == "voltage_gain" {
+			shiftedGain = math.Max(shiftedGain, assertionTarget(assertion))
+		}
+	}
+	if analogInvertingSeriesFeedbackRequired(shifted, inventoryByKey, shiftedGain) {
+		if scales["topology:affine_transfer:feedback"] != 0 ||
+			scales["topology:affine_transfer:series_feedback_input_side"] <= 0 ||
+			scales["topology:affine_transfer:series_feedback_output_side"] <= 0 {
+			t.Fatalf("sparse catalog did not produce bounded series feedback: %#v", scales)
+		}
+	}
+}
+
 func TestTopologyObligationsDerivePrimitiveThresholdNetworks(t *testing.T) {
 	inventory, _ := testHeldOutSynthesisEnvironment(t)
 	for _, test := range []struct {

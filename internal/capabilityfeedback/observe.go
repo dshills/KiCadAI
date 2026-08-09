@@ -131,18 +131,25 @@ func validateSynthesisEnvelope(run opentopologysynthesis.SynthesisRun) error {
 		return fmt.Errorf("required content hashes are missing")
 	}
 	if run.Report.Status == opentopologysynthesis.StatusPassed {
+		if run.SelectedGraph == nil {
+			return fmt.Errorf("passing synthesis lacks a selected graph")
+		}
 		if run.Report.StopReason != opentopologysynthesis.StopPassed || run.Report.Selected == nil ||
-			run.SelectedGraph == nil || run.SelectedTrial == nil || run.Physical == nil ||
+			run.SelectedTrial == nil || run.Physical == nil ||
 			run.Physical.Status != opentopologysynthesis.PhysicalLoweringReady ||
 			!validSHA256(run.Physical.Hash) || len(run.Report.Diagnostics) != 0 {
 			return fmt.Errorf("passing synthesis lacks a complete selected and physically ready result")
 		}
 		selected := run.Report.Selected
+		selectedGraphHash, graphHashErr := opentopologysynthesis.GraphHash(*run.SelectedGraph)
+		selectedTopologyHash, topologyHashErr := opentopologysynthesis.TopologyHash(*run.SelectedGraph)
 		if !validSHA256(selected.TopologyHash) || !validSHA256(selected.ActiveStructureHash) ||
 			!validSHA256(selected.EvaluationHash) || selected.PhysicalHash != run.Physical.Hash ||
+			graphHashErr != nil || topologyHashErr != nil ||
 			run.Physical.RequirementHash != run.Report.RequirementHash ||
 			run.Physical.InventoryHash != run.Report.PrimitiveInventoryHash ||
-			run.Physical.GraphHash != selected.TopologyHash ||
+			selected.TopologyHash != selectedTopologyHash ||
+			run.Physical.GraphHash != selectedGraphHash ||
 			run.Physical.EvaluationHash != selected.EvaluationHash {
 			return fmt.Errorf("passing synthesis selection and physical evidence are not hash-linked")
 		}

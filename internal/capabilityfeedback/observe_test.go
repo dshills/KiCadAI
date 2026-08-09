@@ -63,6 +63,23 @@ func TestObserveClassifiesAuthoritativeTerminalOutcomes(t *testing.T) {
 	}
 }
 
+func TestObserveValidatesSeparateTopologyAndFullGraphHashes(t *testing.T) {
+	requirement := feedbackTestRequirement(t)
+	run := feedbackTestRun(t, requirement, opentopologysynthesis.StatusPassed, opentopologysynthesis.StopPassed)
+	if run.Report.Selected.TopologyHash == run.Physical.GraphHash {
+		t.Fatal("test graph does not distinguish topology and full graph hashes")
+	}
+	promotion := feedbackPassingPromotion(t, requirement, run)
+	meta := CaseMeta{ID: "case-hash-domains", Role: RoleDiscovery, Domain: capabilityevaluation.DomainAnalog, SafetyImpact: capabilityevaluation.SafetyReviewRequired}
+	if _, err := Observe(meta, requirement, run, &promotion); err != nil {
+		t.Fatalf("valid separate hash domains were rejected: %v", err)
+	}
+	run.Physical.GraphHash = run.Report.Selected.TopologyHash
+	if _, err := Observe(meta, requirement, run, &promotion); err == nil {
+		t.Fatal("topology hash substituted for full physical graph hash was accepted")
+	}
+}
+
 func TestObserveUsesUniversalDiagnosisAsRootAndSuppressesTerminalWrapper(t *testing.T) {
 	requirement := feedbackTestRequirement(t)
 	run := feedbackTestRun(t, requirement, opentopologysynthesis.StatusExhausted, opentopologysynthesis.StopRepairExhausted)
@@ -178,19 +195,37 @@ func feedbackTestRun(t *testing.T, requirement opentopologysynthesis.Requirement
 	}
 	if status == opentopologysynthesis.StatusPassed {
 		physicalHash := feedbackHash("physical-lowering")
+		resistance := 1000.0
+		graph := opentopologysynthesis.CandidateGraph{
+			Schema: opentopologysynthesis.CandidateGraphSchema, Version: opentopologysynthesis.CandidateGraphVersion,
+			Nodes: []opentopologysynthesis.GraphNode{
+				{ID: "input", Scope: "external", SemanticKind: "port", SemanticID: "input"},
+				{ID: "output", Scope: "external", SemanticKind: "port", SemanticID: "output"},
+			},
+			Instances: []opentopologysynthesis.GraphInstance{{
+				ID: "r1", PrimitiveKey: "resistor", Kind: "resistor", ValueSI: &resistance,
+				Terminals: []opentopologysynthesis.TerminalConnection{{Terminal: "1", Node: "input"}, {Terminal: "2", Node: "output"}},
+			}},
+		}
+		graphHash, err := opentopologysynthesis.GraphHash(graph)
+		if err != nil {
+			t.Fatal(err)
+		}
+		topologyHash, err := opentopologysynthesis.TopologyHash(graph)
+		if err != nil {
+			t.Fatal(err)
+		}
 		run.Report.Selected = &opentopologysynthesis.SelectedResult{
-			Fingerprint: "selected", TopologyHash: feedbackHash("topology"),
+			Fingerprint: "selected", TopologyHash: topologyHash,
 			ActiveStructureHash: feedbackHash("active-structure"), EvaluationHash: feedbackHash("evaluation"),
 			PhysicalHash: physicalHash,
 		}
-		run.SelectedGraph = &opentopologysynthesis.CandidateGraph{
-			Schema: opentopologysynthesis.CandidateGraphSchema, Version: opentopologysynthesis.CandidateGraphVersion,
-		}
+		run.SelectedGraph = &graph
 		run.SelectedTrial = &opentopologysynthesis.ValueTrial{Number: 1, Hash: feedbackHash("value-trial")}
 		run.Physical = &opentopologysynthesis.PhysicalLoweringResult{
 			Schema: opentopologysynthesis.PhysicalLoweringSchema, Version: opentopologysynthesis.PhysicalLoweringVersion,
 			PolicyVersion: opentopologysynthesis.PolicyVersion, RequirementHash: requirementHash,
-			InventoryHash: run.Report.PrimitiveInventoryHash, GraphHash: run.Report.Selected.TopologyHash,
+			InventoryHash: run.Report.PrimitiveInventoryHash, GraphHash: graphHash,
 			EvaluationHash: run.Report.Selected.EvaluationHash, Status: opentopologysynthesis.PhysicalLoweringReady,
 			Hash: physicalHash,
 		}

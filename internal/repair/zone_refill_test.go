@@ -150,6 +150,22 @@ func TestKiCadZoneRefillRunnerAllowsDRCViolationExitCode(t *testing.T) {
 	}
 }
 
+func TestKiCadZoneRefillRunnerReportsLaunchFailureWithoutStderr(t *testing.T) {
+	project := t.TempDir()
+	pcb := filepath.Join(project, "demo.kicad_pcb")
+	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
+		t.Fatalf("write pcb: %v", err)
+	}
+	runner := KiCadZoneRefillRunner{Runner: fakeCheckRunner{result: checks.CommandResult{
+		ExitCode: -1,
+		Err:      errors.New("signal: abort trap"),
+	}}}
+	_, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{})
+	if err == nil || !strings.Contains(err.Error(), "signal: abort trap") {
+		t.Fatalf("RefillZones() error = %v", err)
+	}
+}
+
 func TestDiscoverZoneRefillPCBRejectsAmbiguousDirectory(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"alpha.kicad_pcb", "beta.kicad_pcb"} {

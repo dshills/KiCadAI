@@ -90,6 +90,25 @@ func TestInitialEvaluationPolicyReservesBudgetsForAuthorizedRepairs(t *testing.T
 	}
 }
 
+func TestCandidateEvaluationPolicyAllowsAtomicCornerProofWithinGlobalBudget(t *testing.T) {
+	policy := DefaultPolicy()
+	policy.MaxCandidateSimulations = 128
+	policy.MaxCornerEvaluations = 2_048
+	policy.MaxValueTrials = 128
+	policy.MaxTopologyRepairs = 16
+	initial := synthesisInitialEvaluationPolicy(policy, 8)
+	consumed := Consumption{CandidateSimulations: 5, CornerEvaluations: 100, ValueTrials: 2}
+
+	got := synthesisCandidateEvaluationPolicy(policy, initial, consumed)
+	if got.MaxCornerEvaluations != 1_948 {
+		t.Fatalf("candidate corner budget = %d, want remaining global 1948", got.MaxCornerEvaluations)
+	}
+	if got.MaxCandidateSimulations != initial.MaxCandidateSimulations-consumed.CandidateSimulations ||
+		got.MaxValueTrials != initial.MaxValueTrials-consumed.ValueTrials {
+		t.Fatalf("candidate/value repair reserves changed: got=%#v initial=%#v", got, initial)
+	}
+}
+
 func TestSynthesisMarginNormalizesSubUnitQuantitiesRelatively(t *testing.T) {
 	minimum := 0.9e-6
 	actual := 1e-6

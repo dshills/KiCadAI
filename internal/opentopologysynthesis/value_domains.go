@@ -19,6 +19,11 @@ import (
 const (
 	valueCandidatesPerInstance              = architecturesearch.DefaultMaxValueCandidates
 	maxCatalogResistanceDividerCombinations = 4_096
+	// A nominal RC corner at the exact minimum bandwidth can fall below the
+	// requirement under reviewed component tolerances. Keep a fixed 25% design
+	// headroom in value ranking; trusted worst-case simulation still decides
+	// acceptance and this factor does not relax the declared bound.
+	minimumBandwidthDesignFactor = 1.25
 )
 
 func BuildValueSearchPlan(
@@ -880,7 +885,10 @@ func deriveAnalyticScales(requirement Requirement, primitive PrimitiveCandidate)
 			}
 		case "voltage_gain", "voltage_gain_at_frequency":
 			addRatioDerivedResistanceScales(&result, source, assertion.ID, "gain ratio applied to neutral resistance anchor", value, anchorResistance, 20)
-		case "cutoff_frequency":
+		case "cutoff_frequency", "bandwidth":
+			if assertion.Metric == "bandwidth" && assertion.Min != nil {
+				value = *assertion.Min * minimumBandwidthDesignFactor
+			}
 			if value > 0 {
 				add(AnalyticScale{ID: source + ":rc_capacitance", Kind: "capacitance", ValueSI: 1 / (2 * math.Pi * value * anchorResistance), Unit: "F", Derivation: "C=1/(2*pi*f*Ranchor)", SourceKind: "behavioral_assertion", SourceID: assertion.ID, Priority: 10})
 			}
@@ -1010,6 +1018,7 @@ func deriveTopologyAnalyticScales(
 		requirement,
 		graph,
 		instance,
+		inventory,
 	); len(scales) != 0 {
 		return scales
 	}
@@ -5772,6 +5781,7 @@ func deriveAnalogTransferTopologyScales(
 	requirement Requirement,
 	graph CandidateGraph,
 	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
 ) []AnalyticScale {
 	gain, cutoff := 0.0, 0.0
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
@@ -5781,8 +5791,11 @@ func deriveAnalogTransferTopologyScales(
 			if target > gain {
 				gain = target
 			}
-		case "cutoff_frequency":
+		case "cutoff_frequency", "bandwidth":
 			target := assertionTarget(assertion)
+			if assertion.Metric == "bandwidth" && assertion.Min != nil {
+				target = *assertion.Min * minimumBandwidthDesignFactor
+			}
 			if target > 0 {
 				cutoff = target
 			}
@@ -5821,6 +5834,100 @@ func deriveAnalogTransferTopologyScales(
 		}
 		inputNode := ""
 		referenceNode := ""
+		supplyNode := ""
+		for _, node := range graph.Nodes {
+			if node.Role == "input" &&
+				between("resistor", terminals["IN_MINUS"], node.ID) != "" {
+				inputNode = node.ID
+			}
+			if node.Role == "reference" {
+				referenceNode = node.ID
+			}
+			if node.Role == "supply" {
+				supplyNode = node.ID
+			}
+		}
+		feedbackInput := between("resistor", terminals["IN_MINUS"], inputNode)
+		feedbackOutput := between("resistor", terminals["IN_MINUS"], terminals["OUT"])
+		seriesFeedbackValues := map[string]float64{}
+		if feedbackOutput == "" {
+			leftValue, rightValue, found := catalogSeriesResistancePair(
+				requirement, inventory, 10_000*gain,
+			)
+			if found {
+				for _, middle := range graph.Nodes {
+					if middle.Scope != "internal" || middle.ID == terminals["IN_MINUS"] ||
+						middle.ID == terminals["IN_PLUS"] || middle.ID == terminals["OUT"] {
+						continue
+					}
+					leftID := between("resistor", terminals["IN_MINUS"], middle.ID)
+					rightID := between("resistor", middle.ID, terminals["OUT"])
+					if leftID != "" && rightID != "" {
+						seriesFeedbackValues[leftID] = leftValue
+						seriesFeedbackValues[rightID] = rightValue
+						break
+					}
+				}
+			}
+		}
+		biasUpper := between("resistor", supplyNode, terminals["IN_PLUS"])
+		biasLower := between("resistor", terminals["IN_PLUS"], referenceNode)
+		biasCapacitor := between("capacitor", terminals["IN_PLUS"], referenceNode)
+		if feedbackInput != "" && (feedbackOutput != "" || len(seriesFeedbackValues) == 2) && biasUpper != "" &&
+			biasLower != "" && biasCapacitor != "" {
+			bias, ok := topologyBiasedInvertingReference(
+				requirement, graph, inputNode, terminals["OUT"], supplyNode, referenceNode, gain,
+			)
+			supplyVoltage, supplyOK := topologyNodeNominalVoltage(requirement, graph, supplyNode)
+			referenceVoltage, referenceOK := topologyNodeNominalVoltage(requirement, graph, referenceNode)
+			if !ok || !supplyOK || !referenceOK {
+				continue
+			}
+			const anchorResistance = 10_000.0
+			lowerResistance := anchorResistance
+			upperResistance := lowerResistance * (supplyVoltage - bias) / (bias - referenceVoltage)
+			theveninResistance := upperResistance * lowerResistance / (upperResistance + lowerResistance)
+			switch instance.ID {
+			case feedbackInput:
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:input", Kind: "resistance", ValueSI: anchorResistance, Unit: "ohm",
+					Derivation: "neutral input resistance for bounded inverting magnitude gain", SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+				}}
+			case feedbackOutput:
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:feedback", Kind: "resistance", ValueSI: anchorResistance * gain, Unit: "ohm",
+					Derivation: "R_feedback=R_input*|A_v| for bounded affine magnitude gain", SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+				}}
+			case biasLower:
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:bias_lower", Kind: "resistance", ValueSI: lowerResistance, Unit: "ohm",
+					Derivation: "neutral lower resistance for the behavior-derived affine reference", SourceKind: "candidate_topology", SourceID: terminals["IN_PLUS"], Priority: 1,
+				}}
+			case biasUpper:
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:bias_upper", Kind: "resistance", ValueSI: upperResistance, Unit: "ohm",
+					Derivation: "rail-divider ratio derived from nominal input, output, and magnitude gain", SourceKind: "candidate_topology", SourceID: terminals["IN_PLUS"], Priority: 1,
+				}}
+			case biasCapacitor:
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:bias_bypass", Kind: "capacitance", ValueSI: 10 / (2 * math.Pi * cutoff * theveninResistance), Unit: "F",
+					Derivation: "bias-reference pole placed one decade below the required signal bandwidth", SourceKind: "candidate_topology", SourceID: terminals["IN_PLUS"], Priority: 1,
+				}}
+			}
+			if value, found := seriesFeedbackValues[instance.ID]; found {
+				side := "input_side"
+				if between("resistor", instance.Terminals[0].Node, terminals["OUT"]) == instance.ID ||
+					between("resistor", instance.Terminals[1].Node, terminals["OUT"]) == instance.ID {
+					side = "output_side"
+				}
+				return []AnalyticScale{{
+					ID: "topology:affine_transfer:series_feedback_" + side, Kind: "resistance", ValueSI: value, Unit: "ohm",
+					Derivation: "catalog-ranked series feedback composition realizes the bounded affine magnitude gain", SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+				}}
+			}
+		}
+		inputNode = ""
+		referenceNode = ""
 		for _, node := range graph.Nodes {
 			if node.Role == "input" &&
 				between("resistor", terminals["IN_PLUS"], node.ID) != "" {

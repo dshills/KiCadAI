@@ -28,6 +28,85 @@ func TestActiveControlValueUsesRisingStartupExcitation(t *testing.T) {
 	}
 }
 
+func TestActiveControlValueUsesBehavioralRisingEventWithoutExcitationAnnotation(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		Ports: []Port{
+			{ID: "gate", Kind: "digital", Direction: "sink", Electrical: Electrical{DefaultState: "low"}},
+			{ID: "rail", Kind: "power", Direction: "source"},
+		},
+		OperatingCases: []OperatingCase{{
+			ID: "turn_on",
+			Events: []OperatingEvent{{
+				ID: "rise", Kind: "input_step", Target: "gate",
+				Initial: 0, Applied: 3.3, Unit: "V",
+			}},
+		}},
+		BehavioralRequirements: []BehavioralAssertion{{
+			ID: "regulated", Analysis: simmodel.AnalysisDCOperatingPoint,
+			Metric: "output_voltage", Observation: Observation{Kind: "port", ID: "rail"},
+		}},
+	}}
+
+	active, found := requirementActiveControlValue(requirement, "gate")
+	if !found || active != 3.3 {
+		t.Fatalf("active gate = %.12g, %t; want 3.3 V inferred from a declared rising behavior event", active, found)
+	}
+}
+
+func TestHarnessDoesNotCombineAlternativeCrossCaseLoadMagnitudes(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		Ports: []Port{{ID: "out", Kind: "power", Direction: "source"}},
+		OperatingCases: []OperatingCase{
+			{ID: "current_load", Conditions: []OperatingCondition{{Axis: "load_current", Target: "out", Min: .1, Max: 1, Unit: "A"}}},
+			{ID: "resistive_load", Conditions: []OperatingCondition{{Axis: "load_resistance", Target: "out", Min: 5, Max: 50, Unit: "ohm"}}},
+		},
+	}}
+	assertion := BehavioralAssertion{Observation: Observation{Kind: "port", ID: "out"}}
+	for _, test := range []struct {
+		name, caseID, wantAxis, rejectAxis string
+	}{
+		{name: "declared current load", caseID: "current_load", wantAxis: "load_current", rejectAxis: "load_resistance"},
+		{name: "declared resistive load", caseID: "resistive_load", wantAxis: "load_resistance", rejectAxis: "load_current"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var operatingCase OperatingCase
+			for _, candidate := range requirement.Requirements.OperatingCases {
+				if candidate.ID == test.caseID {
+					operatingCase = candidate
+				}
+			}
+			foundWanted, foundRejected := false, false
+			for _, condition := range simulationHarnessConditions(requirement, assertion, operatingCase) {
+				if condition.Target != "out" {
+					continue
+				}
+				foundWanted = foundWanted || condition.Axis == test.wantAxis
+				foundRejected = foundRejected || condition.Axis == test.rejectAxis
+			}
+			if !foundWanted || foundRejected {
+				t.Fatalf("cross-case load conditions wanted=%t rejected=%t", foundWanted, foundRejected)
+			}
+		})
+	}
+}
+
+func TestLoadMeasurementRejectsMultipleExplicitLoadMagnitudes(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		Ports: []Port{{ID: "out", Kind: "power", Direction: "source"}},
+	}}
+	graph := CandidateGraph{Nodes: []GraphNode{{
+		ID: "port_out", Scope: "external", SemanticKind: "port", SemanticID: "out", Role: "output",
+	}}}
+	assertion := BehavioralAssertion{Observation: Observation{Kind: "port", ID: "out"}}
+	operatingCase := OperatingCase{Conditions: []OperatingCondition{
+		{Axis: "load_current", Target: "out", Min: 1, Max: 1, Unit: "A"},
+		{Axis: "load_resistance", Target: "out", Min: 5, Max: 5, Unit: "ohm"},
+	}}
+	if component, found := loadMeasurementComponent(requirement, assertion, operatingCase, operatingCorner{}, graph); found {
+		t.Fatalf("ambiguous explicit load measurement selected %q", component)
+	}
+}
+
 func TestPowerTransferDistortionExcitationUsesFeasiblePowerLoadIntersection(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t, filepath.Join(multiStageOODCorpusRoot(), "bounded_audio_power_transfer.json"),
@@ -350,7 +429,10 @@ func TestTrustedSimulationEvaluationReportsStableFailureAndBudgets(t *testing.T)
 		tiny,
 	)
 	if exhausted.Status != SimulationEvaluationExhausted || !exhausted.Consumption.BudgetExhausted ||
-		len(exhausted.Issues) != 1 || exhausted.Issues[0].Code != CodeSearchExhausted {
+		len(exhausted.Issues) != 1 || exhausted.Issues[0].Code != CodeSearchExhausted ||
+		exhausted.Consumption.CandidateSimulations > tiny.MaxCandidateSimulations ||
+		exhausted.Consumption.CornerEvaluations > tiny.MaxCornerEvaluations ||
+		len(exhausted.Attempts) != 0 {
 		t.Fatalf("exhausted evaluation = status=%s consumption=%#v issues=%#v", exhausted.Status, exhausted.Consumption, exhausted.Issues)
 	}
 

@@ -19,6 +19,23 @@ const (
 	maxWorstCaseWorkers          = 8
 )
 
+// CornerEvaluationUpperBound returns the maximum number of report corners an
+// evaluation can produce for a resolved plan. Callers use this before starting
+// an atomic worst-case analysis so an explicit work budget is never exceeded.
+// Directed corners can collapse onto existing deterministic corners; counting
+// both directions for every assertion is therefore conservative and stable.
+func CornerEvaluationUpperBound(plan Plan) int {
+	if !plan.WorstCase {
+		return 0
+	}
+	groups := groupedUncertainties(plan.Uncertainties)
+	result := 1 + len(deterministicCorners(plan.Uncertainties))
+	if len(groups) > maxExhaustiveWorstCaseGroups {
+		result += 2 * len(plan.Assertions)
+	}
+	return result
+}
+
 // EvaluateWorstCase evaluates the nominal point and each one-at-a-time
 // endpoint. Compact plans also receive complete lower/upper enumeration.
 // Larger plans receive a deterministic pairwise covering array followed by

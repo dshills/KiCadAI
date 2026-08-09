@@ -2828,7 +2828,7 @@ func topologyDecisionObligation(requirement Requirement) (int, bool) {
 
 // topologyAnalogRelationshipSeeds constructs active-transfer candidates with a
 // real input time constant when the requested behavior simultaneously requires
-// gain above unity and a bounded cutoff. It retains both an incomplete
+// gain above unity and a bounded cutoff or bandwidth. It retains both an incomplete
 // feedback relationship for diagnosis-driven graph repair and the corresponding
 // closed-loop relationship; both come only from gain and frequency obligations.
 func topologyAnalogRelationshipSeeds(
@@ -2841,17 +2841,16 @@ func topologyAnalogRelationshipSeeds(
 	policy Policy,
 	initial topologySearchState,
 ) ([]TopologyCandidate, Consumption, map[string][]string) {
-	requireGain, requireCutoff := false, false
+	gain, requireCutoff := 0.0, false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		switch assertion.Metric {
 		case "voltage_gain":
-			requireGain = requireGain ||
-				(assertion.Min != nil && *assertion.Min > 1)
-		case "cutoff_frequency":
+			gain = math.Max(gain, assertionTarget(assertion))
+		case "cutoff_frequency", "bandwidth":
 			requireCutoff = true
 		}
 	}
-	if !requireGain || !requireCutoff {
+	if gain <= 1 || !requireCutoff {
 		return nil, Consumption{}, map[string][]string{}
 	}
 	var opamp, resistor, capacitor PrimitiveCandidate
@@ -3026,6 +3025,100 @@ func topologyAnalogRelationshipSeeds(
 							retained[topologyHash] = candidate
 						}
 					}
+
+					// A bipolar input mapped into a unipolar output range implies an
+					// affine level translation, not a ground-referenced non-inverting
+					// stage. Derive an inverting magnitude-gain relationship around a
+					// rail-divided positive reference. This uses only declared port
+					// ranges, nominal values, rails, and gain; no circuit-family identity
+					// or corpus metadata participates.
+					if _, needsBias := topologyBiasedInvertingReference(
+						requirement, initial.graph, input, output, supply, reference, gain,
+					); needsBias {
+						biased := initial
+						var summingNode, biasNode string
+						biased, summingNode = addRelationshipInternalNode(
+							biased, requirement, inventoryByKey, &consumption,
+						)
+						biased, biasNode = addRelationshipInternalNode(
+							biased, requirement, inventoryByKey, &consumption,
+						)
+						if summingNode != "" && biasNode != "" &&
+							internalNodeCount(biased.graph) <= limits.MaxInternalNodes {
+							biased = addRelationshipPrimitive(
+								biased, requirement, inventoryByKey, opamp,
+								[]TerminalConnection{
+									{Terminal: "IN_MINUS", Node: summingNode},
+									{Terminal: "IN_PLUS", Node: biasNode},
+									{Terminal: "OUT", Node: output},
+									{Terminal: "V_MINUS", Node: reference},
+									{Terminal: "V_PLUS", Node: supply},
+								},
+								&consumption,
+							)
+							for _, edge := range [][2]string{
+								{input, summingNode},
+								{supply, biasNode},
+								{biasNode, reference},
+							} {
+								biased = addRelationshipPrimitive(
+									biased, requirement, inventoryByKey, resistor,
+									topologyTwoTerminalPlacement(edge[0], edge[1]),
+									&consumption,
+								)
+							}
+							if analogInvertingSeriesFeedbackRequired(requirement, inventoryByKey, gain) {
+								var feedbackJoin string
+								biased, feedbackJoin = addRelationshipInternalNode(
+									biased, requirement, inventoryByKey, &consumption,
+								)
+								if feedbackJoin != "" {
+									for _, edge := range [][2]string{
+										{summingNode, feedbackJoin},
+										{feedbackJoin, output},
+									} {
+										biased = addRelationshipPrimitive(
+											biased, requirement, inventoryByKey, resistor,
+											topologyTwoTerminalPlacement(edge[0], edge[1]),
+											&consumption,
+										)
+									}
+								}
+							} else {
+								biased = addRelationshipPrimitive(
+									biased, requirement, inventoryByKey, resistor,
+									topologyTwoTerminalPlacement(summingNode, output),
+									&consumption,
+								)
+							}
+							biased = addRelationshipPrimitive(
+								biased, requirement, inventoryByKey, capacitor,
+								topologyTwoTerminalPlacement(biasNode, reference),
+								&consumption,
+							)
+							if len(biased.graph.Instances) <= limits.MaxPrimitiveInstances &&
+								consumption.GeneratedGraphs <= policy.MaxGeneratedGraphs {
+								if issues := ValidateCompleteGraph(biased.graph, inventory, limits); len(issues) == 0 {
+									normalized, err := NormalizeGraph(biased.graph)
+									if err == nil {
+										topologyHash, hashErr := TopologyHash(normalized)
+										if hashErr == nil {
+											consumption.CompleteGraphs++
+											candidate := TopologyCandidate{
+												Fingerprint: biased.hash, TopologyHash: topologyHash,
+												Score: biased.score, Graph: normalized,
+												Operations: cloneGraphOperations(biased.operations),
+											}
+											if existing, found := retained[topologyHash]; !found ||
+												compareTopologyCandidates(candidate, existing) < 0 {
+												retained[topologyHash] = candidate
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -3036,6 +3129,86 @@ func topologyAnalogRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+// analogInvertingSeriesFeedbackRequired reports whether the reviewed catalog
+// can satisfy the declared magnitude-gain interval with a two-resistor series
+// feedback arm but not with one resistor. The decision is derived only from
+// the behavior and immutable inventory, so sparse value catalogs gain a
+// reusable composition without manufacturing an unevidenced value.
+func analogInvertingSeriesFeedbackRequired(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	gain float64,
+) bool {
+	if gain <= 1 {
+		return false
+	}
+	const inputResistance = 10_000.0
+	withinBounds := func(realizedGain float64) bool {
+		for _, assertion := range requirement.Requirements.BehavioralRequirements {
+			if assertion.Metric != "voltage_gain" && assertion.Metric != "voltage_gain_at_frequency" {
+				continue
+			}
+			if assertion.Min != nil && realizedGain < *assertion.Min {
+				return false
+			}
+			if assertion.Max != nil && realizedGain > *assertion.Max {
+				return false
+			}
+		}
+		return true
+	}
+	target := inputResistance * gain
+	if direct, found := topologyCatalogResistanceClosest(requirement, inventory, target); found &&
+		withinBounds(direct/inputResistance) {
+		return false
+	}
+	left, right, found := catalogSeriesResistancePair(requirement, inventory, target)
+	return found && withinBounds((left+right)/inputResistance)
+}
+
+func topologyBiasedInvertingReference(
+	requirement Requirement,
+	graph CandidateGraph,
+	inputNode string,
+	outputNode string,
+	supplyNode string,
+	referenceNode string,
+	gain float64,
+) (float64, bool) {
+	portForNode := func(nodeID string) (Port, bool) {
+		for _, node := range graph.Nodes {
+			if node.ID == nodeID && node.Scope == "external" {
+				return requirementPort(requirement, node.SemanticID)
+			}
+		}
+		return Port{}, false
+	}
+	input, inputFound := portForNode(inputNode)
+	output, outputFound := portForNode(outputNode)
+	if !inputFound || !outputFound || gain <= 1 ||
+		input.Electrical.MinVoltageV == nil || input.Electrical.NominalVoltageV == nil || input.Electrical.MaxVoltageV == nil ||
+		output.Electrical.MinVoltageV == nil || output.Electrical.NominalVoltageV == nil || output.Electrical.MaxVoltageV == nil {
+		return 0, false
+	}
+	supplyVoltage, supplyFound := topologyNodeNominalVoltage(requirement, graph, supplyNode)
+	referenceVoltage, referenceFound := topologyNodeNominalVoltage(requirement, graph, referenceNode)
+	if !supplyFound || !referenceFound || supplyVoltage <= referenceVoltage ||
+		*input.Electrical.MinVoltageV >= referenceVoltage ||
+		*output.Electrical.MinVoltageV < referenceVoltage {
+		return 0, false
+	}
+	bias := (*output.Electrical.NominalVoltageV + gain**input.Electrical.NominalVoltageV) / (1 + gain)
+	minimumOutput := (1+gain)*bias - gain**input.Electrical.MaxVoltageV
+	maximumOutput := (1+gain)*bias - gain**input.Electrical.MinVoltageV
+	epsilon := math.Max(1, math.Abs(supplyVoltage)) * 1e-9
+	if bias <= referenceVoltage+epsilon || bias >= supplyVoltage-epsilon ||
+		minimumOutput < *output.Electrical.MinVoltageV-epsilon ||
+		maximumOutput > *output.Electrical.MaxVoltageV+epsilon {
+		return 0, false
+	}
+	return bias, true
 }
 
 type fullWaveBehaviorEnvelope struct {

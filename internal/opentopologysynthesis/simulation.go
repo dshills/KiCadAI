@@ -171,10 +171,21 @@ func EvaluateCandidate(
 				graph,
 				inventory,
 				environment,
+				result.Policy.MaxCornerEvaluations-result.Consumption.CornerEvaluations,
 			)
+			if attempt.Status == SimulationEvaluationExhausted {
+				result.Status = SimulationEvaluationExhausted
+				result.Consumption.BudgetExhausted = true
+				result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "simulation.policy", "remaining operating-corner budget cannot contain the next atomic worst-case proof", "increase the explicit count budget or narrow the operating envelope")}
+				return finalizeSimulationEvaluation(result)
+			}
 			attempt.Number = len(result.Attempts) + 1
 			result.Attempts = append(result.Attempts, attempt)
 			result.Diagnoses = append(result.Diagnoses, diagnoses...)
+			// The atomic proof was preflighted above. Charge its outer attempt and
+			// every returned worst-case corner before the next iteration derives
+			// the remaining budget; an exhausted preflight performs no simulation
+			// and returns before this accounting boundary.
 			result.Consumption.CandidateSimulations++
 			result.Consumption.CornerEvaluations++
 			if attempt.Report != nil {
@@ -243,6 +254,7 @@ func evaluateAssertionCorner(
 	graph CandidateGraph,
 	inventory PrimitiveInventory,
 	environment SimulationEnvironment,
+	cornerBudget ...int,
 ) (SimulationAttempt, []Diagnosis) {
 	attempt := SimulationAttempt{
 		RequirementID: assertion.ID,
@@ -363,6 +375,11 @@ func evaluateAssertionCorner(
 	if len(resolveDiagnostics) != 0 {
 		attempt.Diagnostics = normalizeSimModelDiagnostics(resolveDiagnostics)
 		return attempt, []Diagnosis{diagnosisFromSimulationDiagnostics(assertion, operatingCase.ID+"/"+corner.ID, graph, attempt.Diagnostics)}
+	}
+	if len(cornerBudget) != 0 &&
+		1+simmodel.CornerEvaluationUpperBound(plan) > cornerBudget[0] {
+		attempt.Status = SimulationEvaluationExhausted
+		return attempt, nil
 	}
 	report, evaluateDiagnostics := simmodel.Evaluate(plan)
 	attempt.ReportHash = hashJSON(report)
@@ -952,10 +969,41 @@ func simulationHarnessConditions(
 	if len(loadTargets) == 0 && len(controlTargets) == 0 && len(excitationTargets) == 0 {
 		return result
 	}
+	loadMagnitudeAxis := map[string]string{}
+	ambiguousLoadMagnitude := map[string]bool{}
+	recordLoadMagnitude := func(condition OperatingCondition) {
+		if condition.Axis != "load_current" && condition.Axis != "load_resistance" {
+			return
+		}
+		if previous := loadMagnitudeAxis[condition.Target]; previous != "" && previous != condition.Axis {
+			ambiguousLoadMagnitude[condition.Target] = true
+			return
+		}
+		loadMagnitudeAxis[condition.Target] = condition.Axis
+	}
+	for _, condition := range result {
+		recordLoadMagnitude(condition)
+	}
+	for target := range loadTargets {
+		if loadMagnitudeAxis[target] != "" || ambiguousLoadMagnitude[target] {
+			continue
+		}
+		for _, candidateCase := range requirement.Requirements.OperatingCases {
+			for _, condition := range candidateCase.Conditions {
+				if condition.Target == target {
+					recordLoadMagnitude(condition)
+				}
+			}
+		}
+	}
 	for _, candidateCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range candidateCase.Conditions {
 			loadCondition := loadTargets[condition.Target] &&
 				slices.Contains([]string{"load_capacitance", "load_current", "load_inductance", "load_resistance"}, condition.Axis)
+			if loadCondition && (condition.Axis == "load_current" || condition.Axis == "load_resistance") &&
+				(ambiguousLoadMagnitude[condition.Target] || loadMagnitudeAxis[condition.Target] != condition.Axis) {
+				continue
+			}
 			controlCondition := controlTargets[condition.Target] &&
 				slices.Contains([]string{"control_voltage", "input_voltage"}, condition.Axis)
 			excitationCondition := excitationTargets[condition.Target] &&
@@ -1092,6 +1140,7 @@ func simulationAssertionRequiresActiveControl(requirement Requirement, assertion
 // and circuit assertions.
 func requirementActiveControlValue(requirement Requirement, controlID string) (float64, bool) {
 	activationControl := false
+	active := math.Inf(-1)
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
 			assertion.Excitation.ID != controlID {
@@ -1104,20 +1153,22 @@ func requirementActiveControlValue(requirement Requirement, controlID string) (f
 			activationControl = true
 		}
 	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, event := range operatingCase.Events {
+			if event.Target == controlID && event.Kind == "input_step" && event.Applied > event.Initial {
+				activationControl = true
+				active = math.Max(active, event.Applied)
+			}
+		}
+	}
 	if !activationControl {
 		return 0, false
 	}
-	active := math.Inf(-1)
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			if condition.Target == controlID &&
 				(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
 				active = math.Max(active, condition.Max)
-			}
-		}
-		for _, event := range operatingCase.Events {
-			if event.Target == controlID && event.Kind == "input_step" && event.Applied > event.Initial {
-				active = math.Max(active, event.Applied)
 			}
 		}
 	}
@@ -2130,16 +2181,22 @@ func loadMeasurementComponent(
 			return loadInstanceID(condition.Target, condition.Axis), true
 		}
 	}
+	components := []string{}
 	for _, condition := range conditions {
 		if condition.Axis != "load_resistance" && condition.Axis != "load_current" {
 			continue
 		}
 		target, found := externalNodeForSemanticTarget(graph, condition.Target)
 		if found && target.ID == observationNode {
-			return loadInstanceID(condition.Target, condition.Axis), true
+			components = append(components, loadInstanceID(condition.Target, condition.Axis))
 		}
 	}
-	return "", false
+	slices.Sort(components)
+	components = slices.Compact(components)
+	if len(components) != 1 {
+		return "", false
+	}
+	return components[0], true
 }
 
 func dominantSupplySource(requirement Requirement, graph CandidateGraph) (string, bool) {

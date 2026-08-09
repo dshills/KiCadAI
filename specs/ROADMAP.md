@@ -78,7 +78,11 @@ from validation feedback to safe automatic repair.
   A separately frozen discovery/held-out corpus must select the rank-1 reusable
   capability before implementation, then prove strict held-out uplift without
   weakening existing gates. See the
-  [specification](closed-loop-open-set-capability-expansion/SPEC.md).
+  [specification](closed-loop-open-set-capability-expansion/SPEC.md). The V1
+  blind run improved discovery from zero to two passes but produced no held-out
+  pass, so completion is not claimed and the consumed validation set will not
+  be tuned against. See the [validation audit](closed-loop-open-set-capability-expansion/V1_VALIDATION_AUDIT.md)
+  and [V2 continuation protocol](closed-loop-open-set-capability-expansion/V2_CONTINUATION_PROTOCOL.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic

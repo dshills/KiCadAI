@@ -192,7 +192,9 @@ func Synthesize(
 				break
 			}
 			work := valueTrials[candidateIndex][trialIndex]
-			evaluationPolicy := remainingSynthesisPolicy(initialEvaluationPolicy, run.Report.Consumption)
+			evaluationPolicy := synthesisCandidateEvaluationPolicy(
+				policy, initialEvaluationPolicy, run.Report.Consumption,
+			)
 			evaluation := EvaluateCandidate(
 				ctx, requirement, work.graph, nil, inventory, environment, evaluationPolicy,
 			)
@@ -403,6 +405,21 @@ func synthesisInitialEvaluationPolicy(policy Policy, retainedCandidates int) Pol
 	result.MaxValueTrials = synthesisInitialBudgetShare(
 		policy.MaxValueTrials, retainedCandidates, repairSlots,
 	)
+	return result
+}
+
+// synthesisCandidateEvaluationPolicy retains the candidate/value share that
+// protects bounded repair work, but permits one simulation attempt to finish
+// its atomic sensitivity-corner report up to the global hard limit. A single
+// assertion can legitimately contain more corners than the proportional
+// initial share and cannot be resumed without repeating already-counted work.
+func synthesisCandidateEvaluationPolicy(
+	policy Policy,
+	initial Policy,
+	consumed Consumption,
+) Policy {
+	result := remainingSynthesisPolicy(initial, consumed)
+	result.MaxCornerEvaluations = max(0, policy.MaxCornerEvaluations-consumed.CornerEvaluations)
 	return result
 }
 

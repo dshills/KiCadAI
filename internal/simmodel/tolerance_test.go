@@ -55,6 +55,9 @@ func TestEvaluateWorstCaseBlocksNominalOnlyDivider(t *testing.T) {
 	if len(report.Corners) != 9 || len(report.Sensitivity) == 0 {
 		t.Fatalf("bounded evidence=%#v", report)
 	}
+	if upper := CornerEvaluationUpperBound(plan); len(report.Corners) > upper || upper != 9 {
+		t.Fatalf("corner upper bound=%d report corners=%d, want exact compact bound 9", upper, len(report.Corners))
+	}
 	if !strings.Contains(diagnostics[0].Message, "dominant contributor") {
 		t.Fatalf("missing attribution: %#v", diagnostics)
 	}
@@ -110,6 +113,10 @@ func TestEightIndependentUncertaintyGroupsRemainDeterministicallyBounded(t *test
 	if len(corners) != want {
 		t.Fatalf("corners=%d, want %d", len(corners), want)
 	}
+	plan := Plan{WorstCase: true, Uncertainties: uncertainties, Assertions: []Assertion{{Metric: "lower"}, {Metric: "upper"}}}
+	if upper := CornerEvaluationUpperBound(plan); upper != 1+want+2*len(plan.Assertions) {
+		t.Fatalf("large-plan corner upper bound=%d, want %d", upper, 1+want+2*len(plan.Assertions))
+	}
 	unique, resultIndex := uniqueCornerEvaluationPlan(corners)
 	if len(unique) != want || len(resultIndex) != want {
 		t.Fatalf("unique corners=%d indices=%d, want %d", len(unique), len(resultIndex), want)
@@ -127,6 +134,28 @@ func TestEightIndependentUncertaintyGroupsRemainDeterministicallyBounded(t *test
 				t.Fatalf("groups %d/%d pair coverage = %#v", first, second, combinations)
 			}
 		}
+	}
+}
+
+func TestCornerEvaluationUpperBoundMatchesExhaustiveBoundary(t *testing.T) {
+	uncertainties := make([]Uncertainty, maxExhaustiveWorstCaseGroups)
+	for index := range uncertainties {
+		uncertainties[index] = Uncertainty{
+			Target:  fmt.Sprintf("devices.r%02d.value_si", index),
+			Source:  fmt.Sprintf("catalog:r%02d:tolerance", index),
+			Nominal: 1000,
+			Minimum: 990,
+			Maximum: 1010,
+		}
+	}
+	plan := Plan{WorstCase: true, Uncertainties: uncertainties, Assertions: []Assertion{{Metric: "bounded"}}}
+	wantDeterministic := 2*maxExhaustiveWorstCaseGroups + 1<<maxExhaustiveWorstCaseGroups
+	want := 1 + wantDeterministic
+	if corners := len(deterministicCorners(uncertainties)); corners != wantDeterministic {
+		t.Fatalf("exhaustive deterministic corners=%d, want one-at-a-time plus full enumeration=%d", corners, wantDeterministic)
+	}
+	if upper := CornerEvaluationUpperBound(plan); upper != want {
+		t.Fatalf("exhaustive corner upper bound=%d, want nominal plus full enumeration=%d", upper, want)
 	}
 }
 

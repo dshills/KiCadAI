@@ -239,7 +239,9 @@ func promoteClosedLoopRun(t *testing.T, id string, run ots.SynthesisRun, environ
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	index, issues := libraryresolver.Load(ctx, libraryresolver.LibraryRoots{SymbolsRoot: symbols, FootprintsRoot: footprints}, libraryresolver.LoadOptions{})
-	for _, issue := range issues {
+	closure, closureIssues := resolveClosedLoopLibraryClosure(index, run)
+	closureIssues = append(closureIssues, libraryresolver.DesignClosureIssuesFrom(issues, closure)...)
+	for _, issue := range closureIssues {
 		if issue.Severity == reports.SeverityError || issue.Severity == reports.SeverityBlocked {
 			t.Fatalf("%s library index issue: %#v", id, issue)
 		}
@@ -247,6 +249,32 @@ func promoteClosedLoopRun(t *testing.T, id string, run ots.SynthesisRun, environ
 	return ots.PromoteSynthesisRun(ctx, run, environment, ots.PhysicalPromotionOptions{
 		OutputRoot: filepath.Join(t.TempDir(), id), KiCadCLI: cli, LibraryIndex: &index, Timeout: 3 * time.Minute,
 	})
+}
+
+func resolveClosedLoopLibraryClosure(index libraryresolver.LibraryIndex, run ots.SynthesisRun) (libraryresolver.DesignClosure, []reports.Issue) {
+	request := libraryresolver.ClosureRequest{}
+	if run.Physical == nil {
+		return libraryresolver.ResolveDesignClosure(index, request)
+	}
+	for _, component := range run.Physical.Resolved.Components {
+		symbol := libraryresolver.SymbolReference{LibraryID: component.SymbolID}
+		for _, unit := range component.Units {
+			symbol.Units = append(symbol.Units, unit.Unit)
+		}
+		footprint := libraryresolver.FootprintReference{LibraryID: component.FootprintID}
+		for _, function := range component.Functions {
+			symbol.Pins = append(symbol.Pins, function.SymbolPin)
+			footprint.Pads = append(footprint.Pads, function.Pad)
+		}
+		request.Symbols = append(request.Symbols, symbol)
+		request.Footprints = append(request.Footprints, footprint)
+		request.Variants = append(request.Variants, libraryresolver.VariantReference{
+			ComponentID: component.ComponentID,
+			VariantID:   component.VariantID,
+			FootprintID: component.FootprintID,
+		})
+	}
+	return libraryresolver.ResolveDesignClosure(index, request)
 }
 
 func closedLoopKiCadCLI(t *testing.T) string {
@@ -486,5 +514,28 @@ func TestClosedLoopBaselineHashRejectsMutation(t *testing.T) {
 	}
 	if mutated == hash {
 		t.Fatal("baseline mutation did not change its content hash")
+	}
+}
+
+func TestClosedLoopPromotionLibraryClosureIgnoresUnselectedDiagnostics(t *testing.T) {
+	index := libraryresolver.LibraryIndex{
+		Symbols: map[string]libraryresolver.SymbolRecord{
+			"Device:R": {LibraryID: "Device:R", LibraryNickname: "Device", Path: "/symbols/Device.kicad_sym"},
+		},
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Resistor_SMD:R_0603": {FootprintID: "Resistor_SMD:R_0603", LibraryNickname: "Resistor_SMD", Path: "/footprints/Resistor_SMD.pretty/R_0603.kicad_mod"},
+		},
+	}
+	run := ots.SynthesisRun{Physical: &ots.PhysicalLoweringResult{Resolved: circuitgraph.ResolvedDocument{Components: []circuitgraph.ResolvedComponent{{
+		ComponentID: "resistor.generic", VariantID: "0603", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0603",
+		Units: []circuitgraph.ResolvedUnit{{Unit: 1}}, Functions: []circuitgraph.ResolvedFunction{{SymbolPin: "1", Pad: "1"}},
+	}}}}}
+	closure, issues := resolveClosedLoopLibraryClosure(index, run)
+	if len(issues) != 0 || len(closure.Symbols) != 1 || len(closure.Footprints) != 1 || len(closure.Variants) != 1 {
+		t.Fatalf("closure=%#v issues=%#v", closure, issues)
+	}
+	loadIssues := []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "library.symbol.Unrelated:Bad", Message: "unselected defect"}}
+	if filtered := libraryresolver.DesignClosureIssuesFrom(loadIssues, closure); len(filtered) != 0 {
+		t.Fatalf("unselected library diagnostic leaked into design closure: %#v", filtered)
 	}
 }
