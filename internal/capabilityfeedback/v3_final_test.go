@@ -23,6 +23,7 @@ const (
 	closedLoopV3HeldOutFinalKeyEnv        = "KICADAI_V3_HELD_OUT_FINAL_KEY_FILE"
 	closedLoopV3FinalRoot                 = "testdata/closed_loop_open_set_v3_final"
 	closedLoopV3HeldOutFinalFile          = "held_out_final.sealed"
+	closedLoopV3ValidationAuditFile       = "V3_VALIDATION_AUDIT.md"
 )
 
 type closedLoopV3ImplementationSeal struct {
@@ -107,8 +108,21 @@ type closedLoopV3HeldOutFinalSeal struct {
 	Hash                string `json:"hash"`
 }
 
-func TestClosedLoopV3ReviewedImplementationIsFrozen(t *testing.T) {
-	loadClosedLoopV3ImplementationSeal(t)
+func TestClosedLoopV3ReviewedImplementationSealIsFrozen(t *testing.T) {
+	// Historical evidence binds the reviewed bytes by digest. It must not
+	// require the live production tree to remain at V3 forever; live-tree
+	// equality is an admission gate of the one-time updater below.
+	loadClosedLoopV3HistoricalImplementationSeal(t)
+}
+
+func TestClosedLoopV3ValidationAuditRetiresFinalUpdater(t *testing.T) {
+	want := filepath.Join(closedLoopSpecDirectory(t), closedLoopV3ValidationAuditFile)
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("V3 validation audit does not retire the final updater: %v", err)
+	}
+	if !slices.Contains(closedLoopV3FinalBlockerPaths(t), want) {
+		t.Fatal("V3 validation audit is not a final-update blocker")
+	}
 }
 
 func TestClosedLoopV3FinalArtifactsAreFrozen(t *testing.T) {
@@ -153,7 +167,9 @@ func TestClosedLoopV3FinalArtifactsAreFrozen(t *testing.T) {
 	if corpusHash(mustCorpusRead(t, filepath.Join(closedLoopV3FinalRoot, closedLoopV3HeldOutFinalFile))) != seal.CiphertextHash {
 		t.Fatal("V3 held-out final ciphertext hash drifted")
 	}
-	implementation := loadClosedLoopV3ImplementationSeal(t)
+	// Final evidence binds the immutable historical implementation seal. A
+	// later production version may legitimately differ from those sealed bytes.
+	implementation := loadClosedLoopV3HistoricalImplementationSeal(t)
 	if implementation.Hash != report.ImplementationSealHash || implementation.Hash != seal.ImplementationHash {
 		t.Fatal("V3 final artifacts are not bound to the reviewed implementation")
 	}
@@ -168,7 +184,7 @@ func TestUpdateClosedLoopV3Final(t *testing.T) {
 		t.Skip("set UPDATE_CLOSED_LOOP_V3_FINAL=1 for the one-time V3 final evaluation")
 	}
 	refuseExistingClosedLoopV3Final(t)
-	implementation := loadClosedLoopV3ImplementationSeal(t)
+	implementation := loadClosedLoopV3CurrentImplementationSeal(t)
 	manifest := loadClosedLoopV3Manifest(t)
 	manifestBytes := mustCorpusRead(t, filepath.Join(closedLoopV3CorpusRoot, "manifest.json"))
 	registry, policy := closedLoopV3Policies(t)
@@ -505,7 +521,7 @@ func closedLoopV3PromotionRows(cases []CaseEvidence) []closedLoopPromotionRow {
 	return rows
 }
 
-func loadClosedLoopV3ImplementationSeal(t *testing.T) closedLoopV3ImplementationSeal {
+func loadClosedLoopV3HistoricalImplementationSeal(t *testing.T) closedLoopV3ImplementationSeal {
 	t.Helper()
 	path := filepath.Join(closedLoopSpecDirectory(t), "V3_REVIEWED_IMPLEMENTATION.json")
 	data := mustCorpusRead(t, path)
@@ -520,6 +536,15 @@ func loadClosedLoopV3ImplementationSeal(t *testing.T) closedLoopV3Implementation
 	if want, err := hashClosedLoopV3ImplementationSeal(seal); err != nil || want != seal.Hash {
 		t.Fatal("V3 reviewed implementation seal hash is invalid")
 	}
+	return seal
+}
+
+func loadClosedLoopV3CurrentImplementationSeal(t *testing.T) closedLoopV3ImplementationSeal {
+	t.Helper()
+	seal := loadClosedLoopV3HistoricalImplementationSeal(t)
+	// This stricter loader is intentionally exclusive to the one-time updater:
+	// it proves the live tree is exactly the reviewed implementation immediately
+	// before held-out evidence can be revealed.
 	for _, artifact := range seal.Artifacts {
 		if corpusHash(mustCorpusRead(t, filepath.Join(closedLoopModuleRoot(t), filepath.FromSlash(artifact.Path)))) != artifact.SHA256 {
 			t.Fatalf("V3 reviewed implementation artifact drifted: %s", artifact.Path)
@@ -530,16 +555,22 @@ func loadClosedLoopV3ImplementationSeal(t *testing.T) closedLoopV3Implementation
 
 func refuseExistingClosedLoopV3Final(t *testing.T) {
 	t.Helper()
-	for _, path := range []string{
+	for _, path := range closedLoopV3FinalBlockerPaths(t) {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("V3 final is one-time and refuses existing artifact: %s", path)
+		}
+	}
+}
+
+func closedLoopV3FinalBlockerPaths(t *testing.T) []string {
+	t.Helper()
+	return []string{
 		closedLoopV3FinalRoot,
 		filepath.Join(closedLoopSpecDirectory(t), "V3_FINAL_REPORT.json"),
 		filepath.Join(closedLoopSpecDirectory(t), "V3_FINAL_COMPARISON.json"),
 		filepath.Join(closedLoopSpecDirectory(t), "V3_PROMOTION_MATRIX.json"),
 		filepath.Join(closedLoopSpecDirectory(t), "V3_HELD_OUT_FINAL_SEAL.json"),
-	} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("V3 final is one-time and refuses existing artifact: %s", path)
-		}
+		filepath.Join(closedLoopSpecDirectory(t), closedLoopV3ValidationAuditFile),
 	}
 }
 

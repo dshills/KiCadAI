@@ -1248,8 +1248,10 @@ func simulationAssertionRequiresActiveControl(requirement Requirement, assertion
 // excitation then supplies the active state for related steady-state output
 // and circuit assertions.
 func requirementActiveControlValue(requirement Requirement, controlID string) (float64, bool) {
-	activationControl := false
+	semanticControl := false
 	active := math.Inf(-1)
+	conditionActive := math.Inf(-1)
+	authoredActiveState := false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
 			assertion.Excitation.ID != controlID {
@@ -1257,31 +1259,38 @@ func requirementActiveControlValue(requirement Requirement, controlID string) (f
 		}
 		switch {
 		case assertion.Analysis == simmodel.AnalysisStartup:
-			activationControl = true
+			semanticControl = true
 		case assertion.Metric == "off_state_current" || assertion.Metric == "on_state_voltage":
-			activationControl = true
+			semanticControl = true
 		}
 	}
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, event := range operatingCase.Events {
 			if event.Target == controlID && event.Kind == "input_step" && event.Applied > event.Initial {
-				activationControl = true
+				authoredActiveState = true
 				active = math.Max(active, event.Applied)
 			}
 		}
-	}
-	if !activationControl {
-		return 0, false
-	}
-	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			if condition.Target == controlID &&
 				(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
-				active = math.Max(active, condition.Max)
+				conditionActive = math.Max(conditionActive, condition.Max)
 			}
 		}
 	}
-	return active, finite(active)
+	if authoredActiveState {
+		if !finite(active) {
+			return 0, false
+		}
+		return active, true
+	}
+	// A startup or state assertion can identify the control semantically
+	// without authoring an event. Only that eventless case falls back to the
+	// maximum declared control-condition value.
+	if !semanticControl || !finite(conditionActive) {
+		return 0, false
+	}
+	return conditionActive, true
 }
 
 func simulationConditionValue(corner operatingCorner, condition OperatingCondition) float64 {

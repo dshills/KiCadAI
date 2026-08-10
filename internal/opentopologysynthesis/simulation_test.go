@@ -53,6 +53,62 @@ func TestActiveControlValueUsesBehavioralRisingEventWithoutExcitationAnnotation(
 	}
 }
 
+func TestActiveControlValuePreservesAuthoredStateInsideBroadConditionRange(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		OperatingCases: []OperatingCase{
+			{ID: "range", Conditions: []OperatingCondition{{
+				Axis: "input_voltage", Target: "control", Min: .2, Max: 4.8, Unit: "V",
+			}}},
+			{ID: "activate", Events: []OperatingEvent{{
+				ID: "rise", Kind: "input_step", Target: "control", Initial: .5, Applied: 2.5, Unit: "V",
+			}}},
+		},
+	}}
+
+	active, found := requirementActiveControlValue(requirement, "control")
+	if !found || active != 2.5 {
+		t.Fatalf("active control = %.12g, %t; want authored 2.5 V state", active, found)
+	}
+}
+
+func TestActiveControlValueRejectsSemanticControlWithoutBoundedState(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		BehavioralRequirements: []BehavioralAssertion{{
+			Metric:     "off_state_current",
+			Excitation: &Observation{Kind: "port", ID: "control"},
+		}},
+	}}
+
+	active, found := requirementActiveControlValue(requirement, "control")
+	if found || active != 0 {
+		t.Fatalf("unbounded active control = %.12g, %t; want fail-closed zero, false", active, found)
+	}
+	requirement.Requirements.OperatingCases = []OperatingCase{{Events: []OperatingEvent{{
+		Kind: "input_step", Target: "control", Initial: 0, Applied: math.Inf(1),
+	}}}}
+	active, found = requirementActiveControlValue(requirement, "control")
+	if found || active != 0 {
+		t.Fatalf("non-finite authored control = %.12g, %t; want fail-closed zero, false", active, found)
+	}
+}
+
+func TestActiveControlValueUsesConditionForEventlessSemanticControl(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{
+		OperatingCases: []OperatingCase{{Conditions: []OperatingCondition{{
+			Axis: "control_voltage", Target: "control", Min: 0, Max: 5, Unit: "V",
+		}}}},
+		BehavioralRequirements: []BehavioralAssertion{{
+			Metric:     "off_state_current",
+			Excitation: &Observation{Kind: "port", ID: "control"},
+		}},
+	}}
+
+	active, found := requirementActiveControlValue(requirement, "control")
+	if !found || active != 5 {
+		t.Fatalf("eventless active control = %.12g, %t; want bounded 5 V fallback", active, found)
+	}
+}
+
 func TestHarnessDoesNotCombineAlternativeCrossCaseLoadMagnitudes(t *testing.T) {
 	requirement := Requirement{Requirements: Requirements{
 		Ports: []Port{{ID: "out", Kind: "power", Direction: "source"}},
