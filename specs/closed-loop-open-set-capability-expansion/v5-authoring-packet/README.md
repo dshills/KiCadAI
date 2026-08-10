@@ -12,14 +12,15 @@ The author must:
 3. read `PUBLIC_REQUIREMENT_CONTRACT.md` and `CORPUS_RULES.md`;
 4. create exactly the twelve JSON files named by the sole assignment file;
 5. preserve the assignment byte-for-byte;
-6. copy `AUTHORSHIP_TEMPLATE.md` to an output file named `AUTHORSHIP.md` and
-   replace every bracketed field with truthful provenance and isolation
-   attestations;
+6. copy `AUTHORSHIP_TEMPLATE.json` to an output file named `AUTHORSHIP.json`,
+   replace every bracketed string with truthful provenance, replace the sample
+   requirement-hash entry with exactly twelve assigned path/hash objects, and
+   preserve every attestation as `true`;
 7. run no KiCadAI synthesis, search, simulation, classifier, feasibility, or
    outcome tool;
-8. return `AUTHORSHIP.md` and the twelve requirement files as one quarantine
+8. return `AUTHORSHIP.json` and the twelve requirement files as one quarantine
    bundle; and
-9. disclose uncertainty in `AUTHORSHIP.md` instead of guessing an
+9. disclose uncertainty in `AUTHORSHIP.json` instead of guessing an
    implementation or outcome.
 
 Project names, titles, descriptions, ports, operating cases, assertions, and

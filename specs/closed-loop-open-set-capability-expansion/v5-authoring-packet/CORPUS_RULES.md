@@ -81,7 +81,7 @@ Do not rename paths or embed manifest identities in content. After authoring is
 complete, calculate SHA-256 over the full exact byte stream of each of the
 twelve returned JSON files—before normalization, reformatting, or any custodian
 change—and record every assigned path and lowercase hexadecimal digest in
-`AUTHORSHIP.md`. A substring, line range, semantic digest, normalized form, or
+`AUTHORSHIP.json`. A substring, line range, semantic digest, normalized form, or
 input-packet hash is not a requirement source hash. Do not disclose a held-out
 behavior summary outside the quarantine bundle. Any requirement or authorship
 change after the corpus freeze creates a new experiment version and requires a

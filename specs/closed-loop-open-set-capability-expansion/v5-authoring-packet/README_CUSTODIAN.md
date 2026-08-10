@@ -8,7 +8,7 @@ For author slot `author_N`, provide only:
 - `README.md`;
 - `PUBLIC_REQUIREMENT_CONTRACT.md`;
 - `CORPUS_RULES.md`;
-- `AUTHORSHIP_TEMPLATE.md`;
+- `AUTHORSHIP_TEMPLATE.json`;
 - `CONTRACT_BINDING.json`;
 - `assignments/author_N.json`; and
 - `AUTHOR_N_PACKET.sha256`.
@@ -24,5 +24,5 @@ distribution and record the selected per-author checksum in the returned
 authorship record.
 
 Every author returns only their twelve requirement files and completed
-`AUTHORSHIP.md` into a separate quarantine. Authors must never share a context
+`AUTHORSHIP.json` into a separate quarantine. Authors must never share a context
 or see another author's returned content.

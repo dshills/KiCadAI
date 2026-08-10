@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"kicadai/internal/corpusfreeze"
 )
 
 const (
@@ -50,7 +52,7 @@ func TestVersionFiveAuthoringPacketSetIsFrozenAndComplete(t *testing.T) {
 		"README.md":                      true,
 		"PUBLIC_REQUIREMENT_CONTRACT.md": true,
 		"CORPUS_RULES.md":                true,
-		"AUTHORSHIP_TEMPLATE.md":         true,
+		"AUTHORSHIP_TEMPLATE.json":       true,
 		"CONTRACT_BINDING.json":          true,
 		"assignments/author_1.json":      true,
 		"assignments/author_2.json":      true,
@@ -68,7 +70,7 @@ func TestVersionFiveAuthoringPacketSetIsFrozenAndComplete(t *testing.T) {
 	wantRoot := map[string]bool{
 		"README_CUSTODIAN.md": true, "README.md": true,
 		"PUBLIC_REQUIREMENT_CONTRACT.md": true, "CORPUS_RULES.md": true,
-		"AUTHORSHIP_TEMPLATE.md": true, "CONTRACT_BINDING.json": true,
+		"AUTHORSHIP_TEMPLATE.json": true, "CONTRACT_BINDING.json": true,
 		"assignments":            true,
 		"AUTHOR_1_PACKET.sha256": true, "AUTHOR_2_PACKET.sha256": true,
 		"AUTHOR_3_PACKET.sha256": true, "PACKET_SET.sha256": true,
@@ -102,7 +104,7 @@ func TestVersionFivePerAuthorPacketsAreDisjointAndFrozen(t *testing.T) {
 	directory := v5AuthoringPacketDirectory(t)
 	common := map[string]bool{
 		"README.md": true, "PUBLIC_REQUIREMENT_CONTRACT.md": true,
-		"CORPUS_RULES.md": true, "AUTHORSHIP_TEMPLATE.md": true,
+		"CORPUS_RULES.md": true, "AUTHORSHIP_TEMPLATE.json": true,
 		"CONTRACT_BINDING.json": true,
 	}
 	for author := 1; author <= 3; author++ {
@@ -134,6 +136,25 @@ func TestVersionFiveAuthoringPacketBindsFrozenContract(t *testing.T) {
 	}
 	if !slices.Equal(binding.RetiredVersions, []int{1, 2, 3, 4}) || binding.RetiredHeldOutReusePolicy != "prohibited" {
 		t.Fatalf("V5 authoring retirement binding = %v/%q", binding.RetiredVersions, binding.RetiredHeldOutReusePolicy)
+	}
+}
+
+func TestVersionFiveAuthorshipTemplateIsStrictAndComplete(t *testing.T) {
+	path := filepath.Join(v5AuthoringPacketDirectory(t), "AUTHORSHIP_TEMPLATE.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorship, err := corpusfreeze.DecodeAuthorshipStrict(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authorship.Schema != "kicadai.closed-loop-open-set-authorship.v5" || authorship.Version != 5 || !authorship.Attestations.AllTrue() {
+		t.Fatalf("V5 authorship template header or attestations are incomplete")
+	}
+	if len(authorship.RequirementSourceSHA256) != 1 || !strings.Contains(authorship.AuthorSlot, "[") ||
+		!strings.Contains(authorship.RequirementSourceSHA256[0].Path, "[") || !strings.Contains(authorship.RequirementSourceSHA256[0].SHA256, "[") {
+		t.Fatal("V5 authorship template does not expose the required replaceable fields")
 	}
 }
 
@@ -241,13 +262,17 @@ func v5VerifyPacketManifest(t *testing.T, directory, manifestName string, want m
 
 func v5PacketManifestNames(t *testing.T, manifestPath string) []string {
 	t.Helper()
+	return v5PacketManifestNamesAt(t, manifestPath, filepath.Dir(manifestPath))
+}
+
+func v5PacketManifestNamesAt(t *testing.T, manifestPath, contentRoot string) []string {
+	t.Helper()
 	manifest, err := os.Open(manifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer manifest.Close()
 
-	base := filepath.Dir(manifestPath)
 	var names []string
 	scanner := bufio.NewScanner(manifest)
 	for scanner.Scan() {
@@ -259,7 +284,7 @@ func v5PacketManifestNames(t *testing.T, manifestPath string) []string {
 		if strings.TrimSpace(name) != name || strings.ContainsAny(name, `\:`) || path.IsAbs(name) || path.Clean(name) != name || name == ".." || strings.HasPrefix(name, "../") {
 			t.Fatalf("unsafe V5 packet manifest entry %q", line)
 		}
-		if gotHash := v5FileSHA256(t, filepath.Join(base, filepath.FromSlash(name))); gotHash != wantHash {
+		if gotHash := v5FileSHA256(t, filepath.Join(contentRoot, filepath.FromSlash(name))); gotHash != wantHash {
 			t.Fatalf("V5 packet file %s hash = %s, want %s", name, gotHash, wantHash)
 		}
 		names = append(names, name)
