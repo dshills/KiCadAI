@@ -39,7 +39,7 @@ const (
 	// The artifact-free harness commit intentionally leaves this empty. The
 	// verifier skips while the no-replace bundle is absent and fails closed if
 	// any bundle appears before its exact manifest hash is frozen.
-	closedLoopV5HeldOutManifestHash = ""
+	closedLoopV5HeldOutManifestHash = "f2fe78f48a3300d3af296b3432ecd5d5943a3630460f678f83e1d0736c89431c"
 )
 
 type closedLoopV5HeldOutPayload struct {

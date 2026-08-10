@@ -1,8 +1,7 @@
 # Closed-Loop Open-Set V5 Baseline Audit
 
-Status: discovery and rank-one package selection frozen; artifact-free held-out
-baseline harness frozen; isolated held-out baseline execution awaiting explicit
-external-key authorization
+Status: discovery and rank-one package selection frozen; isolated held-out
+baseline evaluated and sealed; selected-package implementation may begin
 
 ## Immutable lineage
 
@@ -25,6 +24,8 @@ All commit IDs in this audit refer to the
   `1aa43c067167113c4508175da0e46b350bc8a980`
 - artifact-free held-out baseline harness commit:
   `0b531385329ffc692c372c1c9c83d0914d247a6f`
+- held-out baseline publisher parent commit:
+  `71f2a0df2a832b3edd44c16c51c3136c614c11b9`
 
 The V5 corpus manifest SHA-256 is
 `d703608d09d7d7bd834bb45698446dd03bb0dbe7b00733b636dd73250cac3f6d`.
@@ -107,7 +108,7 @@ The executable generic-plan hash is
 No held-out source, outcome, gap, diagnostic, membership, or promotion detail
 entered package eligibility, ranking, or selection.
 
-## Held-out baseline readiness
+## Held-out baseline seal
 
 The committed harness independently enforces:
 
@@ -150,13 +151,23 @@ and length-delimited policy, selection, and environment metadata are verified
 before decryption. GCM authentication and the independent ciphertext
 commitment both fail on nonce or ciphertext mutation.
 
-The public preflight state is:
+The public sealed state is:
 
 - the external held-out source key exists as a 32-byte file with Unix
   filesystem permissions `0600` (`rw-------`);
 - the source key has not been read by the implementation context;
-- the external held-out baseline key does not exist; and
-- the repository held-out baseline artifact directory does not exist.
+- the distinct external held-out baseline key exists as a 32-byte file with
+  Unix filesystem permissions `0600` (`rw-------`); and
+- the repository contains exactly the canonical four-file encrypted baseline
+  artifact set.
+
+The authorized isolated custodian evaluated all 18 manifest-ordered held-out
+cases under the frozen selection and atomically published only authenticated
+ciphertext and non-revealing public commitments. The held-out manifest
+self-hash is
+`f2fe78f48a3300d3af296b3432ecd5d5943a3630460f678f83e1d0736c89431c`.
+No requirement, outcome, gap, diagnostic, package membership, or promotion
+detail was disclosed to the implementation context.
 
 The outcome-neutral installed-toolchain preflight resolves the committed
 `toolchain/kicad-promotion.lock.json` on `darwin/arm64`, requires KiCad `10.0.3`,
@@ -168,6 +179,16 @@ refuses publication if any content identity changed during evaluation.
 The non-path content identities are included in the authenticated public
 baseline binding, so verification does not depend only on a repository commit,
 ambient `PATH`, or mutable global KiCad configuration.
+The `darwin/arm64` value authenticates the platform on which this one-time
+baseline was evaluated; it is not an ambient-platform requirement for public
+seal verification. Another platform may verify the canonical artifact bytes,
+but it may not replay or replace this consumed baseline. A future independent
+evaluation must bind and publish its own locked toolchain identity.
+
+The manifest `hash` is its canonical semantic self-hash, computed with that
+field omitted. The `manifest.json` entry in `CHECKSUMS.sha256` is deliberately
+different because it hashes the complete serialized file, including the
+populated self-hash. The public verifier checks both commitments.
 
 Normal local tests exercise only the public freeze verifier and skip the gated
 updater. The complete local Go test suite, `go vet`, and golangci-lint pass at
@@ -175,11 +196,9 @@ the harness commit. Prism reported no high- or medium-severity issue in the
 exact staged harness bytes; its remaining low observation concerned the
 intentional exact-byte replay comparison required by the frozen protocol.
 
-## Remaining one-time boundary
+## Next phase
 
-No held-out baseline execution is claimed by this audit. Crossing the next
-boundary requires explicit authority for an isolated custodian to read the
-external source key, create the distinct external baseline key, evaluate all
-18 held-out cases, and publish only authenticated ciphertext and non-revealing
-public commitments. Until that authority is granted, Phase 3 remains
-incomplete and no selected-package implementation may begin.
+The one-time held-out baseline boundary is complete and may not be rerun. The
+implementation context may now implement only the frozen rank-one generic
+`electrothermal_solver` capability package. Held-out baseline ciphertext and
+keys remain sealed until the separately authorized one-time final comparison.
