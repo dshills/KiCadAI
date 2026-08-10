@@ -1,0 +1,40 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection-policy.v5",
+  "version": 5,
+  "package_identity_fields": [
+    "scope",
+    "capability"
+  ],
+  "member_identity_fields": [
+    "stage",
+    "scope",
+    "capability",
+    "code"
+  ],
+  "identity_encoding": "utf8-decimal-byte-length-colon",
+  "affected_case_aggregation": "sorted-unique-union",
+  "required_evidence_aggregation": "sorted-unique-union",
+  "eligibility": {
+    "minimum_affected_discovery_cases": 2,
+    "minimum_reporting_domains": 2
+  },
+  "rank_one_plan_admission": {
+    "require_complete_generic_plan": true,
+    "require_all_members_planned": true
+  },
+  "ranking": [
+    "affected_discovery_cases_desc",
+    "reporting_domains_desc",
+    "safety_impact_weight_desc",
+    "member_cluster_count_asc",
+    "required_evidence_count_asc",
+    "canonical_package_key_asc"
+  ],
+  "tie_behavior": "ranking_tuple_then_canonical_package_key",
+  "ineligible_behavior": "exclude_before_ranking",
+  "no_eligible_package_behavior": "fail_closed",
+  "unexecutable_rank_one_behavior": "fail_closed_no_fallback",
+  "held_out_influence": "prohibited",
+  "selected_member_gap_removal": "exact_member_identity_only",
+  "held_out_success_causality": "at_least_one_new_pass_with_matching_baseline_package"
+}
