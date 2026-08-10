@@ -1,0 +1,33 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v5",
+  "version": 5,
+  "selected_capability": "electrothermal_solver",
+  "review": "prism_reviewed_no_actionable_findings",
+  "artifacts": [
+    {
+      "path": "internal/opentopologysynthesis/simulation.go",
+      "sha256": "1244a9963050037c41ba31635f7cfcb76dea6f285372ab89403a75041e207188"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation_test.go",
+      "sha256": "43bb21e20f996001ee93db310e69be835c9412dcfd321d18f860ae24b34f09f2"
+    },
+    {
+      "path": "internal/simmodel/dynamic_model_test.go",
+      "sha256": "2a619d3eb5d4ca8588d42eec7ea0e1f5a62ff17eff088280c55238aa0784ac73"
+    },
+    {
+      "path": "internal/simmodel/mna_electrothermal.go",
+      "sha256": "ece9b1ed11d83127e50c6c6f5835c919d54640cc9e078c13408815a97dc065aa"
+    },
+    {
+      "path": "internal/simmodel/mna_registry.go",
+      "sha256": "c46b1f47bc498c89d72b4a10113098ee88287544c7c15b56ab91c4c247aaa7eb"
+    },
+    {
+      "path": "internal/simmodel/mna_thermal.go",
+      "sha256": "7d8375daba0a834b3adbc5a832fa8bf656dc4cf0b2c51f86fba41883f03ce084"
+    }
+  ],
+  "hash": "24b5dce41bb6674b77c87718ab5557cd40aa7f35c109b7256856b74f127701a6"
+}
