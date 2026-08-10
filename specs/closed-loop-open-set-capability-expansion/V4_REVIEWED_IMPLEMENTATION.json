@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v4",
+  "version": 4,
+  "selected_capability": "complete_topology",
+  "review": "prism_reviewed_no_actionable_findings",
+  "artifacts": [
+    {
+      "path": "internal/opentopologysynthesis/declarative_topology_provider.go",
+      "sha256": "ca73c33798a7bb51b181f14ff178d0df27be22d09849a6f428de173142cbb6a1"
+    },
+    {
+      "path": "internal/opentopologysynthesis/declarative_topology_provider_test.go",
+      "sha256": "dbf22634145b4bc110d703beb6d0c9f913dacdb212cbeab49c9254ce67b73531"
+    },
+    {
+      "path": "internal/opentopologysynthesis/logic_level_harness_test.go",
+      "sha256": "0854900aa00d5e9da185979a8b5ca4008e4a80a068731e4c2ce4474aaad8ec8f"
+    },
+    {
+      "path": "internal/opentopologysynthesis/nonlinear_switching_promotion_test.go",
+      "sha256": "87aa8866495ceec065a68b6f9f4201f20fd6de639dc337579b02dcea8e35267d"
+    },
+    {
+      "path": "internal/opentopologysynthesis/search.go",
+      "sha256": "489ae8ad6e2d2cdea125bca9ee5bab111da1e750e14d365cbb7f5a8e844d80f7"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation.go",
+      "sha256": "198301211fd1cfb5071a5b9c84c1d877539c8455b0bfb7dee88511334eb8588c"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation_harness_contract_test.go",
+      "sha256": "0346d21455b0c63ed8eb2d05a03cfc424ee4e48d0eeb12d178ad9ce9d3ae8b60"
+    },
+    {
+      "path": "internal/opentopologysynthesis/value_domains.go",
+      "sha256": "26140ed643c297043c81b75352fdad8678dfeaffa4ab6caef02509d734fc558b"
+    },
+    {
+      "path": "internal/simmodel/mna_solver.go",
+      "sha256": "ec35eaecdde53e71fd391ac67d57af5772a5e674e59f1246686e38e6c66b8377"
+    },
+    {
+      "path": "internal/simmodel/mna_transient.go",
+      "sha256": "da206fc842e1f95bafd3af5e7dd9a9cfc45e006be5fa86e17cad05b12239d1d9"
+    },
+    {
+      "path": "internal/simmodel/mna_transient_test.go",
+      "sha256": "3f054d5edbe6a1dbc10f377ec6431e6dc0c188e7595d8ecdf0ef043b6f07079e"
+    },
+    {
+      "path": "internal/simmodel/model.go",
+      "sha256": "15cbd91c636197f0be840fd4af2948de75893dce8adc6143c6997d7d8657bf2c"
+    },
+    {
+      "path": "internal/simmodel/registry.go",
+      "sha256": "04e0e2220b76281a7788e3af6a1be1ed08e6958576b21ba125a344d9804d039c"
+    },
+    {
+      "path": "internal/simmodel/tolerance.go",
+      "sha256": "ff930529bdedb273d7b6752327175e45d1d9b951262cf8d2751e435f1311c234"
+    },
+    {
+      "path": "internal/capabilityfeedback/v4_final_test.go",
+      "sha256": "f7bfb84f0ed44ec6d4442b2f5969d3c7064f15b92d0d71163cddf4e59e5600f6"
+    }
+  ],
+  "hash": "15396ebfe3e349a098a7da2995226ba417e1bd62eebe1abacd322ba1b8a99fec"
+}
