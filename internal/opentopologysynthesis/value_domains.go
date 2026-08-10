@@ -85,6 +85,7 @@ func BuildValueSearchPlan(
 	rejections := map[string][]string{}
 	requiredAnalyses := requirementAnalysisSet(requirement)
 	inventoryByKey := primitiveInventoryByKey(inventory)
+	convergentDigitalScales := deriveConvergentDigitalTopologyScales(requirement, normalizedGraph)
 	preserveDerivedVoltageSeeds := len(regulatedVoltageRelationships(requirement)) != 0
 	for _, instance := range normalizedGraph.Instances {
 		original, found := primitiveByKey(inventory, instance.PrimitiveKey)
@@ -105,6 +106,7 @@ func BuildValueSearchPlan(
 				normalizedGraph,
 				instance,
 				inventoryByKey,
+				convergentDigitalScales,
 			)...,
 		)
 		slices.SortFunc(domain.AnalyticScales, compareAnalyticScales)
@@ -951,6 +953,7 @@ func deriveTopologyAnalyticScales(
 	graph CandidateGraph,
 	instance GraphInstance,
 	inventory map[string]PrimitiveCandidate,
+	convergentDigitalScales ...map[string][]AnalyticScale,
 ) []AnalyticScale {
 	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
 		len(instance.Terminals) != 2 {
@@ -959,6 +962,15 @@ func deriveTopologyAnalyticScales(
 	supply := nominalSupplyVoltage(requirement)
 	if supply <= 0 {
 		return nil
+	}
+	convergent := map[string][]AnalyticScale(nil)
+	if len(convergentDigitalScales) != 0 {
+		convergent = convergentDigitalScales[0]
+	} else {
+		convergent = deriveConvergentDigitalTopologyScales(requirement, graph)
+	}
+	if scales := convergent[instance.ID]; len(scales) != 0 {
+		return scales
 	}
 	if scales := deriveAutonomousPeriodicTopologyScales(
 		requirement,
@@ -1448,6 +1460,114 @@ func deriveTopologyAnalyticScales(
 		}
 	}
 	return nil
+}
+
+// deriveConvergentDigitalTopologyScales recognizes explicit primitive roles
+// in a multi-input digital decision graph once per candidate. It preserves the
+// catalog-ranked value selected for each bounded input and bias resistor
+// without changing value ordering for unrelated topology families.
+func deriveConvergentDigitalTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+) map[string][]AnalyticScale {
+	result := map[string][]AnalyticScale{}
+	groups := declarativeBinaryDecisionGroups(requirement)
+	if len(groups) == 0 {
+		return result
+	}
+	for _, decisions := range groups {
+		output := "port_" + decisions[0].observation
+		inputNodes := map[string]bool{}
+		for _, decision := range decisions {
+			inputNodes["port_"+decision.excitation] = true
+		}
+		resistors := []GraphInstance{}
+		levelShifters := []GraphInstance{}
+		sourcesByGate := map[string][]GraphInstance{}
+		inputsByBase := map[string]map[string]bool{}
+		for _, candidate := range graph.Instances {
+			switch candidate.Kind {
+			case "resistor":
+				if candidate.ValueSI == nil || len(candidate.Terminals) != 2 {
+					continue
+				}
+				resistors = append(resistors, candidate)
+				ends := topologySortedTwoTerminalNodes(candidate)
+				input, base := "", ""
+				if inputNodes[ends[0]] {
+					input, base = ends[0], ends[1]
+				} else if inputNodes[ends[1]] {
+					input, base = ends[1], ends[0]
+				}
+				if input != "" {
+					if inputsByBase[base] == nil {
+						inputsByBase[base] = map[string]bool{}
+					}
+					inputsByBase[base][input] = true
+				}
+			case "npn_bjt":
+				levelShifters = append(levelShifters, candidate)
+			case "p_channel_mosfet":
+				pmos := topologyTerminalNodes(candidate)
+				if pmos["GATE"] != "" && pmos["DRAIN"] == output {
+					sourcesByGate[pmos["GATE"]] = append(sourcesByGate[pmos["GATE"]], candidate)
+				}
+			}
+		}
+		for _, levelShifter := range levelShifters {
+			npn := topologyTerminalNodes(levelShifter)
+			reference, found := graphNodeByID(graph, npn["EMITTER"])
+			if !found || reference.Role != "reference" {
+				continue
+			}
+			sources := sourcesByGate[npn["COLLECTOR"]]
+			if npn["COLLECTOR"] == "" || len(sources) != 1 ||
+				len(inputsByBase[npn["BASE"]]) != len(inputNodes) {
+				continue
+			}
+			pmos := topologyTerminalNodes(sources[0])
+			if pmos["SOURCE"] == "" {
+				continue
+			}
+			for _, instance := range resistors {
+				ends := topologySortedTwoTerminalNodes(instance)
+				role := ""
+				switch {
+				case (ends[0] == npn["BASE"] && inputNodes[ends[1]]) ||
+					(ends[1] == npn["BASE"] && inputNodes[ends[0]]):
+					role = "input_isolation"
+				case (ends[0] == npn["COLLECTOR"] && ends[1] == pmos["SOURCE"]) ||
+					(ends[1] == npn["COLLECTOR"] && ends[0] == pmos["SOURCE"]):
+					role = "gate_bias"
+				case (ends[0] == output && ends[1] == npn["EMITTER"]) ||
+					(ends[1] == output && ends[0] == npn["EMITTER"]):
+					role = "output_bias"
+				}
+				if role == "" {
+					continue
+				}
+				result[instance.ID] = []AnalyticScale{{
+					ID:         "topology:convergent_digital:" + role + ":" + instance.ID,
+					Kind:       "resistance",
+					ValueSI:    *instance.ValueSI,
+					Unit:       "ohm",
+					Derivation: "catalog-ranked bounded value for an explicit multi-input digital decision role",
+					SourceKind: "topology",
+					SourceID:   instance.ID,
+					Priority:   1,
+				}}
+			}
+		}
+	}
+	return result
+}
+
+func topologySortedTwoTerminalNodes(instance GraphInstance) [2]string {
+	result := [2]string{instance.Terminals[0].Node, instance.Terminals[1].Node}
+	if result[1] < result[0] {
+		result[0], result[1] = result[1], result[0]
+	}
+	return result
 }
 
 // deriveCurrentLimitedSwitchTopologyScales preserves the catalog values that

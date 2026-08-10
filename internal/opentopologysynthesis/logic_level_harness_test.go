@@ -101,9 +101,55 @@ func TestLogicLevelStaticHarnessDoesNotGuessAmbiguousOrAuthoredStimulus(t *testi
 	if got := logicLevelStaticHarnessConditions(Requirement{Requirements: Requirements{Ports: []Port{input, second}}}, assertion, nil); len(got) != 0 {
 		t.Fatalf("ambiguous inputs produced inferred conditions: %#v", got)
 	}
-	excitation := Observation{Kind: "port", ID: "input"}
-	assertion.Excitation = &excitation
-	if got := logicLevelStaticHarnessConditions(Requirement{Requirements: Requirements{Ports: []Port{input}}}, assertion, nil); len(got) != 0 {
-		t.Fatalf("explicit excitation produced inferred conditions: %#v", got)
+}
+
+func TestLogicLevelStaticHarnessBindsExplicitExcitationAndDefaultsPeers(t *testing.T) {
+	low, high := 0.0, 3.3
+	input := Port{
+		ID: "selected", Kind: "digital", Direction: "sink",
+		Electrical: Electrical{MinVoltageV: &low, MaxVoltageV: &high, DefaultState: "low"},
+	}
+	peer := input
+	peer.ID = "peer"
+	excitation := Observation{Kind: "port", ID: input.ID}
+	assertion := BehavioralAssertion{
+		Metric: "output_high_voltage", Analysis: simmodel.AnalysisDCOperatingPoint,
+		Excitation: &excitation, Observation: Observation{Kind: "port", ID: "output"},
+	}
+	got := logicLevelStaticHarnessConditions(Requirement{Requirements: Requirements{Ports: []Port{peer, input}}}, assertion, nil)
+	if len(got) != 2 || got[0].Target != input.ID || got[0].Min != high || got[0].Max != high ||
+		got[1].Target != peer.ID || got[1].Min != low || got[1].Max != low {
+		t.Fatalf("explicit excitation conditions = %#v", got)
+	}
+	assertion.Metric = "output_low_voltage"
+	got = logicLevelStaticHarnessConditions(Requirement{Requirements: Requirements{Ports: []Port{peer, input}}}, assertion, nil)
+	if len(got) != 2 || got[0].Target != input.ID || got[0].Min != low || got[0].Max != low {
+		t.Fatalf("explicit low-state conditions = %#v", got)
+	}
+}
+
+func TestLogicLevelStaticHarnessUsesAuthoredPolarityForExplicitExcitation(t *testing.T) {
+	low, high := 0.0, 3.3
+	excitation := Observation{Kind: "port", ID: "selected"}
+	requirement := Requirement{Requirements: Requirements{
+		Ports: []Port{
+			{ID: "selected", Kind: "digital", Direction: "sink", Electrical: Electrical{MinVoltageV: &low, MaxVoltageV: &high}},
+			{ID: "output", Kind: "digital", Direction: "source"},
+		},
+		OperatingCases: []OperatingCase{{ID: "inverting", Events: []OperatingEvent{{
+			Kind: "input_step", Target: "selected", Initial: high, Applied: low,
+		}}}},
+		BehavioralRequirements: []BehavioralAssertion{{
+			Metric: "rise_time", Analysis: simmodel.AnalysisTransient,
+			Observation: Observation{Kind: "port", ID: "output"}, OperatingCases: []string{"inverting"},
+		}},
+	}}
+	conditions := logicLevelStaticHarnessConditions(requirement, BehavioralAssertion{
+		Metric: "output_high_voltage", Analysis: simmodel.AnalysisDCOperatingPoint,
+		Excitation: &excitation, Observation: Observation{Kind: "port", ID: "output"},
+	}, nil)
+	if len(conditions) != 1 || conditions[0].Target != "selected" ||
+		conditions[0].Min != low || conditions[0].Max != low {
+		t.Fatalf("explicit inverting conditions = %#v", conditions)
 	}
 }

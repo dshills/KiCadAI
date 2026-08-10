@@ -101,7 +101,7 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 				if dominant.Target != "" {
 					message += "; dominant contributor " + dominant.Target + " at " + dominant.Corner
 				}
-				nominalDiagnostics = append(nominalDiagnostics, Diagnostic{Path: "worst_case." + corner.ID, Message: message, Suggestion: "adjust catalog-backed component values or operating conditions"})
+				nominalDiagnostics = append(nominalDiagnostics, Diagnostic{Code: DiagnosticAssertionOutOfBounds, Path: "worst_case." + corner.ID, Message: message, Suggestion: "adjust catalog-backed component values or operating conditions"})
 			}
 		}
 	}

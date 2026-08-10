@@ -509,7 +509,10 @@ func cloneAnalyses(source []Analysis) []Analysis {
 	return clone
 }
 
+const DiagnosticAssertionOutOfBounds = "assertion_out_of_bounds"
+
 type Diagnostic struct {
+	Code       string `json:"code,omitempty"`
 	Path       string `json:"path"`
 	Message    string `json:"message"`
 	Suggestion string `json:"suggestion,omitempty"`

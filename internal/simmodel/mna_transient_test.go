@@ -58,6 +58,48 @@ func TestTransientSourceAndDeviceValueEventsExecuteDeterministically(t *testing.
 	}
 }
 
+func TestOneShotPulseDoesNotClaimPeriodicEvidence(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "one_shot", Kind: AnalysisTransient, DurationS: 1, TimeStepS: .1,
+			Excitations: []SourceExcitation{{
+				Component: "source", PulseInitialValue: 0, PulseValue: 5,
+				PulseDelayS: .2, PulseWidthS: .4, PulsePeriodS: 2,
+			}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "one_shot", Node: "OUT", Quantity: QuantityVoltageV,
+			TimeS: .3, Min: 4.99, Max: 5.01,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "OUT", "GND"),
+		resistorEvidence("load", 1000, "OUT", "GND"),
+	}
+	plan, diagnostics := ResolveWithTopology(
+		intent, "catalog", "catalog-hash", components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve one-shot pulse: %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" || len(report.Analyses) != 1 {
+		t.Fatalf("one-shot report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	if report.Analyses[0].FundamentalFrequencyHz != 0 {
+		t.Fatalf("one-shot pulse claimed periodic frequency %.12g Hz", report.Analyses[0].FundamentalFrequencyHz)
+	}
+	nearPeriod := ClonePlan(plan)
+	nearPeriod.Analyses[0].Excitations[0].PulsePeriodS = 1 + 5e-13
+	nearReport, nearDiagnostics := Evaluate(nearPeriod)
+	if len(nearDiagnostics) != 0 || len(nearReport.Analyses) != 1 ||
+		math.Abs(nearReport.Analyses[0].FundamentalFrequencyHz-1/(1+5e-13)) > 1e-12 {
+		t.Fatalf("near-boundary period report=%#v diagnostics=%#v", nearReport, nearDiagnostics)
+	}
+}
+
 func TestReusableMNASystemCloneRestoresContentAndDoesNotAliasSource(t *testing.T) {
 	source := mnaSystem{
 		matrix: [][]complex128{{1, 2}, {3, 4}}, rhs: []complex128{5, 6},

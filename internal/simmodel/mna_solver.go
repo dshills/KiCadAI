@@ -548,6 +548,7 @@ func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
 				scope = strings.Join(assertion.Components, ",")
 			}
 			diagnostics = append(diagnostics, Diagnostic{
+				Code:       DiagnosticAssertionOutOfBounds,
 				Path:       "assertions." + assertion.AnalysisID + "." + scope + "." + assertion.Quantity,
 				Message:    fmt.Sprintf("measured %.12g is outside trusted bounds %.12g..%.12g", actual, assertion.Min, assertion.Max),
 				Suggestion: "adjust catalog-backed component values, connectivity, or bounded analysis conditions",

@@ -109,6 +109,26 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 	dominantTopology := map[string]topologySearchState{initialTopology: initialState}
 	retainedTopology := map[string]TopologyCandidate{}
 	rejections := map[string][]string{}
+	declarativeCandidates, declarativeConsumption, declarativeRejections := topologyDeclarativeProviderSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, declarativeConsumption)
+	for code, samples := range declarativeRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range declarativeCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
 	relationshipCandidates, relationshipConsumption, relationshipRejections := topologyRelationshipSeeds(
 		ctx,
 		requirement,

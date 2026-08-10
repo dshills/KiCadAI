@@ -60,7 +60,8 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			result.FundamentalFrequencyHz = excitation.SineFrequencyHz
 			break
 		}
-		if excitation.PulsePeriodS > 0 {
+		periodTolerance := math.Max(1e-15, math.Abs(excitation.PulsePeriodS)*1e-12)
+		if excitation.PulsePeriodS > 0 && analysis.DurationS+periodTolerance >= excitation.PulsePeriodS {
 			result.FundamentalFrequencyHz = 1 / excitation.PulsePeriodS
 			break
 		}

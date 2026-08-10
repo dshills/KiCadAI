@@ -219,7 +219,7 @@ func assertNonlinearSwitchingDesignPass(t *testing.T, requirement Requirement, r
 		for _, caseID := range assertion.OperatingCases {
 			operatingCase := operatingCases[caseID]
 			operatingCase.Conditions = simulationHarnessConditions(requirement, assertion, operatingCase)
-			for _, corner := range operatingCaseCorners(operatingCase) {
+			for _, corner := range operatingCaseCornersForAssertion(assertion, operatingCase) {
 				wantAttempts[assertion.ID+"\x00"+caseID+"\x00"+corner.ID] = true
 			}
 		}

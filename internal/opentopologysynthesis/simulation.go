@@ -125,7 +125,7 @@ func EvaluateCandidate(
 		for _, caseID := range assertion.OperatingCases {
 			operatingCase := cases[caseID]
 			operatingCase.Conditions = simulationHarnessConditions(requirement, assertion, operatingCase)
-			for _, corner := range operatingCaseCorners(operatingCase) {
+			for _, corner := range operatingCaseCornersForAssertion(assertion, operatingCase) {
 				work := simulationWorkItem{
 					assertion:     assertion,
 					operatingCase: operatingCase,
@@ -387,7 +387,7 @@ func evaluateAssertionCorner(
 	attempt.Report = &report
 	if len(evaluateDiagnostics) != 0 {
 		attempt.Diagnostics = normalizeSimModelDiagnostics(evaluateDiagnostics)
-		if actual, found := failedSimulationActual(report, scale); found {
+		if actual, found := failedSimulationActual(report, evaluateDiagnostics, scale); found {
 			attempt.Actual = &actual
 			code := diagnosisAssertionBelowMinimum
 			direction := "below_minimum"
@@ -516,8 +516,26 @@ func simulationAnalysisCostRank(analysis string) int {
 	}
 }
 
-func failedSimulationActual(report simmodel.Report, scale float64) (float64, bool) {
+func failedSimulationActual(report simmodel.Report, diagnostics []simmodel.Diagnostic, scale float64) (float64, bool) {
+	measuredOutOfBounds := false
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Code == simmodel.DiagnosticAssertionOutOfBounds {
+			measuredOutOfBounds = true
+			break
+		}
+	}
+	if !measuredOutOfBounds {
+		return 0, false
+	}
+	// Each open-topology plan contains exactly one assertion. Refuse to infer
+	// ownership if an evaluator ever violates that invariant.
+	if len(report.Assertions) != 1 {
+		return 0, false
+	}
 	for _, corner := range report.Corners {
+		if len(corner.Assertions) != 1 {
+			return 0, false
+		}
 		for _, assertion := range corner.Assertions {
 			if !assertion.Pass && finite(assertion.Actual) {
 				return assertion.Actual / scale, true
@@ -1049,35 +1067,44 @@ func simulationHarnessConditions(
 }
 
 // logicLevelStaticHarnessConditions supplies the missing state stimulus for a
-// conventional single-input logic-level contract. A paired output-high/output-
-// low requirement describes two static states; evaluating both at the input's
-// nominal midpoint would make those states mutually exclusive. The inference
-// is deliberately narrow and fail-closed: it applies only to DC assertions
-// without an explicit excitation, requires exactly one bounded digital sink,
-// and never replaces an authored input/control condition.
+// logic-level contract. An explicit digital excitation selects that input and
+// places other bounded digital inputs at authored default states. Without an
+// explicit excitation, inference remains limited to one unambiguous input and
+// authored dynamic polarity. Neither form replaces authored input conditions.
 func logicLevelStaticHarnessConditions(
 	requirement Requirement,
 	assertion BehavioralAssertion,
 	conditions []OperatingCondition,
 ) []OperatingCondition {
-	if assertion.Analysis != simmodel.AnalysisDCOperatingPoint || assertion.Excitation != nil ||
+	if assertion.Analysis != simmodel.AnalysisDCOperatingPoint ||
 		assertion.Observation.Kind != "port" ||
 		(assertion.Metric != "output_high_voltage" && assertion.Metric != "output_low_voltage") {
 		return conditions
 	}
 	var input *Port
-	for index := range requirement.Requirements.Ports {
-		port := &requirement.Requirements.Ports[index]
-		if port.Kind != "digital" || port.Direction != "sink" ||
-			port.Electrical.MinVoltageV == nil || port.Electrical.MaxVoltageV == nil ||
-			!finite(*port.Electrical.MinVoltageV) || !finite(*port.Electrical.MaxVoltageV) ||
-			*port.Electrical.MinVoltageV >= *port.Electrical.MaxVoltageV {
-			continue
-		}
-		if input != nil {
+	explicit := assertion.Excitation != nil
+	if explicit {
+		if assertion.Excitation.Kind != "port" {
 			return conditions
 		}
-		input = port
+		for index := range requirement.Requirements.Ports {
+			port := &requirement.Requirements.Ports[index]
+			if port.ID == assertion.Excitation.ID && boundedDigitalSink(*port) {
+				input = port
+				break
+			}
+		}
+	} else {
+		for index := range requirement.Requirements.Ports {
+			port := &requirement.Requirements.Ports[index]
+			if !boundedDigitalSink(*port) {
+				continue
+			}
+			if input != nil {
+				return conditions
+			}
+			input = port
+		}
 	}
 	if input == nil {
 		return conditions
@@ -1090,15 +1117,58 @@ func logicLevelStaticHarnessConditions(
 	}
 	nonInverting, polarityKnown := logicLevelPolarity(requirement, input.ID, assertion.Observation.ID)
 	if !polarityKnown {
-		return conditions
+		if !explicit {
+			return conditions
+		}
+		// With no authored output transition, an explicit excitation carries
+		// only the conventional active-high state selected by the assertion.
+		// Any authored rise/fall evidence above takes precedence, including
+		// an inverting transition.
+		nonInverting = true
 	}
 	value := *input.Electrical.MinVoltageV
 	if (assertion.Metric == "output_high_voltage") == nonInverting {
 		value = *input.Electrical.MaxVoltageV
 	}
-	return append(conditions, OperatingCondition{
+	result := append(append([]OperatingCondition(nil), conditions...), OperatingCondition{
 		Axis: "input_voltage", Target: input.ID, Min: value, Max: value, Unit: "V",
 	})
+	if !explicit {
+		return result
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == input.ID || !boundedDigitalSink(port) ||
+			(port.Electrical.DefaultState != "low" && port.Electrical.DefaultState != "high") ||
+			logicLevelConditionAuthored(result, port.ID) {
+			continue
+		}
+		defaultValue := *port.Electrical.MinVoltageV
+		if port.Electrical.DefaultState == "high" {
+			defaultValue = *port.Electrical.MaxVoltageV
+		}
+		result = append(result, OperatingCondition{
+			Axis: "input_voltage", Target: port.ID,
+			Min: defaultValue, Max: defaultValue, Unit: "V",
+		})
+	}
+	return result
+}
+
+func boundedDigitalSink(port Port) bool {
+	return port.Kind == "digital" && port.Direction == "sink" &&
+		port.Electrical.MinVoltageV != nil && port.Electrical.MaxVoltageV != nil &&
+		finite(*port.Electrical.MinVoltageV) && finite(*port.Electrical.MaxVoltageV) &&
+		*port.Electrical.MinVoltageV < *port.Electrical.MaxVoltageV
+}
+
+func logicLevelConditionAuthored(conditions []OperatingCondition, target string) bool {
+	for _, condition := range conditions {
+		if condition.Target == target &&
+			(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+			return true
+		}
+	}
+	return false
 }
 
 func logicLevelPolarity(requirement Requirement, inputID, outputID string) (bool, bool) {
@@ -1866,7 +1936,7 @@ func simulationIntentParts(
 			simulationAssertion.ReferenceNode = referenceNodeForDomain(requirement, graph, *assertion.Excitation)
 		}
 	}
-	if assertion.Metric == "settling_time" {
+	if assertion.Metric == "settling_time" || quantity == simmodel.QuantityResponseTimeS {
 		effectiveExcitation := simulationEffectiveExcitation(assertion, graph)
 		if effectiveExcitation != nil {
 			component := sourceInstanceForObservation(graph, *effectiveExcitation)
@@ -2524,6 +2594,11 @@ func simulationExcitations(
 				node,
 			),
 		}
+		if effectiveExcitation != nil && !observationMatchesNode(node, *effectiveExcitation) {
+			if value, found := boundedDigitalPeerDefault(requirement, operatingCase, node.SemanticID); found {
+				excitation.DCValue = value
+			}
+		}
 		periodicPulse := assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 &&
 			(transientPeriodicPulseMetric(assertion.Metric) ||
 				periodicControlPulseRequired(requirement, assertion, effectiveExcitation))
@@ -2609,6 +2684,11 @@ func simulationExcitations(
 					configurePulse(initial, applied)
 				}
 			}
+			if !configuredPulse {
+				if initial, applied, found := boundedDigitalDynamicRange(requirement, assertion, node.SemanticID); found {
+					configurePulse(initial, applied)
+				}
+			}
 		}
 		if assertion.Analysis == simmodel.AnalysisACSweep && effectiveExcitation != nil &&
 			observationMatchesNode(node, *effectiveExcitation) {
@@ -2670,6 +2750,56 @@ func periodicControlPulseRequired(
 		}
 	}
 	return false
+}
+
+func boundedDigitalDynamicRange(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	semanticID string,
+) (float64, float64, bool) {
+	if assertion.Metric != "propagation_delay" && assertion.Metric != "rise_time" &&
+		assertion.Metric != "fall_time" && assertion.Metric != "settling_time" {
+		return 0, 0, false
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != semanticID || !boundedDigitalSink(port) {
+			continue
+		}
+		initial, applied := *port.Electrical.MinVoltageV, *port.Electrical.MaxVoltageV
+		if assertion.Metric == "fall_time" ||
+			(assertion.Metric != "rise_time" && port.Electrical.DefaultState == "high") {
+			initial, applied = applied, initial
+		}
+		return initial, applied, true
+	}
+	return 0, 0, false
+}
+
+func boundedDigitalPeerDefault(
+	requirement Requirement,
+	operatingCase OperatingCase,
+	semanticID string,
+) (float64, bool) {
+	for _, condition := range operatingCase.Conditions {
+		if condition.Target == semanticID &&
+			(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+			return 0, false
+		}
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != semanticID || !boundedDigitalSink(port) {
+			continue
+		}
+		switch port.Electrical.DefaultState {
+		case "low":
+			return *port.Electrical.MinVoltageV, true
+		case "high":
+			return *port.Electrical.MaxVoltageV, true
+		default:
+			return 0, false
+		}
+	}
+	return 0, false
 }
 
 func periodicControlRange(requirement Requirement, semanticID string) (float64, float64, bool) {
@@ -2861,6 +2991,40 @@ func valueUncertainty(instance GraphInstance, primitive PrimitiveCandidate) []si
 }
 
 func operatingCaseCorners(operatingCase OperatingCase) []operatingCorner {
+	return operatingCaseCornersWhere(operatingCase, func(condition OperatingCondition) bool {
+		return condition.Axis != "model_corner" && condition.Axis != "tolerance_corner"
+	})
+}
+
+func operatingCaseCornersForAssertion(
+	assertion BehavioralAssertion,
+	operatingCase OperatingCase,
+) []operatingCorner {
+	return operatingCaseCornersWhere(operatingCase, func(condition OperatingCondition) bool {
+		// Requirements are normalized before synthesis; temperature conditions
+		// therefore reach this boundary only in the validated degC unit.
+		switch condition.Axis {
+		case "model_corner", "tolerance_corner":
+			// The trusted simulator expands component-model and catalog-tolerance
+			// uncertainty inside each plan. These authored axes label that proof
+			// obligation; they do not define additional electrical stimuli.
+			return false
+		case "ambient_temperature", "temperature":
+			// Temperature is executable only for analyses whose trusted model
+			// consumes a thermal boundary. Other analyses retain the authored
+			// midpoint without duplicating an electrically identical plan.
+			return assertion.Analysis == simmodel.AnalysisThermal ||
+				assertion.Analysis == simmodel.AnalysisElectrothermal
+		default:
+			return true
+		}
+	})
+}
+
+func operatingCaseCornersWhere(
+	operatingCase OperatingCase,
+	varies func(OperatingCondition) bool,
+) []operatingCorner {
 	if len(operatingCase.Conditions) == 0 {
 		return []operatingCorner{{ID: "nominal", Values: map[string]float64{}}}
 	}
@@ -2881,6 +3045,12 @@ func operatingCaseCorners(operatingCase OperatingCase) []operatingCorner {
 		}
 		condition := operatingCase.Conditions[index]
 		key := conditionKey(condition)
+		if !varies(condition) {
+			values[key] = (condition.Min + condition.Max) / 2
+			expand(index+1, values, suffix+"0")
+			delete(values, key)
+			return
+		}
 		values[key] = condition.Min
 		expand(index+1, values, suffix+"0")
 		if condition.Max != condition.Min {

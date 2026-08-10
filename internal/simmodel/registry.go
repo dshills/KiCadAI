@@ -681,7 +681,7 @@ func evaluateNominal(plan Plan) (Report, []Diagnostic) {
 		pass := assertionWithinBounds(actual, assertion.Min, assertion.Max)
 		report.Assertions = append(report.Assertions, AssertionResult{Metric: assertion.Metric, Min: assertion.Min, Max: assertion.Max, Actual: actual, Pass: pass})
 		if !pass {
-			diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.Metric, Message: fmt.Sprintf("measured %.12g is outside trusted bounds %.12g..%.12g", actual, assertion.Min, assertion.Max), Suggestion: "adjust catalog-backed component values or operating conditions"})
+			diagnostics = append(diagnostics, Diagnostic{Code: DiagnosticAssertionOutOfBounds, Path: "assertions." + assertion.Metric, Message: fmt.Sprintf("measured %.12g is outside trusted bounds %.12g..%.12g", actual, assertion.Min, assertion.Max), Suggestion: "adjust catalog-backed component values or operating conditions"})
 		}
 	}
 	if len(diagnostics) == 0 {
