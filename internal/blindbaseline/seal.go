@@ -98,24 +98,12 @@ func manifestCommitment(manifest Manifest) ([]byte, error) {
 }
 
 func bindingCommitmentFields(binding Binding) []string {
-	return []string{
-		binding.StartingCommit,
-		binding.ContractFreezeCommit,
-		binding.CorpusFreezeCommit,
-		binding.SelectionFreezeCommit,
-		binding.PublisherParentCommit,
-		binding.CorpusManifestSHA256,
-		binding.SourceCiphertextSHA256,
-		binding.SelectionSHA256,
-		binding.EvaluatorPolicy,
-		binding.ImpactRegistrySHA256,
-		binding.SynthesisPolicySHA256,
-		binding.GapPolicySHA256,
-		binding.SelectionPolicySHA256,
-		binding.InventorySHA256,
-		binding.CatalogSHA256,
-		binding.ModelRegistrySHA256,
+	fields := binding.fields()
+	values := make([]string, len(fields))
+	for index := range fields {
+		values[index] = fields[index].value
 	}
+	return values
 }
 
 func lengthDelimited(values []string) []byte {

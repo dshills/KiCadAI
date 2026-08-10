@@ -122,37 +122,19 @@ func validateDestination(repositoryRoot, destinationRoot string) error {
 }
 
 func validateBinding(binding Binding) error {
-	commits := []struct{ name, value string }{
-		{"starting_commit", binding.StartingCommit},
-		{"contract_freeze_commit", binding.ContractFreezeCommit},
-		{"corpus_freeze_commit", binding.CorpusFreezeCommit},
-		{"selection_freeze_commit", binding.SelectionFreezeCommit},
-		{"publisher_parent_commit", binding.PublisherParentCommit},
-	}
-	for _, commit := range commits {
-		if !commitPattern.MatchString(commit.value) {
-			return fmt.Errorf("held-out baseline commit binding %s is invalid", commit.name)
+	for _, field := range binding.fields() {
+		valid := false
+		switch field.kind {
+		case bindingCommit:
+			valid = commitPattern.MatchString(field.value)
+		case bindingHash:
+			valid = hashPattern.MatchString(field.value)
+		case bindingIdentifier:
+			valid = policyIdentifierPattern.MatchString(field.value)
 		}
-	}
-	hashes := []struct{ name, value string }{
-		{"corpus_manifest_sha256", binding.CorpusManifestSHA256},
-		{"source_ciphertext_sha256", binding.SourceCiphertextSHA256},
-		{"selection_sha256", binding.SelectionSHA256},
-		{"impact_registry_sha256", binding.ImpactRegistrySHA256},
-		{"synthesis_policy_sha256", binding.SynthesisPolicySHA256},
-		{"gap_policy_sha256", binding.GapPolicySHA256},
-		{"selection_policy_sha256", binding.SelectionPolicySHA256},
-		{"inventory_sha256", binding.InventorySHA256},
-		{"catalog_sha256", binding.CatalogSHA256},
-		{"model_registry_sha256", binding.ModelRegistrySHA256},
-	}
-	for _, hash := range hashes {
-		if !hashPattern.MatchString(hash.value) {
-			return fmt.Errorf("held-out baseline hash binding %s is invalid", hash.name)
+		if !valid {
+			return fmt.Errorf("held-out baseline binding %s is invalid", field.name)
 		}
-	}
-	if !policyIdentifierPattern.MatchString(binding.EvaluatorPolicy) {
-		return fmt.Errorf("held-out baseline evaluator policy identifier is invalid")
 	}
 	return nil
 }

@@ -229,7 +229,12 @@ func mustDecodeManifest(t *testing.T, data []byte) Manifest {
 }
 
 func testBinding() Binding {
-	return Binding{StartingCommit: testCommit("1"), ContractFreezeCommit: testCommit("2"), CorpusFreezeCommit: testCommit("3"), SelectionFreezeCommit: testCommit("4"), PublisherParentCommit: testCommit("5"), CorpusManifestSHA256: testHash("1"), SourceCiphertextSHA256: testHash("2"), SelectionSHA256: testHash("3"), EvaluatorPolicy: "policy", ImpactRegistrySHA256: testHash("4"), SynthesisPolicySHA256: testHash("5"), GapPolicySHA256: testHash("6"), SelectionPolicySHA256: testHash("7"), InventorySHA256: testHash("8"), CatalogSHA256: testHash("9"), ModelRegistrySHA256: testHash("a")}
+	return Binding{
+		StartingCommit: testCommit("1"), ContractFreezeCommit: testCommit("2"), CorpusFreezeCommit: testCommit("3"), SelectionFreezeCommit: testCommit("4"), PublisherParentCommit: testCommit("5"),
+		CorpusManifestSHA256: testHash("1"), ContractManifestSHA256: testHash("2"), ValidatorManifestSHA256: testHash("3"), PublisherManifestSHA256: testHash("4"), ValidationReportSHA256: testHash("5"), PacketSetSHA256: testHash("6"), ContractBindingSHA256: testHash("7"), HistoricalCommitmentsSHA256: testHash("8"), SourceCiphertextSHA256: testHash("9"),
+		DiscoveryBaselineSHA256: testHash("a"), RankingSHA256: testHash("b"), SelectionSHA256: testHash("c"), GenericPlanSHA256: testHash("d"), EvaluatorPolicy: "policy",
+		ImpactRegistrySHA256: testHash("e"), SynthesisPolicySHA256: testHash("f"), GapPolicySHA256: testHash("1"), SelectionPolicySHA256: testHash("2"), ImplementationManifestSHA256: testHash("3"), InventorySHA256: testHash("4"), CatalogSHA256: testHash("5"), ModelRegistrySHA256: testHash("6"), EnvironmentPolicySHA256: testHash("7"),
+	}
 }
 
 func testCommit(character string) string { return string(bytes.Repeat([]byte(character), 40)) }
