@@ -1,0 +1,301 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "bounded_alarm_reporting",
+    "title": "Bounded alarm reporting",
+    "description": "Study a continuous report and alarm state under independent stimuli, supply variation, and a bounded output fault."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "return",
+        "kind": "reference",
+        "source": "external"
+      },
+      {
+        "id": "measurement_supply",
+        "kind": "supply",
+        "min_voltage_v": 4.75,
+        "nominal_voltage_v": 5,
+        "max_voltage_v": 5.25,
+        "max_current_a": 0.12,
+        "source": "external"
+      },
+      {
+        "id": "alarm_supply",
+        "kind": "supply",
+        "min_voltage_v": 3,
+        "nominal_voltage_v": 3.3,
+        "max_voltage_v": 3.6,
+        "max_current_a": 0.06,
+        "source": "external"
+      }
+    ],
+    "ports": [
+      {
+        "id": "quantity_current",
+        "kind": "analog_current",
+        "direction": "sink",
+        "domain": "return",
+        "electrical": {
+          "max_current_a": 0.02
+        }
+      },
+      {
+        "id": "test_level",
+        "kind": "analog_voltage",
+        "direction": "sink",
+        "domain": "return",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 0.5,
+          "max_voltage_v": 1,
+          "input_impedance_min_ohm": 50000
+        }
+      },
+      {
+        "id": "load_probe",
+        "kind": "analog_current",
+        "direction": "sink",
+        "domain": "return",
+        "electrical": {
+          "max_current_a": 0.002
+        }
+      },
+      {
+        "id": "reported_level",
+        "kind": "analog_voltage",
+        "direction": "source",
+        "domain": "return",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 2.5,
+          "max_voltage_v": 5,
+          "max_current_a": 0.01
+        }
+      },
+      {
+        "id": "alarm_state",
+        "kind": "digital",
+        "direction": "source",
+        "domain": "alarm_supply",
+        "electrical": {
+          "min_voltage_v": 0,
+          "nominal_voltage_v": 1.65,
+          "max_voltage_v": 3.6,
+          "max_current_a": 0.006,
+          "default_state": "low"
+        }
+      },
+      {
+        "id": "measurement_entry",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "measurement_supply",
+        "electrical": {
+          "min_voltage_v": 4.75,
+          "nominal_voltage_v": 5,
+          "max_voltage_v": 5.25,
+          "max_current_a": 0.12
+        }
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "monitoring",
+        "conditions": [
+          {
+            "axis": "input_current",
+            "target": "quantity_current",
+            "min": 0.001,
+            "max": 0.018,
+            "unit": "A"
+          },
+          {
+            "axis": "input_voltage",
+            "target": "test_level",
+            "min": 0,
+            "max": 1,
+            "unit": "V"
+          },
+          {
+            "axis": "load_current",
+            "target": "reported_level",
+            "min": 0,
+            "max": 0.005,
+            "unit": "A"
+          },
+          {
+            "axis": "ambient_temperature",
+            "target": "return",
+            "min": -30,
+            "max": 80,
+            "unit": "degC"
+          }
+        ]
+      },
+      {
+        "id": "fault_envelope",
+        "conditions": [
+          {
+            "axis": "supply_voltage",
+            "target": "measurement_supply",
+            "min": 4.75,
+            "max": 5.25,
+            "unit": "V"
+          },
+          {
+            "axis": "supply_voltage",
+            "target": "alarm_supply",
+            "min": 3,
+            "max": 3.6,
+            "unit": "V"
+          },
+          {
+            "axis": "tolerance_corner",
+            "target": "reported_level",
+            "min": 0.97,
+            "max": 1.03,
+            "unit": "ratio"
+          }
+        ],
+        "events": [
+          {
+            "id": "report_short",
+            "kind": "short_circuit",
+            "target": "reported_level",
+            "trigger_time_s": 0.01,
+            "initial": 1000,
+            "applied": 0.2,
+            "unit": "ohm"
+          },
+          {
+            "id": "quantity_change",
+            "kind": "input_step",
+            "target": "quantity_current",
+            "trigger_time_s": 0.02,
+            "initial": 0.002,
+            "applied": 0.016,
+            "unit": "A"
+          }
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "current_threshold",
+        "metric": "threshold_current",
+        "analysis": "dc_sweep",
+        "excitation": {
+          "kind": "port",
+          "id": "quantity_current"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "alarm_state"
+        },
+        "min": 0.012,
+        "max": 0.014,
+        "unit": "A",
+        "critical": true,
+        "operating_cases": [
+          "monitoring",
+          "fault_envelope"
+        ]
+      },
+      {
+        "id": "test_threshold",
+        "metric": "threshold_voltage",
+        "analysis": "dc_sweep",
+        "excitation": {
+          "kind": "port",
+          "id": "test_level"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "alarm_state"
+        },
+        "min": 0.4,
+        "max": 0.6,
+        "unit": "V",
+        "critical": true,
+        "operating_cases": [
+          "monitoring"
+        ]
+      },
+      {
+        "id": "load_response",
+        "metric": "settling_time",
+        "analysis": "transient",
+        "excitation": {
+          "kind": "port",
+          "id": "load_probe"
+        },
+        "observation": {
+          "kind": "port",
+          "id": "alarm_state"
+        },
+        "max": 0.003,
+        "unit": "s",
+        "critical": true,
+        "operating_cases": [
+          "fault_envelope"
+        ]
+      },
+      {
+        "id": "fault_current",
+        "metric": "peak_current",
+        "analysis": "transient",
+        "observation": {
+          "kind": "port",
+          "id": "reported_level"
+        },
+        "max": 0.03,
+        "unit": "A",
+        "critical": true,
+        "operating_cases": [
+          "fault_envelope"
+        ]
+      },
+      {
+        "id": "report_temperature",
+        "metric": "junction_temperature",
+        "analysis": "thermal",
+        "observation": {
+          "kind": "circuit",
+          "id": "reporting_behavior"
+        },
+        "max": 125,
+        "unit": "degC",
+        "critical": true,
+        "operating_cases": [
+          "monitoring",
+          "fault_envelope"
+        ]
+      }
+    ],
+    "constraints": {
+      "max_components": 28,
+      "max_width_mm": 90,
+      "max_height_mm": 65
+    }
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}
+
