@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "indigo_meadow",
+    "title": "Indigo Meadow Behavioral Study",
+    "description": "Study of measured and state-indicating responses across static and changing external conditions."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "measurement_reference", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "measurement_energy", "kind": "supply", "min_voltage_v": 4.75, "nominal_voltage_v": 5, "max_voltage_v": 5.25, "max_current_a": 0.05, "source": "external"}
+    ],
+    "ports": [
+      {"id": "measured_input", "kind": "analog_voltage", "direction": "sink", "domain": "measurement_reference", "electrical": {"min_voltage_v": -0.12, "nominal_voltage_v": 0, "max_voltage_v": 0.12, "input_impedance_min_ohm": 500000}},
+      {"id": "qualification_input", "kind": "digital", "direction": "sink", "domain": "measurement_reference", "electrical": {"min_voltage_v": 0, "max_voltage_v": 5.25, "input_impedance_min_ohm": 100000, "default_state": "low"}},
+      {"id": "measurement_output", "kind": "analog_voltage", "direction": "source", "domain": "measurement_reference", "electrical": {"min_voltage_v": 0.15, "nominal_voltage_v": 2.5, "max_voltage_v": 4.85, "max_current_a": 0.003}},
+      {"id": "limit_output", "kind": "digital", "direction": "source", "domain": "measurement_reference", "electrical": {"min_voltage_v": 0, "max_voltage_v": 5.25, "max_current_a": 0.004}}
+    ],
+    "operating_cases": [
+      {
+        "id": "measurement_span",
+        "conditions": [
+          {"axis": "input_voltage", "target": "measured_input", "min": -0.08, "max": 0.08, "unit": "V"},
+          {"axis": "supply_voltage", "target": "measurement_energy", "min": 4.75, "max": 5.25, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "measurement_energy", "min": -40, "max": 105, "unit": "degC"}
+        ]
+      },
+      {
+        "id": "measurement_transition",
+        "conditions": [
+          {"axis": "input_voltage", "target": "measured_input", "min": -0.1, "max": 0.1, "unit": "V"},
+          {"axis": "load_capacitance", "target": "measurement_output", "min": 0.00000000002, "max": 0.0000000002, "unit": "F"},
+          {"axis": "tolerance_corner", "target": "measurement_output", "min": -1, "max": 1, "unit": "ratio"}
+        ],
+        "events": [
+          {"id": "measurement_change", "kind": "input_step", "target": "measured_input", "trigger_time_s": 0.002, "initial": -0.04, "applied": 0.04, "unit": "V"},
+          {"id": "qualification_change", "kind": "input_step", "target": "qualification_input", "trigger_time_s": 0.004, "initial": 0, "applied": 5, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "measurement_gain", "metric": "voltage_gain", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "measured_input"}, "observation": {"kind": "port", "id": "measurement_output"}, "min": 19.5, "max": 20.5, "unit": "ratio", "operating_cases": ["measurement_span"], "critical": true},
+      {"id": "measurement_noise", "metric": "output_noise_rms", "analysis": "noise", "observation": {"kind": "port", "id": "measurement_output"}, "max": 0.001, "unit": "V_rms", "frequency_hz": 10000, "operating_cases": ["measurement_span"], "critical": true},
+      {"id": "measurement_settle", "metric": "settling_time", "analysis": "transient", "excitation": {"kind": "port", "id": "measured_input"}, "observation": {"kind": "port", "id": "measurement_output"}, "max": 0.00035, "unit": "s", "operating_cases": ["measurement_transition"], "critical": true},
+      {"id": "limit_boundary", "metric": "threshold_voltage", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "measured_input"}, "observation": {"kind": "port", "id": "limit_output"}, "min": 0.065, "max": 0.08, "unit": "V", "operating_cases": ["measurement_span"], "critical": true},
+      {"id": "thermal_limit", "metric": "junction_temperature", "analysis": "thermal", "observation": {"kind": "circuit", "id": "measurement_thermal_state"}, "max": 135, "unit": "degC", "operating_cases": ["measurement_span", "measurement_transition"], "critical": true}
+    ],
+    "constraints": {"max_components": 28, "max_width_mm": 48, "max_height_mm": 38}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

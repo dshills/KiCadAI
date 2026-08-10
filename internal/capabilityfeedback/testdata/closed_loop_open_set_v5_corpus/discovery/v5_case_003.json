@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "fern_interval",
+    "title": "Fern Interval Behavioral Study",
+    "description": "Study of externally observable state changes across bounded input and environmental conditions."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "logic_reference", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "logic_energy", "kind": "supply", "min_voltage_v": 2.7, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.04, "source": "external"}
+    ],
+    "ports": [
+      {"id": "level_stimulus", "kind": "analog_voltage", "direction": "sink", "domain": "logic_reference", "electrical": {"min_voltage_v": -0.2, "nominal_voltage_v": 1.65, "max_voltage_v": 3.8, "input_impedance_min_ohm": 50000}},
+      {"id": "state_response", "kind": "digital", "direction": "source", "domain": "logic_reference", "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.6, "max_current_a": 0.006}}
+    ],
+    "operating_cases": [
+      {
+        "id": "ascending_input",
+        "conditions": [
+          {"axis": "input_voltage", "target": "level_stimulus", "min": 0, "max": 3.3, "unit": "V"},
+          {"axis": "supply_voltage", "target": "logic_energy", "min": 2.7, "max": 3.6, "unit": "V"},
+          {"axis": "load_capacitance", "target": "state_response", "min": 0.00000000001, "max": 0.00000000008, "unit": "F"}
+        ],
+        "events": [
+          {"id": "rise_transition", "kind": "input_step", "target": "level_stimulus", "trigger_time_s": 0.000001, "initial": 0.4, "applied": 2.9, "unit": "V"}
+        ]
+      },
+      {
+        "id": "descending_input",
+        "conditions": [
+          {"axis": "input_voltage", "target": "level_stimulus", "min": 0, "max": 3.3, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "logic_energy", "min": -40, "max": 85, "unit": "degC"},
+          {"axis": "tolerance_corner", "target": "state_response", "min": -1, "max": 1, "unit": "ratio"}
+        ],
+        "events": [
+          {"id": "fall_transition", "kind": "input_step", "target": "level_stimulus", "trigger_time_s": 0.000001, "initial": 2.9, "applied": 0.4, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "rising_boundary", "metric": "rising_threshold", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "level_stimulus"}, "observation": {"kind": "port", "id": "state_response"}, "min": 1.75, "max": 2.2, "unit": "V", "operating_cases": ["ascending_input"], "critical": true},
+      {"id": "falling_boundary", "metric": "falling_threshold", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "level_stimulus"}, "observation": {"kind": "port", "id": "state_response"}, "min": 0.8, "max": 1.35, "unit": "V", "operating_cases": ["descending_input"], "critical": true},
+      {"id": "boundary_separation", "metric": "hysteresis", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "level_stimulus"}, "observation": {"kind": "port", "id": "state_response"}, "min": 0.45, "max": 1.4, "unit": "V", "operating_cases": ["ascending_input", "descending_input"]},
+      {"id": "response_latency", "metric": "propagation_delay", "analysis": "transient", "excitation": {"kind": "port", "id": "level_stimulus"}, "observation": {"kind": "port", "id": "state_response"}, "max": 0.000002, "unit": "s", "operating_cases": ["ascending_input", "descending_input"], "critical": true},
+      {"id": "asserted_level", "metric": "output_high_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "state_response"}, "min": 2.4, "unit": "V", "operating_cases": ["ascending_input"]}
+    ],
+    "constraints": {"max_components": 14, "max_width_mm": 30, "max_height_mm": 25}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}
