@@ -1,0 +1,64 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection-policy.v6",
+  "version": 6,
+  "candidate_unit": "minimal_causal_unlock_bundle",
+  "atom_identity_fields": [
+    "scope",
+    "capability"
+  ],
+  "member_identity_fields": [
+    "stage",
+    "scope",
+    "capability",
+    "code"
+  ],
+  "identity_encoding": "utf8-byte-length-prefixed-fields",
+  "case_blocker_source": "complete_normalized_typed_root_gaps_after_causal_suppression",
+  "unlock_rule": "case_exact_root_member_set_is_subset_of_bundle_exact_member_set",
+  "eligible_baseline_outcomes": [
+    "unsupported",
+    "exhausted"
+  ],
+  "bundle_generation": {
+    "discovery_only": true,
+    "maximum_capability_atoms": 4,
+    "maximum_exact_members": 12,
+    "minimum_atom_case_support": 2,
+    "require_minimal_unlock_set": true,
+    "reject_empty_case_blockers": true,
+    "reject_duplicate_atoms": true,
+    "reject_duplicate_members": true,
+    "reject_duplicate_cases": true
+  },
+  "eligibility": {
+    "minimum_unlocked_discovery_cases": 2,
+    "minimum_reporting_domains": 2
+  },
+  "ranking": [
+    "unlocked_case_count_desc",
+    "unlocked_domain_count_desc",
+    "unlocked_safety_weight_desc",
+    "capability_atom_count_asc",
+    "exact_member_count_asc"
+  ],
+  "publication_order": "semantic_ranking_then_canonical_bundle_key_asc",
+  "tie_behavior": "fail_closed_before_identity_order",
+  "rank_one_plan_admission": {
+    "require_complete_generic_plan": true,
+    "require_all_atoms_planned": true,
+    "require_all_members_planned": true,
+    "unexecutable_rank_one": "fail_closed_no_fallback"
+  },
+  "held_out_influence": "prohibited",
+  "unsafe_case_unlock_credit": "prohibited",
+  "selected_member_gap_removal": "exact_selected_member_identities_only",
+  "public_admission": {
+    "require_total_pass_uplift": true,
+    "require_claimed_unlock_pass_uplift": true,
+    "minimum_realized_claimed_unlocks": 1,
+    "require_nonselected_gap_preservation": true,
+    "require_no_pass_regression": true,
+    "require_no_unsafe_to_pass": true
+  },
+  "held_out_success_causality": "newly_passing_case_complete_baseline_root_member_set_covered_by_selected_bundle_boolean_only"
+}
