@@ -369,6 +369,172 @@ func TestElectrothermalUsesConservativeAperiodicSteadyStateBoundWithoutThermalCa
 	}
 }
 
+func TestElectrothermalTemperatureAssertionRetainsCatalogOvertemperatureEvidence(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "thermal_limit", Kind: AnalysisElectrothermal, DurationS: 1e-3, TimeStepS: 100e-6,
+			Conditions:  []NamedValue{{Name: "ambient_temperature_c", Value: 25}},
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 10}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "thermal_limit", Component: "load", Quantity: QuantityJunctionTemperatureC,
+			Min: 25, Max: 100,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "OUT", "GND"),
+		{
+			InstanceID: "load", CatalogID: "resistor.reviewed", Family: "resistor", HasValueSI: true, ValueSI: 10,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{
+				{Name: "max_temperature_c", Value: 150},
+				{Name: "thermal_resistance_c_per_w", Value: 50},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(
+		intent, "catalog", "catalog-hash", components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("overtemperature plan diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 1 || diagnostics[0].Code != DiagnosticAssertionOutOfBounds ||
+		len(report.Assertions) != 1 || report.Assertions[0].Pass || report.Assertions[0].Actual <= 150 {
+		t.Fatalf("overtemperature assertion evidence: report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	relaxedIntent := intent
+	relaxedIntent.Assertions = append([]Assertion(nil), intent.Assertions...)
+	relaxedIntent.Assertions[0].Max = 1000
+	relaxedPlan, diagnostics := ResolveWithTopology(
+		relaxedIntent, "catalog", "catalog-hash", components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("relaxed overtemperature plan diagnostics = %#v", diagnostics)
+	}
+	_, diagnostics = Evaluate(relaxedPlan)
+	if len(diagnostics) != 1 || diagnostics[0].Code == DiagnosticAssertionOutOfBounds ||
+		!strings.Contains(diagnostics[0].Message, "exceeds catalog-backed maximum") {
+		t.Fatalf("relaxed assertion bypassed catalog limit: %#v", diagnostics)
+	}
+}
+
+func TestElectrothermalComponentAssertionDoesNotMaskOtherCatalogOvertemperature(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "thermal_limit", Kind: AnalysisElectrothermal, DurationS: 1e-3, TimeStepS: 100e-6,
+			Conditions:  []NamedValue{{Name: "ambient_temperature_c", Value: 25}},
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 10}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "thermal_limit", Component: "asserted_load", Quantity: QuantityJunctionTemperatureC,
+			Min: 25, Max: 40,
+		}},
+	}
+	thermalResistor := func(instance string, resistance float64) ComponentEvidence {
+		return ComponentEvidence{
+			InstanceID: instance, CatalogID: "resistor." + instance, Family: "resistor",
+			HasValueSI: true, ValueSI: resistance,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{
+				{Name: "max_temperature_c", Value: 150},
+				{Name: "thermal_resistance_c_per_w", Value: 50},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}},
+		}
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "OUT", "GND"),
+		thermalResistor("asserted_load", 1000),
+		thermalResistor("unasserted_load", 10),
+	}
+	plan, diagnostics := ResolveWithTopology(
+		intent, "catalog", "catalog-hash", components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("component-scoped overtemperature plan diagnostics = %#v", diagnostics)
+	}
+	_, diagnostics = Evaluate(plan)
+	if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Path, "unasserted_load") ||
+		!strings.Contains(diagnostics[0].Message, "exceeds catalog-backed maximum") {
+		t.Fatalf("unasserted component rating violation was masked: %#v", diagnostics)
+	}
+}
+
+func TestElectrothermalPeakNodeVoltageIsMeasuredWithoutComponentScope(t *testing.T) {
+	claim := CatalogEvidence{
+		ModelID: PrimitiveNMOSSwitchV1,
+		Parameters: append(nmosSwitchParameters(),
+			NamedValue{Name: "max_temperature_c", Value: 150},
+			NamedValue{Name: "junction_to_ambient_c_per_w", Value: 10},
+		),
+		ThermalModel: &ThermalRCNetwork{
+			Reference:          "junction_to_ambient",
+			Stages:             []ThermalRCStage{{ThermalResistanceCPerW: 10, ThermalCapacitanceJPerC: 0.01}},
+			BoundaryAssumption: "Reviewed ambient boundary.",
+		},
+	}
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "thermal_waveform", Kind: AnalysisElectrothermal, DurationS: 1e-3, TimeStepS: 100e-6,
+			Conditions:  []NamedValue{{Name: "ambient_temperature_c", Value: 25}},
+			Excitations: []SourceExcitation{{Component: "gate_drive", DCValue: 5}, {Component: "supply", DCValue: 3}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "thermal_waveform", Node: "DRAIN", Quantity: QuantityPeakAbsVoltageV,
+			Min: 0, Max: 3.01,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("gate_drive", "GATE", "GND"),
+		voltageSourceEvidence("supply", "VCC", "GND"),
+		resistorEvidence("load", 100, "VCC", "DRAIN"),
+		{
+			InstanceID: "switch", CatalogID: "mosfet.dynamic-thermal", Family: "mosfet",
+			ModelClaims: []CatalogEvidence{claim},
+			Connections: []ConnectionEvidence{
+				{Function: "GATE", Net: "GATE"},
+				{Function: "DRAIN", Net: "DRAIN"},
+				{Function: "SOURCE", Net: "GND"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(
+		intent, "catalog", "catalog-hash", components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "DRAIN"}, {Name: "GATE"}, {Name: "VCC"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("electrothermal node-voltage plan diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" || len(report.Assertions) != 1 ||
+		report.Assertions[0].Component != "" || !finite(report.Assertions[0].Actual) ||
+		report.Assertions[0].Actual < 0 || report.Assertions[0].Actual > 3.01 {
+		t.Fatalf("electrothermal node-voltage evidence: report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	unsafe := ClonePlan(plan)
+	for deviceIndex := range unsafe.Devices {
+		if unsafe.Devices[deviceIndex].Component != "switch" {
+			continue
+		}
+		for parameterIndex := range unsafe.Devices[deviceIndex].ModelParameters {
+			if unsafe.Devices[deviceIndex].ModelParameters[parameterIndex].Name == "max_temperature_c" {
+				unsafe.Devices[deviceIndex].ModelParameters[parameterIndex].Value = 25
+			}
+		}
+	}
+	RefreshTopologyHash(&unsafe)
+	_, diagnostics = Evaluate(unsafe)
+	if len(diagnostics) == 0 || !strings.Contains(diagnostics[0].Message, "exceeds catalog-backed maximum") {
+		t.Fatalf("unasserted thermal rating violation did not fail closed: %#v", diagnostics)
+	}
+}
+
 func TestElectrothermalTransientFailsClosedOnSOAViolation(t *testing.T) {
 	pulse := 10e-3
 	claim := CatalogEvidence{
@@ -410,9 +576,11 @@ func TestElectrothermalTransientFailsClosedOnSOAViolation(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("resolve unsafe electrothermal plan: %#v", diagnostics)
 	}
-	_, diagnostics = Evaluate(plan)
-	if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message, "SOA margin") {
-		t.Fatalf("SOA violation diagnostics = %#v", diagnostics)
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 1 || diagnostics[0].Code != DiagnosticAssertionOutOfBounds ||
+		!strings.Contains(diagnostics[0].Message, "outside trusted bounds") ||
+		len(report.Assertions) != 1 || report.Assertions[0].Pass || report.Assertions[0].Actual >= 1 {
+		t.Fatalf("SOA violation report=%#v diagnostics=%#v", report, diagnostics)
 	}
 }
 

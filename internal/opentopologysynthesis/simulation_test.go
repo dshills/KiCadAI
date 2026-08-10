@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kicadai/internal/circuitgraph"
@@ -591,6 +592,97 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 			analysis.DurationS,
 			event,
 		)
+	}
+}
+
+func TestDynamicOutputLoadStepClosesHarnessSourceAndEvent(t *testing.T) {
+	requirement, graph, _, environment := testSimulationFixture(t)
+	maximum := 5.0
+	assertion := BehavioralAssertion{
+		ID: "thermal_peak", Metric: "peak_voltage", Analysis: simmodel.AnalysisElectrothermal,
+		Observation: Observation{Kind: "port", ID: "output"}, Max: &maximum,
+		OperatingCases: []string{"dynamic_load"}, Critical: true,
+	}
+	operatingCase := OperatingCase{
+		ID: "dynamic_load",
+		Conditions: []OperatingCondition{{
+			Axis: "load_current", Target: "output", Min: 0.1, Max: 0.5, Unit: "A",
+		}},
+		Events: []OperatingEvent{{
+			ID: "demand_step", Kind: "load_step", Target: "output", TriggerTimeS: 1e-3,
+			Initial: 0.1, Applied: 0.5, Unit: "A",
+		}},
+	}
+	requirement.Requirements.BehavioralRequirements = []BehavioralAssertion{assertion}
+	requirement.Requirements.OperatingCases = []OperatingCase{operatingCase}
+	corner := operatingCaseCorners(operatingCase)[0]
+	harness, _, diagnostics := simulationHarness(
+		requirement, assertion, operatingCase, corner, graph, environment,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("dynamic load harness diagnostics = %#v", diagnostics)
+	}
+	component := loadInstanceID("output", "load_current")
+	foundHarness := false
+	for _, evidence := range harness {
+		if evidence.InstanceID == component {
+			foundHarness = evidence.Family == "current_source"
+		}
+	}
+	excitations := simulationExcitations(requirement, assertion, operatingCase, corner, graph)
+	foundExcitation := false
+	for _, excitation := range excitations {
+		if excitation.Component == component {
+			foundExcitation = true
+		}
+	}
+	analysis, measurement, diagnostics := simulationIntentParts(
+		requirement, assertion, operatingCase, corner, graph, harness,
+		simmodel.QuantityPeakAbsVoltageV, 1, nil,
+	)
+	if len(diagnostics) != 0 || !foundHarness || !foundExcitation ||
+		len(analysis.SourceValueEvents) != 1 ||
+		analysis.SourceValueEvents[0].Component != component ||
+		analysis.SourceValueEvents[0].Initial != 0.1 ||
+		analysis.SourceValueEvents[0].Applied != 0.5 ||
+		measurement.Component != "" || measurement.Node == "" {
+		t.Fatalf(
+			"dynamic load closure: harness=%t excitation=%t analysis=%#v measurement=%#v diagnostics=%#v",
+			foundHarness, foundExcitation, analysis, measurement, diagnostics,
+		)
+	}
+	dcAssertion := assertion
+	dcAssertion.Analysis = simmodel.AnalysisDCOperatingPoint
+	dcAssertion.Metric = "output_voltage"
+	dcHarness, _, diagnostics := simulationHarness(
+		requirement, dcAssertion, operatingCase, corner, graph, environment,
+	)
+	dcAnalysis, _, intentDiagnostics := simulationIntentParts(
+		requirement, dcAssertion, operatingCase, corner, graph, dcHarness,
+		simmodel.QuantityVoltageV, 1, nil,
+	)
+	if len(diagnostics) != 0 || len(intentDiagnostics) != 0 || len(dcAnalysis.SourceValueEvents) != 0 {
+		t.Fatalf(
+			"static analysis executed a dynamic load event: harness=%#v analysis=%#v diagnostics=%#v intent=%#v",
+			dcHarness, dcAnalysis, diagnostics, intentDiagnostics,
+		)
+	}
+	directDCAnalysis := simmodel.Analysis{
+		Kind: simmodel.AnalysisDCOperatingPoint, DurationS: 2e-3, TimeStepS: 1e-4,
+	}
+	addSimulationEvents(&directDCAnalysis, requirement, operatingCase, graph)
+	if len(directDCAnalysis.SourceValueEvents) != 0 {
+		t.Fatalf("static analysis received a dangling dynamic load event: %#v", directDCAnalysis.SourceValueEvents)
+	}
+	outOfEnvelope := operatingCase
+	outOfEnvelope.Events = append([]OperatingEvent(nil), operatingCase.Events...)
+	outOfEnvelope.Events[0].Applied = 0.6
+	_, _, diagnostics = simulationHarness(
+		requirement, assertion, outOfEnvelope, corner, graph, environment,
+	)
+	if len(diagnostics) != 1 || diagnostics[0].Code != diagnosisSimulationInvalid ||
+		!strings.Contains(diagnostics[0].Message, "exceed the declared load-current envelope") {
+		t.Fatalf("out-of-envelope load step did not fail closed: %#v", diagnostics)
 	}
 }
 

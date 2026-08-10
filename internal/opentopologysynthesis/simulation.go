@@ -778,6 +778,9 @@ func simulationHarness(
 	hashes := []string{}
 	diagnostics := []SimulationDiagnostic{}
 	conditions := simulationHarnessConditions(requirement, assertion, operatingCase)
+	currentLoadSteps := currentLoadStepEventsForAnalysis(assertion.Analysis, operatingCase, graph)
+	currentLoadStepTargets := currentLoadStepTargetSet(currentLoadSteps)
+	diagnostics = append(diagnostics, currentLoadStepEnvelopeDiagnostics(conditions, currentLoadSteps)...)
 	for _, node := range graph.Nodes {
 		if node.Scope != "external" || node.Role == "reference" || node.Role == "output" {
 			continue
@@ -846,7 +849,12 @@ func simulationHarness(
 			}
 			family, modelID, firstTerminal, secondTerminal = "inductor", simmodel.PrimitiveInductorTransientV1, "A", "B"
 		case "load_current":
-			if resistance, found := dynamicVoltageOutputLoadResistance(requirement, assertion, condition, value); found {
+			// A bounded dynamic load step is the exact time-domain trajectory;
+			// the matching condition remains its validated operating envelope.
+			// Model that trajectory with one programmable current source instead
+			// of combining it with a second static equivalent load.
+			if resistance, found := dynamicVoltageOutputLoadResistance(requirement, assertion, condition, value); found &&
+				!currentLoadStepTargets[condition.Target] {
 				family, modelID, firstTerminal, secondTerminal = "resistor", simmodel.PrimitiveResistorV1, "A", "B"
 				value, resistiveCurrentLoad = resistance, true
 			} else {
@@ -899,6 +907,39 @@ func simulationHarness(
 			component.HasValueSI = true
 		}
 		result = append(result, component)
+		hashes = append(hashes, provenanceHashes...)
+	}
+	componentIDs := make(map[string]bool, len(result)+len(currentLoadSteps))
+	for _, component := range result {
+		componentIDs[component.InstanceID] = true
+	}
+	for _, event := range currentLoadSteps {
+		instanceID := loadInstanceID(event.Target, "load_current")
+		if componentIDs[instanceID] {
+			continue
+		}
+		target, _ := externalNodeForSemanticTarget(graph, event.Target)
+		record, provenanceHashes, ok := selectHarnessRecord(
+			environment, "current_source", simmodel.PrimitiveCurrentSourceV1,
+			trustedModelAnalysisKind(assertion.Analysis),
+		)
+		if !ok {
+			diagnostics = append(diagnostics, SimulationDiagnostic{
+				Code: diagnosisModelUnavailable, Path: "simulation.harness." + instanceID,
+				Message: "reviewed current_source harness primitive is unavailable for a dynamic load step",
+			})
+			continue
+		}
+		firstNode, secondNode := loadHarnessNodes(requirement, graph, target, reference)
+		result = append(result, simmodel.ComponentEvidence{
+			InstanceID: instanceID, CatalogID: record.ID, Family: record.Family,
+			ModelClaims: cloneCatalogClaims(record.SimulationModels),
+			Connections: []simmodel.ConnectionEvidence{
+				{Function: "POSITIVE", Net: firstNode},
+				{Function: "NEGATIVE", Net: secondNode},
+			},
+		})
+		componentIDs[instanceID] = true
 		hashes = append(hashes, provenanceHashes...)
 	}
 	shortTargets := map[string]bool{}
@@ -2579,6 +2620,8 @@ func simulationExcitations(
 	graph CandidateGraph,
 ) []simmodel.SourceExcitation {
 	result := []simmodel.SourceExcitation{}
+	currentLoadSteps := currentLoadStepEventsForAnalysis(assertion.Analysis, operatingCase, graph)
+	currentLoadStepTargets := currentLoadStepTargetSet(currentLoadSteps)
 	effectiveExcitation := simulationEffectiveExcitation(assertion, graph)
 	for _, node := range graph.Nodes {
 		if node.Scope != "external" || node.Role == "reference" || node.Role == "output" {
@@ -2710,7 +2753,7 @@ func simulationExcitations(
 		if condition.Axis == "load_current" {
 			if _, found := dynamicVoltageOutputLoadResistance(
 				requirement, assertion, condition, corner.Values[conditionKey(condition)],
-			); found {
+			); found && !currentLoadStepTargets[condition.Target] {
 				continue
 			}
 		}
@@ -2725,6 +2768,21 @@ func simulationExcitations(
 			Component: loadInstanceID(condition.Target, condition.Axis),
 			DCValue:   value,
 		})
+	}
+	excitationIDs := make(map[string]bool, len(result)+len(currentLoadSteps))
+	for _, excitation := range result {
+		excitationIDs[excitation.Component] = true
+	}
+	for _, event := range currentLoadSteps {
+		component := loadInstanceID(event.Target, "load_current")
+		if excitationIDs[component] {
+			continue
+		}
+		result = append(result, simmodel.SourceExcitation{
+			Component: component,
+			DCValue:   event.Initial,
+		})
+		excitationIDs[component] = true
 	}
 	slices.SortFunc(result, func(left, right simmodel.SourceExcitation) int {
 		return cmp.Compare(left.Component, right.Component)
@@ -2886,6 +2944,91 @@ func windowDynamicExcitationRange(
 
 func loadInstanceID(target, axis string) string {
 	return canonicalIdentifier("load_" + target + "_" + axis)
+}
+
+func currentLoadStepEvents(operatingCase OperatingCase, graph CandidateGraph) []OperatingEvent {
+	result := []OperatingEvent{}
+	for _, event := range operatingCase.Events {
+		if event.Kind != "load_step" || event.Unit != "A" ||
+			!finite(event.Initial) || !finite(event.Applied) {
+			continue
+		}
+		target, found := externalNodeForSemanticTarget(graph, event.Target)
+		if !found || target.Role != "output" {
+			continue
+		}
+		result = append(result, event)
+	}
+	slices.SortFunc(result, func(left, right OperatingEvent) int {
+		return cmp.Or(
+			cmp.Compare(left.Target, right.Target),
+			cmp.Compare(left.TriggerTimeS, right.TriggerTimeS),
+			cmp.Compare(left.ID, right.ID),
+		)
+	})
+	return result
+}
+
+func currentLoadStepEventsForAnalysis(analysis string, operatingCase OperatingCase, graph CandidateGraph) []OperatingEvent {
+	if !analysisUsesCurrentLoadSteps(analysis) {
+		return nil
+	}
+	return currentLoadStepEvents(operatingCase, graph)
+}
+
+func analysisUsesCurrentLoadSteps(analysis string) bool {
+	return analysis == simmodel.AnalysisTransient || analysis == simmodel.AnalysisElectrothermal
+}
+
+func currentLoadStepTargetSet(events []OperatingEvent) map[string]bool {
+	result := make(map[string]bool, len(events))
+	for _, event := range events {
+		result[event.Target] = true
+	}
+	return result
+}
+
+func currentLoadStepEnvelopeDiagnostics(
+	conditions []OperatingCondition,
+	events []OperatingEvent,
+) []SimulationDiagnostic {
+	type envelope struct {
+		minimum float64
+		maximum float64
+		found   bool
+	}
+	envelopes := map[string]envelope{}
+	for _, condition := range conditions {
+		if condition.Axis != "load_current" {
+			continue
+		}
+		current := envelopes[condition.Target]
+		if !current.found {
+			current = envelope{minimum: condition.Min, maximum: condition.Max, found: true}
+		} else {
+			current.minimum = math.Min(current.minimum, condition.Min)
+			current.maximum = math.Max(current.maximum, condition.Max)
+		}
+		envelopes[condition.Target] = current
+	}
+	result := []SimulationDiagnostic{}
+	for _, event := range events {
+		envelope := envelopes[event.Target]
+		if !envelope.found ||
+			(event.Initial >= envelope.minimum && event.Initial <= envelope.maximum &&
+				event.Applied >= envelope.minimum && event.Applied <= envelope.maximum) {
+			continue
+		}
+		result = append(result, SimulationDiagnostic{
+			Code: diagnosisSimulationInvalid,
+			Path: "simulation.events." + event.ID,
+			Message: fmt.Sprintf(
+				"dynamic load-step values %.12g..%.12g A exceed the declared load-current envelope %.12g..%.12g A",
+				event.Initial, event.Applied, envelope.minimum, envelope.maximum,
+			),
+		})
+	}
+	return result
 }
 
 func dcSweepUsesDeviceValue(requirement Requirement, assertion BehavioralAssertion, source string) bool {
@@ -3657,6 +3800,21 @@ func addSimulationEvents(analysis *simmodel.Analysis, requirement Requirement, o
 				DurationS:    math.Max(analysis.DurationS-event.TriggerTimeS, analysis.TimeStepS),
 				InitialSI:    1e12,
 				AppliedSI:    resistance,
+			})
+			continue
+		}
+		if event.Kind == "load_step" && target.Role == "output" {
+			if (analysis.Kind != simmodel.AnalysisTransient && analysis.Kind != simmodel.AnalysisElectrothermal) ||
+				event.Unit != "A" || !finite(event.Initial) || !finite(event.Applied) {
+				continue
+			}
+			analysis.SourceValueEvents = append(analysis.SourceValueEvents, simmodel.SourceValueEvent{
+				ID:           canonicalIdentifier(event.ID),
+				Component:    loadInstanceID(event.Target, "load_current"),
+				TriggerTimeS: event.TriggerTimeS,
+				DurationS:    math.Max(analysis.DurationS-event.TriggerTimeS, analysis.TimeStepS),
+				Initial:      event.Initial,
+				Applied:      event.Applied,
 			})
 			continue
 		}

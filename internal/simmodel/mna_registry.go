@@ -1162,7 +1162,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		aggregateThermal := assertion.Quantity == QuantityMaximumJunctionTemperatureC ||
 			assertion.Quantity == QuantityMinimumTransientSOAMargin
-		componentRequired := ((kind == AnalysisThermal || kind == AnalysisElectrothermal) && !aggregateThermal) ||
+		thermalComponentScoped := (kind == AnalysisThermal || kind == AnalysisElectrothermal) &&
+			(assertion.Quantity == QuantityDeviceDissipationW ||
+				assertion.Quantity == QuantityJunctionTemperatureC ||
+				assertion.Quantity == QuantityTransientSOAMargin)
+		componentRequired := thermalComponentScoped ||
 			assertion.Quantity == QuantityDeviceCurrentA ||
 			assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA ||
 			assertion.Quantity == QuantityDCSweepDeviceSlopeAperV ||
@@ -1220,8 +1224,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "loop margin, crossover, and peaking assertions require stability analysis"})
 			}
 		case QuantityPeakAbsVoltageV:
-			if kind != AnalysisStartup && kind != AnalysisTransient {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak absolute voltage assertions require startup or transient analysis"})
+			if kind != AnalysisStartup && kind != AnalysisTransient && kind != AnalysisElectrothermal {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak absolute voltage assertions require startup, transient, or electrothermal analysis"})
 			}
 		case QuantityPeakAbsDeviceVoltageV, QuantityPeakAbsDeviceCurrentA:
 			if kind != AnalysisTransient && kind != AnalysisStartup && kind != AnalysisElectrothermal {

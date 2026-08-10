@@ -157,6 +157,19 @@ func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, diss
 }
 
 func thermalDeviceResultAtResistanceScale(device ResolvedDevice, analysis Analysis, ambient, dissipation, resistanceScale float64) (DeviceResult, *Diagnostic) {
+	return thermalDeviceResultAtResistanceScaleWithRating(
+		device, analysis, ambient, dissipation, resistanceScale, false,
+	)
+}
+
+func thermalDeviceResultAtResistanceScaleWithRating(
+	device ResolvedDevice,
+	analysis Analysis,
+	ambient float64,
+	dissipation float64,
+	resistanceScale float64,
+	allowExplicitTemperatureAssertion bool,
+) (DeviceResult, *Diagnostic) {
 	entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
 	parameters := deviceParameterMap(device)
 	maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
@@ -174,7 +187,7 @@ func thermalDeviceResultAtResistanceScale(device ResolvedDevice, analysis Analys
 	}
 	temperature := normalizedMNAFloat(reference + dissipation*theta*resistanceScale)
 	entry.JunctionTemperatureC = &temperature
-	if temperature > maximum {
+	if temperature > maximum && !allowExplicitTemperatureAssertion {
 		return DeviceResult{}, &Diagnostic{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: fmt.Sprintf("predicted steady-state temperature %.12g C exceeds catalog-backed maximum %.12g C", temperature, maximum), Suggestion: "reduce dissipation, improve the reviewed thermal path, or select a suitably rated component"}
 	}
 	return entry, nil

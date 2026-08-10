@@ -33,16 +33,25 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 	thermalStates := map[string][]float64{}
 	steadyThermalEvidence := map[string]bool{}
 	soaExcursions := map[string]transientSOAExcursion{}
-	assertedThermalComponents := electrothermalAssertionComponents(plan, analysis.ID)
+	temperatureAssertionMaximums := electrothermalTemperatureAssertionMaximums(plan, analysis.ID)
+	temperatureAssertionPreservesCatalogLimits := map[string]bool{}
+	maximumTemperatureByComponent := map[string]float64{}
+	soaAssertionComponents := electrothermalSOAAssertionCoverage(plan, analysis.ID)
 	dynamicDevices := 0
 	for _, device := range plan.Devices {
 		devices[device.Component] = device
+		parameters := deviceParameterMap(device)
+		maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
+		if hasMaximum {
+			maximumTemperatureByComponent[device.Component] = maximum
+		}
+		if assertionMaximum, asserted := temperatureAssertionMaximums[device.Component]; asserted && hasMaximum && assertionMaximum <= maximum {
+			temperatureAssertionPreservesCatalogLimits[device.Component] = true
+		}
 		if device.ThermalModel != nil {
 			thermalStates[device.Component] = make([]float64, len(device.ThermalModel.Stages))
 			dynamicDevices++
-		} else if assertedThermalComponents[device.Component] && thermalDeviceSupportsDissipation(device) {
-			parameters := deviceParameterMap(device)
-			_, hasMaximum := namedValue(parameters, "max_temperature_c")
+		} else if thermalDeviceSupportsDissipation(device) {
 			_, _, hasPath := resolvedThermalPath(nil, parameters, analysis.Conditions, ambient)
 			if hasMaximum || hasPath {
 				steadyThermalEvidence[device.Component] = true
@@ -100,7 +109,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 				}
 				temperature = normalizedMNAFloat(temperature)
 				observation.JunctionTemperatureC = &temperature
-				maximum, hasMaximum := namedValue(deviceParameterMap(device), "max_temperature_c")
+				maximum, hasMaximum := maximumTemperatureByComponent[device.Component]
 				if !hasMaximum {
 					return result, []Diagnostic{{
 						Path:       fmt.Sprintf("analyses.%s.devices.%s", analysis.ID, device.Component),
@@ -108,7 +117,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 						Suggestion: "select a complete reviewed electrothermal model",
 					}}
 				}
-				if temperature > maximum {
+				if temperature > maximum && !temperatureAssertionPreservesCatalogLimits[device.Component] {
 					return result, []Diagnostic{{
 						Path:       fmt.Sprintf("analyses.%s.points[%d].devices.%s.junction_temperature_c", analysis.ID, pointIndex, device.Component),
 						Message:    fmt.Sprintf("predicted dynamic junction temperature %.12g C exceeds catalog-backed maximum %.12g C at %.12g s", temperature, maximum, point.TimeS),
@@ -136,7 +145,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 				soaExcursions[device.Component] = excursion
 				observation.TransientSOAMargin = normalizedMNAFloat(margin)
 				observation.TransientSOAEvaluated = true
-				if margin < 1 {
+				if margin < 1 && !soaAssertionComponents[device.Component] {
 					return result, []Diagnostic{{
 						Path:       fmt.Sprintf("analyses.%s.points[%d].devices.%s.transient_soa", analysis.ID, pointIndex, device.Component),
 						Message:    fmt.Sprintf("transient SOA margin %.12g is below unity at %.12g s", margin, point.TimeS),
@@ -147,31 +156,56 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 		}
 		previousTime = point.TimeS
 	}
-	if diagnostic := applyPeriodicSteadyThermalEvidence(&result, devices, steadyThermalEvidence, analysis, ambient, baseResistanceScale); diagnostic != nil {
+	if diagnostic := applyPeriodicSteadyThermalEvidence(
+		&result, devices, steadyThermalEvidence, analysis, ambient, baseResistanceScale,
+		temperatureAssertionPreservesCatalogLimits,
+	); diagnostic != nil {
 		return result, []Diagnostic{*diagnostic}
 	}
 	return result, nil
 }
 
-func electrothermalAssertionComponents(plan Plan, analysisID string) map[string]bool {
-	result := map[string]bool{}
+func electrothermalTemperatureAssertionMaximums(plan Plan, analysisID string) map[string]float64 {
+	result := map[string]float64{}
+	add := func(component string, maximum float64) {
+		if component == "" || !finite(maximum) {
+			return
+		}
+		if current, exists := result[component]; !exists || maximum < current {
+			result[component] = maximum
+		}
+	}
 	for _, assertion := range plan.Assertions {
 		if assertion.AnalysisID != analysisID {
 			continue
 		}
 		switch assertion.Quantity {
-		case QuantityJunctionTemperatureC,
-			QuantityMaximumJunctionTemperatureC,
-			QuantityTransientSOAMargin,
-			QuantityMinimumTransientSOAMargin:
-		default:
+		case QuantityJunctionTemperatureC:
+			add(assertion.Component, assertion.Max)
+		case QuantityMaximumJunctionTemperatureC:
+			for _, component := range assertion.Components {
+				add(component, assertion.Max)
+			}
+		}
+	}
+	return result
+}
+
+func electrothermalSOAAssertionCoverage(plan Plan, analysisID string) map[string]bool {
+	result := map[string]bool{}
+	for _, assertion := range plan.Assertions {
+		if assertion.AnalysisID != analysisID || assertion.Min < 1 {
 			continue
 		}
-		if assertion.Component != "" {
-			result[assertion.Component] = true
-		}
-		for _, component := range assertion.Components {
-			result[component] = true
+		switch assertion.Quantity {
+		case QuantityTransientSOAMargin:
+			if assertion.Component != "" {
+				result[assertion.Component] = true
+			}
+		case QuantityMinimumTransientSOAMargin:
+			for _, component := range assertion.Components {
+				result[component] = true
+			}
 		}
 	}
 	return result
@@ -194,6 +228,7 @@ func applyPeriodicSteadyThermalEvidence(
 	analysis Analysis,
 	ambient float64,
 	baseResistanceScale float64,
+	temperatureAssertionPreservesCatalogLimits map[string]bool,
 ) *Diagnostic {
 	if len(steadyThermalEvidence) == 0 {
 		return nil
@@ -232,8 +267,9 @@ func applyPeriodicSteadyThermalEvidence(
 		}
 		temperatures := map[string]*float64{}
 		for component := range steadyThermalEvidence {
-			steady, diagnostic := thermalDeviceResultAtResistanceScale(
+			steady, diagnostic := thermalDeviceResultAtResistanceScaleWithRating(
 				devices[component], analysis, ambient, maximumScaledDissipation[component], 1,
+				temperatureAssertionPreservesCatalogLimits[component],
 			)
 			if diagnostic != nil {
 				return diagnostic
@@ -284,7 +320,10 @@ func applyPeriodicSteadyThermalEvidence(
 	for component := range steadyThermalEvidence {
 		device := devices[component]
 		averageScaledDissipation := weightedEnergy[component] / windowDuration
-		steady, diagnostic := thermalDeviceResultAtResistanceScale(device, analysis, ambient, averageScaledDissipation, 1)
+		steady, diagnostic := thermalDeviceResultAtResistanceScaleWithRating(
+			device, analysis, ambient, averageScaledDissipation, 1,
+			temperatureAssertionPreservesCatalogLimits[component],
+		)
 		if diagnostic != nil {
 			return diagnostic
 		}
