@@ -63,8 +63,10 @@ the sorted union of observed discovery root members carrying that atom.
 
 A candidate bundle is a canonical sorted set of capability atoms and their
 exact member union. Candidate generation uses discovery evidence only and is
-bounded by `V6_SELECTION_POLICY.json`. A candidate receives unlock credit for a
-case only when all of the following are true:
+the deduplicated closure of unions of eligible case blocker signatures. It is
+bounded by `V6_SELECTION_POLICY.json`; exceeding the candidate ceiling fails
+closed rather than truncating the ranking. A candidate receives unlock credit
+for a case only when all of the following are true:
 
 - the baseline outcome is `unsupported` or `exhausted`;
 - every exact root member of the case is contained in the candidate member set;

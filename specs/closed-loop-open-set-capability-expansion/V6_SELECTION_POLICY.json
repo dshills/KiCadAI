@@ -23,6 +23,7 @@
     "discovery_only": true,
     "maximum_capability_atoms": 4,
     "maximum_exact_members": 12,
+    "maximum_candidate_bundles": 4096,
     "minimum_atom_case_support": 2,
     "require_minimal_unlock_set": true,
     "reject_empty_case_blockers": true,
