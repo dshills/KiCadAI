@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	v6ContractFreezeCommit = "65f6da46c25abe7f77479754f0260e02403f7f8c"
-	v6ContractManifestHash = "19e2deaf80c4d97a3cf2f7405a51d97df7ce6f2172a1e1830c57177b7c2a7c60"
-	v6PacketSetHash        = "3ca4f144bb455aeeb8e454eb74584b5c7286f2e0e76b0eaf3c5f2e83dd1e5e49"
+	v6ContractFreezeCommit = "0d0350f4542a6f7f97b813331d228cac969767cd"
+	v6ContractManifestHash = "61f76c00477f2f6eb350556f4e2d0ba85b338846a9b61ed92691263c9552f591"
+	v6PacketSetHash        = "664b6d20ceb1433509e20016e0fbe3ddf98f6c8c1da01f5aeca7f50f2db6f31a"
 )
 
 type v6PacketBinding struct {

@@ -68,12 +68,15 @@ shape, supply shape, or safety category.
 
 ## Historical exclusion
 
-The validator binds the raw and normalized semantic commitments of every V1
-through V6 requirement, including the retired V6 corpus. A V6 requirement fails
-if its raw hash, normalized semantic hash, or prohibited near-duplicate
+The validator binds every historical commitment that the retired protocols
+published: raw commitments for every V1 through V5 requirement, neutral
+semantic commitments for V4 and V5, and identifier-normalized semantic
+commitments for V5. These are the strongest outcome-neutral commitments that
+exist without reopening retired held-out sources. A V6 requirement fails if
+its raw hash, any available semantic hash, or prohibited near-duplicate
 signature matches historical or same-corpus evidence.
 
-Historical held-out comparisons operate on commitments only. No V1-V6 held-out
+Historical held-out comparisons operate on commitments only. No V1-V5 held-out
 plaintext may be decrypted or exposed to authors, validators, selectors,
 implementers, reviewers, or logs.
 
