@@ -1,0 +1,64 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_011",
+    "role": "discovery",
+    "domain": "mixed_signal",
+    "safety_impact": "review_required"
+  },
+  "outcome": "unsupported",
+  "stop_reason": "no_passing_graph",
+  "requirement_hash": "c9213c2c1692e6551302a70933fbb9a248d7eab3dceec62f741afb123c9ef16c",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "b354bd21ac186d891c06e1309a4713a079100648b5c9bfa0e81afc94f3349601",
+  "analysis_kinds": [
+    "ac_sweep",
+    "dc_operating_point",
+    "dc_sweep",
+    "distortion",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 47,
+    "generated_graphs": 562,
+    "complete_graphs": 8,
+    "candidate_simulations": 64,
+    "corner_evaluations": 64,
+    "value_trials": 64,
+    "topology_repairs": 0,
+    "maximum_frontier": 192,
+    "budget_exhausted": false
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "current_transfer"
+      ],
+      "operating_cases": [
+        "frequency_response/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "b354bd21ac186d891c06e1309a4713a079100648b5c9bfa0e81afc94f3349601",
+        "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+      ]
+    }
+  ],
+  "hash": "0ee5d35094c27e860133e4468ed5d3e6c15c0f43ba741cbf5d087df607897a23"
+}

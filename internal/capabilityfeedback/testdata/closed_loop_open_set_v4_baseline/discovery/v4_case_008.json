@@ -1,0 +1,74 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_008",
+    "role": "discovery",
+    "domain": "mcu",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "d34398e7102c4a074c88383cf0987939754a32702ac57c64d608dd901e693dfb",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+  "analysis_kinds": [
+    "dc_sweep",
+    "electrothermal",
+    "stability",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 335,
+    "generated_graphs": 4007,
+    "complete_graphs": 138,
+    "candidate_simulations": 128,
+    "corner_evaluations": 951,
+    "value_trials": 34,
+    "topology_repairs": 10,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "topology_repair",
+      "scope": "topology",
+      "capability": "causal_topology_repair",
+      "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+      "required_evidence": [
+        "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+      ]
+    },
+    {
+      "stage": "topology_search",
+      "scope": "topology",
+      "capability": "complete_topology",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "required_evidence": [
+        "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+      ]
+    },
+    {
+      "stage": "value_search",
+      "scope": "component",
+      "capability": "catalog_value_domain",
+      "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "required_evidence": [
+        "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+      ],
+      "evidence_hashes": [
+        "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+      ]
+    }
+  ],
+  "hash": "31c02bed838d89b44771ba6ab1b3806f410d4d07c88a165d1759783300f8d59d"
+}

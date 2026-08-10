@@ -1,0 +1,145 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_004",
+    "role": "discovery",
+    "domain": "power",
+    "safety_impact": "safety_critical"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "fbf0f528b6902407234171bb6a1643134cf4a40c9c48db2d591224c0d922ce3a",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "thermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 2,
+    "generated_graphs": 37,
+    "complete_graphs": 4,
+    "candidate_simulations": 128,
+    "corner_evaluations": 198,
+    "value_trials": 23,
+    "topology_repairs": 3,
+    "maximum_frontier": 0,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_operating_point_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "inactive_draw"
+      ],
+      "operating_cases": [
+        "normal_delivery/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+        "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+        "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "normal_voltage"
+      ],
+      "operating_cases": [
+        "normal_delivery/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+        "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+        "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "thermal_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "thermal_ceiling"
+      ],
+      "operating_cases": [
+        "bounded_faults/nominal"
+      ],
+      "analysis_kinds": [
+        "thermal"
+      ],
+      "required_evidence": [
+        "thermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "4710e0570925c9c535b49d2c9f3c12bf0643899d4415db4c39fd29250a085f69",
+        "6d000148f160f6c0b520392773060f8198fd74cc27c6698f88341b15eb88ce3f",
+        "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "transient_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "fault_peak"
+      ],
+      "operating_cases": [
+        "bounded_faults/nominal"
+      ],
+      "analysis_kinds": [
+        "transient"
+      ],
+      "required_evidence": [
+        "transient_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "52e78edbd0a3e00080bcbe0ec2ffe1c25d89df1c1a67975d00467116e3eec334",
+        "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "88f572850647688bbe62f4c0102c2b5d6f392cd21a7a36f06470ec94cd7a9c6e"
+}

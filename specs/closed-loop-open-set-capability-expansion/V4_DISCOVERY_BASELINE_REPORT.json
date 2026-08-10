@@ -1,0 +1,1621 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-baseline.v4",
+  "version": 4,
+  "corpus_manifest_hash": "4c6bc5c8c94bccc16a066f69ac0a4c69c326e8f77aa8db02f9b9ef327ef732a6",
+  "freeze_commit": "35675e05bff9599be4492edfbe38bccdfa7a594f",
+  "evaluator_policy": "closed-loop-capability-policy-v2-realizability",
+  "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "gap_transition_policy_sha256": "ba73b2db190f48c70b31bc77b7689240df122f73b41e8b63624e540635139aa8",
+  "environment": {
+    "go_minimum": "1.23",
+    "kicad": "10.0.3",
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "outcome_counts": [
+    {
+      "role": "discovery",
+      "pass": 0,
+      "unsupported": 2,
+      "unsafe": 0,
+      "exhausted": 10
+    },
+    {
+      "role": "discovery",
+      "domain": "analog",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 2
+    },
+    {
+      "role": "discovery",
+      "domain": "power",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 2
+    },
+    {
+      "role": "discovery",
+      "domain": "digital",
+      "pass": 0,
+      "unsupported": 1,
+      "unsafe": 0,
+      "exhausted": 1
+    },
+    {
+      "role": "discovery",
+      "domain": "mcu",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 2
+    },
+    {
+      "role": "discovery",
+      "domain": "sensor",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 2
+    },
+    {
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "pass": 0,
+      "unsupported": 1,
+      "unsafe": 0,
+      "exhausted": 1
+    },
+    {
+      "role": "held_out",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "analog",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "power",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "digital",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "mcu",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "sensor",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    },
+    {
+      "role": "held_out",
+      "domain": "mixed_signal",
+      "pass": 0,
+      "unsupported": 0,
+      "unsafe": 0,
+      "exhausted": 0
+    }
+  ],
+  "discovery": {
+    "schema": "kicadai.closed-loop-capability-report.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "ranking_policy": "case_count,domain_count,analysis_count,safety_score,reuse_score,capability,key",
+    "corpus_role": "discovery",
+    "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+    "case_count": 12,
+    "cases": [
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_001",
+          "role": "discovery",
+          "domain": "analog",
+          "safety_impact": "non_safety"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "813b6b369341ae71b75de8b328ca7514c58bcd1a57d7f502edb07a58f1416716",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "5f2c40f296f7892834ffac55d65c58b059ccd697534e44af8c9ea6d6e7d4cd04",
+        "analysis_kinds": [
+          "dc_sweep",
+          "noise",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 234,
+          "generated_graphs": 2535,
+          "complete_graphs": 169,
+          "candidate_simulations": 104,
+          "corner_evaluations": 104,
+          "value_trials": 88,
+          "topology_repairs": 16,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "voltage_gain_evidence",
+            "code": "ASSERTION_BELOW_MINIMUM",
+            "requirement_ids": [
+              "aux_scale"
+            ],
+            "operating_cases": [
+              "extended/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_sweep"
+            ],
+            "required_evidence": [
+              "voltage_gain_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "1dd187040745ce73c8ee38f7f718ef5f913fffcd70a6222cb8fbfcae5666fcac",
+              "26802a670b7a3a28b0bd374c99a5fc5d838809032d9a6f244e0486f6ee23b5e7",
+              "2be8966503947e16fa37778e81ac178efef36529d0508d935d10e14b1458c992",
+              "367be736943444c3ea72bd64483034efa643bc86488ac98036b9a1810890f764",
+              "5f2c40f296f7892834ffac55d65c58b059ccd697534e44af8c9ea6d6e7d4cd04",
+              "c2f0812369046836b4b8f49767e87c42b751e6460231393f418c9a161a918e1a",
+              "db65852c2f03fa95e256202bf1c4f5ce3128d132c838b2df33cc12313fe3ab55",
+              "deed74792c39e7e2f024f824910b312f35bc45db1647f2399aded527e5d35e83",
+              "fa5a89c5396fa3944ea68640b4732846ca76f03e4019a3fdd66c27b31404d8a4"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "a81efef3caf3354341bf285044b7b6d1c0c2bfd5603d59449ad6a3ed24d3bede"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_002",
+          "role": "discovery",
+          "domain": "analog",
+          "safety_impact": "review_required"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "no_complete_graph",
+        "requirement_hash": "9dcb36b918c12860a9d7cf03a355fdbb0cb4af66d8a8407d39bcf70906f75a75",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "501590d87ebd5a626afa4498abefdd68e7e5d07e22577a97ca5f2d71d17a98aa",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 342,
+          "generated_graphs": 8000,
+          "complete_graphs": 0,
+          "candidate_simulations": 0,
+          "corner_evaluations": 0,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 817,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "requirement_realizability",
+            "scope": "topology",
+            "capability": "multi_obligation_composition",
+            "code": "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+            "requirement_ids": [
+              "level_transfer",
+              "load_recovery",
+              "trim_authority"
+            ],
+            "operating_cases": [
+              "balanced",
+              "corners"
+            ],
+            "analysis_kinds": [
+              "dc_operating_point",
+              "dc_sweep",
+              "transient"
+            ],
+            "required_evidence": [
+              "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "501590d87ebd5a626afa4498abefdd68e7e5d07e22577a97ca5f2d71d17a98aa"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "7a3c6ef43bd32391388cb4fdb6b7153865820369265fd75a107434e1690fe232"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_003",
+          "role": "discovery",
+          "domain": "power",
+          "safety_impact": "safety_relevant"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "f4839869f9dad8ab15e72d42a5518a7fee07190c52810436db35b13049a231b1",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "startup"
+        ],
+        "consumption": {
+          "expanded_states": 44,
+          "generated_graphs": 518,
+          "complete_graphs": 38,
+          "candidate_simulations": 128,
+          "corner_evaluations": 306,
+          "value_trials": 16,
+          "topology_repairs": 6,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_sweep_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "delivered_level"
+            ],
+            "operating_cases": [
+              "dynamic_load/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_sweep"
+            ],
+            "required_evidence": [
+              "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a",
+              "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          },
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "electrothermal_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "delivered_watts"
+            ],
+            "operating_cases": [
+              "dynamic_load/nominal"
+            ],
+            "analysis_kinds": [
+              "electrothermal"
+            ],
+            "required_evidence": [
+              "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "37397fb96a90592e6d4b11b551e08e5e973d33fc40b7c8afb8af3ab355018e38",
+              "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          },
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "output_voltage_evidence",
+            "code": "OPERATING_POINT_INVALID",
+            "requirement_ids": [
+              "auxiliary_bounds"
+            ],
+            "operating_cases": [
+              "dynamic_load/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_operating_point"
+            ],
+            "required_evidence": [
+              "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "3d074223706a4319afe078a554129fa747f5d0a103ce766f806df19b3f7ce5a2",
+              "48fa4e560cfcacd40bb7c37a787e67082fa59e080afe7067f3c5ce7719375de3",
+              "c6a64bb7d8cc161422747803278e9103c1029a226d90b366b9fa21f4a01b5596",
+              "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "59617f0de4e1afa8ea901f08a170ebc17c3a4439e80a62760c2efbf88fd3dd63"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_004",
+          "role": "discovery",
+          "domain": "power",
+          "safety_impact": "safety_critical"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "fbf0f528b6902407234171bb6a1643134cf4a40c9c48db2d591224c0d922ce3a",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "thermal",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 2,
+          "generated_graphs": 37,
+          "complete_graphs": 4,
+          "candidate_simulations": 128,
+          "corner_evaluations": 198,
+          "value_trials": 23,
+          "topology_repairs": 3,
+          "maximum_frontier": 0,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_operating_point_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "inactive_draw"
+            ],
+            "operating_cases": [
+              "normal_delivery/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_operating_point"
+            ],
+            "required_evidence": [
+              "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+              "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+              "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          },
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_sweep_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "normal_voltage"
+            ],
+            "operating_cases": [
+              "normal_delivery/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_sweep"
+            ],
+            "required_evidence": [
+              "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+              "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+              "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          },
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "thermal_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "thermal_ceiling"
+            ],
+            "operating_cases": [
+              "bounded_faults/nominal"
+            ],
+            "analysis_kinds": [
+              "thermal"
+            ],
+            "required_evidence": [
+              "thermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "4710e0570925c9c535b49d2c9f3c12bf0643899d4415db4c39fd29250a085f69",
+              "6d000148f160f6c0b520392773060f8198fd74cc27c6698f88341b15eb88ce3f",
+              "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          },
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "transient_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "fault_peak"
+            ],
+            "operating_cases": [
+              "bounded_faults/nominal"
+            ],
+            "analysis_kinds": [
+              "transient"
+            ],
+            "required_evidence": [
+              "transient_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "52e78edbd0a3e00080bcbe0ec2ffe1c25d89df1c1a67975d00467116e3eec334",
+              "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+              "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "88f572850647688bbe62f4c0102c2b5d6f392cd21a7a36f06470ec94cd7a9c6e"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_005",
+          "role": "discovery",
+          "domain": "digital",
+          "safety_impact": "non_safety"
+        },
+        "outcome": "unsupported",
+        "stop_reason": "value_exhausted",
+        "requirement_hash": "9492514c5a35d1b202596990dbdfc77065e8e6b51b70b30c0cd125cb6ab07c09",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "b8232f6cd9fdfe3b84ef1b0bb26d7c7ca23440af70b4df7b88f03916055b2e46",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 380,
+          "generated_graphs": 4144,
+          "complete_graphs": 94,
+          "candidate_simulations": 0,
+          "corner_evaluations": 0,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 192,
+          "budget_exhausted": false
+        },
+        "gaps": [
+          {
+            "stage": "value_search",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ],
+            "evidence_hashes": [
+              "b8232f6cd9fdfe3b84ef1b0bb26d7c7ca23440af70b4df7b88f03916055b2e46"
+            ]
+          }
+        ],
+        "hash": "4539ef9e85434cb20662d18e4f20c15926988a5534b7ef2217987929711369a2"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_006",
+          "role": "discovery",
+          "domain": "digital",
+          "safety_impact": "safety_relevant"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "766987e06056f893cfe6c4bc75e93e4f38f909de87ca368e87f6740ec9ae34df",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "noise",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 232,
+          "generated_graphs": 2787,
+          "complete_graphs": 189,
+          "candidate_simulations": 128,
+          "corner_evaluations": 639,
+          "value_trials": 16,
+          "topology_repairs": 6,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "topology_repair",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1"
+            ]
+          },
+          {
+            "stage": "topology_search",
+            "scope": "topology",
+            "capability": "complete_topology",
+            "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+            "required_evidence": [
+              "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1"
+            ]
+          },
+          {
+            "stage": "value_search",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ],
+            "evidence_hashes": [
+              "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1"
+            ]
+          }
+        ],
+        "hash": "7ebd97d9e062689a49c5dc427bee55143c5c0a992aa53f946edb5183cf1deffc"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_007",
+          "role": "discovery",
+          "domain": "mcu",
+          "safety_impact": "non_safety"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "4095f74109673e6cda61c10285be95e608cd4f9afa9419cba7ff6a4fa7c9ebeb",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "0b9fbbf55772e06596ba0d3d09011afd1eb840765624ea5c45cb2497c0206e37",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "noise",
+          "startup",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 240,
+          "generated_graphs": 2896,
+          "complete_graphs": 192,
+          "candidate_simulations": 128,
+          "corner_evaluations": 816,
+          "value_trials": 50,
+          "topology_repairs": 14,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_sweep_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "level_accuracy"
+            ],
+            "operating_cases": [
+              "active/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_sweep"
+            ],
+            "required_evidence": [
+              "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "0b9fbbf55772e06596ba0d3d09011afd1eb840765624ea5c45cb2497c0206e37",
+              "4dbb0ac22e0900a293201bdadfb00d5796c8393bbcc03e894e029eb66cec2ea6"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "6c2acf342bdf143cd4ec7b3d8daad918534e27a03b6ca49eb6a491ba903606d6"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_008",
+          "role": "discovery",
+          "domain": "mcu",
+          "safety_impact": "review_required"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "d34398e7102c4a074c88383cf0987939754a32702ac57c64d608dd901e693dfb",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+        "analysis_kinds": [
+          "dc_sweep",
+          "electrothermal",
+          "stability",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 335,
+          "generated_graphs": 4007,
+          "complete_graphs": 138,
+          "candidate_simulations": 128,
+          "corner_evaluations": 951,
+          "value_trials": 34,
+          "topology_repairs": 10,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "topology_repair",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+            ]
+          },
+          {
+            "stage": "topology_search",
+            "scope": "topology",
+            "capability": "complete_topology",
+            "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+            "required_evidence": [
+              "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+            ]
+          },
+          {
+            "stage": "value_search",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ],
+            "evidence_hashes": [
+              "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0"
+            ]
+          }
+        ],
+        "hash": "31c02bed838d89b44771ba6ab1b3806f410d4d07c88a165d1759783300f8d59d"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_009",
+          "role": "discovery",
+          "domain": "sensor",
+          "safety_impact": "safety_relevant"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "84e24ae1abeb86db55ed1b0ed72a44b53eaf4ccfb8242a2deae5285a0b45fd12",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "e9a9a8b4420b2ec3cc83625ca32ab89d1c169284d867746b3d408ad9823bf91e",
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "noise",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 234,
+          "generated_graphs": 2517,
+          "complete_graphs": 178,
+          "candidate_simulations": 128,
+          "corner_evaluations": 646,
+          "value_trials": 24,
+          "topology_repairs": 8,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_operating_point_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "excitation_loading"
+            ],
+            "operating_cases": [
+              "measurement_corners/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_operating_point"
+            ],
+            "required_evidence": [
+              "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "ab59247f1f34afdcc9da37f5e518dc3ed57ebf878ccb879e300170c36fd6ef29",
+              "e9a9a8b4420b2ec3cc83625ca32ab89d1c169284d867746b3d408ad9823bf91e"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+            ]
+          }
+        ],
+        "hash": "3521b211bc747acdbeee71ad7c3182bce61f55cb0486b909f5ab8714190045ab"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_010",
+          "role": "discovery",
+          "domain": "sensor",
+          "safety_impact": "safety_critical"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "2aeeecb8081e9009a34467e713432ab970bbefd46c132ad8ed9878157a6b8d4a",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210",
+        "analysis_kinds": [
+          "dc_sweep",
+          "thermal",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 403,
+          "generated_graphs": 8000,
+          "complete_graphs": 5,
+          "candidate_simulations": 128,
+          "corner_evaluations": 970,
+          "value_trials": 16,
+          "topology_repairs": 4,
+          "maximum_frontier": 564,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "topology_repair",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+            ]
+          },
+          {
+            "stage": "topology_search",
+            "scope": "topology",
+            "capability": "complete_topology",
+            "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+            "required_evidence": [
+              "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+            ]
+          },
+          {
+            "stage": "value_search",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ],
+            "evidence_hashes": [
+              "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+            ]
+          }
+        ],
+        "hash": "fd5ef6c20362aad8695861502a2578b08450cc0768f8821bec5a693ca528e347"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_011",
+          "role": "discovery",
+          "domain": "mixed_signal",
+          "safety_impact": "review_required"
+        },
+        "outcome": "unsupported",
+        "stop_reason": "no_passing_graph",
+        "requirement_hash": "c9213c2c1692e6551302a70933fbb9a248d7eab3dceec62f741afb123c9ef16c",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "b354bd21ac186d891c06e1309a4713a079100648b5c9bfa0e81afc94f3349601",
+        "analysis_kinds": [
+          "ac_sweep",
+          "dc_operating_point",
+          "dc_sweep",
+          "distortion",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 47,
+          "generated_graphs": 562,
+          "complete_graphs": 8,
+          "candidate_simulations": 64,
+          "corner_evaluations": 64,
+          "value_trials": 64,
+          "topology_repairs": 0,
+          "maximum_frontier": 192,
+          "budget_exhausted": false
+        },
+        "gaps": [
+          {
+            "stage": "simulation",
+            "scope": "simulation",
+            "capability": "dc_sweep_solver",
+            "code": "SIMULATION_INVALID",
+            "requirement_ids": [
+              "current_transfer"
+            ],
+            "operating_cases": [
+              "frequency_response/nominal"
+            ],
+            "analysis_kinds": [
+              "dc_sweep"
+            ],
+            "required_evidence": [
+              "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ],
+            "evidence_hashes": [
+              "b354bd21ac186d891c06e1309a4713a079100648b5c9bfa0e81afc94f3349601",
+              "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+            ],
+            "downstream_symptoms": [
+              "OPEN_TOPOLOGY_NO_PASSING_GRAPH"
+            ]
+          }
+        ],
+        "hash": "0ee5d35094c27e860133e4468ed5d3e6c15c0f43ba741cbf5d087df607897a23"
+      },
+      {
+        "schema": "kicadai.closed-loop-capability-case.v1",
+        "policy_version": "closed-loop-capability-policy-v2-realizability",
+        "case": {
+          "id": "v4_case_012",
+          "role": "discovery",
+          "domain": "mixed_signal",
+          "safety_impact": "safety_critical"
+        },
+        "outcome": "exhausted",
+        "stop_reason": "search_exhausted",
+        "requirement_hash": "fe335a5d4d2b5f31778286951fb832d5d7b62388c288ca415073865306b8bf6a",
+        "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+        "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+        "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+        "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+        "synthesis_hash": "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4",
+        "analysis_kinds": [
+          "dc_sweep",
+          "electrothermal",
+          "stability",
+          "transient"
+        ],
+        "consumption": {
+          "expanded_states": 337,
+          "generated_graphs": 4450,
+          "complete_graphs": 140,
+          "candidate_simulations": 128,
+          "corner_evaluations": 1523,
+          "value_trials": 16,
+          "topology_repairs": 4,
+          "maximum_frontier": 192,
+          "budget_exhausted": true
+        },
+        "gaps": [
+          {
+            "stage": "topology_repair",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4"
+            ]
+          },
+          {
+            "stage": "topology_search",
+            "scope": "topology",
+            "capability": "complete_topology",
+            "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+            "required_evidence": [
+              "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+            ],
+            "evidence_hashes": [
+              "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4"
+            ]
+          }
+        ],
+        "hash": "8074e5f360b9dc16ec4f952c92d4018508eee22cc67f620b86afc689c3b4cfc9"
+      }
+    ],
+    "clusters": [
+      {
+        "rank": 1,
+        "key": "exhausted:topology_search:topology:complete_topology:OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+        "outcome": "exhausted",
+        "stage": "topology_search",
+        "scope": "topology",
+        "capability": "complete_topology",
+        "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+        "case_count": 4,
+        "domain_count": 4,
+        "analysis_count": 7,
+        "safety_score": 14,
+        "reuse_score": 5,
+        "cases": [
+          "v4_case_006",
+          "v4_case_008",
+          "v4_case_010",
+          "v4_case_012"
+        ],
+        "domains": [
+          "digital",
+          "mcu",
+          "mixed_signal",
+          "sensor"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "noise",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "downstream_reuse": [
+          "installed_kicad_verification",
+          "passing_behavioral_evidence",
+          "physical_realization",
+          "round_trip_fidelity",
+          "route_completion"
+        ],
+        "required_evidence": [
+          "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1",
+          "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+          "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4",
+          "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+        ]
+      },
+      {
+        "rank": 2,
+        "key": "exhausted:topology_repair:topology:causal_topology_repair:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "outcome": "exhausted",
+        "stage": "topology_repair",
+        "scope": "topology",
+        "capability": "causal_topology_repair",
+        "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "case_count": 4,
+        "domain_count": 4,
+        "analysis_count": 7,
+        "safety_score": 14,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_006",
+          "v4_case_008",
+          "v4_case_010",
+          "v4_case_012"
+        ],
+        "domains": [
+          "digital",
+          "mcu",
+          "mixed_signal",
+          "sensor"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "noise",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "required_evidence": [
+          "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1",
+          "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+          "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4",
+          "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+        ]
+      },
+      {
+        "rank": 3,
+        "key": "exhausted:value_search:component:catalog_value_domain:OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "outcome": "exhausted",
+        "stage": "value_search",
+        "scope": "component",
+        "capability": "catalog_value_domain",
+        "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "case_count": 3,
+        "domain_count": 3,
+        "analysis_count": 7,
+        "safety_score": 9,
+        "reuse_score": 5,
+        "cases": [
+          "v4_case_006",
+          "v4_case_008",
+          "v4_case_010"
+        ],
+        "domains": [
+          "digital",
+          "mcu",
+          "sensor"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "noise",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "downstream_reuse": [
+          "installed_kicad_verification",
+          "passing_behavioral_evidence",
+          "physical_realization",
+          "round_trip_fidelity",
+          "route_completion"
+        ],
+        "required_evidence": [
+          "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+        ],
+        "evidence_hashes": [
+          "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1",
+          "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+          "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+        ]
+      },
+      {
+        "rank": 4,
+        "key": "exhausted:simulation:simulation:dc_sweep_solver:SIMULATION_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "dc_sweep_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 3,
+        "domain_count": 2,
+        "analysis_count": 7,
+        "safety_score": 8,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_003",
+          "v4_case_004",
+          "v4_case_007"
+        ],
+        "domains": [
+          "mcu",
+          "power"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "noise",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "required_evidence": [
+          "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "0b9fbbf55772e06596ba0d3d09011afd1eb840765624ea5c45cb2497c0206e37",
+          "4dbb0ac22e0900a293201bdadfb00d5796c8393bbcc03e894e029eb66cec2ea6",
+          "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+          "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+          "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a",
+          "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675",
+          "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+        ]
+      },
+      {
+        "rank": 5,
+        "key": "exhausted:simulation:simulation:dc_operating_point_solver:SIMULATION_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "dc_operating_point_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 2,
+        "domain_count": 2,
+        "analysis_count": 5,
+        "safety_score": 8,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_004",
+          "v4_case_009"
+        ],
+        "domains": [
+          "power",
+          "sensor"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "noise",
+          "thermal",
+          "transient"
+        ],
+        "required_evidence": [
+          "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "4e6d21b80695c609ea10138687a074a9c77be5273cc1087fd7b41be988886862",
+          "ab59247f1f34afdcc9da37f5e518dc3ed57ebf878ccb879e300170c36fd6ef29",
+          "c7cc825fc923d74d407c2f5a3062c89bbb1a19f915d011933bd9ee221953f72f",
+          "e9a9a8b4420b2ec3cc83625ca32ab89d1c169284d867746b3d408ad9823bf91e",
+          "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+        ]
+      },
+      {
+        "rank": 6,
+        "key": "unsupported:simulation:simulation:dc_sweep_solver:SIMULATION_INVALID",
+        "outcome": "unsupported",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "dc_sweep_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 5,
+        "safety_score": 1,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_011"
+        ],
+        "domains": [
+          "mixed_signal"
+        ],
+        "analysis_kinds": [
+          "ac_sweep",
+          "dc_operating_point",
+          "dc_sweep",
+          "distortion",
+          "transient"
+        ],
+        "required_evidence": [
+          "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "b354bd21ac186d891c06e1309a4713a079100648b5c9bfa0e81afc94f3349601",
+          "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+        ]
+      },
+      {
+        "rank": 7,
+        "key": "exhausted:simulation:simulation:thermal_solver:SIMULATION_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "thermal_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 4,
+        "safety_score": 5,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_004"
+        ],
+        "domains": [
+          "power"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "thermal",
+          "transient"
+        ],
+        "required_evidence": [
+          "thermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "4710e0570925c9c535b49d2c9f3c12bf0643899d4415db4c39fd29250a085f69",
+          "6d000148f160f6c0b520392773060f8198fd74cc27c6698f88341b15eb88ce3f",
+          "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+        ]
+      },
+      {
+        "rank": 8,
+        "key": "exhausted:simulation:simulation:transient_solver:SIMULATION_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "transient_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 4,
+        "safety_score": 5,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_004"
+        ],
+        "domains": [
+          "power"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "thermal",
+          "transient"
+        ],
+        "required_evidence": [
+          "transient_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "52e78edbd0a3e00080bcbe0ec2ffe1c25d89df1c1a67975d00467116e3eec334",
+          "ff500aae474a52ae9aaad7f6844b422c63acd25de8ad168f35ec4923fa513065"
+        ]
+      },
+      {
+        "rank": 9,
+        "key": "exhausted:simulation:simulation:electrothermal_solver:SIMULATION_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "electrothermal_solver",
+        "code": "SIMULATION_INVALID",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 4,
+        "safety_score": 3,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_003"
+        ],
+        "domains": [
+          "power"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "startup"
+        ],
+        "required_evidence": [
+          "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "37397fb96a90592e6d4b11b551e08e5e973d33fc40b7c8afb8af3ab355018e38",
+          "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+        ]
+      },
+      {
+        "rank": 10,
+        "key": "exhausted:simulation:simulation:output_voltage_evidence:OPERATING_POINT_INVALID",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "output_voltage_evidence",
+        "code": "OPERATING_POINT_INVALID",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 4,
+        "safety_score": 3,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_003"
+        ],
+        "domains": [
+          "power"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "startup"
+        ],
+        "required_evidence": [
+          "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "3d074223706a4319afe078a554129fa747f5d0a103ce766f806df19b3f7ce5a2",
+          "48fa4e560cfcacd40bb7c37a787e67082fa59e080afe7067f3c5ce7719375de3",
+          "c6a64bb7d8cc161422747803278e9103c1029a226d90b366b9fa21f4a01b5596",
+          "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+        ]
+      },
+      {
+        "rank": 11,
+        "key": "exhausted:requirement_realizability:topology:multi_obligation_composition:OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+        "outcome": "exhausted",
+        "stage": "requirement_realizability",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "code": "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 4,
+        "safety_score": 1,
+        "reuse_score": 6,
+        "cases": [
+          "v4_case_002"
+        ],
+        "domains": [
+          "analog"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "electrothermal",
+          "transient"
+        ],
+        "downstream_reuse": [
+          "complete_topology",
+          "installed_kicad_verification",
+          "passing_behavioral_evidence",
+          "physical_realization",
+          "round_trip_fidelity",
+          "route_completion"
+        ],
+        "required_evidence": [
+          "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "501590d87ebd5a626afa4498abefdd68e7e5d07e22577a97ca5f2d71d17a98aa"
+        ]
+      },
+      {
+        "rank": 12,
+        "key": "unsupported:value_search:component:catalog_value_domain:OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "outcome": "unsupported",
+        "stage": "value_search",
+        "scope": "component",
+        "capability": "catalog_value_domain",
+        "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 3,
+        "safety_score": 0,
+        "reuse_score": 5,
+        "cases": [
+          "v4_case_005"
+        ],
+        "domains": [
+          "digital"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point",
+          "dc_sweep",
+          "transient"
+        ],
+        "downstream_reuse": [
+          "installed_kicad_verification",
+          "passing_behavioral_evidence",
+          "physical_realization",
+          "round_trip_fidelity",
+          "route_completion"
+        ],
+        "required_evidence": [
+          "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+        ],
+        "evidence_hashes": [
+          "b8232f6cd9fdfe3b84ef1b0bb26d7c7ca23440af70b4df7b88f03916055b2e46"
+        ]
+      },
+      {
+        "rank": 13,
+        "key": "exhausted:simulation:simulation:voltage_gain_evidence:ASSERTION_BELOW_MINIMUM",
+        "outcome": "exhausted",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "voltage_gain_evidence",
+        "code": "ASSERTION_BELOW_MINIMUM",
+        "case_count": 1,
+        "domain_count": 1,
+        "analysis_count": 3,
+        "safety_score": 0,
+        "reuse_score": 0,
+        "cases": [
+          "v4_case_001"
+        ],
+        "domains": [
+          "analog"
+        ],
+        "analysis_kinds": [
+          "dc_sweep",
+          "noise",
+          "transient"
+        ],
+        "required_evidence": [
+          "voltage_gain_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "1dd187040745ce73c8ee38f7f718ef5f913fffcd70a6222cb8fbfcae5666fcac",
+          "26802a670b7a3a28b0bd374c99a5fc5d838809032d9a6f244e0486f6ee23b5e7",
+          "2be8966503947e16fa37778e81ac178efef36529d0508d935d10e14b1458c992",
+          "367be736943444c3ea72bd64483034efa643bc86488ac98036b9a1810890f764",
+          "5f2c40f296f7892834ffac55d65c58b059ccd697534e44af8c9ea6d6e7d4cd04",
+          "c2f0812369046836b4b8f49767e87c42b751e6460231393f418c9a161a918e1a",
+          "db65852c2f03fa95e256202bf1c4f5ce3128d132c838b2df33cc12313fe3ab55",
+          "deed74792c39e7e2f024f824910b312f35bc45db1647f2399aded527e5d35e83",
+          "fa5a89c5396fa3944ea68640b4732846ca76f03e4019a3fdd66c27b31404d8a4"
+        ]
+      }
+    ],
+    "hash": "1291179cad8dba402ae0c19b2e592997c700ceb91b83d7a864e7be88ac325091"
+  },
+  "expansion_plan": {
+    "schema": "kicadai.capability-expansion-plan.v1",
+    "policy_version": "evidence-driven-capability-expansion-v1",
+    "source_assessment_hash": "fd2521aaca48315582d53a928fab32da5e943ce1a37b6a24073cdee2aceb2722",
+    "source_classification": "unsupported",
+    "domains": [
+      "digital",
+      "mcu",
+      "mixed_signal",
+      "sensor"
+    ],
+    "needs": [
+      {
+        "id": "architecture:complete_topology",
+        "capability_id": "complete_topology",
+        "kind": "architecture",
+        "requirement_kind": "architecture",
+        "stage": "topology_search",
+        "gap_codes": [
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ],
+        "required_source_kinds": [
+          "engineering_reference",
+          "verification"
+        ],
+        "required_artifact": "declarative_provider",
+        "required_promotion_gates": [
+          "connectivity",
+          "deterministic_replay",
+          "kicad_drc",
+          "kicad_erc",
+          "round_trip_zero_diff",
+          "route_completion",
+          "simulation",
+          "workflow",
+          "writer_correctness"
+        ],
+        "action": "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+      }
+    ],
+    "risks": [
+      "candidate evidence remains quarantined until explicit reviewed promotion",
+      "the original unsupported assessment is immutable and requires a fresh run after promotion"
+    ],
+    "hash": "20624c4ed6204cfd5e00e3fc722da8e4992aa4996bf0e46f0d2d7f5d5643854d"
+  },
+  "hash": "894f2920a58b9b530bcc3c0325182ea0e86e46da12a6e54b09575eff82a61f15"
+}

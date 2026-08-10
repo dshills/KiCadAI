@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_002",
+    "role": "discovery",
+    "domain": "analog",
+    "safety_impact": "review_required"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "no_complete_graph",
+  "requirement_hash": "9dcb36b918c12860a9d7cf03a355fdbb0cb4af66d8a8407d39bcf70906f75a75",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "501590d87ebd5a626afa4498abefdd68e7e5d07e22577a97ca5f2d71d17a98aa",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "electrothermal",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 342,
+    "generated_graphs": 8000,
+    "complete_graphs": 0,
+    "candidate_simulations": 0,
+    "corner_evaluations": 0,
+    "value_trials": 0,
+    "topology_repairs": 0,
+    "maximum_frontier": 817,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "requirement_realizability",
+      "scope": "topology",
+      "capability": "multi_obligation_composition",
+      "code": "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+      "requirement_ids": [
+        "level_transfer",
+        "load_recovery",
+        "trim_authority"
+      ],
+      "operating_cases": [
+        "balanced",
+        "corners"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point",
+        "dc_sweep",
+        "transient"
+      ],
+      "required_evidence": [
+        "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+      ],
+      "evidence_hashes": [
+        "501590d87ebd5a626afa4498abefdd68e7e5d07e22577a97ca5f2d71d17a98aa"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "7a3c6ef43bd32391388cb4fdb6b7153865820369265fd75a107434e1690fe232"
+}

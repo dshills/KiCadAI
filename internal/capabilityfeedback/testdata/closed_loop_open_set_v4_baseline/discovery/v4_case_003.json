@@ -1,0 +1,118 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_003",
+    "role": "discovery",
+    "domain": "power",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "f4839869f9dad8ab15e72d42a5518a7fee07190c52810436db35b13049a231b1",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "electrothermal",
+    "startup"
+  ],
+  "consumption": {
+    "expanded_states": 44,
+    "generated_graphs": 518,
+    "complete_graphs": 38,
+    "candidate_simulations": 128,
+    "corner_evaluations": 306,
+    "value_trials": 16,
+    "topology_repairs": 6,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_sweep_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "delivered_level"
+      ],
+      "operating_cases": [
+        "dynamic_load/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_sweep"
+      ],
+      "required_evidence": [
+        "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a",
+        "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "electrothermal_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "delivered_watts"
+      ],
+      "operating_cases": [
+        "dynamic_load/nominal"
+      ],
+      "analysis_kinds": [
+        "electrothermal"
+      ],
+      "required_evidence": [
+        "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "37397fb96a90592e6d4b11b551e08e5e973d33fc40b7c8afb8af3ab355018e38",
+        "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    },
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "output_voltage_evidence",
+      "code": "OPERATING_POINT_INVALID",
+      "requirement_ids": [
+        "auxiliary_bounds"
+      ],
+      "operating_cases": [
+        "dynamic_load/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "3d074223706a4319afe078a554129fa747f5d0a103ce766f806df19b3f7ce5a2",
+        "48fa4e560cfcacd40bb7c37a787e67082fa59e080afe7067f3c5ce7719375de3",
+        "c6a64bb7d8cc161422747803278e9103c1029a226d90b366b9fa21f4a01b5596",
+        "d7988a4696a6fb33b852a756ae9713d1d3503444d9d97a466ab4341c7b6ec71a"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "59617f0de4e1afa8ea901f08a170ebc17c3a4439e80a62760c2efbf88fd3dd63"
+}

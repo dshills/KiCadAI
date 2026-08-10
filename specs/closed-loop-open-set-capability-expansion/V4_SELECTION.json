@@ -1,0 +1,64 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v4",
+  "version": 4,
+  "corpus_manifest_hash": "4c6bc5c8c94bccc16a066f69ac0a4c69c326e8f77aa8db02f9b9ef327ef732a6",
+  "freeze_commit": "35675e05bff9599be4492edfbe38bccdfa7a594f",
+  "evaluator_policy": "closed-loop-capability-policy-v2-realizability",
+  "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "gap_transition_policy_sha256": "ba73b2db190f48c70b31bc77b7689240df122f73b41e8b63624e540635139aa8",
+  "discovery_baseline_hash": "894f2920a58b9b530bcc3c0325182ea0e86e46da12a6e54b09575eff82a61f15",
+  "cluster": {
+    "rank": 1,
+    "key": "exhausted:topology_search:topology:complete_topology:OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+    "outcome": "exhausted",
+    "stage": "topology_search",
+    "scope": "topology",
+    "capability": "complete_topology",
+    "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+    "case_count": 4,
+    "domain_count": 4,
+    "analysis_count": 7,
+    "safety_score": 14,
+    "reuse_score": 5,
+    "cases": [
+      "v4_case_006",
+      "v4_case_008",
+      "v4_case_010",
+      "v4_case_012"
+    ],
+    "domains": [
+      "digital",
+      "mcu",
+      "mixed_signal",
+      "sensor"
+    ],
+    "analysis_kinds": [
+      "dc_operating_point",
+      "dc_sweep",
+      "electrothermal",
+      "noise",
+      "stability",
+      "thermal",
+      "transient"
+    ],
+    "downstream_reuse": [
+      "installed_kicad_verification",
+      "passing_behavioral_evidence",
+      "physical_realization",
+      "round_trip_fidelity",
+      "route_completion"
+    ],
+    "required_evidence": [
+      "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+    ],
+    "evidence_hashes": [
+      "21766abcae00b485d98955216abe86c152cba6b50cb2e5f780012b8b341fd8d1",
+      "2497ca09bbcbc0c51365441a6908f0e41cadb7f7637f67a070032a6ca7f60ab0",
+      "b408d26f12ae186e0c8ecc4274fe567e554017112e343206bf7bac7be4c1e9a4",
+      "cbd7ea8b5453a77f28037cce154bb63f961c6a50db7bcdf0f5ea9faf021b3210"
+    ]
+  },
+  "expansion_plan_hash": "20624c4ed6204cfd5e00e3fc722da8e4992aa4996bf0e46f0d2d7f5d5643854d",
+  "hash": "a82d7c26191e15b42692e5de9fb365947ae76915b683c07bd512b4bf96404a9b"
+}

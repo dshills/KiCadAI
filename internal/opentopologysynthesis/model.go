@@ -239,15 +239,18 @@ type Report struct {
 }
 
 type Consumption struct {
-	ExpandedStates       int  `json:"expanded_states"`
-	GeneratedGraphs      int  `json:"generated_graphs"`
-	CompleteGraphs       int  `json:"complete_graphs"`
-	CandidateSimulations int  `json:"candidate_simulations"`
-	CornerEvaluations    int  `json:"corner_evaluations"`
-	ValueTrials          int  `json:"value_trials"`
-	TopologyRepairs      int  `json:"topology_repairs"`
-	MaximumFrontier      int  `json:"maximum_frontier"`
-	BudgetExhausted      bool `json:"budget_exhausted"`
+	ExpandedStates       int `json:"expanded_states"`
+	GeneratedGraphs      int `json:"generated_graphs"`
+	CompleteGraphs       int `json:"complete_graphs"`
+	CandidateSimulations int `json:"candidate_simulations"`
+	CornerEvaluations    int `json:"corner_evaluations"`
+	ValueTrials          int `json:"value_trials"`
+	TopologyRepairs      int `json:"topology_repairs"`
+	// MaximumFrontier is the peak queued state count across heap/beam-backed
+	// search lanes. Direct bounded enumerators can expand states and generate
+	// graphs without a queue, so their valid maximum frontier remains zero.
+	MaximumFrontier int  `json:"maximum_frontier"`
+	BudgetExhausted bool `json:"budget_exhausted"`
 }
 
 type CandidateReport struct {

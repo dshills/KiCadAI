@@ -1,0 +1,63 @@
+{
+  "schema": "kicadai.closed-loop-capability-case.v1",
+  "policy_version": "closed-loop-capability-policy-v2-realizability",
+  "case": {
+    "id": "v4_case_009",
+    "role": "discovery",
+    "domain": "sensor",
+    "safety_impact": "safety_relevant"
+  },
+  "outcome": "exhausted",
+  "stop_reason": "search_exhausted",
+  "requirement_hash": "84e24ae1abeb86db55ed1b0ed72a44b53eaf4ccfb8242a2deae5285a0b45fd12",
+  "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+  "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+  "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "synthesis_hash": "e9a9a8b4420b2ec3cc83625ca32ab89d1c169284d867746b3d408ad9823bf91e",
+  "analysis_kinds": [
+    "dc_operating_point",
+    "dc_sweep",
+    "noise",
+    "transient"
+  ],
+  "consumption": {
+    "expanded_states": 234,
+    "generated_graphs": 2517,
+    "complete_graphs": 178,
+    "candidate_simulations": 128,
+    "corner_evaluations": 646,
+    "value_trials": 24,
+    "topology_repairs": 8,
+    "maximum_frontier": 192,
+    "budget_exhausted": true
+  },
+  "gaps": [
+    {
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "dc_operating_point_solver",
+      "code": "SIMULATION_INVALID",
+      "requirement_ids": [
+        "excitation_loading"
+      ],
+      "operating_cases": [
+        "measurement_corners/nominal"
+      ],
+      "analysis_kinds": [
+        "dc_operating_point"
+      ],
+      "required_evidence": [
+        "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ],
+      "evidence_hashes": [
+        "ab59247f1f34afdcc9da37f5e518dc3ed57ebf878ccb879e300170c36fd6ef29",
+        "e9a9a8b4420b2ec3cc83625ca32ab89d1c169284d867746b3d408ad9823bf91e"
+      ],
+      "downstream_symptoms": [
+        "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+      ]
+    }
+  ],
+  "hash": "3521b211bc747acdbeee71ad7c3182bce61f55cb0486b909f5ab8714190045ab"
+}
