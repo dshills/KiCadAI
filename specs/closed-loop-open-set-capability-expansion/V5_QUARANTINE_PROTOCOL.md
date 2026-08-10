@@ -1,7 +1,7 @@
 # Closed-Loop Open-Set V5 Quarantine and Corpus-Freeze Protocol
 
-Status: validator freeze candidate; corpus authoring prohibited until the
-revised authoring-packet and validator commit exists
+Status: operational validator freeze; corpus authoring may begin only from a
+commit that contains this protocol and the matching `V5_VALIDATOR.sha256`
 
 ## Boundary
 
@@ -54,6 +54,37 @@ mismatches fail closed.
 Validation errors name only the public case identity and violated contract.
 The validator returns no requirement text, electrical value, outcome,
 diagnostic, feasibility statement, gap, or implementation suggestion.
+
+## Custodian interface
+
+The outcome-blind custodian runs locally with one exact bundle root per frozen
+author slot:
+
+```text
+go run ./cmd/kicadai-corpus-validate \
+  -packet-root specs/closed-loop-open-set-capability-expansion/v5-authoring-packet \
+  -history specs/closed-loop-open-set-capability-expansion/V5_HISTORICAL_COMMITMENTS.json \
+  -bundle author_1=/external/quarantine/author_1 \
+  -bundle author_2=/external/quarantine/author_2 \
+  -bundle author_3=/external/quarantine/author_3 \
+  -output /external/quarantine/V5_VALIDATION_REPORT.json
+```
+
+The loader verifies both packet checksum layers and requires the exact
+policy-bound packet-set hash before it accepts assignments.
+Each bundle must contain exactly `AUTHORSHIP.json`, the assigned requirement
+files, and only their necessary directories; symlinks, special files, extra
+paths, and missing paths fail closed. On Unix, every untrusted path component
+is opened descriptor-relative with kernel-enforced no-follow semantics.
+Historical comparison consumes only the
+canonical raw and neutral-semantic commitments in the exact policy-bound
+`V5_HISTORICAL_COMMITMENTS.json`. That file was mechanically derived from the
+four retired corpus manifests; retired requirement sources were not opened.
+
+Successful stdout contains only the total validated case count and isolated
+author count. The atomically written report contains contract commitments,
+case identities and hashes, and aggregate quota counts. It contains no source
+bytes, expected outcomes, synthesis results, feasibility results, or gap data.
 
 ## Public electrical sanity
 

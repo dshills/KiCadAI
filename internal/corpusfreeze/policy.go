@@ -23,6 +23,8 @@ func V5Policy() Policy {
 		MinimumMultiOutputPerRole:      5,
 		MinimumConvergingInputsPerRole: 5,
 		MinimumCriticalDomainsPerRole:  4,
+		PacketSetSHA256:                "004dc3ab1325e34d12190cf0358adb607597f2e7bc8fff44eb412309b63c42b9",
+		HistoricalCommitmentsSHA256:    "0de93fd451ab322d6b0dbaaf1a74cc088e208dce28ea22e6f4513435bc95e700",
 		ProhibitedIdentityPrefixes:     []string{"v5_case_", "v5_source_"},
 		ProhibitedTerms: []string{
 			"allowlist", "block family", "candidate", "component", "coordinate", "fixture",

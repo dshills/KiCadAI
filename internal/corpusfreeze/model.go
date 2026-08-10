@@ -83,6 +83,7 @@ type Bundle struct {
 }
 
 type Binding struct {
+	PacketSetSHA256       string
 	ContractBindingSHA256 string
 	AuthorPacketSHA256    map[string]string
 	AssignmentSHA256      map[string]string
@@ -91,6 +92,7 @@ type Binding struct {
 type HistoricalCommitments struct {
 	RawSHA256             map[string]string
 	NeutralSemanticSHA256 map[string]string
+	SourceSHA256          string
 }
 
 type Policy struct {
@@ -117,6 +119,8 @@ type Policy struct {
 	MinimumCriticalDomainsPerRole  int
 	ProhibitedIdentityPrefixes     []string
 	ProhibitedTerms                []string
+	PacketSetSHA256                string
+	HistoricalCommitmentsSHA256    string
 }
 
 type EntryEvidence struct {
@@ -133,15 +137,17 @@ type EntryEvidence struct {
 }
 
 type Report struct {
-	Schema                string                    `json:"schema"`
-	Version               int                       `json:"version"`
-	PolicySHA256          string                    `json:"policy_sha256"`
-	ContractBindingSHA256 string                    `json:"contract_binding_sha256"`
-	AuthorPacketSHA256    map[string]string         `json:"author_packet_sha256"`
-	AssignmentSHA256      map[string]string         `json:"assignment_sha256"`
-	AuthorshipSHA256      map[string]string         `json:"authorship_sha256"`
-	Entries               []EntryEvidence           `json:"entries"`
-	Counts                map[string]map[string]int `json:"counts"`
-	AuthorStartedAt       map[string]time.Time      `json:"author_started_at"`
-	AuthorEndedAt         map[string]time.Time      `json:"author_ended_at"`
+	Schema                      string                    `json:"schema"`
+	Version                     int                       `json:"version"`
+	PolicySHA256                string                    `json:"policy_sha256"`
+	PacketSetSHA256             string                    `json:"packet_set_sha256"`
+	ContractBindingSHA256       string                    `json:"contract_binding_sha256"`
+	HistoricalCommitmentsSHA256 string                    `json:"historical_commitments_sha256"`
+	AuthorPacketSHA256          map[string]string         `json:"author_packet_sha256"`
+	AssignmentSHA256            map[string]string         `json:"assignment_sha256"`
+	AuthorshipSHA256            map[string]string         `json:"authorship_sha256"`
+	Entries                     []EntryEvidence           `json:"entries"`
+	Counts                      map[string]map[string]int `json:"counts"`
+	AuthorStartedAt             map[string]time.Time      `json:"author_started_at"`
+	AuthorEndedAt               map[string]time.Time      `json:"author_ended_at"`
 }

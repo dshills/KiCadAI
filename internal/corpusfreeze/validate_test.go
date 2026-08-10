@@ -231,6 +231,23 @@ func TestValidateRejectsHistoricalRawAndSemanticReuse(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsHistoricalCommitmentSourceSubstitution(t *testing.T) {
+	fixture := validValidationFixture(t)
+	fixture.policy.HistoricalCommitmentsSHA256 = strings.Repeat("c", 64)
+	historical := HistoricalCommitments{SourceSHA256: strings.Repeat("d", 64)}
+	if _, err := Validate(fixture.assignments, fixture.bundles, fixture.binding, historical, fixture.policy); err == nil || !strings.Contains(err.Error(), "does not match frozen policy") {
+		t.Fatalf("historical source substitution error = %v", err)
+	}
+}
+
+func TestValidateRejectsPacketSetSubstitution(t *testing.T) {
+	fixture := validValidationFixture(t)
+	fixture.policy.PacketSetSHA256 = strings.Repeat("c", 64)
+	if _, err := Validate(fixture.assignments, fixture.bundles, fixture.binding, HistoricalCommitments{}, fixture.policy); err == nil || !strings.Contains(err.Error(), "does not match frozen policy") {
+		t.Fatalf("packet-set substitution error = %v", err)
+	}
+}
+
 func TestNormalizedSemanticHashIgnoresProjectTextAndSemanticIDSpelling(t *testing.T) {
 	first := testRequirement(t, false)
 	second := testRequirement(t, false)
@@ -369,6 +386,7 @@ func validValidationFixture(t *testing.T) validationFixture {
 		"held_out/request_002.json":  marshalTestJSON(t, testRequirement(t, true)),
 	}
 	binding := Binding{
+		PacketSetSHA256:       strings.Repeat("f", 64),
 		ContractBindingSHA256: strings.Repeat("a", 64),
 		AuthorPacketSHA256:    map[string]string{"author_1": strings.Repeat("b", 64)},
 		AssignmentSHA256:      map[string]string{"author_1": hashBytes(assignmentData)},

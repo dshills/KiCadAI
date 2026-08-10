@@ -230,8 +230,8 @@ func physicalFunctionalRegions(
 		totalWeight += seed.weight
 	}
 	if totalWeight <= 0 || math.IsNaN(totalWeight) || math.IsInf(totalWeight, 0) {
-		// Invalid catalog geometry degrades deterministically to equal regions.
-		totalWeight = float64(len(ordered)) * physicalRegionMinimumWeight
+		// Bounds consume the per-seed weights directly, so repair those values;
+		// the aggregate is only the validity check and is not used downstream.
 		for _, seed := range ordered {
 			seed.weight = physicalRegionMinimumWeight
 		}

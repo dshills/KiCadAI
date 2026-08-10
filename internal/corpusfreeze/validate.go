@@ -88,8 +88,9 @@ func newValidationState(policy Policy, binding Binding, historical HistoricalCom
 		implementationText: implementationText,
 		report: Report{
 			Schema: "kicadai.behavior-corpus-validation-report.v1", Version: 1,
-			PolicySHA256: policySHA256, ContractBindingSHA256: binding.ContractBindingSHA256,
-			AuthorPacketSHA256: map[string]string{}, AssignmentSHA256: map[string]string{}, AuthorshipSHA256: map[string]string{},
+			PolicySHA256: policySHA256, PacketSetSHA256: binding.PacketSetSHA256, ContractBindingSHA256: binding.ContractBindingSHA256,
+			HistoricalCommitmentsSHA256: historical.SourceSHA256,
+			AuthorPacketSHA256:          map[string]string{}, AssignmentSHA256: map[string]string{}, AuthorshipSHA256: map[string]string{},
 			Counts: map[string]map[string]int{}, AuthorStartedAt: map[string]time.Time{}, AuthorEndedAt: map[string]time.Time{},
 		},
 	}
@@ -412,13 +413,19 @@ func validatePolicy(policy Policy) error {
 }
 
 func validateBinding(policy Policy, binding Binding, historical HistoricalCommitments) error {
-	if !validSHA256(binding.ContractBindingSHA256) || len(binding.AuthorPacketSHA256) != len(policy.AuthorSlots) || len(binding.AssignmentSHA256) != len(policy.AuthorSlots) {
+	if !validSHA256(binding.PacketSetSHA256) || !validSHA256(binding.ContractBindingSHA256) || len(binding.AuthorPacketSHA256) != len(policy.AuthorSlots) || len(binding.AssignmentSHA256) != len(policy.AuthorSlots) {
 		return fmt.Errorf("corpus-freeze binding is incomplete")
+	}
+	if policy.PacketSetSHA256 != "" && (!validSHA256(policy.PacketSetSHA256) || binding.PacketSetSHA256 != policy.PacketSetSHA256) {
+		return fmt.Errorf("packet set does not match frozen policy")
 	}
 	for _, author := range policy.AuthorSlots {
 		if !validSHA256(binding.AuthorPacketSHA256[author]) || !validSHA256(binding.AssignmentSHA256[author]) {
 			return fmt.Errorf("corpus-freeze binding for %s is invalid", author)
 		}
+	}
+	if policy.HistoricalCommitmentsSHA256 != "" && (!validSHA256(policy.HistoricalCommitmentsSHA256) || historical.SourceSHA256 != policy.HistoricalCommitmentsSHA256) {
+		return fmt.Errorf("historical commitment source does not match frozen policy")
 	}
 	for _, group := range []struct {
 		name        string
