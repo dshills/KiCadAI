@@ -1,0 +1,16 @@
+{
+  "schema": "kicadai.closed-loop-open-set-held-out-baseline-seal.v4",
+  "version": 4,
+  "algorithm": "AES-256-GCM/random-nonce-prefixed",
+  "corpus_manifest_hash": "4c6bc5c8c94bccc16a066f69ac0a4c69c326e8f77aa8db02f9b9ef327ef732a6",
+  "freeze_commit": "40431aa4f563eda2db6556af5aba7d417593a759",
+  "selection_hash": "a82d7c26191e15b42692e5de9fb365947ae76915b683c07bd512b4bf96404a9b",
+  "evaluator_policy": "closed-loop-capability-policy-v2-realizability",
+  "impact_registry_hash": "64080fc37ce81747b6cf33b8919fb8e6a33a8c9182b0b2ce0174f190c11a9377",
+  "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+  "gap_transition_policy_sha256": "ba73b2db190f48c70b31bc77b7689240df122f73b41e8b63624e540635139aa8",
+  "payload_hash": "392bb710267ba031599ab40718243c343b89a9866fb6db11fca234270117654d",
+  "ciphertext_sha256": "72d90f6680a6b99af64c5c1bb00528903d0539552075efb581256cce097561b7",
+  "case_count": 12,
+  "hash": "48814e837f466b579c7bef0fccedf605b778ae6bf865b4a5d04141ddf37840c2"
+}

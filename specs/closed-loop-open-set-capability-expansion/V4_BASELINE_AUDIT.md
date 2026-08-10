@@ -1,6 +1,6 @@
 # V4 Discovery Baseline and Rank-One Selection Audit
 
-Status: discovery frozen; held-out baseline not yet opened
+Status: discovery frozen; blind held-out baseline sealed
 
 ## Bound inputs
 
@@ -83,4 +83,39 @@ are evidence metadata only and may not enter production logic or tests.
 
 Update modes refuse overwrite, report/selection mutation changes their content
 hashes, and normal tests reproduce committed bytes read-only. The held-out
-baseline may be sealed only after this discovery selection commit.
+baseline was sealed only after this discovery selection commit.
+
+## Blind held-out baseline seal
+
+The 12 held-out requirements were decrypted only inside the baseline test
+process after the committed discovery selection reproduced byte-for-byte. Each
+requirement ran twice through the frozen synthesis policy, inventory,
+environment, replay comparison, promotion rule, policy-v2 observation, and
+separate held-out aggregation path. The blind run completed in 213.39 seconds.
+
+The runner emitted no requirement content, per-case progress, outcomes, gaps,
+diagnostics, or aggregate classifications. This audit intentionally records no
+held-out result distribution. No held-out plaintext artifact was written to
+the repository.
+
+The normalized baseline payload was encrypted with AES-256-GCM using a fresh
+random nonce prefixed to the ciphertext and a new 256-bit key stored outside
+the repository. Authenticated additional data binds the payload schema, corpus
+manifest, discovery selection, evaluator policy, impact registry, synthesis
+policy, gap-transition policy, and plaintext payload hash. The source and
+baseline use separate external keys.
+
+- selection commit:
+  `40431aa4f563eda2db6556af5aba7d417593a759`
+- held-out case count: 12
+- payload hash:
+  `392bb710267ba031599ab40718243c343b89a9866fb6db11fca234270117654d`
+- ciphertext SHA-256:
+  `72d90f6680a6b99af64c5c1bb00528903d0539552075efb581256cce097561b7`
+- seal content hash:
+  `48814e837f466b579c7bef0fccedf605b778ae6bf865b4a5d04141ddf37840c2`
+
+Normal tests verify the public seal metadata, checksum, ciphertext hash, and
+discovery-selection reproduction without a key. A key-gated test authenticates
+and validates the encrypted payload contract without logging its content.
+Updater mode refuses to overwrite the ciphertext, seal, or checksum.
