@@ -20,6 +20,8 @@ const (
 	closedLoopV5PublicAdmissionSchema    = "kicadai.closed-loop-open-set-public-admission.v5"
 	closedLoopV5PublicAdmissionRoot      = "testdata/closed_loop_open_set_v5_public_admission"
 	closedLoopV5PublicAdmissionUpdateEnv = "UPDATE_CLOSED_LOOP_V5_PUBLIC_ADMISSION"
+	closedLoopV5PublicRetirementAudit    = "V5_PUBLIC_ADMISSION_RETIREMENT_AUDIT.md"
+	closedLoopV5PublicRetirementChecksum = "V5_PUBLIC_ADMISSION_RETIREMENT_AUDIT.sha256"
 )
 
 type closedLoopV5PublicAdmissionComparison struct {
@@ -122,6 +124,11 @@ func TestUpdateClosedLoopV5PublicAdmission(t *testing.T) {
 	if _, err := os.Stat(closedLoopV5PublicAdmissionRoot); !os.IsNotExist(err) {
 		t.Fatal("V5 public admission already exists; refusing overwrite")
 	}
+	for _, name := range []string{closedLoopV5PublicRetirementAudit, closedLoopV5PublicRetirementChecksum} {
+		if _, err := os.Stat(filepath.Join(closedLoopSpecDirectory(t), name)); !os.IsNotExist(err) {
+			t.Fatal("V5 public admission is permanently retired")
+		}
+	}
 	implementation := loadClosedLoopV5CurrentImplementationSeal(t)
 	manifest := loadClosedLoopV5Manifest(t)
 	baseline := loadClosedLoopV5FrozenBaselineReport(t)
@@ -164,6 +171,27 @@ func TestUpdateClosedLoopV5PublicAdmission(t *testing.T) {
 		closedLoopV5SelectedPassCount(selection, baseline.Discovery.Cases),
 		closedLoopV5SelectedPassCount(selection, discovery.Cases),
 	)
+}
+
+func TestClosedLoopV5PublicAdmissionRetirementIsFrozen(t *testing.T) {
+	specRoot := closedLoopSpecDirectory(t)
+	auditPath := filepath.Join(specRoot, closedLoopV5PublicRetirementAudit)
+	if _, err := os.Stat(auditPath); os.IsNotExist(err) {
+		t.Skip("V5 public admission has not been retired")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(closedLoopV5PublicAdmissionRoot); !os.IsNotExist(err) {
+		t.Fatal("retired V5 must not contain a successful public admission artifact root")
+	}
+	audit := mustCorpusRead(t, auditPath)
+	assertArtifactChecksum(t, filepath.Join(specRoot, closedLoopV5PublicRetirementChecksum), filepath.Base(auditPath), audit)
+	if !bytes.Contains(audit, []byte("Held-out source opened: no")) ||
+		!bytes.Contains(audit, []byte("Held-out baseline opened: no")) ||
+		!bytes.Contains(audit, []byte("Held-out final key created: no")) ||
+		!bytes.Contains(audit, []byte("Final updater: permanently retired")) {
+		t.Fatal("V5 public retirement audit does not prove the held-out boundary stayed closed")
+	}
 }
 
 func buildClosedLoopV5PublicAdmissionReport(

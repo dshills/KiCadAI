@@ -196,9 +196,17 @@ the harness commit. Prism reported no high- or medium-severity issue in the
 exact staged harness bytes; its remaining low observation concerned the
 intentional exact-byte replay comparison required by the frozen protocol.
 
-## Next phase
+## Public-admission result
 
 The one-time held-out baseline boundary is complete and may not be rerun. The
-implementation context may now implement only the frozen rank-one generic
-`electrothermal_solver` capability package. Held-out baseline ciphertext and
-keys remain sealed until the separately authorized one-time final comparison.
+reviewed generic `electrothermal_solver` implementation removed the exact
+selected member from all three affected discovery cases, but every case
+retained independent nonselected baseline gaps. Total and selected-package
+pass counts therefore remained zero, so the frozen strict public-admission gate
+failed.
+
+V5 is permanently retired before held-out final evaluation. The held-out
+source and baseline remain unopened, no final key was created, and no final
+retry, tuning, corpus mutation, policy change, or gate relaxation is permitted.
+The durable retirement evidence is
+`V5_PUBLIC_ADMISSION_RETIREMENT_AUDIT.md`.
