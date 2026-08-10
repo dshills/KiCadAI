@@ -3,7 +3,11 @@ package capabilityfeedback
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +22,7 @@ import (
 	"kicadai/internal/externalkey"
 	"kicadai/internal/libraryresolver"
 	ots "kicadai/internal/opentopologysynthesis"
+	"kicadai/internal/promotiontoolchain"
 	"kicadai/internal/reports"
 )
 
@@ -28,7 +33,9 @@ const (
 	closedLoopV5HeldOutBaselineUpdate = "UPDATE_CLOSED_LOOP_V5_HELD_OUT_BASELINE"
 	closedLoopV5HeldOutSourceKeyEnv   = "KICADAI_V5_HELD_OUT_SOURCE_KEY_FILE"
 	closedLoopV5HeldOutBaselineKeyEnv = "KICADAI_V5_HELD_OUT_BASELINE_KEY_FILE"
+	closedLoopV5PromotionVerifyEnv    = "VERIFY_CLOSED_LOOP_V5_PROMOTION_ENVIRONMENT"
 	closedLoopV5SelectionFreezeCommit = "ffcff3881ca2e03a454fd350124637664bf4d4e4"
+	closedLoopV5MaximumKiCadCLIBytes  = 1 << 30
 	// The artifact-free harness commit intentionally leaves this empty. The
 	// verifier skips while the no-replace bundle is absent and fails closed if
 	// any bundle appears before its exact manifest hash is frozen.
@@ -36,12 +43,36 @@ const (
 )
 
 type closedLoopV5HeldOutPayload struct {
-	Schema    string                     `json:"schema"`
-	Version   int                        `json:"version"`
-	Binding   blindbaseline.Binding      `json:"binding"`
-	Cases     []closedLoopV5CaseArtifact `json:"cases"`
-	Aggregate AggregateReport            `json:"aggregate"`
-	Hash      string                     `json:"hash"`
+	Schema               string                           `json:"schema"`
+	Version              int                              `json:"version"`
+	Binding              blindbaseline.Binding            `json:"binding"`
+	PromotionEnvironment closedLoopV5PromotionEnvironment `json:"promotion_environment"`
+	Cases                []closedLoopV5CaseArtifact       `json:"cases"`
+	Aggregate            AggregateReport                  `json:"aggregate"`
+	Hash                 string                           `json:"hash"`
+}
+
+type closedLoopV5PromotionEnvironment struct {
+	Schema               string `json:"schema"`
+	Version              int    `json:"version"`
+	Platform             string `json:"platform"`
+	KiCadVersion         string `json:"kicad_version"`
+	ToolchainLockSHA256  string `json:"toolchain_lock_sha256"`
+	KiCadCLISHA256       string `json:"kicad_cli_sha256"`
+	SymbolTableSHA256    string `json:"symbol_table_sha256"`
+	FootprintTableSHA256 string `json:"footprint_table_sha256"`
+	SymbolsSHA256        string `json:"symbols_sha256"`
+	SymbolsFileCount     int    `json:"symbols_file_count"`
+	SymbolsByteCount     int64  `json:"symbols_byte_count"`
+	FootprintsSHA256     string `json:"footprints_sha256"`
+	FootprintsFileCount  int    `json:"footprints_file_count"`
+	FootprintsByteCount  int64  `json:"footprints_byte_count"`
+	Hash                 string `json:"hash"`
+}
+
+type closedLoopV5ResolvedPromotionEnvironment struct {
+	Evidence promotiontoolchain.Evidence
+	Public   closedLoopV5PromotionEnvironment
 }
 
 func TestClosedLoopV5HeldOutBaselineSealIsFrozen(t *testing.T) {
@@ -122,6 +153,7 @@ func TestUpdateClosedLoopV5HeldOutBaseline(t *testing.T) {
 	assertClosedLoopV5ImplementationBoundary(t, repositoryRoot)
 	registry, policy := closedLoopV5Policies(t)
 	inventory, environment := closedLoopSynthesisEnvironment(t)
+	promotionEnvironment := resolveClosedLoopV5PromotionEnvironment(t, repositoryRoot)
 
 	sourceKey, err := externalkey.Read(repositoryRoot, sourceKeyPath)
 	if err != nil {
@@ -135,7 +167,10 @@ func TestUpdateClosedLoopV5HeldOutBaseline(t *testing.T) {
 	}
 	assertClosedLoopV5HeldOutSources(t, manifest, sealedCases)
 
-	artifacts := runClosedLoopV5HeldOutBaseline(t, sealedCases, policy, inventory, environment)
+	artifacts := runClosedLoopV5HeldOutBaseline(t, sealedCases, policy, inventory, environment, promotionEnvironment)
+	if after := resolveClosedLoopV5PromotionEnvironment(t, repositoryRoot); after.Public != promotionEnvironment.Public {
+		t.Fatal("locked V5 installed-KiCad promotion environment changed during the held-out baseline")
+	}
 	evidence := make([]CaseEvidence, len(artifacts))
 	for index := range artifacts {
 		evidence[index] = artifacts[index].Observation
@@ -178,8 +213,17 @@ func TestUpdateClosedLoopV5HeldOutBaseline(t *testing.T) {
 		CatalogSHA256:                catalogHash,
 		ModelRegistrySHA256:          modelRegistryHash,
 		EnvironmentPolicySHA256:      environmentPolicyHash,
+		PromotionPlatform:            promotionEnvironment.Public.Platform,
+		KiCadVersion:                 promotionEnvironment.Public.KiCadVersion,
+		PromotionToolchainSHA256:     promotionEnvironment.Public.Hash,
+		PromotionToolchainLockSHA256: promotionEnvironment.Public.ToolchainLockSHA256,
+		KiCadCLISHA256:               promotionEnvironment.Public.KiCadCLISHA256,
+		SymbolTableSHA256:            promotionEnvironment.Public.SymbolTableSHA256,
+		FootprintTableSHA256:         promotionEnvironment.Public.FootprintTableSHA256,
+		SymbolsSHA256:                promotionEnvironment.Public.SymbolsSHA256,
+		FootprintsSHA256:             promotionEnvironment.Public.FootprintsSHA256,
 	}
-	payload := closedLoopV5HeldOutPayload{Schema: closedLoopV5HeldOutPayloadSchema, Version: closedLoopV5BaselineVersion, Binding: binding, Cases: artifacts, Aggregate: aggregate}
+	payload := closedLoopV5HeldOutPayload{Schema: closedLoopV5HeldOutPayloadSchema, Version: closedLoopV5BaselineVersion, Binding: binding, PromotionEnvironment: promotionEnvironment.Public, Cases: artifacts, Aggregate: aggregate}
 	payload.Hash, err = hashClosedLoopV5HeldOutPayload(payload)
 	if err != nil {
 		t.Fatal("hash sealed V5 held-out baseline")
@@ -269,7 +313,7 @@ func assertClosedLoopV5HeldOutSources(t *testing.T, manifest corpuspublication.M
 	}
 }
 
-func runClosedLoopV5HeldOutBaseline(t *testing.T, sealed []corpuspublication.HeldOutCase, policy ots.Policy, inventory ots.PrimitiveInventory, environment ots.SimulationEnvironment) []closedLoopV5CaseArtifact {
+func runClosedLoopV5HeldOutBaseline(t *testing.T, sealed []corpuspublication.HeldOutCase, policy ots.Policy, inventory ots.PrimitiveInventory, environment ots.SimulationEnvironment, promotionEnvironment closedLoopV5ResolvedPromotionEnvironment) []closedLoopV5CaseArtifact {
 	t.Helper()
 	artifacts := make([]closedLoopV5CaseArtifact, 0, len(sealed))
 	for index := range sealed {
@@ -288,7 +332,7 @@ func runClosedLoopV5HeldOutBaseline(t *testing.T, sealed []corpuspublication.Hel
 		var promotion *ots.PhysicalPromotionResult
 		var proof *closedLoopV5PromotionProof
 		if first.Report.Status == ots.StatusPassed {
-			current := promoteClosedLoopV5SealedRun(t, first, environment)
+			current := promoteClosedLoopV5SealedRun(t, first, environment, promotionEnvironment)
 			if current.Status != ots.PhysicalPromotionPassed || !current.ReplayIdentical || len(current.Runs) != 2 {
 				t.Fatal("sealed V5 held-out physical promotion failed closed")
 			}
@@ -324,13 +368,13 @@ func runClosedLoopV5SealedSynthesis(t *testing.T, requirement ots.Requirement, i
 	return run
 }
 
-func promoteClosedLoopV5SealedRun(t *testing.T, run ots.SynthesisRun, environment ots.SimulationEnvironment) ots.PhysicalPromotionResult {
+func promoteClosedLoopV5SealedRun(t *testing.T, run ots.SynthesisRun, environment ots.SimulationEnvironment, promotionEnvironment closedLoopV5ResolvedPromotionEnvironment) ots.PhysicalPromotionResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	index, issues := libraryresolver.Load(ctx, libraryresolver.LibraryRoots{
-		SymbolsRoot:    closedLoopLibraryRoot(t, libraryresolver.EnvSymbolsRoot),
-		FootprintsRoot: closedLoopLibraryRoot(t, libraryresolver.EnvFootprintsRoot),
+		SymbolsRoot:    promotionEnvironment.Evidence.SymbolsRoot,
+		FootprintsRoot: promotionEnvironment.Evidence.FootprintsRoot,
 	}, libraryresolver.LoadOptions{})
 	closure, closureIssues := resolveClosedLoopLibraryClosure(index, run)
 	closureIssues = append(closureIssues, libraryresolver.DesignClosureIssuesFrom(issues, closure)...)
@@ -340,8 +384,69 @@ func promoteClosedLoopV5SealedRun(t *testing.T, run ots.SynthesisRun, environmen
 		}
 	}
 	return ots.PromoteSynthesisRun(ctx, run, environment, ots.PhysicalPromotionOptions{
-		OutputRoot: filepath.Join(t.TempDir(), "sealed-v5-held-out"), KiCadCLI: closedLoopKiCadCLI(t), LibraryIndex: &index, Timeout: 3 * time.Minute,
+		OutputRoot: filepath.Join(t.TempDir(), "sealed-v5-held-out"), KiCadCLI: promotionEnvironment.Evidence.KiCadCLI, LibraryIndex: &index, Timeout: 3 * time.Minute,
 	})
+}
+
+func resolveClosedLoopV5PromotionEnvironment(t *testing.T, repositoryRoot string) closedLoopV5ResolvedPromotionEnvironment {
+	t.Helper()
+	document, err := promotiontoolchain.Load(filepath.Join(repositoryRoot, "toolchain", "kicad-promotion.lock.json"))
+	if err != nil {
+		t.Fatal("load locked V5 installed-KiCad promotion toolchain")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	evidence, err := promotiontoolchain.Resolve(ctx, document, promotiontoolchain.ResolveOptions{})
+	if err != nil {
+		t.Fatal("resolve locked V5 installed-KiCad promotion toolchain")
+	}
+	cliHash, err := hashClosedLoopV5RegularFile(evidence.KiCadCLI)
+	if err != nil {
+		t.Fatal("hash locked V5 kicad-cli executable")
+	}
+	public := closedLoopV5PromotionEnvironment{
+		Schema: "kicadai.closed-loop-open-set-promotion-environment.v5", Version: closedLoopV5BaselineVersion,
+		Platform: evidence.OS + "/" + evidence.Arch, KiCadVersion: evidence.KiCadVersion,
+		ToolchainLockSHA256: evidence.LockSHA256, KiCadCLISHA256: cliHash,
+		SymbolTableSHA256: evidence.SymbolTableSHA256, FootprintTableSHA256: evidence.FootprintTableSHA256,
+		SymbolsSHA256: evidence.SymbolsIdentity.SHA256, SymbolsFileCount: evidence.SymbolsIdentity.FileCount, SymbolsByteCount: evidence.SymbolsIdentity.ByteCount,
+		FootprintsSHA256: evidence.FootprintsIdentity.SHA256, FootprintsFileCount: evidence.FootprintsIdentity.FileCount, FootprintsByteCount: evidence.FootprintsIdentity.ByteCount,
+	}
+	public.Hash, err = hashClosedLoopV5PromotionEnvironment(public)
+	if err != nil || !closedLoopV5ValidHash(public.Hash) || public.SymbolsFileCount <= 0 || public.SymbolsByteCount <= 0 || public.FootprintsFileCount <= 0 || public.FootprintsByteCount <= 0 {
+		t.Fatal("locked V5 installed-KiCad promotion environment is invalid")
+	}
+	return closedLoopV5ResolvedPromotionEnvironment{Evidence: evidence, Public: public}
+}
+
+func hashClosedLoopV5RegularFile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = file.Close() }()
+	opened, err := file.Stat()
+	if err != nil || !opened.Mode().IsRegular() || opened.Size() <= 0 || opened.Size() > closedLoopV5MaximumKiCadCLIBytes {
+		return "", fmt.Errorf("promotion tool is not a nonempty regular file")
+	}
+	pathInfo, err := os.Lstat(path)
+	if err != nil || !pathInfo.Mode().IsRegular() || !os.SameFile(opened, pathInfo) {
+		return "", fmt.Errorf("promotion tool path changed or is not regular")
+	}
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	after, err := file.Stat()
+	if err != nil || after.Size() != opened.Size() || !after.ModTime().Equal(opened.ModTime()) {
+		return "", fmt.Errorf("promotion tool changed while hashing")
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func hashClosedLoopV5PromotionEnvironment(environment closedLoopV5PromotionEnvironment) (string, error) {
+	environment.Hash = ""
+	return digest(environment)
 }
 
 func closedLoopV5SealedEnvironmentBindings(t *testing.T, cases []CaseEvidence) (string, string, string, string) {
@@ -424,4 +529,47 @@ func TestClosedLoopV5CanonicalGitObjectID(t *testing.T) {
 			t.Fatalf("accepted noncanonical Git object ID %q", invalid)
 		}
 	}
+}
+
+func TestClosedLoopV5PromotionEnvironmentCommitments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "kicad-cli")
+	content := []byte("locked promotion executable")
+	if err := os.WriteFile(path, content, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := hashClosedLoopV5RegularFile(path)
+	if err != nil || got != corpusHash(content) {
+		t.Fatalf("promotion executable hash = %q, %v", got, err)
+	}
+	link := filepath.Join(t.TempDir(), "kicad-cli-link")
+	if err := os.Symlink(path, link); err == nil {
+		if _, err := hashClosedLoopV5RegularFile(link); err == nil {
+			t.Fatal("promotion executable hash accepted a symbolic link")
+		}
+	}
+	environment := closedLoopV5PromotionEnvironment{Schema: "schema", Version: 5, Platform: "test/arm64", KiCadVersion: "10.0.3", ToolchainLockSHA256: testV5Hash("1"), KiCadCLISHA256: testV5Hash("2"), SymbolTableSHA256: testV5Hash("3"), FootprintTableSHA256: testV5Hash("4"), SymbolsSHA256: testV5Hash("5"), SymbolsFileCount: 1, SymbolsByteCount: 2, FootprintsSHA256: testV5Hash("6"), FootprintsFileCount: 3, FootprintsByteCount: 4}
+	first, err := hashClosedLoopV5PromotionEnvironment(environment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environment.KiCadCLISHA256 = testV5Hash("7")
+	second, err := hashClosedLoopV5PromotionEnvironment(environment)
+	if err != nil || first == second {
+		t.Fatal("promotion toolchain mutation did not change its commitment")
+	}
+}
+
+func TestClosedLoopV5PromotionEnvironmentResolvesWhenRequested(t *testing.T) {
+	if os.Getenv(closedLoopV5PromotionVerifyEnv) != "1" {
+		t.Skip("set VERIFY_CLOSED_LOOP_V5_PROMOTION_ENVIRONMENT=1 to resolve and hash the installed locked toolchain")
+	}
+	repositoryRoot := filepath.Dir(filepath.Dir(closedLoopSpecDirectory(t)))
+	resolved := resolveClosedLoopV5PromotionEnvironment(t, repositoryRoot)
+	if resolved.Public.Platform != runtime.GOOS+"/"+runtime.GOARCH || resolved.Public.KiCadVersion != "10.0.3" || !closedLoopV5ValidHash(resolved.Public.Hash) || !closedLoopV5ValidHash(resolved.Public.KiCadCLISHA256) {
+		t.Fatal("resolved V5 promotion environment differs from its locked platform or version")
+	}
+}
+
+func testV5Hash(character string) string {
+	return strings.Repeat(character, 64)
 }

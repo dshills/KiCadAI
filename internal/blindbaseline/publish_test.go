@@ -145,6 +145,19 @@ func TestPublishAcceptsSHA256CommitBindings(t *testing.T) {
 	}
 }
 
+func TestBindingRejectsMalformedPromotionPlatformAndVersion(t *testing.T) {
+	binding := testBinding()
+	binding.PromotionPlatform = "../darwin/arm64"
+	if err := validateBinding(binding); err == nil {
+		t.Fatal("binding accepted a malformed promotion platform")
+	}
+	binding = testBinding()
+	binding.KiCadVersion = "latest"
+	if err := validateBinding(binding); err == nil {
+		t.Fatal("binding accepted a noncanonical KiCad version")
+	}
+}
+
 func TestPublishRejectsReservedKeyAndExternalDestination(t *testing.T) {
 	repository := t.TempDir()
 	external := t.TempDir()
@@ -234,6 +247,7 @@ func testBinding() Binding {
 		CorpusManifestSHA256: testHash("1"), ContractManifestSHA256: testHash("2"), ValidatorManifestSHA256: testHash("3"), PublisherManifestSHA256: testHash("4"), ValidationReportSHA256: testHash("5"), PacketSetSHA256: testHash("6"), ContractBindingSHA256: testHash("7"), HistoricalCommitmentsSHA256: testHash("8"), SourceCiphertextSHA256: testHash("9"),
 		DiscoveryBaselineSHA256: testHash("a"), RankingSHA256: testHash("b"), SelectionSHA256: testHash("c"), GenericPlanSHA256: testHash("d"), EvaluatorPolicy: "policy",
 		ImpactRegistrySHA256: testHash("e"), SynthesisPolicySHA256: testHash("f"), GapPolicySHA256: testHash("1"), SelectionPolicySHA256: testHash("2"), ImplementationManifestSHA256: testHash("3"), InventorySHA256: testHash("4"), CatalogSHA256: testHash("5"), ModelRegistrySHA256: testHash("6"), EnvironmentPolicySHA256: testHash("7"),
+		PromotionPlatform: "test/arm64", KiCadVersion: "10.0.3", PromotionToolchainSHA256: testHash("8"), PromotionToolchainLockSHA256: testHash("9"), KiCadCLISHA256: testHash("a"), SymbolTableSHA256: testHash("b"), FootprintTableSHA256: testHash("c"), SymbolsSHA256: testHash("d"), FootprintsSHA256: testHash("e"),
 	}
 }
 

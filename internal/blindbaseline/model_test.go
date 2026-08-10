@@ -19,7 +19,7 @@ func TestBindingFieldRegistryCoversJSONContractInOrder(t *testing.T) {
 			t.Fatalf("binding registry entry %d does not match unique JSON field %q", index, name)
 		}
 		seen[name] = true
-		if fields[index].kind < bindingCommit || fields[index].kind > bindingIdentifier {
+		if fields[index].kind < bindingCommit || fields[index].kind > bindingVersion {
 			t.Fatalf("binding registry entry %q has invalid validation kind", name)
 		}
 	}

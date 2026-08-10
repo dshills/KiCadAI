@@ -18,6 +18,8 @@ import (
 var commitPattern = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 var hashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var policyIdentifierPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]{0,127}$`)
+var platformPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9_]+$`)
+var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 func Publish(request Request) (Result, error) {
 	if request.Random == nil {
@@ -131,6 +133,10 @@ func validateBinding(binding Binding) error {
 			valid = hashPattern.MatchString(field.value)
 		case bindingIdentifier:
 			valid = policyIdentifierPattern.MatchString(field.value)
+		case bindingPlatform:
+			valid = platformPattern.MatchString(field.value)
+		case bindingVersion:
+			valid = versionPattern.MatchString(field.value)
 		}
 		if !valid {
 			return fmt.Errorf("held-out baseline binding %s is invalid", field.name)

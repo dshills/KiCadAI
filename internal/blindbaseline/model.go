@@ -44,6 +44,15 @@ type Binding struct {
 	CatalogSHA256                string `json:"catalog_sha256"`
 	ModelRegistrySHA256          string `json:"model_registry_sha256"`
 	EnvironmentPolicySHA256      string `json:"environment_policy_sha256"`
+	PromotionPlatform            string `json:"promotion_platform"`
+	KiCadVersion                 string `json:"kicad_version"`
+	PromotionToolchainSHA256     string `json:"promotion_toolchain_sha256"`
+	PromotionToolchainLockSHA256 string `json:"promotion_toolchain_lock_sha256"`
+	KiCadCLISHA256               string `json:"kicad_cli_sha256"`
+	SymbolTableSHA256            string `json:"symbol_table_sha256"`
+	FootprintTableSHA256         string `json:"footprint_table_sha256"`
+	SymbolsSHA256                string `json:"symbols_sha256"`
+	FootprintsSHA256             string `json:"footprints_sha256"`
 }
 
 type bindingFieldKind uint8
@@ -52,6 +61,8 @@ const (
 	bindingCommit bindingFieldKind = iota + 1
 	bindingHash
 	bindingIdentifier
+	bindingPlatform
+	bindingVersion
 )
 
 type bindingField struct {
@@ -93,6 +104,15 @@ func (binding Binding) fields() []bindingField {
 		{"catalog_sha256", binding.CatalogSHA256, bindingHash},
 		{"model_registry_sha256", binding.ModelRegistrySHA256, bindingHash},
 		{"environment_policy_sha256", binding.EnvironmentPolicySHA256, bindingHash},
+		{"promotion_platform", binding.PromotionPlatform, bindingPlatform},
+		{"kicad_version", binding.KiCadVersion, bindingVersion},
+		{"promotion_toolchain_sha256", binding.PromotionToolchainSHA256, bindingHash},
+		{"promotion_toolchain_lock_sha256", binding.PromotionToolchainLockSHA256, bindingHash},
+		{"kicad_cli_sha256", binding.KiCadCLISHA256, bindingHash},
+		{"symbol_table_sha256", binding.SymbolTableSHA256, bindingHash},
+		{"footprint_table_sha256", binding.FootprintTableSHA256, bindingHash},
+		{"symbols_sha256", binding.SymbolsSHA256, bindingHash},
+		{"footprints_sha256", binding.FootprintsSHA256, bindingHash},
 	}
 }
 
