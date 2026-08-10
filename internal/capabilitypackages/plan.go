@@ -6,12 +6,11 @@ import (
 	"strings"
 
 	"kicadai/internal/capabilityexpansion"
-	"kicadai/internal/capabilityfeedback"
 	"kicadai/internal/capabilitygate"
 )
 
 func BuildGenericPlan(candidate Candidate) (GenericPlan, error) {
-	if candidate.Rank != 1 || candidate.Key != Tuple(string(candidate.Scope), candidate.Capability) || len(candidate.Members) == 0 {
+	if candidate.Rank != 1 || candidate.Key != Tuple(candidate.Scope, candidate.Capability) || len(candidate.Members) == 0 {
 		return GenericPlan{}, fmt.Errorf("generic package plan requires canonical rank one")
 	}
 	evidence := make([]capabilitygate.Evidence, 0, len(candidate.Members))
@@ -31,7 +30,7 @@ func BuildGenericPlan(candidate Candidate) (GenericPlan, error) {
 		Stage: candidate.Members[0].Stage, Description: "content-addressed discovery package requires generic expansion evidence",
 	})
 	for _, member := range candidate.Members {
-		if member.Key != Tuple(member.Stage, string(member.Scope), member.Capability, member.Code) || member.Scope != candidate.Scope || member.Capability != candidate.Capability {
+		if member.Key != Tuple(member.Stage, member.Scope, member.Capability, member.Code) || member.Scope != candidate.Scope || member.Capability != candidate.Capability {
 			return GenericPlan{}, fmt.Errorf("rank-one package contains an invalid member")
 		}
 		gaps = append(gaps, capabilitygate.Gap{
@@ -93,7 +92,7 @@ func ValidatePlan(plan GenericPlan) error {
 		needs[need.ID] = need
 	}
 	for index, member := range plan.Members {
-		if member.Key != Tuple(member.Stage, string(member.Scope), member.Capability, member.Code) {
+		if member.Key != Tuple(member.Stage, member.Scope, member.Capability, member.Code) {
 			return fmt.Errorf("generic package plan member is invalid")
 		}
 		if _, duplicate := members[member.Key]; duplicate {
@@ -130,15 +129,15 @@ func ValidatePlan(plan GenericPlan) error {
 	return nil
 }
 
-func scopeRequirementKind(scope capabilityfeedback.GapScope) capabilitygate.RequirementKind {
+func scopeRequirementKind(scope string) capabilitygate.RequirementKind {
 	switch scope {
-	case capabilityfeedback.ScopeTopology:
+	case "topology":
 		return capabilitygate.RequirementArchitecture
-	case capabilityfeedback.ScopeComponent:
+	case "component":
 		return capabilitygate.RequirementComponent
-	case capabilityfeedback.ScopeModel:
+	case "model":
 		return capabilitygate.RequirementModel
-	case capabilityfeedback.ScopePhysical, capabilityfeedback.ScopeRouting:
+	case "physical", "routing":
 		return capabilitygate.RequirementPhysical
 	default:
 		return capabilitygate.RequirementVerification

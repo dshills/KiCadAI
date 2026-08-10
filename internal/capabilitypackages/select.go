@@ -10,9 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"kicadai/internal/capabilityevaluation"
-	"kicadai/internal/capabilityfeedback"
 )
 
 type caseContribution struct {
@@ -21,7 +18,7 @@ type caseContribution struct {
 }
 
 type accumulator struct {
-	scope        capabilityfeedback.GapScope
+	scope        string
 	capability   string
 	cases        map[string]caseContribution
 	domains      map[string]bool
@@ -85,42 +82,33 @@ func ValidatePolicy(policy SelectionPolicy) error {
 	return nil
 }
 
-func Build(report capabilityfeedback.AggregateReport, registry capabilityevaluation.ImpactRegistry, policy SelectionPolicy) ([]Candidate, error) {
+func Build(observations []Observation, policy SelectionPolicy) ([]Candidate, error) {
 	if err := ValidatePolicy(policy); err != nil {
 		return nil, err
 	}
-	if report.CorpusRole != capabilityfeedback.RoleDiscovery {
-		return nil, fmt.Errorf("capability packages require discovery-only evidence")
-	}
-	if err := capabilityfeedback.ValidateAggregateReport(report, registry); err != nil {
-		return nil, fmt.Errorf("validate discovery evidence: %w", err)
-	}
-	cases := make(map[string]caseContribution, len(report.Cases))
-	for _, current := range report.Cases {
-		cases[current.Case.ID] = caseContribution{domain: string(current.Case.Domain), weight: safetyWeight(current.Case.SafetyImpact)}
-	}
 	groups := map[string]*accumulator{}
-	for _, cluster := range report.Clusters {
-		if cluster.Stage == "" || cluster.Scope == "" || cluster.Capability == "" || cluster.Code == "" {
-			return nil, fmt.Errorf("discovery cluster has an incomplete member identity")
+	for _, observation := range observations {
+		if observation.Role != "discovery" {
+			continue
 		}
-		key := Tuple(string(cluster.Scope), cluster.Capability)
+		if observation.CaseID == "" || observation.ReportingDomain == "" || observation.Stage == "" || observation.Scope == "" || observation.Capability == "" || observation.Code == "" || observation.SafetyWeight < 0 {
+			return nil, fmt.Errorf("incomplete discovery observation")
+		}
+		key := Tuple(observation.Scope, observation.Capability)
 		group := groups[key]
 		if group == nil {
-			group = &accumulator{scope: cluster.Scope, capability: cluster.Capability, cases: map[string]caseContribution{}, domains: map[string]bool{}, members: map[string]Member{}, requirements: map[string]bool{}}
+			group = &accumulator{scope: observation.Scope, capability: observation.Capability, cases: map[string]caseContribution{}, domains: map[string]bool{}, members: map[string]Member{}, requirements: map[string]bool{}}
 			groups[key] = group
 		}
-		memberKey := Tuple(cluster.Stage, string(cluster.Scope), cluster.Capability, cluster.Code)
-		group.members[memberKey] = Member{Key: memberKey, Stage: cluster.Stage, Scope: cluster.Scope, Capability: cluster.Capability, Code: cluster.Code}
-		for _, caseID := range cluster.Cases {
-			contribution, found := cases[caseID]
-			if !found {
-				return nil, fmt.Errorf("cluster references unknown discovery case %q", caseID)
-			}
-			group.cases[caseID] = contribution
-			group.domains[contribution.domain] = true
+		contribution := caseContribution{domain: observation.ReportingDomain, weight: observation.SafetyWeight}
+		if existing, found := group.cases[observation.CaseID]; found && existing != contribution {
+			return nil, fmt.Errorf("inconsistent case contribution")
 		}
-		for _, evidence := range cluster.RequiredEvidence {
+		group.cases[observation.CaseID] = contribution
+		group.domains[observation.ReportingDomain] = true
+		memberKey := Tuple(observation.Stage, observation.Scope, observation.Capability, observation.Code)
+		group.members[memberKey] = Member{Key: memberKey, Stage: observation.Stage, Scope: observation.Scope, Capability: observation.Capability, Code: observation.Code}
+		for _, evidence := range observation.RequiredEvidence {
 			if strings.TrimSpace(evidence) == "" {
 				return nil, fmt.Errorf("cluster contains empty required evidence")
 			}
@@ -226,17 +214,4 @@ func compare(left, right Candidate, ranking []string) int {
 		}
 	}
 	return 0
-}
-
-func safetyWeight(value capabilityevaluation.SafetyImpact) int64 {
-	switch value {
-	case capabilityevaluation.SafetyReviewRequired:
-		return 1
-	case capabilityevaluation.SafetyRelevant:
-		return 3
-	case capabilityevaluation.SafetyCritical:
-		return 5
-	default:
-		return 0
-	}
 }

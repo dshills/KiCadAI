@@ -4,7 +4,6 @@ package capabilitypackages
 
 import (
 	"kicadai/internal/capabilityexpansion"
-	"kicadai/internal/capabilityfeedback"
 )
 
 const (
@@ -45,23 +44,35 @@ type PlanAdmission struct {
 }
 
 type Member struct {
-	Key        string                      `json:"key"`
-	Stage      string                      `json:"stage"`
-	Scope      capabilityfeedback.GapScope `json:"scope"`
-	Capability string                      `json:"capability"`
-	Code       string                      `json:"code"`
+	Key        string `json:"key"`
+	Stage      string `json:"stage"`
+	Scope      string `json:"scope"`
+	Capability string `json:"capability"`
+	Code       string `json:"code"`
 }
 
 type Candidate struct {
-	Rank             int                         `json:"rank"`
-	Key              string                      `json:"key"`
-	Scope            capabilityfeedback.GapScope `json:"scope"`
-	Capability       string                      `json:"capability"`
-	Cases            []string                    `json:"cases"`
-	Domains          []string                    `json:"domains"`
-	SafetyWeight     int64                       `json:"safety_weight"`
-	Members          []Member                    `json:"members"`
-	RequiredEvidence []string                    `json:"required_evidence"`
+	Rank             int      `json:"rank"`
+	Key              string   `json:"key"`
+	Scope            string   `json:"scope"`
+	Capability       string   `json:"capability"`
+	Cases            []string `json:"cases"`
+	Domains          []string `json:"domains"`
+	SafetyWeight     int64    `json:"safety_weight"`
+	Members          []Member `json:"members"`
+	RequiredEvidence []string `json:"required_evidence"`
+}
+
+type Observation struct {
+	Role             string   `json:"role"`
+	CaseID           string   `json:"case_id"`
+	ReportingDomain  string   `json:"reporting_domain"`
+	SafetyWeight     int64    `json:"safety_weight"`
+	Stage            string   `json:"stage"`
+	Scope            string   `json:"scope"`
+	Capability       string   `json:"capability"`
+	Code             string   `json:"code"`
+	RequiredEvidence []string `json:"required_evidence"`
 }
 
 type MemberBinding struct {
