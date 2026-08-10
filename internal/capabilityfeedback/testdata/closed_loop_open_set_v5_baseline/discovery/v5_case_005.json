@@ -1,0 +1,80 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_005",
+  "requirement_sha256": "228ef0231c67bd7b3ade2ef6fb7992fb92c31455bca755dd4c4203ca15155ccc",
+  "normalized_replay_sha256": [
+    "f94dab393318383c26f1517d101410f894060f87786a1d6355eba5d7aee6f217",
+    "f94dab393318383c26f1517d101410f894060f87786a1d6355eba5d7aee6f217"
+  ],
+  "synthesis_sha256": "6aebfaa1ad5eee71d173782a88534b601bc9c3b5c89f630c38f3c11be839ca26",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_005",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "safety_critical"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "no_complete_graph",
+    "requirement_hash": "775a1c1521f9887fb6ef5f8315d6ca339b1be5d621beb217b5bb7ed00e45c92a",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "6aebfaa1ad5eee71d173782a88534b601bc9c3b5c89f630c38f3c11be839ca26",
+    "analysis_kinds": [
+      "dc_sweep",
+      "noise",
+      "thermal",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 661,
+      "generated_graphs": 8000,
+      "complete_graphs": 0,
+      "candidate_simulations": 0,
+      "corner_evaluations": 0,
+      "value_trials": 0,
+      "topology_repairs": 0,
+      "maximum_frontier": 972,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "requirement_realizability",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "code": "OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED",
+        "requirement_ids": [
+          "limit_boundary",
+          "measurement_gain",
+          "measurement_noise",
+          "measurement_settle"
+        ],
+        "operating_cases": [
+          "measurement_span",
+          "measurement_transition"
+        ],
+        "analysis_kinds": [
+          "dc_sweep",
+          "noise",
+          "transient"
+        ],
+        "required_evidence": [
+          "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "6aebfaa1ad5eee71d173782a88534b601bc9c3b5c89f630c38f3c11be839ca26"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "e1e2f31907ba0f729f595fb14b35663a7ad5f91476ebab9a9d6f44385adab074"
+  },
+  "hash": "d977112a1f78dd664dd41b9af4fe6f5c62e5afbe617728db07fa7c535440a19c"
+}

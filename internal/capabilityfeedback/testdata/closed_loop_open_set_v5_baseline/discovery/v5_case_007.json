@@ -1,0 +1,78 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_007",
+  "requirement_sha256": "197e77041df04a19618e6fc64133e93cabfed85cec555649dbb9efba9b8abb98",
+  "normalized_replay_sha256": [
+    "d787026de3d0f277aadc058f419fbc03361187f8b9c1c0df84d0613163cd3fae",
+    "d787026de3d0f277aadc058f419fbc03361187f8b9c1c0df84d0613163cd3fae"
+  ],
+  "synthesis_sha256": "560adb14945032bcbf5f6009776aa7269e0663662cc4926dc18ed37a17f6f280",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_007",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "review_required"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "2d675dab8b54b921b6375d6130555b68b59cd8358d1b12a8cbbd3c2265d83d36",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "560adb14945032bcbf5f6009776aa7269e0663662cc4926dc18ed37a17f6f280",
+    "analysis_kinds": [
+      "ac_sweep",
+      "dc_sweep",
+      "noise",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 1,
+      "generated_graphs": 7,
+      "complete_graphs": 4,
+      "candidate_simulations": 95,
+      "corner_evaluations": 95,
+      "value_trials": 79,
+      "topology_repairs": 16,
+      "maximum_frontier": 0,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "transimpedance_evidence",
+        "code": "ASSERTION_BELOW_MINIMUM",
+        "requirement_ids": [
+          "current_response"
+        ],
+        "operating_cases": [
+          "centered_range/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_sweep"
+        ],
+        "required_evidence": [
+          "transimpedance_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "133362d923f098dad07f40ea50753c1d59e21dccf4e1adb92bfbade845dfcbbd",
+          "2a752f2f3e25891141055a6dd22d8d7598907c56c30d223a137b9f600aa5c0a1",
+          "560adb14945032bcbf5f6009776aa7269e0663662cc4926dc18ed37a17f6f280",
+          "5a6fff39ce1af2578a0d3721334291a6fe0c373837125cdae27b4ab6d5939bcd",
+          "f8a039fe567b7baa56eee2e2c605b1e42c109db1321c399d6db8898da21c44b2"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "cee94a04c91aa726b75133f870220e552f56b86918fc146869b9dc0bae84fd16"
+  },
+  "hash": "cc520aefe3fad021cc6bffedcb108612f226688c724b619cbb276691c7d59229"
+}

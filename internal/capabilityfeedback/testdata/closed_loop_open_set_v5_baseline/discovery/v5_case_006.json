@@ -1,0 +1,108 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_006",
+  "requirement_sha256": "c85ca12c76dd1a0a13b2c3c7a3900139a07adfcdf825d40d39bef8f086c5922a",
+  "normalized_replay_sha256": [
+    "cb6d868a674401ea3503591d64873fc6545d12692252aec8a98284035f17c9a1",
+    "cb6d868a674401ea3503591d64873fc6545d12692252aec8a98284035f17c9a1"
+  ],
+  "synthesis_sha256": "c334f6825214b5420e7c48d4db07bee138f9e3f4a9f9ac96602d3e2e78c4a076",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_006",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "review_required"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "no_complete_graph",
+    "requirement_hash": "84caff50db115e3513e60bfbc18740c2abca82d72317df56112446875d01ce69",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "c334f6825214b5420e7c48d4db07bee138f9e3f4a9f9ac96602d3e2e78c4a076",
+    "analysis_kinds": [
+      "dc_sweep",
+      "distortion",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 73,
+      "generated_graphs": 8000,
+      "complete_graphs": 0,
+      "candidate_simulations": 0,
+      "corner_evaluations": 0,
+      "value_trials": 0,
+      "topology_repairs": 0,
+      "maximum_frontier": 1969,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "requirement_realizability",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "code": "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+        "requirement_ids": [
+          "high_rate_frequency",
+          "low_rate_frequency",
+          "wave_excursion"
+        ],
+        "operating_cases": [
+          "high_rate",
+          "low_rate"
+        ],
+        "analysis_kinds": [
+          "dc_sweep",
+          "transient"
+        ],
+        "required_evidence": [
+          "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "c334f6825214b5420e7c48d4db07bee138f9e3f4a9f9ac96602d3e2e78c4a076"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "requirement_realizability",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "code": "OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED",
+        "requirement_ids": [
+          "high_rate_frequency",
+          "low_rate_frequency",
+          "phase_balance",
+          "wave_excursion",
+          "wave_purity"
+        ],
+        "operating_cases": [
+          "high_rate",
+          "low_rate"
+        ],
+        "analysis_kinds": [
+          "dc_sweep",
+          "distortion",
+          "transient"
+        ],
+        "required_evidence": [
+          "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "c334f6825214b5420e7c48d4db07bee138f9e3f4a9f9ac96602d3e2e78c4a076"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "5563488b58dce996e51bf94d19f13984df654cf51134abb3d8335b3ccf47ac44"
+  },
+  "hash": "8ebb98712fe16336e5fc976d76ed1d9da7b55b0878011684dc21be4a253e70c4"
+}

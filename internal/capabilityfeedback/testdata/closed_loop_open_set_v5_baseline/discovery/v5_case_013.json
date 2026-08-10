@@ -1,0 +1,155 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_013",
+  "requirement_sha256": "d9b3baacf899d1fa5e0f3daa1d1b03043b30b76b265e3b414ae0d93846bf78aa",
+  "normalized_replay_sha256": [
+    "b217173f28ce4b86e1e0b2b6f0c41aeee1a77a2c24147f66cecb7f5ec5938a95",
+    "b217173f28ce4b86e1e0b2b6f0c41aeee1a77a2c24147f66cecb7f5ec5938a95"
+  ],
+  "synthesis_sha256": "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_013",
+      "role": "discovery",
+      "domain": "analog",
+      "safety_impact": "safety_critical"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "ae3f67b34b1f884e400fbc5bcd07d8d44d377b9a54d3509b31ce38ca6a2a140c",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+    "analysis_kinds": [
+      "ac_sweep",
+      "dc_sweep",
+      "electrothermal",
+      "noise",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 233,
+      "generated_graphs": 2794,
+      "complete_graphs": 118,
+      "candidate_simulations": 128,
+      "corner_evaluations": 322,
+      "value_trials": 12,
+      "topology_repairs": 4,
+      "maximum_frontier": 192,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "bandwidth_evidence",
+        "code": "OPERATING_POINT_INVALID",
+        "requirement_ids": [
+          "response_bandwidth"
+        ],
+        "operating_cases": [
+          "frequency_edges/nominal"
+        ],
+        "analysis_kinds": [
+          "ac_sweep"
+        ],
+        "required_evidence": [
+          "bandwidth_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "05b07d3e7a02f8a66f0069cdcf308072dcd81e6bc238f7b8ef2554b9aa49bb38",
+          "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+          "f73b8f13fdee0df52909387f94b1c1792bb9c61433ca9c200ecc9b8cb03c7b5c"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "electrothermal_solver",
+        "code": "SIMULATION_INVALID",
+        "requirement_ids": [
+          "thermal_output_limit"
+        ],
+        "operating_cases": [
+          "balanced_static/nominal"
+        ],
+        "analysis_kinds": [
+          "electrothermal"
+        ],
+        "required_evidence": [
+          "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+          "c4e4c71f4b98e880129846546cb9fdd162ea598c4cabb891fd7b0ea93bc61134"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "output_noise_rms_evidence",
+        "code": "OPERATING_POINT_INVALID",
+        "requirement_ids": [
+          "quiet_difference"
+        ],
+        "operating_cases": [
+          "balanced_static/nominal"
+        ],
+        "analysis_kinds": [
+          "noise"
+        ],
+        "required_evidence": [
+          "output_noise_rms_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "05b07d3e7a02f8a66f0069cdcf308072dcd81e6bc238f7b8ef2554b9aa49bb38",
+          "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+          "f73b8f13fdee0df52909387f94b1c1792bb9c61433ca9c200ecc9b8cb03c7b5c"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "transimpedance_evidence",
+        "code": "OPERATING_POINT_INVALID",
+        "requirement_ids": [
+          "balance_scale"
+        ],
+        "operating_cases": [
+          "balanced_static/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_sweep"
+        ],
+        "required_evidence": [
+          "transimpedance_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "6bfb67b7ce565fa84c3913545b3b8814c3574c234db5dfe95ce63c2671e29c1f",
+          "9b75a2f56bb1a5f352bfd53a9f80e486d51c4f2a1b345a0e5a3276804c592e7a",
+          "a4a462a7bba6f13deb9f22e50af8c30696d3d7980041d8398677ef1cfa4f7b64",
+          "c9ff60d608ac667a5611cfa314594de21f26397c06ce8f511643178fd81d0260"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "896eba42f3b1bad71ea5a84c11b89c7076ef01a5c1b8b2f831e761cd1ea2b183"
+  },
+  "hash": "b6722401f7dbd8e783fab819982aa625057fd9ff63f5bf626289225f66bc9611"
+}

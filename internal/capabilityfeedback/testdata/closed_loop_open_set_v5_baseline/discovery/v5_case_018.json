@@ -1,0 +1,74 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_018",
+  "requirement_sha256": "7f76a9087f223aa57e76e0dd1e01706626a04f30d651d165f794dbd87f8fd0c5",
+  "normalized_replay_sha256": [
+    "44e6b67424459ed71de0fdc0ca24f4519d9a26334848feac95cb6134c2e702b0",
+    "44e6b67424459ed71de0fdc0ca24f4519d9a26334848feac95cb6134c2e702b0"
+  ],
+  "synthesis_sha256": "1b2e7667450b647408f0b60dd38af6c55d89eabb875cf47f8ab681667fab555e",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_018",
+      "role": "discovery",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "038fbc2c482d98756b22746a08934287351acae69499d16af3e9dc17b25bc33f",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "1b2e7667450b647408f0b60dd38af6c55d89eabb875cf47f8ab681667fab555e",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "startup",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 289,
+      "generated_graphs": 7420,
+      "complete_graphs": 8,
+      "candidate_simulations": 128,
+      "corner_evaluations": 1154,
+      "value_trials": 41,
+      "topology_repairs": 16,
+      "maximum_frontier": 810,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "startup_solver",
+        "code": "SIMULATION_INVALID",
+        "requirement_ids": [
+          "readiness_delay"
+        ],
+        "operating_cases": [
+          "activation_sequence/nominal"
+        ],
+        "analysis_kinds": [
+          "startup"
+        ],
+        "required_evidence": [
+          "startup_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "15b86a2874f12e0330ade034dc09dd8ab58aa3ada81e0be288093a8d5e009317",
+          "1b2e7667450b647408f0b60dd38af6c55d89eabb875cf47f8ab681667fab555e"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "d45765e91dd0b4ed983df8c07623793cefb603db4d83d3b227803ae8b28cdef5"
+  },
+  "hash": "43d126efa93fbd28c24d6babac47f688209367045a3bf058cb0a9621d6b5032d"
+}

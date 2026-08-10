@@ -1,0 +1,61 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_010",
+  "requirement_sha256": "a51a142639f187bd2a7ca2d3660d0faf78ade93ce72f8341b2875a5623fe89bf",
+  "normalized_replay_sha256": [
+    "d0ff5cdda230e65ba6b17d6fd90e803589a3c9cfb0ffe44da6e2d028424a1a02",
+    "d0ff5cdda230e65ba6b17d6fd90e803589a3c9cfb0ffe44da6e2d028424a1a02"
+  ],
+  "synthesis_sha256": "d359fb9e3535cbdd475ea434aa9a1f2c62aa355c1cb62c2d2e36da3cc9aeddc8",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_010",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "non_safety"
+    },
+    "outcome": "unsupported",
+    "stop_reason": "value_exhausted",
+    "requirement_hash": "ef254835c228c4080d72a28edc819981aaf571a0f1c8f4406d19906949684782",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "d359fb9e3535cbdd475ea434aa9a1f2c62aa355c1cb62c2d2e36da3cc9aeddc8",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "startup",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 260,
+      "generated_graphs": 3123,
+      "complete_graphs": 28,
+      "candidate_simulations": 0,
+      "corner_evaluations": 0,
+      "value_trials": 0,
+      "topology_repairs": 0,
+      "maximum_frontier": 192,
+      "budget_exhausted": false
+    },
+    "gaps": [
+      {
+        "stage": "value_search",
+        "scope": "component",
+        "capability": "catalog_value_domain",
+        "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "required_evidence": [
+          "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+        ],
+        "evidence_hashes": [
+          "d359fb9e3535cbdd475ea434aa9a1f2c62aa355c1cb62c2d2e36da3cc9aeddc8"
+        ]
+      }
+    ],
+    "hash": "30be132d40f4c609ee1a5cb98ac73fb035a6f1b4f73af20b4ff5d87170753db9"
+  },
+  "hash": "5172644e92e058f3a316fe3c317f9136337fbc176bd033e58e29dca9aa5e12db"
+}

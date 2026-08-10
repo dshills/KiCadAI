@@ -18,29 +18,38 @@ import (
 )
 
 const (
-	closedLoopV5BaselineSchema             = "kicadai.closed-loop-open-set-discovery-baseline.v5"
-	closedLoopV5CaseArtifactSchema         = "kicadai.closed-loop-open-set-discovery-case.v5"
-	closedLoopV5RankingSchema              = "kicadai.closed-loop-open-set-package-ranking.v5"
-	closedLoopV5SelectionSchema            = "kicadai.closed-loop-open-set-selection.v5"
-	closedLoopV5BaselineVersion            = 5
-	closedLoopV5BaselineRoot               = "testdata/closed_loop_open_set_v5_baseline"
-	closedLoopV5BaselineUpdateEnv          = "UPDATE_CLOSED_LOOP_V5_DISCOVERY_BASELINE"
-	closedLoopV5CorpusFreezeCommit         = "82f0b7ce6b704fd3c7ca832f8ad0b194c0e38f8b"
-	closedLoopV5InfrastructureCommit       = "3cf8e3c8df4ea6f2b4898dfd79871d2ca1590314"
-	closedLoopV5SelectionPolicyHash        = "d5d50e3b865ff2629e67f52661c709a3aeeeb297889c6dd2ca67e32a748c57fb"
-	closedLoopV5ImplementationManifestHash = "d06997de15c5afe71853058124f9b30a6afdd018fcf09d3a6da2e7df57d88b28"
-	closedLoopV5ImpactRegistryFileHash     = "c0229f216b3024627992327ddaa90f44df7f3f1f97412d05b22161284d15afa0"
-	closedLoopV5SynthesisPolicyFileHash    = "7e415c9a6b6d30142840c8bd56e598db70b1a2103bc663ccd73df762871cbb66"
-	closedLoopV5GapPolicyFileHash          = "ba73b2db190f48c70b31bc77b7689240df122f73b41e8b63624e540635139aa8"
+	closedLoopV5BaselineSchema              = "kicadai.closed-loop-open-set-discovery-baseline.v5"
+	closedLoopV5CaseArtifactSchema          = "kicadai.closed-loop-open-set-discovery-case.v5"
+	closedLoopV5RankingSchema               = "kicadai.closed-loop-open-set-package-ranking.v5"
+	closedLoopV5SelectionSchema             = "kicadai.closed-loop-open-set-selection.v5"
+	closedLoopV5BaselineVersion             = 5
+	closedLoopV5BaselineRoot                = "testdata/closed_loop_open_set_v5_baseline"
+	closedLoopV5BaselineUpdateEnv           = "UPDATE_CLOSED_LOOP_V5_DISCOVERY_BASELINE"
+	closedLoopV5BaselineVerifyEnv           = "VERIFY_CLOSED_LOOP_V5_DISCOVERY_BASELINE"
+	closedLoopV5CorpusFreezeCommit          = "82f0b7ce6b704fd3c7ca832f8ad0b194c0e38f8b"
+	closedLoopV5InfrastructureCommit        = "3cf8e3c8df4ea6f2b4898dfd79871d2ca1590314"
+	closedLoopV5SelectionFreezeParentCommit = "f61476915f841215b1c5f35d1a3c73345cffbdb1"
+	closedLoopV5SelectionPolicyHash         = "d5d50e3b865ff2629e67f52661c709a3aeeeb297889c6dd2ca67e32a748c57fb"
+	closedLoopV5ImplementationManifestHash  = "d06997de15c5afe71853058124f9b30a6afdd018fcf09d3a6da2e7df57d88b28"
+	closedLoopV5ImpactRegistryFileHash      = "c0229f216b3024627992327ddaa90f44df7f3f1f97412d05b22161284d15afa0"
+	closedLoopV5SynthesisPolicyFileHash     = "7e415c9a6b6d30142840c8bd56e598db70b1a2103bc663ccd73df762871cbb66"
+	closedLoopV5GapPolicyFileHash           = "ba73b2db190f48c70b31bc77b7689240df122f73b41e8b63624e540635139aa8"
+	closedLoopV5BaselineHash                = "2c12965bbe54a44408e963a0e4b732120f4838f69bb5a87ec658d2c00efcbd1b"
+	closedLoopV5RankingHash                 = "8cc41daa115ef4bbf79f6c90423d51a669392244bf87e3c428e6923aec3db406"
+	closedLoopV5GenericPlanHash             = "84363b328225915c60c7cd9ca106a48046247398c1fe4062387bd30b041236f9"
+	closedLoopV5SelectionHash               = "f9083b9e138718761c42d3feacfa42446253bbd2659748d94a77862402c9967d"
 )
 
 type closedLoopV5CaseArtifact struct {
-	Schema                 string                      `json:"schema"`
-	Version                int                         `json:"version"`
-	CaseID                 string                      `json:"case_id"`
-	RequirementSHA256      string                      `json:"requirement_sha256"`
+	Schema            string `json:"schema"`
+	Version           int    `json:"version"`
+	CaseID            string `json:"case_id"`
+	RequirementSHA256 string `json:"requirement_sha256"`
+	// NormalizedReplaySHA256 commits the complete canonical JSON for each
+	// replay. SynthesisSHA256 is the synthesis engine's hashless content
+	// commitment; exact no-write reproduction proves both came from one run.
 	NormalizedReplaySHA256 []string                    `json:"normalized_replay_sha256"`
-	Synthesis              ots.SynthesisRun            `json:"synthesis"`
+	SynthesisSHA256        string                      `json:"synthesis_sha256"`
 	Promotion              *closedLoopV5PromotionProof `json:"promotion,omitempty"`
 	Observation            CaseEvidence                `json:"observation"`
 	Hash                   string                      `json:"hash"`
@@ -122,7 +131,7 @@ func TestClosedLoopV5DiscoveryBaselineIsFrozen(t *testing.T) {
 		t.Fatalf("verify V5 discovery baseline checksums: %v", err)
 	}
 	manifest := loadClosedLoopV5Manifest(t)
-	registry, _ := closedLoopV4Policies(t)
+	registry, _ := closedLoopV5Policies(t)
 	policy := loadClosedLoopV5SelectionPolicy(t)
 	caseArtifacts := loadClosedLoopV5CaseArtifacts(t, manifest)
 	cases := make([]CaseEvidence, len(caseArtifacts))
@@ -155,6 +164,9 @@ func TestClosedLoopV5DiscoveryBaselineIsFrozen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if plan.Hash != closedLoopV5GenericPlanHash {
+		t.Fatal("V5 generic plan differs from the frozen rank-one plan")
+	}
 	assertClosedLoopV5ArtifactEqual(t, "generic_plan.json", plan)
 	selected, err := capabilitypackages.SelectRankOne(candidates, plan, policy)
 	if err != nil {
@@ -176,7 +188,7 @@ func TestUpdateClosedLoopV5DiscoveryBaseline(t *testing.T) {
 		t.Fatal("V5 discovery baseline already exists; refusing overwrite")
 	}
 	manifest := loadClosedLoopV5Manifest(t)
-	registry, synthesisPolicy := closedLoopV4Policies(t)
+	registry, synthesisPolicy := closedLoopV5Policies(t)
 	selectionPolicy := loadClosedLoopV5SelectionPolicy(t)
 	inventory, environment := closedLoopSynthesisEnvironment(t)
 	caseArtifacts := runClosedLoopV5DiscoveryBaseline(t, manifest, synthesisPolicy, inventory, environment)
@@ -199,6 +211,9 @@ func TestUpdateClosedLoopV5DiscoveryBaseline(t *testing.T) {
 	plan, err := capabilitypackages.BuildGenericPlan(candidates[0])
 	if err != nil {
 		t.Fatal(err)
+	}
+	if plan.Hash != closedLoopV5GenericPlanHash {
+		t.Fatal("V5 generic plan differs from the frozen rank-one plan")
 	}
 	selected, err := capabilitypackages.SelectRankOne(candidates, plan, selectionPolicy)
 	if err != nil {
@@ -229,6 +244,60 @@ func TestUpdateClosedLoopV5DiscoveryBaseline(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("V5 discovery baseline selected package scope=%s capability=%s cases=%d domains=%d members=%d", selected.Scope, selected.Capability, len(selected.Cases), len(selected.Domains), len(selected.Members))
+}
+
+func TestReproduceClosedLoopV5DiscoveryBaseline(t *testing.T) {
+	if os.Getenv(closedLoopV5BaselineVerifyEnv) != "1" {
+		t.Skip("set VERIFY_CLOSED_LOOP_V5_DISCOVERY_BASELINE=1 to rerun and reproduce the frozen V5 discovery baseline")
+	}
+	if _, err := os.Stat(closedLoopV5BaselineRoot); err != nil {
+		t.Fatalf("V5 discovery baseline must be frozen before reproduction: %v", err)
+	}
+	manifest := loadClosedLoopV5Manifest(t)
+	registry, synthesisPolicy := closedLoopV5Policies(t)
+	selectionPolicy := loadClosedLoopV5SelectionPolicy(t)
+	inventory, environment := closedLoopSynthesisEnvironment(t)
+	caseArtifacts := runClosedLoopV5DiscoveryBaseline(t, manifest, synthesisPolicy, inventory, environment)
+	refs := make([]closedLoopV5ArtifactRef, len(caseArtifacts))
+	cases := make([]CaseEvidence, len(caseArtifacts))
+	for index, artifact := range caseArtifacts {
+		path := filepath.ToSlash(filepath.Join("discovery", artifact.CaseID+".json"))
+		data := corpusJSON(t, artifact)
+		if !bytes.Equal(data, mustCorpusRead(t, filepath.Join(closedLoopV5BaselineRoot, filepath.FromSlash(path)))) {
+			t.Fatalf("V5 discovery artifact %s did not reproduce", artifact.CaseID)
+		}
+		refs[index] = closedLoopV5ArtifactRef{CaseID: artifact.CaseID, Path: path, SHA256: corpusHash(data)}
+		cases[index] = artifact.Observation
+	}
+	discovery, err := EvaluateRealizabilityAware(RoleDiscovery, cases, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := buildClosedLoopV5BaselineReport(t, discovery, refs)
+	assertClosedLoopV5ArtifactEqual(t, "report.json", report)
+	observations, err := PackageObservations(discovery, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidates, err := capabilitypackages.Build(observations, selectionPolicy)
+	if err != nil || len(candidates) == 0 {
+		t.Fatalf("rebuild V5 capability packages: %v", err)
+	}
+	ranking := buildClosedLoopV5Ranking(t, report.Hash, candidates)
+	assertClosedLoopV5ArtifactEqual(t, "package_ranking.json", ranking)
+	plan, err := capabilitypackages.BuildGenericPlan(candidates[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Hash != closedLoopV5GenericPlanHash {
+		t.Fatal("V5 generic plan differs from the frozen rank-one plan")
+	}
+	assertClosedLoopV5ArtifactEqual(t, "generic_plan.json", plan)
+	selected, err := capabilitypackages.SelectRankOne(candidates, plan, selectionPolicy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertClosedLoopV5ArtifactEqual(t, "selection.json", buildClosedLoopV5Selection(t, report.Hash, ranking.Hash, selected, plan.Hash))
 }
 
 func runClosedLoopV5DiscoveryBaseline(t *testing.T, manifest corpuspublication.Manifest, policy ots.Policy, inventory ots.PrimitiveInventory, environment ots.SimulationEnvironment) []closedLoopV5CaseArtifact {
@@ -265,7 +334,7 @@ func runClosedLoopV5DiscoveryBaseline(t *testing.T, manifest corpuspublication.M
 		if err != nil {
 			t.Fatalf("%s observation failed: %v", entry.ID, err)
 		}
-		artifact := closedLoopV5CaseArtifact{Schema: closedLoopV5CaseArtifactSchema, Version: closedLoopV5BaselineVersion, CaseID: entry.ID, RequirementSHA256: entry.RequirementSHA256, NormalizedReplaySHA256: []string{corpusHash(firstBytes), corpusHash(secondBytes)}, Synthesis: first, Promotion: promotionProof, Observation: evidence}
+		artifact := closedLoopV5CaseArtifact{Schema: closedLoopV5CaseArtifactSchema, Version: closedLoopV5BaselineVersion, CaseID: entry.ID, RequirementSHA256: entry.RequirementSHA256, NormalizedReplaySHA256: []string{corpusHash(firstBytes), corpusHash(secondBytes)}, SynthesisSHA256: first.Hash, Promotion: promotionProof, Observation: evidence}
 		artifact.Hash, err = hashClosedLoopV5CaseArtifact(artifact)
 		if err != nil {
 			t.Fatal(err)
@@ -300,6 +369,29 @@ func loadClosedLoopV5SelectionPolicy(t *testing.T) capabilitypackages.SelectionP
 	return policy
 }
 
+func closedLoopV5Policies(t *testing.T) (capabilityevaluation.ImpactRegistry, ots.Policy) {
+	t.Helper()
+	specRoot := closedLoopSpecDirectory(t)
+	commitments := []struct {
+		name string
+		hash string
+	}{
+		{"V4_IMPACT_REGISTRY.json", closedLoopV5ImpactRegistryFileHash},
+		{"V4_SYNTHESIS_POLICY.json", closedLoopV5SynthesisPolicyFileHash},
+		{"V4_GAP_TRANSITION_POLICY.json", closedLoopV5GapPolicyFileHash},
+		{"V5_IMPLEMENTATION.sha256", closedLoopV5ImplementationManifestHash},
+	}
+	for _, commitment := range commitments {
+		if got := corpusHash(mustCorpusRead(t, filepath.Join(specRoot, commitment.name))); got != commitment.hash {
+			t.Fatalf("V5 inherited policy commitment %s = %s, want %s", commitment.name, got, commitment.hash)
+		}
+	}
+	// V5 deliberately reuses the public V4 impact registry and synthesis
+	// ceilings byte-for-byte. The V5 file commitments above make that reuse
+	// explicit before delegating to the existing strict decoder.
+	return closedLoopV4Policies(t)
+}
+
 func loadClosedLoopV5CaseArtifacts(t *testing.T, manifest corpuspublication.Manifest) []closedLoopV5CaseArtifact {
 	t.Helper()
 	artifacts := make([]closedLoopV5CaseArtifact, 0, closedLoopV5RoleSize)
@@ -310,8 +402,7 @@ func loadClosedLoopV5CaseArtifacts(t *testing.T, manifest corpuspublication.Mani
 		var artifact closedLoopV5CaseArtifact
 		decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV5BaselineRoot, "discovery", entry.ID+".json")), &artifact)
 		expected, err := hashClosedLoopV5CaseArtifact(artifact)
-		synthesisBytes, marshalErr := json.Marshal(artifact.Synthesis)
-		if err != nil || marshalErr != nil || artifact.Hash != expected || artifact.Schema != closedLoopV5CaseArtifactSchema || artifact.Version != closedLoopV5BaselineVersion || artifact.CaseID != entry.ID || artifact.RequirementSHA256 != entry.RequirementSHA256 || len(artifact.NormalizedReplaySHA256) != 2 || artifact.NormalizedReplaySHA256[0] != artifact.NormalizedReplaySHA256[1] || artifact.NormalizedReplaySHA256[0] != corpusHash(synthesisBytes) || artifact.Observation.SynthesisHash != artifact.Synthesis.Hash {
+		if err != nil || artifact.Hash != expected || artifact.Schema != closedLoopV5CaseArtifactSchema || artifact.Version != closedLoopV5BaselineVersion || artifact.CaseID != entry.ID || artifact.RequirementSHA256 != entry.RequirementSHA256 || len(artifact.NormalizedReplaySHA256) != 2 || artifact.NormalizedReplaySHA256[0] != artifact.NormalizedReplaySHA256[1] || !closedLoopV5ValidHash(artifact.NormalizedReplaySHA256[0]) || artifact.Observation.SynthesisHash != artifact.SynthesisSHA256 {
 			t.Fatalf("V5 case artifact %s is invalid", entry.ID)
 		}
 		if artifact.Observation.Outcome == OutcomePass {
@@ -350,11 +441,17 @@ func writeClosedLoopV5CaseArtifacts(root string, artifacts []closedLoopV5CaseArt
 func buildClosedLoopV5BaselineReport(t *testing.T, discovery AggregateReport, refs []closedLoopV5ArtifactRef) closedLoopV5BaselineReport {
 	t.Helper()
 	inventoryHash, catalogHash, modelRegistryHash, synthesisPolicyHash := closedLoopV5EnvironmentBindings(t, discovery.Cases)
-	report := closedLoopV5BaselineReport{Schema: closedLoopV5BaselineSchema, Version: closedLoopV5BaselineVersion, CorpusManifestSHA256: closedLoopV5CorpusManifestHash, CorpusFreezeCommit: closedLoopV5CorpusFreezeCommit, InfrastructureCommit: closedLoopV5InfrastructureCommit, SelectionFreezeParentCommit: closedLoopV5InfrastructureCommit, EvaluatorPolicy: RealizabilityPolicyVersion, ImpactRegistryFileSHA256: closedLoopV5ImpactRegistryFileHash, SynthesisPolicyFileSHA256: closedLoopV5SynthesisPolicyFileHash, GapPolicyFileSHA256: closedLoopV5GapPolicyFileHash, SelectionPolicySHA256: closedLoopV5SelectionPolicyHash, ImplementationManifestSHA256: closedLoopV5ImplementationManifestHash, InventorySHA256: inventoryHash, CatalogSHA256: catalogHash, ModelRegistrySHA256: modelRegistryHash, SynthesisPolicySHA256: synthesisPolicyHash, OutcomeCounts: closedLoopOutcomeCounts(discovery.Cases), CaseArtifacts: refs, Discovery: discovery}
+	report := closedLoopV5BaselineReport{Schema: closedLoopV5BaselineSchema, Version: closedLoopV5BaselineVersion, CorpusManifestSHA256: closedLoopV5CorpusManifestHash, CorpusFreezeCommit: closedLoopV5CorpusFreezeCommit, InfrastructureCommit: closedLoopV5InfrastructureCommit, SelectionFreezeParentCommit: closedLoopV5SelectionFreezeParentCommit, EvaluatorPolicy: RealizabilityPolicyVersion, ImpactRegistryFileSHA256: closedLoopV5ImpactRegistryFileHash, SynthesisPolicyFileSHA256: closedLoopV5SynthesisPolicyFileHash, GapPolicyFileSHA256: closedLoopV5GapPolicyFileHash, SelectionPolicySHA256: closedLoopV5SelectionPolicyHash, ImplementationManifestSHA256: closedLoopV5ImplementationManifestHash, InventorySHA256: inventoryHash, CatalogSHA256: catalogHash, ModelRegistrySHA256: modelRegistryHash, SynthesisPolicySHA256: synthesisPolicyHash, OutcomeCounts: closedLoopOutcomeCounts(discovery.Cases), CaseArtifacts: refs, Discovery: discovery}
 	var err error
 	report.Hash, err = hashClosedLoopV5BaselineReport(report)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// These literal commitments intentionally retire update mode after the
+	// one-time freeze. Reproduction uses the no-write verifier; drift must not
+	// become an invitation to rewrite the baseline or selection.
+	if report.Hash != closedLoopV5BaselineHash {
+		t.Fatal("V5 discovery baseline differs from the frozen baseline")
 	}
 	return report
 }
@@ -367,16 +464,22 @@ func buildClosedLoopV5Ranking(t *testing.T, baselineHash string, candidates []ca
 	if err != nil {
 		t.Fatal(err)
 	}
+	if ranking.Hash != closedLoopV5RankingHash {
+		t.Fatal("V5 package ranking differs from the frozen ranking")
+	}
 	return ranking
 }
 
 func buildClosedLoopV5Selection(t *testing.T, baselineHash, rankingHash string, selected capabilitypackages.Candidate, planHash string) closedLoopV5Selection {
 	t.Helper()
-	selection := closedLoopV5Selection{Schema: closedLoopV5SelectionSchema, Version: closedLoopV5BaselineVersion, StartingCommit: "d8e98b4dee3212823525c5955e8e025bd0039d03", ContractFreezeCommit: "a9249879d5e02575fe047925d613458ffec62030", CorpusFreezeCommit: closedLoopV5CorpusFreezeCommit, InfrastructureCommit: closedLoopV5InfrastructureCommit, SelectionFreezeParentCommit: closedLoopV5InfrastructureCommit, CorpusManifestSHA256: closedLoopV5CorpusManifestHash, BaselineSHA256: baselineHash, RankingSHA256: rankingHash, SelectionPolicySHA256: closedLoopV5SelectionPolicyHash, Selected: selected, GenericPlanSHA256: planHash}
+	selection := closedLoopV5Selection{Schema: closedLoopV5SelectionSchema, Version: closedLoopV5BaselineVersion, StartingCommit: "d8e98b4dee3212823525c5955e8e025bd0039d03", ContractFreezeCommit: "a9249879d5e02575fe047925d613458ffec62030", CorpusFreezeCommit: closedLoopV5CorpusFreezeCommit, InfrastructureCommit: closedLoopV5InfrastructureCommit, SelectionFreezeParentCommit: closedLoopV5SelectionFreezeParentCommit, CorpusManifestSHA256: closedLoopV5CorpusManifestHash, BaselineSHA256: baselineHash, RankingSHA256: rankingHash, SelectionPolicySHA256: closedLoopV5SelectionPolicyHash, Selected: selected, GenericPlanSHA256: planHash}
 	var err error
 	selection.Hash, err = hashClosedLoopV5Selection(selection)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if selection.Hash != closedLoopV5SelectionHash {
+		t.Fatal("V5 rank-one selection differs from the frozen selection")
 	}
 	return selection
 }

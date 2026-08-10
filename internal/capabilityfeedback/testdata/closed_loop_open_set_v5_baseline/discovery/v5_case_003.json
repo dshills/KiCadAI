@@ -1,0 +1,61 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_003",
+  "requirement_sha256": "8136c9f2443e1796f4434cf0b6bb905a45a63a51580f6438f59619697859a02b",
+  "normalized_replay_sha256": [
+    "607c10c4d9c8742b8a94b8da3ca88a41e2e1fce6d3c3b549dfc172aa5beb6eef",
+    "607c10c4d9c8742b8a94b8da3ca88a41e2e1fce6d3c3b549dfc172aa5beb6eef"
+  ],
+  "synthesis_sha256": "7a30408e8478d133e834a142df589dc4bb0ca18df7313cd2a92c4dc03bd18c3f",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_003",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "safety_relevant"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "no_complete_graph",
+    "requirement_hash": "3e89c811865266782840657ab5e82beb9c7ae6e536a869b154ec21c002a69e36",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "7a30408e8478d133e834a142df589dc4bb0ca18df7313cd2a92c4dc03bd18c3f",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "dc_sweep",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 175,
+      "generated_graphs": 8000,
+      "complete_graphs": 0,
+      "candidate_simulations": 0,
+      "corner_evaluations": 0,
+      "value_trials": 0,
+      "topology_repairs": 0,
+      "maximum_frontier": 4626,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "topology_search",
+        "scope": "topology",
+        "capability": "complete_topology",
+        "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+        "required_evidence": [
+          "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "7a30408e8478d133e834a142df589dc4bb0ca18df7313cd2a92c4dc03bd18c3f"
+        ]
+      }
+    ],
+    "hash": "4608de6d5a60464963126dfe3e2c2a064467e6a80a0a19f588f7325e74c71851"
+  },
+  "hash": "d5d47014fe5f69acd4204197462018edcc5d1c66da83f2da47d373f1503bc86c"
+}

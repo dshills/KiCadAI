@@ -1,0 +1,43 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v5",
+  "version": 5,
+  "starting_commit": "d8e98b4dee3212823525c5955e8e025bd0039d03",
+  "contract_freeze_commit": "a9249879d5e02575fe047925d613458ffec62030",
+  "corpus_freeze_commit": "82f0b7ce6b704fd3c7ca832f8ad0b194c0e38f8b",
+  "infrastructure_commit": "3cf8e3c8df4ea6f2b4898dfd79871d2ca1590314",
+  "selection_freeze_parent_commit": "f61476915f841215b1c5f35d1a3c73345cffbdb1",
+  "corpus_manifest_sha256": "d703608d09d7d7bd834bb45698446dd03bb0dbe7b00733b636dd73250cac3f6d",
+  "baseline_sha256": "2c12965bbe54a44408e963a0e4b732120f4838f69bb5a87ec658d2c00efcbd1b",
+  "ranking_sha256": "8cc41daa115ef4bbf79f6c90423d51a669392244bf87e3c428e6923aec3db406",
+  "selection_policy_sha256": "d5d50e3b865ff2629e67f52661c709a3aeeeb297889c6dd2ca67e32a748c57fb",
+  "selected": {
+    "rank": 1,
+    "key": "10:simulation21:electrothermal_solver",
+    "scope": "simulation",
+    "capability": "electrothermal_solver",
+    "cases": [
+      "v5_case_002",
+      "v5_case_008",
+      "v5_case_013"
+    ],
+    "domains": [
+      "analog",
+      "power"
+    ],
+    "safety_weight": 13,
+    "members": [
+      {
+        "key": "10:simulation10:simulation21:electrothermal_solver18:SIMULATION_INVALID",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "electrothermal_solver",
+        "code": "SIMULATION_INVALID"
+      }
+    ],
+    "required_evidence": [
+      "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+    ]
+  },
+  "generic_plan_sha256": "84363b328225915c60c7cd9ca106a48046247398c1fe4062387bd30b041236f9",
+  "hash": "f9083b9e138718761c42d3feacfa42446253bbd2659748d94a77862402c9967d"
+}

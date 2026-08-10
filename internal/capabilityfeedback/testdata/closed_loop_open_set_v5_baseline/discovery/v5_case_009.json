@@ -1,0 +1,107 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_009",
+  "requirement_sha256": "c3418708c28d2904e896f8c1aae0622c8530e18228dab7ba576edcf354d081f9",
+  "normalized_replay_sha256": [
+    "a3c4dd97d680213f82bd57b7ad06b375ad71cceddc247af6dc8a8ae2172bad46",
+    "a3c4dd97d680213f82bd57b7ad06b375ad71cceddc247af6dc8a8ae2172bad46"
+  ],
+  "synthesis_sha256": "f28d8e8f1a4bef0262323c80f0aef456a589e3dfdd08201b859c94bd4e870e8a",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_009",
+      "role": "discovery",
+      "domain": "digital",
+      "safety_impact": "safety_critical"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "0fe35539937f58882f62fb84af880eaedbda032f3d8e53f6fc76cc3aa1946fb9",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "f28d8e8f1a4bef0262323c80f0aef456a589e3dfdd08201b859c94bd4e870e8a",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "dc_sweep",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 388,
+      "generated_graphs": 8000,
+      "complete_graphs": 5,
+      "candidate_simulations": 73,
+      "corner_evaluations": 2024,
+      "value_trials": 32,
+      "topology_repairs": 16,
+      "maximum_frontier": 626,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "hysteresis_evidence",
+        "code": "ASSERTION_BELOW_MINIMUM",
+        "requirement_ids": [
+          "crossing_memory"
+        ],
+        "operating_cases": [
+          "level_sweep/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_sweep"
+        ],
+        "required_evidence": [
+          "hysteresis_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "69f364e22bbf1ca9a7c0997736a630a0cb3607d3153dfb4caf737925894db312",
+          "7e85b58d87f7013a0bb9f4ba9939b76fc634f655e1b8e477b4065838263a8883",
+          "c0e4358525d710257eb83da6839ebe30073aec1b8f9e51711f29750dae0628e1",
+          "dc831e3c35d410a01d6c3283d0fe1be70065686a8fc961fadc3265c6d0f41217",
+          "e7f512070b2fe64dc19d2ed6c1bb98d945b6bbb5dd1fdebc1ec4394f69bcded6",
+          "f28d8e8f1a4bef0262323c80f0aef456a589e3dfdd08201b859c94bd4e870e8a"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "rising_threshold_evidence",
+        "code": "ASSERTION_ABOVE_MAXIMUM",
+        "requirement_ids": [
+          "upper_crossing"
+        ],
+        "operating_cases": [
+          "level_sweep/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_sweep"
+        ],
+        "required_evidence": [
+          "rising_threshold_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "27a6c4e6390f51fc71c9c1b6e9ff788cdf21c568d2de8e2be8e140773ceb2aa7",
+          "aac4ebb2eff1174c51d77a5de7fccb90fe14418ae3a03997d1256acc64d679c1",
+          "df3aa175cf01ebccaa5b7858347852f5dfe9cf536b04c6e61a629434c2e3ab05",
+          "e55c0f5f4d87a5b682664b3f8db6cecc5249be02f017c9fa99e5650f0beb4d59",
+          "e601a82a4fc620a1aac71987bc20e0e69c9d79d718b9b8da5ddff069d0a6920f",
+          "f28d8e8f1a4bef0262323c80f0aef456a589e3dfdd08201b859c94bd4e870e8a"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "97d9217282f28314def5bd7662c7155e62ada0dc82bae8992d5b46af37ae14b3"
+  },
+  "hash": "ad88db4880dbf62dd84df3e1ba59125901703230538eafb7008d012594d8d5f6"
+}

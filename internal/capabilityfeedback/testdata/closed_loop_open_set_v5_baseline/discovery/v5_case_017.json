@@ -1,0 +1,63 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_017",
+  "requirement_sha256": "9af75f798f2a2a79ae655abddc9adc87218466097de87885a7cbdc6f7462ac82",
+  "normalized_replay_sha256": [
+    "cc03ac08fb88ad899a7520fc87afe7f126198f3a3a516d11fe8e8225b0bf1fd7",
+    "cc03ac08fb88ad899a7520fc87afe7f126198f3a3a516d11fe8e8225b0bf1fd7"
+  ],
+  "synthesis_sha256": "e0ac461762817933446eaebca5865436c184f62be53367ce7037e44e8702e1ce",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_017",
+      "role": "discovery",
+      "domain": "sensor",
+      "safety_impact": "non_safety"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "1dce9f6261479b553e1a1f2fd205b320af495de4ca428d698ae05592a2dcf7aa",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "e0ac461762817933446eaebca5865436c184f62be53367ce7037e44e8702e1ce",
+    "analysis_kinds": [
+      "ac_sweep",
+      "dc_operating_point",
+      "dc_sweep",
+      "noise",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 3,
+      "generated_graphs": 42,
+      "complete_graphs": 8,
+      "candidate_simulations": 128,
+      "corner_evaluations": 706,
+      "value_trials": 100,
+      "topology_repairs": 12,
+      "maximum_frontier": 0,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "topology_repair",
+        "scope": "topology",
+        "capability": "causal_topology_repair",
+        "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+        "required_evidence": [
+          "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+        ],
+        "evidence_hashes": [
+          "e0ac461762817933446eaebca5865436c184f62be53367ce7037e44e8702e1ce"
+        ]
+      }
+    ],
+    "hash": "f01c858cd049070d46fd0a5a8b9faee7e41193938a7679d85ade87aa1c946993"
+  },
+  "hash": "05e7e8e3641c0011a1f3b4e5f872c54d3cbb40e3f039d81b83eb3b5671fb3298"
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_004",
+  "requirement_sha256": "45e8d25c23f09825c7bd9a36b2a9198014cff13e5af71de2e15d8d5fdfc7c02d",
+  "normalized_replay_sha256": [
+    "58bbf58487e5fb4f9b025bdaf481329a0f4eb4943d790d49cd337eb82563554b",
+    "58bbf58487e5fb4f9b025bdaf481329a0f4eb4943d790d49cd337eb82563554b"
+  ],
+  "synthesis_sha256": "6d04a858f7e98424dbd7730f5f5fb0b3b49bdebf4219110d6805d319e84bb942",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_004",
+      "role": "discovery",
+      "domain": "mcu",
+      "safety_impact": "review_required"
+    },
+    "outcome": "unsupported",
+    "stop_reason": "no_passing_graph",
+    "requirement_hash": "f7086232242cecf9cc4dc0e8da1fe3255a0a604b088f476697e8c9099b9577b5",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "6d04a858f7e98424dbd7730f5f5fb0b3b49bdebf4219110d6805d319e84bb942",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 116,
+      "generated_graphs": 1345,
+      "complete_graphs": 8,
+      "candidate_simulations": 64,
+      "corner_evaluations": 193,
+      "value_trials": 22,
+      "topology_repairs": 0,
+      "maximum_frontier": 192,
+      "budget_exhausted": false
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "model",
+        "capability": "dc_operating_point_model",
+        "code": "MODEL_UNAVAILABLE",
+        "requirement_ids": [
+          "idle_draw"
+        ],
+        "operating_cases": [
+          "light_loading/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point"
+        ],
+        "required_evidence": [
+          "dc_operating_point_model: reviewed model provenance and applicability bounds"
+        ],
+        "evidence_hashes": [
+          "17d9af01234203d1b3a7a069925392b9f8439dc54c7f250dd8f5a6bec6e95f2c",
+          "6d04a858f7e98424dbd7730f5f5fb0b3b49bdebf4219110d6805d319e84bb942"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "b025aa939d324e3875900e10fdd9a627c2a5cc9e49c0fac56e4879eff2ee99e7"
+  },
+  "hash": "a2ca2c6fc052efb4356dd31f9e7c773b58d129494af69b085f53100c16f31f8f"
+}

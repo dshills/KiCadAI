@@ -1,0 +1,65 @@
+{
+  "schema": "kicadai.closed-loop-open-set-package-plan.v5",
+  "version": 5,
+  "package_key": "10:simulation21:electrothermal_solver",
+  "members": [
+    {
+      "key": "10:simulation10:simulation21:electrothermal_solver18:SIMULATION_INVALID",
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "electrothermal_solver",
+      "code": "SIMULATION_INVALID"
+    }
+  ],
+  "bindings": [
+    {
+      "member_key": "10:simulation10:simulation21:electrothermal_solver18:SIMULATION_INVALID",
+      "need_id": "verification:electrothermal_solver"
+    }
+  ],
+  "expansion_plan": {
+    "schema": "kicadai.capability-expansion-plan.v1",
+    "policy_version": "evidence-driven-capability-expansion-v1",
+    "source_assessment_hash": "4c61e76373d384b28b4d6f8d9b32faece97f8d46a38260cfd3614199cf35f4c7",
+    "source_classification": "unsupported",
+    "domains": [
+      "analog",
+      "power"
+    ],
+    "needs": [
+      {
+        "id": "verification:electrothermal_solver",
+        "capability_id": "electrothermal_solver",
+        "kind": "verification",
+        "requirement_kind": "verification",
+        "stage": "simulation",
+        "gap_codes": [
+          "SIMULATION_INVALID"
+        ],
+        "required_source_kinds": [
+          "engineering_reference",
+          "verification"
+        ],
+        "required_artifact": "verification_manifest",
+        "required_promotion_gates": [
+          "connectivity",
+          "deterministic_replay",
+          "kicad_drc",
+          "kicad_erc",
+          "round_trip_zero_diff",
+          "route_completion",
+          "simulation",
+          "workflow",
+          "writer_correctness"
+        ],
+        "action": "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      }
+    ],
+    "risks": [
+      "candidate evidence remains quarantined until explicit reviewed promotion",
+      "the original unsupported assessment is immutable and requires a fresh run after promotion"
+    ],
+    "hash": "7d42693be2c81d24fbcf3591906bda0528bb5818c09be42904cc798da2946678"
+  },
+  "hash": "84363b328225915c60c7cd9ca106a48046247398c1fe4062387bd30b041236f9"
+}

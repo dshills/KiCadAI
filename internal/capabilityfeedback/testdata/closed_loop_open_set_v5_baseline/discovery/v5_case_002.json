@@ -1,0 +1,136 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-case.v5",
+  "version": 5,
+  "case_id": "v5_case_002",
+  "requirement_sha256": "3bc65a284173c15ecf9a310585c1d17fd4cce21b63385a81303f95d9ce1c8c7d",
+  "normalized_replay_sha256": [
+    "facb257bd788d901033080fbb8702d6a0940bff6c55814e17efe2802996ee2fe",
+    "facb257bd788d901033080fbb8702d6a0940bff6c55814e17efe2802996ee2fe"
+  ],
+  "synthesis_sha256": "5895b1685de1c4997c4796370fe175e31a161857ee980ac03fd1cd1d33b03cd1",
+  "observation": {
+    "schema": "kicadai.closed-loop-capability-case.v1",
+    "policy_version": "closed-loop-capability-policy-v2-realizability",
+    "case": {
+      "id": "v5_case_002",
+      "role": "discovery",
+      "domain": "power",
+      "safety_impact": "safety_critical"
+    },
+    "outcome": "exhausted",
+    "stop_reason": "search_exhausted",
+    "requirement_hash": "385affebcaeca013cbb821fde2755e7b7c91370b546d5bcb82780c725d4830b0",
+    "inventory_hash": "b88b0b3925a8f6b3d099dafbed9a61f8db806223494351b4fc317d8d4d0b0056",
+    "catalog_hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
+    "model_registry_hash": "eda37827d25056f6758cf24be3949099dc55e8286ba95cafe2c3f8fa2ed28180",
+    "synthesis_policy_hash": "4b067326445c90ac125ee5bf61ab7d57d96118806a83e02e7675ea2905038df4",
+    "synthesis_hash": "5895b1685de1c4997c4796370fe175e31a161857ee980ac03fd1cd1d33b03cd1",
+    "analysis_kinds": [
+      "dc_operating_point",
+      "dc_sweep",
+      "electrothermal",
+      "startup",
+      "transient"
+    ],
+    "consumption": {
+      "expanded_states": 31,
+      "generated_graphs": 237,
+      "complete_graphs": 16,
+      "candidate_simulations": 128,
+      "corner_evaluations": 404,
+      "value_trials": 15,
+      "topology_repairs": 7,
+      "maximum_frontier": 187,
+      "budget_exhausted": true
+    },
+    "gaps": [
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "dc_sweep_solver",
+        "code": "SIMULATION_INVALID",
+        "requirement_ids": [
+          "energy_conversion"
+        ],
+        "operating_cases": [
+          "rated_delivery/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_sweep"
+        ],
+        "required_evidence": [
+          "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "5895b1685de1c4997c4796370fe175e31a161857ee980ac03fd1cd1d33b03cd1",
+          "fc1f4cd316fdb7ef11e038a683b3c015b2c315ee5893899776066fc59ff89675"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "electrothermal_solver",
+        "code": "SIMULATION_INVALID",
+        "requirement_ids": [
+          "temperature_bound"
+        ],
+        "operating_cases": [
+          "rated_delivery/nominal"
+        ],
+        "analysis_kinds": [
+          "electrothermal"
+        ],
+        "required_evidence": [
+          "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "24b6adb67c0a5317c05cfce73beacd5e782a22c097ca7a7182c82d0893b98efa",
+          "5895b1685de1c4997c4796370fe175e31a161857ee980ac03fd1cd1d33b03cd1"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      },
+      {
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "output_voltage_evidence",
+        "code": "ASSERTION_BELOW_MINIMUM",
+        "requirement_ids": [
+          "regulated_level"
+        ],
+        "operating_cases": [
+          "rated_delivery/nominal"
+        ],
+        "analysis_kinds": [
+          "dc_operating_point"
+        ],
+        "required_evidence": [
+          "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+        ],
+        "evidence_hashes": [
+          "06cafba3aeb4c27204015d612605ea29f06548f4e93f2c9ce05bfbbdf78f601e",
+          "2e041b12d3c0960d0bbe676ff68123dccd701542d52443bc6dedaad44214d735",
+          "553fbae4032758a914f1a6bbc5edb2508badfce04e3a85ecf305f6e63f7edeac",
+          "5895b1685de1c4997c4796370fe175e31a161857ee980ac03fd1cd1d33b03cd1",
+          "7faa79d1583b28b52c5e19c0c8a02096424326baca4786f69d289158f0a84816",
+          "834f4ac18d8142987f64442c5a8dd8e909628ef7a772431fa3ee6829c473ae02",
+          "9931e41cbca81db96915a85fa383ebe195744e2cfb942917183f5eb8b4837838",
+          "b3486618168a91d23bb44228886da9ffaa4391a279217c2d0e66dd58fb9cc7d9",
+          "d60208fcd86616a147e0c64b0480052566c7f897619c427172b9c74f1d66214d"
+        ],
+        "downstream_symptoms": [
+          "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+        ]
+      }
+    ],
+    "hash": "2e52b8d2a02334f081bd1d7ba5cc83daea6823b050a26f9572488bd7786fa5ec"
+  },
+  "hash": "2383840de2d5073692967caf791027137c954ebde5341adaae647f7452d5b6df"
+}
