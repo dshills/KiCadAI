@@ -116,7 +116,12 @@ implementation workspace, and writes a corpus manifest containing only:
 - aggregate quota/diversity results;
 - discovery plaintext entries;
 - authenticated held-out ciphertext metadata and commitments; and
-- starting, contract, packet, validator, and corpus-freeze commits.
+- starting, contract, packet, validator, and freeze-parent commits.
+
+The manifest cannot contain the hash of the Git commit that contains the
+manifest without a circular commitment. It therefore records the exact parent
+commit. The corpus-freeze commit is defined as the first Git commit containing
+the committed manifest checksum; later protocols bind that derived commit.
 
 The manifest, ciphertext, discovery sources, aggregate audit, and checksums are
 committed atomically. Held-out plaintext, behavior summaries, per-case

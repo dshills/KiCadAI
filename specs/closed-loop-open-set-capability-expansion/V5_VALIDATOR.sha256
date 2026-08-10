@@ -1,4 +1,4 @@
-6ec2984770c705d30fa348749177ebc23b64a2efdf7104e2901f64842d325d6d  specs/closed-loop-open-set-capability-expansion/V5_QUARANTINE_PROTOCOL.md
+ecc92331008fbd6e72930e2ad26cd7906edec9030aba63bb1278bafca94d5c80  specs/closed-loop-open-set-capability-expansion/V5_QUARANTINE_PROTOCOL.md
 0de93fd451ab322d6b0dbaaf1a74cc088e208dce28ea22e6f4513435bc95e700  specs/closed-loop-open-set-capability-expansion/V5_HISTORICAL_COMMITMENTS.json
 004dc3ab1325e34d12190cf0358adb607597f2e7bc8fff44eb412309b63c42b9  specs/closed-loop-open-set-capability-expansion/v5-authoring-packet/PACKET_SET.sha256
 1c9516805ec8fe35928df1c10232798c6957be87ebaed9db04bcb81f026cab0b  specs/closed-loop-open-set-capability-expansion/v5_authoring_packet_test.go
