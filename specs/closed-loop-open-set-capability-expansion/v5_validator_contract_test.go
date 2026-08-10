@@ -33,6 +33,13 @@ func TestVersionFiveOutcomeBlindValidatorIsFrozen(t *testing.T) {
 		"internal/corpusfreeze/history_test.go":                                                 true,
 		"internal/corpusfreeze/output.go":                                                       true,
 		"internal/corpusfreeze/output_test.go":                                                  true,
+		"internal/opentopologysynthesis/model.go":                                               true,
+		"internal/opentopologysynthesis/model_test.go":                                          true,
+		"internal/opentopologysynthesis/decode.go":                                              true,
+		"internal/opentopologysynthesis/normalize.go":                                           true,
+		"internal/opentopologysynthesis/validate.go":                                            true,
+		"internal/reports/issue.go":                                                              true,
+		"internal/reports/diagnostics.go":                                                        true,
 	}
 	got := map[string]bool{}
 	manifestPath := filepath.Join(directory, "V5_VALIDATOR.sha256")

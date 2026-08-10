@@ -13,16 +13,18 @@ const (
 	ReportVersion      = 1
 	PolicyVersion      = "open-topology-policy-v1"
 
-	MaxRequirementBytes = 256 * 1024
-	MaxDomains          = 16
-	MaxPorts            = 24
-	MaxOperatingCases   = 24
-	MaxConditions       = 16
-	MaxEvents           = 16
-	MaxAssertions       = 64
-	MaxComponents       = 32
-	MaxBoardDimensionMM = 500
-	MaxTextBytes        = 4096
+	// These are production RequirementSchema resource limits, independent of
+	// any individual corpus or evaluation protocol version.
+	MaxRequirementBytes  = 256 * 1024
+	MaxDomains           = 16
+	MaxPorts             = 24
+	MaxOperatingCases    = 24
+	MaxConditionsPerCase = 32
+	MaxTotalEvents       = 32
+	MaxAssertions        = 64
+	MaxComponents        = 64
+	MaxBoardDimensionMM  = 500
+	MaxTextBytes         = 4096
 )
 
 const (

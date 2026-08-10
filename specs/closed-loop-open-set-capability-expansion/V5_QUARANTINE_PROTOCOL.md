@@ -72,6 +72,13 @@ go run ./cmd/kicadai-corpus-validate \
 
 The loader verifies both packet checksum layers and requires the exact
 policy-bound packet-set hash before it accepts assignments.
+`V5_VALIDATOR.sha256` also binds the production public-requirement model,
+strict decoder, normalizer, validator, and stable issue representation used by
+the custodian. This dependency binding was added when the operational freeze
+identified that the already-frozen author contract's maxima of 32 conditions,
+32 total events, and 64 components exceeded the production decoder's former
+16, 16, and 32 limits. Production now accepts the committed public bounds; the
+author packet and authored electrical behavior were not changed.
 Each bundle must contain exactly `AUTHORSHIP.json`, the assigned requirement
 files, and only their necessary directories; symlinks, special files, extra
 paths, and missing paths fail closed. On Unix, every untrusted path component

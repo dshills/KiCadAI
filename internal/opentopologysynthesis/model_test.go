@@ -3,6 +3,7 @@ package opentopologysynthesis
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -103,6 +104,160 @@ func TestValidationFailsClosedAndReturnsStableSortedIssues(t *testing.T) {
 	if !bytes.Equal(firstJSON, secondJSON) {
 		t.Fatalf("validation output is nondeterministic:\n%s\n%s", firstJSON, secondJSON)
 	}
+}
+
+func TestPublicRequirementContractUpperBoundsAreAccepted(t *testing.T) {
+	// These literals intentionally remain independent of the production
+	// constants so the committed public contract cannot drift silently.
+	const (
+		publicMaxConditions = 32
+		publicMaxEvents     = 32
+		publicMaxComponents = 64
+	)
+	if MaxConditionsPerCase != publicMaxConditions || MaxTotalEvents != publicMaxEvents || MaxComponents != publicMaxComponents {
+		t.Fatalf("production/public maxima = conditions %d/%d, events %d/%d, components %d/%d",
+			MaxConditionsPerCase, publicMaxConditions, MaxTotalEvents, publicMaxEvents, MaxComponents, publicMaxComponents)
+	}
+
+	data := mustRead(t, filepath.Join(frozenCorpusRoot(), "sensor_conditioner.json"))
+	requirement, issues := DecodeStrict(bytes.NewReader(data))
+	if len(issues) != 0 {
+		t.Fatalf("valid decode issues: %#v", issues)
+	}
+	if len(requirement.Requirements.OperatingCases) == 0 || len(requirement.Requirements.Ports) == 0 || len(requirement.Requirements.Domains) == 0 {
+		t.Fatal("test fixture must contain at least one operating case, port, and domain")
+	}
+	if len(allowedConditionAxes) == 0 {
+		t.Fatal("public contract must expose at least one condition axis")
+	}
+	conditionsPerTarget := len(allowedConditionAxes)
+	requiredTargets := (publicMaxConditions + conditionsPerTarget - 1) / conditionsPerTarget
+	targets := make([]string, 0, len(requirement.Requirements.Domains)+len(requirement.Requirements.Ports))
+	seenTargets := map[string]bool{}
+	addTarget := func(id string) bool {
+		if seenTargets[id] {
+			return false
+		}
+		targets = append(targets, id)
+		seenTargets[id] = true
+		return true
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		addTarget(domain.ID)
+	}
+	for _, port := range requirement.Requirements.Ports {
+		addTarget(port.ID)
+	}
+	for index := 0; len(targets) < requiredTargets && len(requirement.Requirements.Domains) < MaxDomains; index++ {
+		id := fmt.Sprintf("boundary_domain_%02d", index)
+		if addTarget(id) {
+			requirement.Requirements.Domains = append(requirement.Requirements.Domains, Domain{
+				ID:     id,
+				Kind:   "supply",
+				Source: "external",
+			})
+		}
+	}
+	for index := 0; len(targets) < requiredTargets && len(requirement.Requirements.Ports) < MaxPorts; index++ {
+		id := fmt.Sprintf("boundary_port_%02d", index)
+		if addTarget(id) {
+			requirement.Requirements.Ports = append(requirement.Requirements.Ports, Port{
+				ID:        id,
+				Kind:      "analog_voltage",
+				Direction: "sink",
+				Domain:    requirement.Requirements.Domains[0].ID,
+			})
+		}
+	}
+	if len(targets) < requiredTargets {
+		t.Fatalf("public limits expose %d unique condition targets, want %d", len(targets), requiredTargets)
+	}
+	conditions := make([]OperatingCondition, 0, publicMaxConditions)
+	for index := 0; index < publicMaxConditions; index++ {
+		conditions = append(conditions, OperatingCondition{
+			Axis:   allowedConditionAxes[index%conditionsPerTarget],
+			Target: targets[index/conditionsPerTarget],
+			Min:    0,
+			Max:    1,
+			Unit:   "V",
+		})
+	}
+	for index := range requirement.Requirements.OperatingCases {
+		requirement.Requirements.OperatingCases[index].Events = nil
+	}
+	events := make([]OperatingEvent, 0, publicMaxEvents)
+	for index := 0; index < publicMaxEvents; index++ {
+		events = append(events, OperatingEvent{
+			ID:           fmt.Sprintf("boundary_event_%02d", index),
+			Kind:         "input_step",
+			Target:       requirement.Requirements.Ports[0].ID,
+			TriggerTimeS: float64(index),
+			Initial:      0,
+			Applied:      1,
+			Unit:         "V",
+		})
+	}
+	requirement.Requirements.OperatingCases[0].Conditions = conditions
+	requirement.Requirements.OperatingCases[0].Events = events
+	// Open-topology requirements declare a component-count constraint; concrete
+	// components do not exist until synthesis constructs a candidate graph.
+	requirement.Requirements.Constraints.MaxComponents = publicMaxComponents
+
+	if issues := Validate(requirement); len(issues) != 0 {
+		t.Fatalf("public contract upper bounds rejected: %#v", issues)
+	}
+	deepCopy := func(t *testing.T, source Requirement) Requirement {
+		t.Helper()
+		data, err := json.Marshal(source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var candidate Requirement
+		if err := json.Unmarshal(data, &candidate); err != nil {
+			t.Fatal(err)
+		}
+		return candidate
+	}
+
+	assertRejected := func(t *testing.T, candidate Requirement, path string) {
+		t.Helper()
+		for _, issue := range Validate(candidate) {
+			if issue.Path == path {
+				return
+			}
+		}
+		t.Fatalf("missing rejection at %q", path)
+	}
+
+	t.Run("conditions", func(t *testing.T) {
+		candidate := deepCopy(t, requirement)
+		candidate.Requirements.OperatingCases[0].Conditions = append(
+			candidate.Requirements.OperatingCases[0].Conditions,
+			candidate.Requirements.OperatingCases[0].Conditions[0],
+		)
+		assertRejected(t, candidate, "requirements.operating_cases[0].conditions")
+	})
+	t.Run("events", func(t *testing.T) {
+		candidate := deepCopy(t, requirement)
+		candidate.Requirements.OperatingCases[0].Events = append(
+			candidate.Requirements.OperatingCases[0].Events,
+			OperatingEvent{
+				ID:           "boundary_event_over_limit",
+				Kind:         "input_step",
+				Target:       candidate.Requirements.Ports[0].ID,
+				TriggerTimeS: 1,
+				Initial:      0,
+				Applied:      1,
+				Unit:         "V",
+			},
+		)
+		assertRejected(t, candidate, "requirements.operating_cases")
+	})
+	t.Run("components", func(t *testing.T) {
+		candidate := deepCopy(t, requirement)
+		candidate.Requirements.Constraints.MaxComponents++
+		assertRejected(t, candidate, "requirements.constraints.max_components")
+	})
 }
 
 func TestPolicyAndReportContractsAreDeterministic(t *testing.T) {

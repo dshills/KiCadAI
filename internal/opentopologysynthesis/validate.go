@@ -256,8 +256,8 @@ func (validator *requirementValidator) validateCases() {
 			validator.add(path+".id", "operating-case ID must be unique")
 		}
 		validator.cases[operatingCase.ID] = operatingCase
-		if len(operatingCase.Conditions) == 0 || len(operatingCase.Conditions) > MaxConditions {
-			validator.add(path+".conditions", fmt.Sprintf("condition count must be between 1 and %d", MaxConditions))
+		if len(operatingCase.Conditions) == 0 || len(operatingCase.Conditions) > MaxConditionsPerCase {
+			validator.add(path+".conditions", fmt.Sprintf("condition count must be between 1 and %d", MaxConditionsPerCase))
 		}
 		seenConditions := map[string]bool{}
 		for conditionIndex, condition := range operatingCase.Conditions {
@@ -306,8 +306,10 @@ func (validator *requirementValidator) validateCases() {
 			}
 		}
 	}
-	if eventCount > MaxEvents {
-		validator.add("requirements.operating_cases", fmt.Sprintf("total event count exceeds %d", MaxEvents))
+	if eventCount > MaxTotalEvents {
+		// The limit is aggregate across every case, so the diagnostic belongs
+		// to the operating-case collection rather than one case's events.
+		validator.add("requirements.operating_cases", fmt.Sprintf("total event count exceeds %d", MaxTotalEvents))
 	}
 }
 
