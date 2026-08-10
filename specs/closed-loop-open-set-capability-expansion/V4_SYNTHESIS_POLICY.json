@@ -1,0 +1,12 @@
+{
+  "max_expanded_states": 4000,
+  "max_generated_graphs": 8000,
+  "max_primitive_instances": 24,
+  "max_internal_nodes": 24,
+  "max_candidate_simulations": 128,
+  "max_corner_evaluations": 2048,
+  "max_value_trials": 128,
+  "max_topology_repairs": 16,
+  "max_retained_candidates": 8,
+  "max_diagnostic_samples": 32
+}

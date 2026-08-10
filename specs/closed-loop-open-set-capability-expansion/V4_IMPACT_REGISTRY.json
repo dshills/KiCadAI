@@ -1,0 +1,41 @@
+{
+  "version": "closed-loop-open-set-impact-v2-realizability",
+  "records": [
+    {
+      "capability": "catalog_value_domain",
+      "consumers": ["passing_behavioral_evidence", "physical_realization"]
+    },
+    {
+      "capability": "complete_topology",
+      "consumers": ["passing_behavioral_evidence", "physical_realization"]
+    },
+    {
+      "capability": "energy_domain_creation",
+      "consumers": ["complete_topology", "passing_behavioral_evidence", "physical_realization"]
+    },
+    {
+      "capability": "multi_obligation_composition",
+      "consumers": ["complete_topology", "passing_behavioral_evidence", "physical_realization"]
+    },
+    {
+      "capability": "passing_behavioral_evidence",
+      "consumers": ["physical_realization"]
+    },
+    {
+      "capability": "physical_realization",
+      "consumers": ["route_completion"]
+    },
+    {
+      "capability": "primitive_inventory",
+      "consumers": ["catalog_value_domain", "physical_realization", "trusted_simulation_model"]
+    },
+    {
+      "capability": "route_completion",
+      "consumers": ["installed_kicad_verification", "round_trip_fidelity"]
+    },
+    {
+      "capability": "trusted_simulation_model",
+      "consumers": ["passing_behavioral_evidence"]
+    }
+  ]
+}

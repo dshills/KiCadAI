@@ -1,0 +1,15 @@
+{
+  "schema": "closed-loop-gap-transition-policy",
+  "version": "closed-loop-gap-transition-v1",
+  "selected_cluster_identity_fields": ["stage", "scope", "capability", "code"],
+  "gap_identity_fields": ["stage", "scope", "capability", "code", "required_evidence"],
+  "required_evidence_normalization": "sorted_unique_bytewise",
+  "identity_encoding": "decimal_utf8_byte_length_delimited",
+  "relation": "baseline_nonselected_subset_of_final",
+  "allow_new_final_gaps": true,
+  "require_exact_case_set": true,
+  "require_unique_case_ids": true,
+  "baseline_pass_must_remain_pass": true,
+  "baseline_unsafe_must_not_become_pass": true,
+  "final_pass_requires_external_promotion_gates": true
+}
