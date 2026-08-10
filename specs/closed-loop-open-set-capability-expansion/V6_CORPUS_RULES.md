@@ -13,8 +13,8 @@ The corpus contains exactly 36 behavior-only requirements:
 - exactly one discovery and one held-out requirement per domain per author.
 
 Authors receive disjoint ID, source-ID, and stable-path allocations covering
-`v6_case_001` through `v6_case_036`. IDs and source IDs appear only in the
-manifest and authorship records, never in requirement bodies.
+the complete 36-entry corpus. Concrete IDs and source IDs appear only in
+assignments, the manifest, and authorship records, never in requirement bodies.
 
 ## Isolation
 

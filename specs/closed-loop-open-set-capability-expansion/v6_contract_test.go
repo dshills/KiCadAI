@@ -19,7 +19,7 @@ const (
 	v6StartingCommit        = "9b6f8be61006f7de179099feb0b38080ff18ecb3"
 	v6SpecHash              = "eef26a916f633d897c5b966f809c5a8b8f06feae755ea0365305840ac4adf294"
 	v6PlanHash              = "12d7112c564407ffda15944d131b5996b3b48e98a4be1eeb1f44b6e57d42b488"
-	v6CorpusRulesHash       = "c0b47dd7c6b13c898f5e223f1e452aaa17d9dad52e1b9586ac7ae1115ad2cbcb"
+	v6CorpusRulesHash       = "2537aefdd2835d8f3795cd165316137e7b6ba99a197d7cb2b5e7c295b52a0159"
 	v6BaselineProtocolHash  = "67d4ce8d2c6c5abc07cd9f26646cdbab24261406bf57f5a718fa641f7fa505a7"
 	v6SelectionPolicyHash   = "1d82387013cccff736b33b497194586254c25a395db97d25d923abf1b658e2f3"
 	v6ModelHash             = "ab5ad9d83d11797a7e3f43b5293aac55aacf5454b130d316384b9cd981f37466"
