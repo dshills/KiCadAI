@@ -115,7 +115,7 @@ func TestRequirementRealizabilityIntersectsSharedDomainSupplyConditions(t *testi
 	}
 }
 
-func TestRequirementRealizabilityClassifiesIndependentObligationGraphs(t *testing.T) {
+func TestRequirementRealizabilityLeavesComposableOutputsAndClassifiesIndependentControls(t *testing.T) {
 	multiOutput := realizabilityTestRequirement()
 	multiOutput.Requirements.Ports = append(multiOutput.Requirements.Ports, Port{
 		ID: "secondary_out", Kind: "digital", Direction: "source", Domain: "reference",
@@ -127,7 +127,7 @@ func TestRequirementRealizabilityClassifiesIndependentObligationGraphs(t *testin
 		Unit: "V", OperatingCases: []string{"nominal"},
 	})
 	assessment := AssessRequirementRealizability(multiOutput)
-	if findingWithCode(assessment.Findings, CodeMultiOutputCompositionRequired) == nil ||
+	if findingWithCode(assessment.Findings, CodeMultiOutputCompositionRequired) != nil ||
 		findingWithCode(assessment.Findings, CodeMultiControlCompositionRequired) != nil {
 		t.Fatalf("multi-output assessment = %#v", assessment)
 	}

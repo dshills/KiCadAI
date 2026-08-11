@@ -48,6 +48,16 @@ func (frontier *topologyFrontier) Pop() any {
 }
 
 func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inventory PrimitiveInventory, policy Policy) TopologySearchResult {
+	return searchPrimitiveTopologies(ctx, requirement, inventory, policy, true)
+}
+
+func searchPrimitiveTopologies(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	policy Policy,
+	allowMultiOutputComposition bool,
+) TopologySearchResult {
 	result := TopologySearchResult{
 		Schema:        TopologySearchSchema,
 		Version:       TopologySearchVersion,
@@ -127,6 +137,42 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
 			compareTopologyCandidates(candidate, existing) < 0 {
 			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	if allowMultiOutputComposition {
+		compositionCandidates, compositionConsumption, compositionRejections := topologyMultiOutputCompositionSeeds(
+			ctx,
+			requirement,
+			inventory,
+			representatives,
+			inventoryByKey,
+			limits,
+			result.Policy,
+			initialState,
+		)
+		addSearchConsumption(&result.Consumption, compositionConsumption)
+		for code, samples := range compositionRejections {
+			rejections[code] = append(rejections[code], samples...)
+		}
+		for _, candidate := range compositionCandidates {
+			if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+				compareTopologyCandidates(candidate, existing) < 0 {
+				retainedTopology[candidate.TopologyHash] = candidate
+			}
+		}
+		if len(compositionCandidates) != 0 {
+			// The full-requirement declarative provider runs before composition,
+			// so native multi-output primitives already compete with these
+			// candidates. Each obligation subsearch also runs every single-output
+			// relationship and fallback lane. Repeating those lanes against the
+			// parent can only build one output cone and leave another output
+			// incomplete; a successful merge is therefore the bounded-search
+			// completion point, not a shortcut around an unexplored provider.
+			combined := make([]TopologyCandidate, 0, len(retainedTopology))
+			for _, candidate := range retainedTopology {
+				combined = append(combined, candidate)
+			}
+			return finalizeComposedTopologySearchResult(result, combined, rejections)
 		}
 	}
 	relationshipCandidates, relationshipConsumption, relationshipRejections := topologyRelationshipSeeds(
@@ -495,18 +541,100 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		frontier = &topologyFrontier{}
 	}
 
+	searchStatus, searchIssues := exploreTopologyFrontier(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		frontier,
+		visited,
+		dominantTopology,
+		retainedTopology,
+		rejections,
+		&result.Consumption,
+	)
+	if searchStatus != "" {
+		result.Status = searchStatus
+		result.Issues = searchIssues
+	}
+
+	candidates := make([]TopologyCandidate, 0, len(retainedTopology))
+	for _, candidate := range retainedTopology {
+		candidates = append(candidates, candidate)
+	}
+	result.Candidates = finalizeTopologyCandidates(
+		candidates,
+		result.Policy.MaxRetainedCandidates,
+		rejections,
+	)
+	result.Rejections = normalizeSearchRejections(rejections)
+	if len(result.Candidates) != 0 {
+		result.Status = TopologySearchCandidates
+		result.Issues = nil
+	} else if result.Status != TopologySearchCanceled &&
+		(result.Consumption.GeneratedGraphs >= result.Policy.MaxGeneratedGraphs ||
+			result.Consumption.ExpandedStates >= result.Policy.MaxExpandedStates) {
+		result.Status = TopologySearchExhausted
+		result.Consumption.BudgetExhausted = true
+		result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
+	} else if result.Status != TopologySearchCanceled && result.Status != TopologySearchExhausted {
+		result.Status = TopologySearchExhausted
+		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "search", "bounded search produced no complete primitive graph", "increase the explicit graph budget or onboard a compatible primitive")}
+	}
+	return result
+}
+
+func finalizeTopologyCandidates(
+	candidates []TopologyCandidate,
+	maxRetainedCandidates int,
+	rejections map[string][]string,
+) []TopologyCandidate {
+	result := make([]TopologyCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		activeHash, err := ActiveStructureHash(candidate.Graph)
+		if err != nil {
+			rejections["active_structure_hash_failed"] = append(
+				rejections["active_structure_hash_failed"],
+				candidate.TopologyHash+":"+err.Error(),
+			)
+			continue
+		}
+		candidate.ActiveStructureHash = activeHash
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	if len(result) > maxRetainedCandidates {
+		result = selectDiverseTopologyCandidates(result, maxRetainedCandidates)
+	}
+	return result
+}
+
+func exploreTopologyFrontier(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	frontier *topologyFrontier,
+	visited map[string]bool,
+	dominantTopology map[string]topologySearchState,
+	retainedTopology map[string]TopologyCandidate,
+	rejections map[string][]string,
+	consumption *Consumption,
+) (TopologySearchStatus, []reports.Issue) {
 	for frontier.Len() != 0 {
 		if err := ctx.Err(); err != nil {
-			result.Status = TopologySearchCanceled
-			result.Issues = []reports.Issue{graphIssue(CodeCanceled, "search", "open-topology search canceled", "retry with an active context")}
-			break
+			return TopologySearchCanceled, []reports.Issue{graphIssue(CodeCanceled, "search", "open-topology search canceled", "retry with an active context")}
 		}
-		if result.Consumption.ExpandedStates >= result.Policy.MaxExpandedStates ||
-			result.Consumption.GeneratedGraphs >= result.Policy.MaxGeneratedGraphs {
-			result.Status = TopologySearchExhausted
-			result.Consumption.BudgetExhausted = true
-			result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
-			break
+		if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			consumption.BudgetExhausted = true
+			return TopologySearchExhausted, []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
 		}
 		state := heap.Pop(frontier).(topologySearchState)
 		if dominant, found := dominantTopology[state.topology]; found && dominant.hash != state.hash {
@@ -516,10 +644,8 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 			)
 			continue
 		}
-		result.Consumption.ExpandedStates++
-		if frontier.Len() > result.Consumption.MaximumFrontier {
-			result.Consumption.MaximumFrontier = frontier.Len()
-		}
+		consumption.ExpandedStates++
+		consumption.MaximumFrontier = max(consumption.MaximumFrontier, frontier.Len())
 
 		completeIssues := ValidateCompleteGraph(state.graph, inventory, limits)
 		if len(completeIssues) == 0 && len(state.graph.Instances) != 0 && state.score.BehaviorGap == 0 {
@@ -531,7 +657,7 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 				if normalizeErr != nil {
 					rejections["canonical_normalization_failed"] = append(rejections["canonical_normalization_failed"], state.hash)
 				} else {
-					result.Consumption.CompleteGraphs++
+					consumption.CompleteGraphs++
 					candidate := TopologyCandidate{
 						Fingerprint:  state.hash,
 						TopologyHash: topologyHash,
@@ -554,12 +680,17 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		if len(state.graph.Instances) >= limits.MaxPrimitiveInstances {
 			continue
 		}
-		remainingGraphs := result.Policy.MaxGeneratedGraphs - result.Consumption.GeneratedGraphs
+		remainingGraphs := policy.MaxGeneratedGraphs - consumption.GeneratedGraphs
 		expansions, generatedGraphs := expandTopologyState(
-			state, representatives, limits, requirement, inventory, inventoryByKey,
+			state,
+			representatives,
+			limits,
+			requirement,
+			inventory,
+			inventoryByKey,
 			remainingGraphs,
 		)
-		result.Consumption.GeneratedGraphs += generatedGraphs
+		consumption.GeneratedGraphs += generatedGraphs
 		for _, expansion := range expansions {
 			hash, hashErr := GraphHash(expansion.graph)
 			if hashErr != nil {
@@ -595,59 +726,18 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 			}
 			dominantTopology[topologyHash] = expansion
 			if len(expansion.operations) != 0 {
-				last := len(expansion.operations) - 1
-				expansion.operations[last].AfterHash = hash
+				expansion.operations[len(expansion.operations)-1].AfterHash = hash
 			}
 			heap.Push(frontier, expansion)
-			if frontier.Len() > result.Consumption.MaximumFrontier {
-				result.Consumption.MaximumFrontier = frontier.Len()
-			}
+			consumption.MaximumFrontier = max(consumption.MaximumFrontier, frontier.Len())
 		}
 
-		if len(retainedTopology) >= result.Policy.MaxRetainedCandidates &&
-			result.Consumption.ExpandedStates >= minPositive(result.Policy.MaxRetainedCandidates*8, result.Policy.MaxExpandedStates) {
+		if len(retainedTopology) >= policy.MaxRetainedCandidates &&
+			consumption.ExpandedStates >= minPositive(policy.MaxRetainedCandidates*8, policy.MaxExpandedStates) {
 			break
 		}
 	}
-
-	for topologyHash, candidate := range retainedTopology {
-		activeHash, err := ActiveStructureHash(candidate.Graph)
-		if err != nil {
-			rejections["active_structure_hash_failed"] = append(
-				rejections["active_structure_hash_failed"], topologyHash+":"+err.Error(),
-			)
-			delete(retainedTopology, topologyHash)
-			continue
-		}
-		candidate.ActiveStructureHash = activeHash
-		retainedTopology[topologyHash] = candidate
-	}
-	result.Candidates = make([]TopologyCandidate, 0, len(retainedTopology))
-	for _, candidate := range retainedTopology {
-		result.Candidates = append(result.Candidates, candidate)
-	}
-	slices.SortFunc(result.Candidates, compareTopologyCandidates)
-	if len(result.Candidates) > result.Policy.MaxRetainedCandidates {
-		result.Candidates = selectDiverseTopologyCandidates(
-			result.Candidates,
-			result.Policy.MaxRetainedCandidates,
-		)
-	}
-	result.Rejections = normalizeSearchRejections(rejections)
-	if len(result.Candidates) != 0 {
-		result.Status = TopologySearchCandidates
-		result.Issues = nil
-	} else if result.Status != TopologySearchCanceled &&
-		(result.Consumption.GeneratedGraphs >= result.Policy.MaxGeneratedGraphs ||
-			result.Consumption.ExpandedStates >= result.Policy.MaxExpandedStates) {
-		result.Status = TopologySearchExhausted
-		result.Consumption.BudgetExhausted = true
-		result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
-	} else if result.Status != TopologySearchCanceled && result.Status != TopologySearchExhausted {
-		result.Status = TopologySearchExhausted
-		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "search", "bounded search produced no complete primitive graph", "increase the explicit graph budget or onboard a compatible primitive")}
-	}
-	return result
+	return "", nil
 }
 
 // topologyFrequencySelectiveRelationshipSeeds recognizes a bounded rejection

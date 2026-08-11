@@ -244,18 +244,6 @@ func requirementObligationFindings(
 	}
 
 	findings := []RequirementRealizabilityFinding{}
-	if len(byOutput) > 1 {
-		finding := RequirementRealizabilityFinding{
-			Code:       CodeMultiOutputCompositionRequired,
-			Path:       "requirements.behavioral_requirements",
-			Message:    fmt.Sprintf("behavior contract contains assertions for %d distinct source outputs", len(byOutput)),
-			Suggestion: "compose and prove every independent output obligation in one complete causal topology",
-		}
-		for _, assertions := range byOutput {
-			appendAssertionFindingEvidence(&finding, assertions)
-		}
-		findings = append(findings, finding)
-	}
 	for outputID, controls := range controlsByOutput {
 		if len(controls) < 2 {
 			continue
