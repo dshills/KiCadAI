@@ -1,0 +1,117 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v6",
+  "version": 6,
+  "starting_commit": "9b6f8be61006f7de179099feb0b38080ff18ecb3",
+  "contract_freeze_commit": "0d0350f4542a6f7f97b813331d228cac969767cd",
+  "corpus_freeze_commit": "209c84ca1d7a0b65beca74f3aa2c46a1fe95bed9",
+  "infrastructure_commit": "e07c423ae36cd969e7aa199304299e6c6eae3632",
+  "selection_freeze_parent_commit": "e07c423ae36cd969e7aa199304299e6c6eae3632",
+  "corpus_manifest_sha256": "0445db99a32b5d62e8fc897d532e994fe85ff072aceba294733183d06f6b685a",
+  "baseline_sha256": "4183ad9ba2759ddb1f1d6dd8585d2afed45573ab42e1c41e69b16d347a3e56a5",
+  "ranking_sha256": "6d2c5c79d4e99e181a181460aff9dc0b54d86a141c360e868ba451031fcc6d50",
+  "selection_policy_sha256": "1d82387013cccff736b33b497194586254c25a395db97d25d923abf1b658e2f3",
+  "selected": {
+    "rank": 1,
+    "key": "39:10:simulation23:output_voltage_evidence30:8:topology17:complete_topology41:8:topology28:multi_obligation_composition34:9:component20:catalog_value_domain",
+    "atoms": [
+      {
+        "key": "10:simulation23:output_voltage_evidence",
+        "scope": "simulation",
+        "capability": "output_voltage_evidence",
+        "cases": [
+          "v6_case_008",
+          "v6_case_014"
+        ],
+        "case_support": 2
+      },
+      {
+        "key": "8:topology17:complete_topology",
+        "scope": "topology",
+        "capability": "complete_topology",
+        "cases": [
+          "v6_case_002",
+          "v6_case_003",
+          "v6_case_005"
+        ],
+        "case_support": 3
+      },
+      {
+        "key": "8:topology28:multi_obligation_composition",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "cases": [
+          "v6_case_004",
+          "v6_case_013"
+        ],
+        "case_support": 2
+      },
+      {
+        "key": "9:component20:catalog_value_domain",
+        "scope": "component",
+        "capability": "catalog_value_domain",
+        "cases": [
+          "v6_case_002",
+          "v6_case_010",
+          "v6_case_015"
+        ],
+        "case_support": 3
+      }
+    ],
+    "members": [
+      {
+        "key": "10:simulation10:simulation23:output_voltage_evidence23:ASSERTION_BELOW_MINIMUM",
+        "stage": "simulation",
+        "scope": "simulation",
+        "capability": "output_voltage_evidence",
+        "code": "ASSERTION_BELOW_MINIMUM"
+      },
+      {
+        "key": "12:value_search9:component20:catalog_value_domain29:OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+        "stage": "value_search",
+        "scope": "component",
+        "capability": "catalog_value_domain",
+        "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED"
+      },
+      {
+        "key": "15:topology_search8:topology17:complete_topology30:OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+        "stage": "topology_search",
+        "scope": "topology",
+        "capability": "complete_topology",
+        "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED"
+      },
+      {
+        "key": "25:requirement_realizability8:topology28:multi_obligation_composition47:OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED",
+        "stage": "requirement_realizability",
+        "scope": "topology",
+        "capability": "multi_obligation_composition",
+        "code": "OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED"
+      }
+    ],
+    "unlocked_cases": [
+      "v6_case_003",
+      "v6_case_004",
+      "v6_case_005",
+      "v6_case_008",
+      "v6_case_010",
+      "v6_case_013",
+      "v6_case_015"
+    ],
+    "reporting_domains": [
+      "analog",
+      "digital",
+      "mcu",
+      "power",
+      "sensor"
+    ],
+    "safety_weight": 18,
+    "required_evidence": [
+      "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence",
+      "complete_topology: reviewed reusable topology construction and complete-graph evidence",
+      "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence",
+      "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+    ],
+    "eligible": true
+  },
+  "generic_plan_sha256": "7da60ccc693eaef1457f48ff77000c30e91896d3665a9d780181fdc6917062bc",
+  "hash": "9f1a9f8120d81b9c09a75dea382b6fcf6b94b15f620c05b37beb25217efab13b"
+}

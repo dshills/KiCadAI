@@ -39,11 +39,11 @@ const (
 	// These are populated exactly once in the selection-freeze commit. Their
 	// empty infrastructure values make an accidentally published baseline fail
 	// closed until its exact bytes have been reviewed and frozen.
-	closedLoopV6InfrastructureCommit = ""
-	closedLoopV6BaselineHash         = ""
-	closedLoopV6RankingHash          = ""
-	closedLoopV6GenericPlanHash      = ""
-	closedLoopV6SelectionHash        = ""
+	closedLoopV6InfrastructureCommit = "e07c423ae36cd969e7aa199304299e6c6eae3632"
+	closedLoopV6BaselineHash         = "4183ad9ba2759ddb1f1d6dd8585d2afed45573ab42e1c41e69b16d347a3e56a5"
+	closedLoopV6RankingHash          = "6d2c5c79d4e99e181a181460aff9dc0b54d86a141c360e868ba451031fcc6d50"
+	closedLoopV6GenericPlanHash      = "7da60ccc693eaef1457f48ff77000c30e91896d3665a9d780181fdc6917062bc"
+	closedLoopV6SelectionHash        = "9f1a9f8120d81b9c09a75dea382b6fcf6b94b15f620c05b37beb25217efab13b"
 )
 
 type closedLoopV6CaseArtifact struct {
@@ -372,7 +372,17 @@ func buildClosedLoopV6GenericPlan(t *testing.T, selected capabilitybundles.Candi
 	steps := make([]closedLoopV6PlanStep, len(selected.Members))
 	for index, member := range selected.Members {
 		memberKeys[index] = member.Key
-		steps[index] = closedLoopV6PlanStep{Order: index + 1, MemberKey: member.Key, Stage: member.Stage, Scope: member.Scope, Capability: member.Capability, Code: member.Code, RequiredEvidence: append([]string(nil), selected.RequiredEvidence...)}
+		var memberEvidence []string
+		prefix := member.Capability + ":"
+		for _, evidence := range selected.RequiredEvidence {
+			if strings.HasPrefix(evidence, prefix) {
+				memberEvidence = append(memberEvidence, evidence)
+			}
+		}
+		if len(memberEvidence) == 0 {
+			t.Fatalf("V6 generic-plan member %s has no capability-specific evidence", member.Key)
+		}
+		steps[index] = closedLoopV6PlanStep{Order: index + 1, MemberKey: member.Key, Stage: member.Stage, Scope: member.Scope, Capability: member.Capability, Code: member.Code, RequiredEvidence: memberEvidence}
 	}
 	plan := closedLoopV6GenericPlan{Schema: closedLoopV6GenericPlanSchema, Version: closedLoopV6BaselineVersion, BundleKey: selected.Key, Admission: capabilitybundles.PlanEvidence{Executable: true, AtomKeys: atomKeys, MemberKeys: memberKeys}, RequiredEvidence: append([]string(nil), selected.RequiredEvidence...), Steps: steps}
 	var err error

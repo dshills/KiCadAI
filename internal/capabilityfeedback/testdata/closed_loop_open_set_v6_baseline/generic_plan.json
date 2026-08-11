@@ -1,0 +1,73 @@
+{
+  "schema": "kicadai.closed-loop-open-set-generic-plan.v6",
+  "version": 6,
+  "bundle_key": "39:10:simulation23:output_voltage_evidence30:8:topology17:complete_topology41:8:topology28:multi_obligation_composition34:9:component20:catalog_value_domain",
+  "admission": {
+    "executable": true,
+    "atom_keys": [
+      "10:simulation23:output_voltage_evidence",
+      "8:topology17:complete_topology",
+      "8:topology28:multi_obligation_composition",
+      "9:component20:catalog_value_domain"
+    ],
+    "member_keys": [
+      "10:simulation10:simulation23:output_voltage_evidence23:ASSERTION_BELOW_MINIMUM",
+      "12:value_search9:component20:catalog_value_domain29:OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "15:topology_search8:topology17:complete_topology30:OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "25:requirement_realizability8:topology28:multi_obligation_composition47:OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED"
+    ]
+  },
+  "required_evidence": [
+    "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence",
+    "complete_topology: reviewed reusable topology construction and complete-graph evidence",
+    "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence",
+    "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "member_key": "10:simulation10:simulation23:output_voltage_evidence23:ASSERTION_BELOW_MINIMUM",
+      "stage": "simulation",
+      "scope": "simulation",
+      "capability": "output_voltage_evidence",
+      "code": "ASSERTION_BELOW_MINIMUM",
+      "required_evidence": [
+        "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+      ]
+    },
+    {
+      "order": 2,
+      "member_key": "12:value_search9:component20:catalog_value_domain29:OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "stage": "value_search",
+      "scope": "component",
+      "capability": "catalog_value_domain",
+      "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "required_evidence": [
+        "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+      ]
+    },
+    {
+      "order": 3,
+      "member_key": "15:topology_search8:topology17:complete_topology30:OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "stage": "topology_search",
+      "scope": "topology",
+      "capability": "complete_topology",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "required_evidence": [
+        "complete_topology: reviewed reusable topology construction and complete-graph evidence"
+      ]
+    },
+    {
+      "order": 4,
+      "member_key": "25:requirement_realizability8:topology28:multi_obligation_composition47:OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED",
+      "stage": "requirement_realizability",
+      "scope": "topology",
+      "capability": "multi_obligation_composition",
+      "code": "OPEN_TOPOLOGY_MULTI_OUTPUT_COMPOSITION_REQUIRED",
+      "required_evidence": [
+        "multi_obligation_composition: reviewed reusable topology construction and complete-graph evidence"
+      ]
+    }
+  ],
+  "hash": "7da60ccc693eaef1457f48ff77000c30e91896d3665a9d780181fdc6917062bc"
+}
