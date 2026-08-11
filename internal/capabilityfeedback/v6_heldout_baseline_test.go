@@ -29,8 +29,8 @@ const (
 	// absent: the freeze test skips before consulting them. They are populated
 	// exactly once after this outcome-neutral harness is committed and the
 	// custodian publication succeeds; any artifact appearing first fails closed.
-	closedLoopV6HeldOutPublisherCommit = ""
-	closedLoopV6HeldOutManifestHash    = ""
+	closedLoopV6HeldOutPublisherCommit    = "418015f79be6f1b5d53e91897e2c631c46ae7aff"
+	closedLoopV6HeldOutManifestCommitment = "5803530b12c284a90b5943a1ac3aa8fc58ce327a0a6b5ffca4289ff42244d9d8"
 )
 
 type closedLoopV6HeldOutPayload struct {
@@ -62,7 +62,7 @@ func TestClosedLoopV6HeldOutBaselineSealIsFrozen(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	if closedLoopV6HeldOutPublisherCommit == "" || closedLoopV6HeldOutManifestHash == "" {
+	if closedLoopV6HeldOutPublisherCommit == "" || closedLoopV6HeldOutManifestCommitment == "" {
 		t.Fatal("V6 held-out baseline exists without literal publisher and manifest commitments")
 	}
 	manifest, err := blindbaseline.VerifyV6(closedLoopV6HeldOutBaselineRoot)
@@ -74,7 +74,7 @@ func TestClosedLoopV6HeldOutBaselineSealIsFrozen(t *testing.T) {
 	selection := loadClosedLoopV6FrozenSelection(t)
 	promotion := discovery.PromotionEnvironment
 	binding := manifest.Binding
-	if manifest.Hash != closedLoopV6HeldOutManifestHash || manifest.CaseCount != closedLoopV6RoleSize ||
+	if manifest.Hash != closedLoopV6HeldOutManifestCommitment || manifest.CaseCount != closedLoopV6RoleSize ||
 		binding.StartingCommit != selection.StartingCommit || binding.ContractFreezeCommit != selection.ContractFreezeCommit ||
 		binding.CorpusFreezeCommit != closedLoopV6CorpusFreezeCommit || binding.SelectionFreezeCommit != closedLoopV6SelectionFreezeCommit ||
 		binding.PublisherParentCommit != closedLoopV6HeldOutPublisherCommit || binding.CorpusManifestSHA256 != closedLoopV6CorpusManifestHash ||
