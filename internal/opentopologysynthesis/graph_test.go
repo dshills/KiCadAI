@@ -289,6 +289,38 @@ func TestInitialGraphContainsOnlySemanticExternalPorts(t *testing.T) {
 	}
 }
 
+func TestInitialGraphMaterializesUnrepresentedExternalSupplyDomain(t *testing.T) {
+	data := mustRead(t, filepath.Join(frozenCorpusRoot(), "powered_lowpass.json"))
+	requirement, issues := DecodeStrict(bytes.NewReader(data))
+	if len(issues) != 0 {
+		t.Fatalf("decode issues: %#v", issues)
+	}
+	requirement.Requirements.Domains = append(requirement.Requirements.Domains, Domain{
+		ID:              "auxiliary_supply",
+		Kind:            "supply",
+		Source:          "external",
+		MinVoltageV:     graphFloat(4.75),
+		NominalVoltageV: graphFloat(5),
+		MaxVoltageV:     graphFloat(5.25),
+	})
+	requirement = Normalize(requirement)
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	node, ok := ExternalNodeForObservation(
+		graph,
+		requirement,
+		Observation{Kind: "domain", ID: "auxiliary_supply"},
+	)
+	if !ok || node != "domain_auxiliary_supply" {
+		t.Fatalf("supply-domain observation binding = %q/%t", node, ok)
+	}
+	if issues := ValidatePartialGraph(graph, testGraphInventory(), GraphLimits{}); len(issues) != 0 {
+		t.Fatalf("supply-domain initial graph issues: %#v", issues)
+	}
+}
+
 func testGraphInventory() PrimitiveInventory {
 	return PrimitiveInventory{
 		Schema:  PrimitiveInventorySchema,

@@ -8516,7 +8516,8 @@ func topologyBehaviorGap(
 		maximumHighFrequencyGain < minimumPassbandGain
 	requireInternalTransfer = requireReactive && requireAnalogTransfer
 	activeCount, analogActiveCount, switchingActiveCount, decisionCount, resistorCount := 0, 0, 0, 0, 0
-	hasReactive, hasResistor, hasThermal, hasSOA := false, false, false, false
+	hasExternalReactiveTimeConstant := topologyGraphHasExternalReactiveTimeConstant(requirement, graph)
+	hasReactive, hasResistor, hasThermal, hasSOA := hasExternalReactiveTimeConstant, false, false, false
 	for _, instance := range graph.Instances {
 		primitive := inventory[instance.PrimitiveKey]
 		if topologyActiveKind(instance.Kind) {
@@ -8553,7 +8554,8 @@ func topologyBehaviorGap(
 	if resistorCount < minimumResistors {
 		gap += minimumResistors - resistorCount
 	}
-	if requireTimeConstant && !requireAnalogTransfer && !topologyGraphHasPassiveTimeConstant(graph) {
+	if requireTimeConstant && !requireAnalogTransfer &&
+		!topologyGraphHasPassiveTimeConstant(graph) && !hasExternalReactiveTimeConstant {
 		gap++
 	}
 	if requireAnalogTransfer && analogActiveCount == 0 {
@@ -8599,6 +8601,38 @@ func topologyBehaviorGap(
 	}
 	gap += topologySwitchedLoadEnvelopeGap(requirement, graph, inventory)
 	return gap
+}
+
+func topologyGraphHasExternalReactiveTimeConstant(requirement Requirement, graph CandidateGraph) bool {
+	reactivePorts := map[string]bool{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if (condition.Axis == "load_capacitance" || condition.Axis == "load_inductance") &&
+				condition.Max > 0 {
+				reactivePorts[condition.Target] = true
+			}
+		}
+	}
+	if len(reactivePorts) == 0 {
+		return false
+	}
+	reactiveNodes := map[string]bool{}
+	for _, node := range graph.Nodes {
+		if node.SemanticKind == "port" && reactivePorts[node.SemanticID] {
+			reactiveNodes[node.ID] = true
+		}
+	}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
+			continue
+		}
+		for _, terminal := range instance.Terminals {
+			if reactiveNodes[terminal.Node] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func topologyRequiresAbsoluteDecisionReference(requirement Requirement) bool {

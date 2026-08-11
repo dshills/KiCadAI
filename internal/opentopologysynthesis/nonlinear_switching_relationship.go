@@ -10,6 +10,13 @@ import (
 	"kicadai/internal/simmodel"
 )
 
+const (
+	autonomousPeriodicPullupResistanceOhm          = 10_000.0
+	autonomousPeriodicTimingResistanceOhm          = 100_000.0
+	autonomousPeriodicThresholdResistanceOhm       = 100_000.0
+	autonomousPeriodicEnableIsolationResistanceOhm = 1_000_000.0
+)
+
 // topologyNonlinearSwitchingRelationshipSeeds composes relationship operators
 // selected only from behavioral obligations. Each operator still produces a
 // primitive graph that passes the ordinary completeness, scoring, simulation,
@@ -252,47 +259,66 @@ func topologyAutonomousPeriodicRelationshipSeeds(
 	policy Policy,
 	initial topologySearchState,
 ) ([]TopologyCandidate, Consumption, map[string][]string) {
-	frequency, output, required := topologyAutonomousPeriodicBehavior(requirement)
+	behavior, required := topologyAutonomousPeriodicBehavior(requirement)
 	if !required {
 		return nil, Consumption{}, map[string][]string{}
 	}
 	highRail, lowRail := topologyPowerRails(requirement, initial.graph)
 	references := topologyNodesByRole(initial.graph, "reference")
 	controls := topologyNodesByRole(initial.graph, "control", "input")
-	if lowRail == "" && len(references) == 1 {
-		lowRail = references[0]
+	timingNode := ""
+	if behavior.timingPort != "" {
+		timingNode = "port_" + behavior.timingPort
+		controls = slices.DeleteFunc(controls, func(node string) bool {
+			return node == timingNode
+		})
 	}
-	if highRail == "" || lowRail == "" || len(references) != 1 || len(controls) != 1 {
+	if highRail == "" || len(references) != 1 || len(controls) != 1 {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"autonomous periodic behavior requires one supply, one reference, one enable/control endpoint, and one output"}}
 	}
+	if lowRail == "" {
+		lowRail = references[0]
+	}
 	comparator := topologyPeriodicComparatorPrimitive(requirement, inventory)
-	chargeResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", 100_000)
-	thresholdResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", 100_000)
-	pullupResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", 10_000)
-	enableIsolation := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", 1_000_000)
+	chargeResistance := autonomousPeriodicTimingResistanceOhm
+	if behavior.timingPort != "" {
+		if externalResistance, ok := topologyExternalTimingResistance(requirement, behavior); ok {
+			chargeResistance = externalResistance
+		}
+	}
+	chargeResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", chargeResistance)
+	thresholdResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", autonomousPeriodicThresholdResistanceOhm)
+	pullupResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", autonomousPeriodicPullupResistanceOhm)
+	enableIsolation := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", autonomousPeriodicEnableIsolationResistanceOhm)
 	if comparator.Key == "" || chargeResistor.Key == "" || thresholdResistor.Key == "" || pullupResistor.Key == "" || enableIsolation.Key == "" {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"autonomous periodic behavior lacks a reviewed comparator and timing/bias resistor set"}}
 	}
-	chargeR := primitiveSeedValueOrZero(chargeResistor)
-	if chargeR <= 0 || !finite(chargeR) {
+	chargeValue := seedPrimitiveValue(chargeResistor)
+	if chargeValue == nil || *chargeValue <= 0 || !finite(*chargeValue) {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"autonomous periodic behavior lacks a positive reviewed charge-resistor value"}}
 	}
-	capTarget := 1 / (2 * math.Log(2) * frequency * chargeR)
-	timingCapacitor := topologyPrimitiveClosestValue(inventory.Primitives, "capacitor", capTarget)
-	if timingCapacitor.Key == "" {
-		return nil, Consumption{}, map[string][]string{"relationship_gap": {fmt.Sprintf("autonomous periodic behavior lacks a reviewed timing capacitor near %.12g F", capTarget)}}
+	chargeR := *chargeValue
+	var timingCapacitor PrimitiveCandidate
+	if behavior.timingPort == "" {
+		capTarget := 1 / (2 * math.Log(2) * behavior.frequency * chargeR)
+		timingCapacitor = topologyPrimitiveClosestValue(inventory.Primitives, "capacitor", capTarget)
+		if timingCapacitor.Key == "" {
+			return nil, Consumption{}, map[string][]string{"relationship_gap": {fmt.Sprintf("autonomous periodic behavior lacks a reviewed timing capacitor near %.12g F", capTarget)}}
+		}
 	}
 	consumption := Consumption{ExpandedStates: 1}
 	state := initial
-	var threshold, timing string
+	var threshold string
 	state, threshold = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
-	state, timing = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
-	if threshold == "" || timing == "" {
-		return nil, consumption, map[string][]string{"graph_limit": {"autonomous periodic behavior requires two internal timing nodes"}}
+	if timingNode == "" {
+		state, timingNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
 	}
-	outputNode := "port_" + output
+	if threshold == "" || timingNode == "" {
+		return nil, consumption, map[string][]string{"graph_limit": {"autonomous periodic behavior requires threshold and timing nodes"}}
+	}
+	outputNode := "port_" + behavior.output
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, comparator, []TerminalConnection{
-		{Terminal: "IN_PLUS", Node: threshold}, {Terminal: "IN_MINUS", Node: timing},
+		{Terminal: "IN_PLUS", Node: threshold}, {Terminal: "IN_MINUS", Node: timingNode},
 		{Terminal: "OUT", Node: outputNode}, {Terminal: "V_PLUS", Node: highRail}, {Terminal: "V_MINUS", Node: lowRail},
 	}, &consumption)
 	if comparator.Kind == "comparator" {
@@ -301,23 +327,124 @@ func topologyAutonomousPeriodicRelationshipSeeds(
 	for _, edge := range [][2]string{{outputNode, threshold}, {highRail, threshold}, {threshold, references[0]}} {
 		state = addRelationshipPrimitive(state, requirement, inventoryByKey, thresholdResistor, topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
 	}
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, chargeResistor, topologyTwoTerminalPlacement(outputNode, timing), &consumption)
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, timingCapacitor, topologyTwoTerminalPlacement(timing, references[0]), &consumption)
+	state = addRelationshipPrimitive(state, requirement, inventoryByKey, chargeResistor, topologyTwoTerminalPlacement(outputNode, timingNode), &consumption)
+	if timingCapacitor.Key != "" {
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, timingCapacitor, topologyTwoTerminalPlacement(timingNode, references[0]), &consumption)
+	}
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, enableIsolation, topologyTwoTerminalPlacement(controls[0], threshold), &consumption)
 	return finalizeNonlinearSwitchingRelationship(ctx, requirement, inventory, limits, policy, []topologySearchState{state}, consumption, "autonomous hysteretic timing")
 }
 
-func topologyAutonomousPeriodicBehavior(requirement Requirement) (float64, string, bool) {
-	frequency, output := 0.0, ""
+type topologyAutonomousPeriodicEnvelope struct {
+	frequency  float64
+	output     string
+	timingPort string
+}
+
+func topologyAutonomousPeriodicBehavior(requirement Requirement) (topologyAutonomousPeriodicEnvelope, bool) {
+	result := topologyAutonomousPeriodicEnvelope{}
+	minimumFrequency, maximumFrequency := math.Inf(1), 0.0
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Metric != "oscillation_frequency" || assertion.Analysis != "transient" ||
-			assertion.Excitation != nil || assertion.Observation.Kind != "port" {
+			assertion.Observation.Kind != "port" {
 			continue
 		}
-		frequency = assertionTarget(assertion)
-		output = assertion.Observation.ID
+		timingPort := ""
+		if assertion.Excitation != nil {
+			if assertion.Excitation.Kind != "port" ||
+				!topologyTimingCapacitancePort(requirement, assertion.Excitation.ID, assertion.OperatingCases) {
+				continue
+			}
+			timingPort = assertion.Excitation.ID
+		}
+		if result.output != "" && (result.output != assertion.Observation.ID || result.timingPort != timingPort) {
+			return topologyAutonomousPeriodicEnvelope{}, false
+		}
+		frequency := assertionTarget(assertion)
+		if frequency <= 0 || !finite(frequency) {
+			continue
+		}
+		result.output = assertion.Observation.ID
+		result.timingPort = timingPort
+		minimumFrequency = math.Min(minimumFrequency, frequency)
+		maximumFrequency = math.Max(maximumFrequency, frequency)
 	}
-	return frequency, output, frequency > 0 && output != ""
+	if result.output == "" || maximumFrequency <= 0 || math.IsInf(minimumFrequency, 1) {
+		return topologyAutonomousPeriodicEnvelope{}, false
+	}
+	result.frequency = geometricMean(minimumFrequency, maximumFrequency)
+	return result, result.frequency > 0
+}
+
+func topologyTimingCapacitancePort(requirement Requirement, portID string, operatingCaseIDs []string) bool {
+	validPort := false
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == portID && port.Direction == "sink" && port.Kind == "analog_voltage" {
+			validPort = true
+			break
+		}
+	}
+	if !validPort {
+		return false
+	}
+	operatingCases := map[string]bool{}
+	for _, operatingCaseID := range operatingCaseIDs {
+		operatingCases[operatingCaseID] = true
+	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		if !operatingCases[operatingCase.ID] {
+			continue
+		}
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "load_capacitance" && condition.Target == portID &&
+				condition.Min > 0 && condition.Max >= condition.Min {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func topologyExternalTimingResistance(
+	requirement Requirement,
+	behavior topologyAutonomousPeriodicEnvelope,
+) (float64, bool) {
+	minimum, maximum := math.Inf(1), 0.0
+	operatingCases := make(map[string]OperatingCase, len(requirement.Requirements.OperatingCases))
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		operatingCases[operatingCase.ID] = operatingCase
+	}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "oscillation_frequency" || assertion.Analysis != "transient" ||
+			assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
+			assertion.Excitation.ID != behavior.timingPort || assertion.Observation.Kind != "port" ||
+			assertion.Observation.ID != behavior.output {
+			continue
+		}
+		frequency := assertionTarget(assertion)
+		for _, operatingCaseID := range assertion.OperatingCases {
+			operatingCase, found := operatingCases[operatingCaseID]
+			if !found {
+				continue
+			}
+			for _, condition := range operatingCase.Conditions {
+				if condition.Axis != "load_capacitance" || condition.Target != behavior.timingPort ||
+					condition.Min <= 0 || condition.Max < condition.Min {
+					continue
+				}
+				capacitance := geometricMean(condition.Min, condition.Max)
+				resistance := 1 / (2 * math.Log(2) * frequency * capacitance)
+				if resistance > 0 && finite(resistance) {
+					minimum = math.Min(minimum, resistance)
+					maximum = math.Max(maximum, resistance)
+				}
+			}
+		}
+	}
+	if math.IsInf(minimum, 1) || maximum <= 0 {
+		return 0, false
+	}
+	return geometricMean(minimum, maximum), true
 }
 
 func topologyPeriodicComparatorPrimitive(requirement Requirement, inventory PrimitiveInventory) PrimitiveCandidate {

@@ -50,6 +50,98 @@ func TestNonlinearSwitchingRelationshipOperatorsProduceCompletePrimitiveGraphs(t
 	}
 }
 
+func TestAutonomousPeriodicRelationshipUsesExternalTimingCapacitance(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(nonlinearSwitchingCorpusRoot(), "autonomous_square_wave_source.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	requirement.Requirements.Ports = append(requirement.Requirements.Ports, Port{
+		ID:        "timing_terminal",
+		Kind:      "analog_voltage",
+		Direction: "sink",
+		Domain:    "ground",
+		Electrical: Electrical{
+			MinVoltageV:          graphFloat(0),
+			MaxVoltageV:          graphFloat(5.25),
+			InputImpedanceMinOhm: graphFloat(1_000_000),
+		},
+	})
+	for index := range requirement.Requirements.BehavioralRequirements {
+		assertion := &requirement.Requirements.BehavioralRequirements[index]
+		if assertion.Metric == "oscillation_frequency" {
+			assertion.Excitation = &Observation{Kind: "port", ID: "timing_terminal"}
+		}
+	}
+	for index := range requirement.Requirements.OperatingCases {
+		requirement.Requirements.OperatingCases[index].Conditions = append(
+			requirement.Requirements.OperatingCases[index].Conditions,
+			OperatingCondition{
+				Axis: "load_capacitance", Target: "timing_terminal",
+				Min: 6e-9, Max: 8e-9, Unit: "F",
+			},
+		)
+	}
+	requirement = Normalize(requirement)
+	if issues := Validate(requirement); len(issues) != 0 {
+		t.Fatalf("external timing requirement issues = %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	var selected *TopologyCandidate
+	for index := range search.Candidates {
+		candidate := &search.Candidates[index]
+		for _, graphInstance := range candidate.Graph.Instances {
+			terminals := topologyTerminalNodes(graphInstance)
+			if (graphInstance.Kind == "comparator" || graphInstance.Kind == "opamp") &&
+				terminals["IN_MINUS"] == "port_timing_terminal" {
+				selected = candidate
+				break
+			}
+		}
+		if selected != nil {
+			break
+		}
+	}
+	if selected == nil {
+		t.Fatalf("external timing relationship graph not found: status=%s rejections=%#v candidates=%d", search.Status, search.Rejections, len(search.Candidates))
+	}
+	for _, graphInstance := range selected.Graph.Instances {
+		if graphInstance.Kind == "capacitor" {
+			t.Fatalf("external timing graph added an internal timing capacitor: %#v", selected.Graph)
+		}
+	}
+	plan := BuildValueSearchPlan(requirement, selected.Graph, inventory, DefaultPolicy())
+	if plan.Status != ValuePlanReady {
+		t.Fatalf("external timing value plan = %s issues=%#v rejections=%#v", plan.Status, plan.Issues, plan.Rejections)
+	}
+	foundTimingResistance := false
+	for _, domain := range plan.Domains {
+		instance := selected.Graph.Instances[0]
+		for _, candidateInstance := range selected.Graph.Instances {
+			if candidateInstance.ID == domain.InstanceID {
+				instance = candidateInstance
+				break
+			}
+		}
+		if instance.Kind != "resistor" || len(instance.Terminals) != 2 ||
+			!((instance.Terminals[0].Node == "port_waveform_output" && instance.Terminals[1].Node == "port_timing_terminal") ||
+				(instance.Terminals[1].Node == "port_waveform_output" && instance.Terminals[0].Node == "port_timing_terminal")) {
+			continue
+		}
+		if len(domain.Candidates) == 0 || domain.Candidates[0].ValueSI == nil ||
+			*domain.Candidates[0].ValueSI < 50_000 || *domain.Candidates[0].ValueSI > 200_000 {
+			t.Fatalf("external timing resistance candidates = %#v", domain.Candidates)
+		}
+		foundTimingResistance = true
+	}
+	if !foundTimingResistance {
+		t.Fatal("external timing graph lacks its derived charge-resistance domain")
+	}
+}
+
 func TestBoundedBipolarRelationshipRejectsUnityMinimumGainWithoutInvalidResistance(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t, filepath.Join(nonlinearSwitchingCorpusRoot(), "bounded_bipolar_transfer.json"),

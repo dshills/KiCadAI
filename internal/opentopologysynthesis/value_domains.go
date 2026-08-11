@@ -210,28 +210,31 @@ func validateGraphRequirementBinding(graph CandidateGraph, requirement Requireme
 	for _, port := range requirement.Requirements.Ports {
 		expectedPorts[port.ID] = port
 	}
-	expectedReferences := map[string]bool{}
+	expectedDomains := map[string]Domain{}
 	for _, domain := range requirement.Requirements.Domains {
-		if domain.Kind == "reference" {
-			expectedReferences[domain.ID] = true
-		}
+		expectedDomains[domain.ID] = domain
 	}
 	seenPorts := map[string]bool{}
-	seenReferences := map[string]bool{}
+	seenDomains := map[string]bool{}
 	issues := []reports.Issue{}
 	for _, node := range graph.Nodes {
 		if node.Scope != "external" {
 			continue
 		}
 		if node.SemanticKind == "domain" {
-			if !expectedReferences[node.SemanticID] || node.Domain != node.SemanticID || node.Role != "reference" {
-				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external reference node is not declared by the behavioral requirement", "rebuild the graph from the normalized requirement"))
+			domain, found := expectedDomains[node.SemanticID]
+			if !found || node.Domain != node.SemanticID || node.Role != domain.Kind {
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external source-domain node is not declared by the behavioral requirement", "rebuild the graph from the normalized requirement"))
 				continue
 			}
-			if seenReferences[node.SemanticID] {
-				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"))
+			if seenDomains[node.SemanticID] {
+				message, suggestion := "behavioral source domain is bound more than once", "bind each semantic source exactly once"
+				if domain.Kind == "reference" {
+					message, suggestion = "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"
+				}
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, message, suggestion))
 			}
-			seenReferences[node.SemanticID] = true
+			seenDomains[node.SemanticID] = true
 			continue
 		}
 		port, found := expectedPorts[node.SemanticID]
@@ -243,13 +246,18 @@ func validateGraphRequirementBinding(graph CandidateGraph, requirement Requireme
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral port is bound more than once", "bind each semantic port exactly once"))
 		}
 		seenPorts[node.SemanticID] = true
-		if port.Kind == "reference" {
-			if seenReferences[port.Domain] {
-				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"))
+		role := graphRoleForPort(port)
+		if role == "reference" || role == "supply" {
+			if seenDomains[port.Domain] {
+				message, suggestion := "behavioral source domain is bound more than once", "bind each semantic source exactly once"
+				if role == "reference" {
+					message, suggestion = "behavioral reference domain is bound more than once", "bind each semantic reference exactly once"
+				}
+				issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, message, suggestion))
 			}
-			seenReferences[port.Domain] = true
+			seenDomains[port.Domain] = true
 		}
-		if node.Domain != port.Domain || node.Role != graphRoleForPort(port) {
+		if node.Domain != port.Domain || node.Role != role {
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "nodes."+node.ID, "external graph-node domain or role differs from its behavioral port", "rebuild the graph from the normalized requirement"))
 		}
 	}
@@ -258,9 +266,13 @@ func validateGraphRequirementBinding(graph CandidateGraph, requirement Requireme
 			issues = append(issues, graphIssue(CodeNoCompleteGraph, "requirements.ports."+portID, "behavioral port is absent from the candidate graph", "connect every required external interface"))
 		}
 	}
-	for domainID := range expectedReferences {
-		if !seenReferences[domainID] {
-			issues = append(issues, graphIssue(CodeNoCompleteGraph, "requirements.domains."+domainID, "behavioral reference domain is absent from the candidate graph", "materialize every required semantic reference"))
+	for domainID, domain := range expectedDomains {
+		if !seenDomains[domainID] {
+			message, suggestion := "behavioral source domain is absent from the candidate graph", "materialize every required semantic source"
+			if domain.Kind == "reference" {
+				message, suggestion = "behavioral reference domain is absent from the candidate graph", "materialize every required semantic reference"
+			}
+			issues = append(issues, graphIssue(CodeNoCompleteGraph, "requirements.domains."+domainID, message, suggestion))
 		}
 	}
 	return reports.SortedIssues(issues)
@@ -1726,11 +1738,12 @@ func deriveAutonomousPeriodicTopologyScales(
 	instance GraphInstance,
 	inventory map[string]PrimitiveCandidate,
 ) []AnalyticScale {
-	frequency, outputID, required := topologyAutonomousPeriodicBehavior(requirement)
+	behavior, required := topologyAutonomousPeriodicBehavior(requirement)
 	if !required || !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
 		len(instance.Terminals) != 2 {
 		return nil
 	}
+	outputID := behavior.output
 	output := "port_" + outputID
 	between := func(candidate GraphInstance, left, right string) bool {
 		return len(candidate.Terminals) == 2 &&
@@ -1760,17 +1773,22 @@ func deriveAutonomousPeriodicTopologyScales(
 			}
 		}
 	}
-	if !finite(minimumLoad) {
-		return nil
+	resistanceAnchor := 10_000.0
+	if finite(minimumLoad) {
+		resistanceAnchor = math.Max(resistanceAnchor, 5*minimumLoad)
 	}
-	resistanceAnchor := math.Max(10_000, 5*minimumLoad)
-	oscillatorCutoff := frequency * math.Log(2) / math.Pi
-	timingResistance, timingCapacitance, pairOK := catalogRCPair(
-		requirement,
-		inventory,
-		oscillatorCutoff,
-		resistanceAnchor,
-	)
+	timingResistance, timingCapacitance, pairOK := 0.0, 0.0, false
+	if behavior.timingPort != "" {
+		timingResistance, pairOK = topologyExternalTimingResistance(requirement, behavior)
+	} else {
+		oscillatorCutoff := behavior.frequency * math.Log(2) / math.Pi
+		timingResistance, timingCapacitance, pairOK = catalogRCPair(
+			requirement,
+			inventory,
+			oscillatorCutoff,
+			resistanceAnchor,
+		)
+	}
 	if !pairOK {
 		return nil
 	}
@@ -1799,6 +1817,9 @@ func deriveAutonomousPeriodicTopologyScales(
 		result.ValueSI = thresholdResistance
 		result.Derivation = "equal conductances establish symmetric one-third and two-thirds hysteresis thresholds"
 	case instance.Kind == "resistor" && between(instance, output, highRail):
+		if !finite(minimumLoad) {
+			return nil
+		}
 		low, high, swingOK := topologyDecisionOutputSwing(requirement, graph, comparator, inventory)
 		requiredSwing := requirementMinimumMetric(requirement, "output_swing")
 		maximumPullup := 0.0
