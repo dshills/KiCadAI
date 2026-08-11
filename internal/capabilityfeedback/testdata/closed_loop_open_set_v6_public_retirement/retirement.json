@@ -1,0 +1,26 @@
+{
+  "schema": "kicadai.closed-loop-open-set-public-retirement.v6",
+  "version": 6,
+  "selection_sha256": "9f1a9f8120d81b9c09a75dea382b6fcf6b94b15f620c05b37beb25217efab13b",
+  "implementation_hash": "76ef8f3a2328b2de42ca2fe6af50e09d822b4365bd3bf5a4665a68edc9854c8e",
+  "comparison": {
+    "discovery_pass_before": 0,
+    "discovery_pass_after": 0,
+    "claimed_unlock_pass_before": 0,
+    "claimed_unlock_pass_after": 0,
+    "at_least_one_claimed_unlock": false,
+    "exact_unique_case_set": true,
+    "no_baseline_pass_regression": true,
+    "no_baseline_unsafe_became_pass": true,
+    "selected_member_removal_only": false,
+    "deterministic_replay_complete": true,
+    "physical_promotion_complete": true,
+    "synthesis_environment_preserved": false,
+    "promotion_environment_preserved": true
+  },
+  "held_out_source_opened": false,
+  "held_out_baseline_opened": false,
+  "held_out_final_key_created": false,
+  "final_updater": "permanently_retired",
+  "hash": "2bc80f68b582347fc2e958f5b7ba58a5b80ad3246285a15d546ad892feb1f38d"
+}

@@ -76,6 +76,7 @@ type closedLoopV6PublicRetirement struct {
 	HeldOutSourceOpened    bool                                  `json:"held_out_source_opened"`
 	HeldOutBaselineOpened  bool                                  `json:"held_out_baseline_opened"`
 	HeldOutFinalKeyCreated bool                                  `json:"held_out_final_key_created"`
+	FinalUpdater           string                                `json:"final_updater"`
 	Hash                   string                                `json:"hash"`
 }
 
@@ -227,7 +228,7 @@ func TestClosedLoopV6PublicRetirementIsFrozen(t *testing.T) {
 	decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV6PublicRetirementRoot, "retirement.json")), &retirement)
 	if retirement.Schema != closedLoopV6PublicRetirementSchema || retirement.Version != closedLoopV6BaselineVersion ||
 		retirement.HeldOutSourceOpened || retirement.HeldOutBaselineOpened || retirement.HeldOutFinalKeyCreated ||
-		closedLoopV6PublicAdmissionPasses(retirement.Comparison) {
+		retirement.FinalUpdater != "permanently_retired" || closedLoopV6PublicAdmissionPasses(retirement.Comparison) {
 		t.Fatal("V6 public retirement boundary is invalid")
 	}
 	if want, err := hashClosedLoopV6PublicRetirement(retirement); err != nil || want != retirement.Hash {
@@ -597,6 +598,7 @@ func publishClosedLoopV6PublicRetirement(
 	retirement := closedLoopV6PublicRetirement{
 		Schema: closedLoopV6PublicRetirementSchema, Version: closedLoopV6BaselineVersion,
 		SelectionSHA256: selection.Hash, ImplementationHash: implementation.Hash, Comparison: comparison,
+		FinalUpdater: "permanently_retired",
 	}
 	var err error
 	retirement.Hash, err = hashClosedLoopV6PublicRetirement(retirement)
@@ -611,11 +613,21 @@ func publishClosedLoopV6PublicRetirement(
 			"# V6 Public Admission Retirement Audit\n\n"+
 				"Public discovery admission failed a strict gate. V6 is permanently retired.\n\n"+
 				"- retirement hash: `%s`\n"+
-				"- held-out source opened: no\n"+
-				"- held-out baseline opened: no\n"+
-				"- held-out final key created: no\n"+
+				"- discovery pass uplift: %d -> %d (failed)\n"+
+				"- claimed-unlock pass uplift: %d -> %d (failed)\n"+
+				"- selected-member-only removal: %t\n"+
+				"- synthesis environment preserved: %t\n"+
+				"- held-out source opened: %s\n"+
+				"- held-out baseline opened: %s\n"+
+				"- held-out final key created: %s\n"+
 				"- final updater: permanently retired\n",
 			retirement.Hash,
+			comparison.DiscoveryPassBefore, comparison.DiscoveryPassAfter,
+			comparison.ClaimedUnlockPassBefore, comparison.ClaimedUnlockPassAfter,
+			comparison.SelectedMemberRemovalOnly, comparison.SynthesisEnvironmentPreserved,
+			closedLoopV6AuditYesNo(retirement.HeldOutSourceOpened),
+			closedLoopV6AuditYesNo(retirement.HeldOutBaselineOpened),
+			closedLoopV6AuditYesNo(retirement.HeldOutFinalKeyCreated),
 		))
 		if err := os.WriteFile(filepath.Join(root, "RETIREMENT_AUDIT.md"), audit, 0o644); err != nil {
 			return err
@@ -624,6 +636,13 @@ func publishClosedLoopV6PublicRetirement(
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func closedLoopV6AuditYesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 func assertClosedLoopV6PublicAdmissionFileSet(t *testing.T, manifest corpuspublication.Manifest) {
