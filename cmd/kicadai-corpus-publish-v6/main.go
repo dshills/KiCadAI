@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"kicadai/internal/corpusfreeze"
@@ -100,7 +99,7 @@ func run(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	contractManifest, err := corpuspublication.VerifyChecksumManifest(filepath.Dir(*contractManifestPath), *contractManifestPath)
+	contractManifest, err := corpuspublication.VerifyV6ContractManifest(*repositoryRoot, *contractManifestPath)
 	if err != nil {
 		return fmt.Errorf("verify V6 contract manifest: %w", err)
 	}

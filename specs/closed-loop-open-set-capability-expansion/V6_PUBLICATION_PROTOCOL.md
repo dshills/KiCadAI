@@ -20,7 +20,9 @@ report is not trusted as input.
 
 The publisher:
 
-1. verifies every checksum manifest and lineage identifier;
+1. verifies every checksum manifest and lineage identifier, resolving the
+   contract manifest's intentional parent-relative entries while requiring
+   every canonical target to remain inside the repository root;
 2. reloads the exact packet and V1–V5 historical commitment boundary;
 3. mechanically revalidates all 36 cases without synthesis or classification;
 4. creates one exclusive 32-byte external key with Unix mode `0600`;
