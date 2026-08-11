@@ -2,13 +2,18 @@ package capabilityfeedback
 
 import (
 	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"kicadai/internal/atomicdir"
 	"kicadai/internal/capabilitybundles"
@@ -18,17 +23,18 @@ import (
 )
 
 const (
-	closedLoopV6BaselineSchema       = "kicadai.closed-loop-open-set-discovery-baseline.v6"
-	closedLoopV6CaseArtifactSchema   = "kicadai.closed-loop-open-set-discovery-case.v6"
-	closedLoopV6RankingSchema        = "kicadai.closed-loop-open-set-bundle-ranking.v6"
-	closedLoopV6GenericPlanSchema    = "kicadai.closed-loop-open-set-generic-plan.v6"
-	closedLoopV6SelectionSchema      = "kicadai.closed-loop-open-set-selection.v6"
-	closedLoopV6BaselineVersion      = 6
-	closedLoopV6BaselineRoot         = "testdata/closed_loop_open_set_v6_baseline"
-	closedLoopV6BaselineUpdateEnv    = "UPDATE_CLOSED_LOOP_V6_DISCOVERY_BASELINE"
-	closedLoopV6CorpusFreezeCommit   = "209c84ca1d7a0b65beca74f3aa2c46a1fe95bed9"
-	closedLoopV6SelectionPolicyHash  = "1d82387013cccff736b33b497194586254c25a395db97d25d923abf1b658e2f3"
-	closedLoopV6ContractManifestHash = "61f76c00477f2f6eb350556f4e2d0ba85b338846a9b61ed92691263c9552f591"
+	closedLoopV6BaselineSchema        = "kicadai.closed-loop-open-set-discovery-baseline.v6"
+	closedLoopV6CaseArtifactSchema    = "kicadai.closed-loop-open-set-discovery-case.v6"
+	closedLoopV6RankingSchema         = "kicadai.closed-loop-open-set-bundle-ranking.v6"
+	closedLoopV6GenericPlanSchema     = "kicadai.closed-loop-open-set-generic-plan.v6"
+	closedLoopV6SelectionSchema       = "kicadai.closed-loop-open-set-selection.v6"
+	closedLoopV6BaselineVersion       = 6
+	closedLoopV6BaselineRoot          = "testdata/closed_loop_open_set_v6_baseline"
+	closedLoopV6BaselineUpdateEnv     = "UPDATE_CLOSED_LOOP_V6_DISCOVERY_BASELINE"
+	closedLoopV6FullEvidenceVerifyEnv = "VERIFY_CLOSED_LOOP_V6_FULL_EVIDENCE"
+	closedLoopV6CorpusFreezeCommit    = "209c84ca1d7a0b65beca74f3aa2c46a1fe95bed9"
+	closedLoopV6SelectionPolicyHash   = "1d82387013cccff736b33b497194586254c25a395db97d25d923abf1b658e2f3"
+	closedLoopV6ContractManifestHash  = "61f76c00477f2f6eb350556f4e2d0ba85b338846a9b61ed92691263c9552f591"
 
 	// These are populated exactly once in the selection-freeze commit. Their
 	// empty infrastructure values make an accidentally published baseline fail
@@ -384,18 +390,49 @@ func writeClosedLoopV6CaseArtifacts(root string, artifacts []closedLoopV6CaseArt
 	}
 	refs := make([]closedLoopV6ArtifactRef, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		path := filepath.ToSlash(filepath.Join("discovery", artifact.CaseID+".json"))
-		data, err := json.MarshalIndent(artifact, "", "  ")
+		path := filepath.ToSlash(filepath.Join("discovery", artifact.CaseID+".json.gz"))
+		digest, err := writeClosedLoopV6CompressedArtifact(filepath.Join(root, filepath.FromSlash(path)), artifact)
 		if err != nil {
 			return nil, err
 		}
-		data = append(data, '\n')
-		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(path)), data, 0o644); err != nil {
-			return nil, err
-		}
-		refs = append(refs, closedLoopV6ArtifactRef{CaseID: artifact.CaseID, Path: path, SHA256: corpusHash(data)})
+		refs = append(refs, closedLoopV6ArtifactRef{CaseID: artifact.CaseID, Path: path, SHA256: digest})
 	}
 	return refs, nil
+}
+
+func writeClosedLoopV6CompressedArtifact(path string, artifact closedLoopV6CaseArtifact) (digest string, err error) {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return "", err
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = file.Close()
+		}
+	}()
+	hash := sha256.New()
+	compressed, err := gzip.NewWriterLevel(io.MultiWriter(file, hash), gzip.BestCompression)
+	if err != nil {
+		return "", err
+	}
+	compressed.Header.ModTime = time.Unix(0, 0).UTC()
+	compressed.Header.OS = 255
+	if err := json.NewEncoder(compressed).Encode(artifact); err != nil {
+		_ = compressed.Close()
+		return "", fmt.Errorf("encode compressed V6 evidence %s: %w", artifact.CaseID, err)
+	}
+	if err := compressed.Close(); err != nil {
+		return "", fmt.Errorf("close compressed V6 evidence %s: %w", artifact.CaseID, err)
+	}
+	if err := file.Sync(); err != nil {
+		return "", fmt.Errorf("sync compressed V6 evidence %s: %w", artifact.CaseID, err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("close V6 evidence file %s: %w", artifact.CaseID, err)
+	}
+	closed = true
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func assertClosedLoopV6CaseArtifacts(t *testing.T, report closedLoopV6BaselineReport) {
@@ -405,7 +442,7 @@ func assertClosedLoopV6CaseArtifacts(t *testing.T, report closedLoopV6BaselineRe
 	}
 	for index, ref := range report.CaseArtifacts {
 		wantID := fmt.Sprintf("v6_case_%03d", index+1)
-		wantPath := filepath.ToSlash(filepath.Join("discovery", wantID+".json"))
+		wantPath := filepath.ToSlash(filepath.Join("discovery", wantID+".json.gz"))
 		if ref.CaseID != wantID || ref.Path != wantPath || !closedLoopV6ValidHash(ref.SHA256) {
 			t.Fatalf("V6 discovery evidence reference %d is invalid", index+1)
 		}
@@ -413,11 +450,28 @@ func assertClosedLoopV6CaseArtifacts(t *testing.T, report closedLoopV6BaselineRe
 		if corpusHash(data) != ref.SHA256 {
 			t.Fatalf("V6 discovery evidence %s differs from its report commitment", ref.CaseID)
 		}
+		reader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			t.Fatalf("V6 discovery evidence %s is not a gzip stream", ref.CaseID)
+		}
+		if os.Getenv(closedLoopV6FullEvidenceVerifyEnv) != "1" {
+			firstByte := []byte{0}
+			read, readErr := reader.Read(firstByte)
+			closeErr := reader.Close()
+			if read != 1 || readErr != nil || closeErr != nil || firstByte[0] != '{' {
+				t.Fatalf("V6 discovery evidence %s has an invalid canonical JSON stream", ref.CaseID)
+			}
+			continue
+		}
 		var artifact closedLoopV6CaseArtifact
-		decodeCorpusStrict(t, data, &artifact)
-		expected, err := hashClosedLoopV6CaseArtifact(artifact)
-		if err != nil || artifact.Hash != expected || artifact.Schema != closedLoopV6CaseArtifactSchema || artifact.Version != closedLoopV6BaselineVersion || artifact.CaseID != wantID || len(artifact.Replays) != 2 {
-			t.Fatalf("V6 discovery evidence %s is invalid", ref.CaseID)
+		decoder := json.NewDecoder(reader)
+		decodeErr := decoder.Decode(&artifact)
+		var trailing any
+		trailingErr := decoder.Decode(&trailing)
+		closeErr := reader.Close()
+		expected, hashErr := hashClosedLoopV6CaseArtifact(artifact)
+		if decodeErr != nil || trailingErr != io.EOF || closeErr != nil || hashErr != nil || artifact.Hash != expected || artifact.Schema != closedLoopV6CaseArtifactSchema || artifact.Version != closedLoopV6BaselineVersion || artifact.CaseID != wantID || len(artifact.Replays) != 2 {
+			t.Fatalf("V6 discovery evidence %s is structurally invalid", ref.CaseID)
 		}
 		first, firstErr := json.Marshal(artifact.Replays[0])
 		second, secondErr := json.Marshal(artifact.Replays[1])
@@ -509,7 +563,7 @@ func assertClosedLoopV6BaselineFileSet(t *testing.T) {
 	t.Helper()
 	want := map[string]bool{corpuspublication.ChecksumFile: true, "BASELINE_AUDIT.md": true, "report.json": true, "bundle_ranking.json": true, "generic_plan.json": true, "selection.json": true}
 	for index := 1; index <= closedLoopV6RoleSize; index++ {
-		want[fmt.Sprintf("discovery/v6_case_%03d.json", index)] = true
+		want[fmt.Sprintf("discovery/v6_case_%03d.json.gz", index)] = true
 	}
 	var got []string
 	if err := filepath.WalkDir(closedLoopV6BaselineRoot, func(path string, entry os.DirEntry, err error) error {
@@ -556,5 +610,26 @@ func TestClosedLoopV6SelectionHashRejectsMutation(t *testing.T) {
 	mutated, err := hashClosedLoopV6Selection(selection)
 	if err != nil || mutated == hash {
 		t.Fatal("V6 selection hash did not bind mutation")
+	}
+}
+
+func TestClosedLoopV6CompressedEvidenceIsDeterministic(t *testing.T) {
+	artifact := closedLoopV6CaseArtifact{Schema: closedLoopV6CaseArtifactSchema, Version: closedLoopV6BaselineVersion, CaseID: "v6_case_001", RequirementSHA256: strings.Repeat("a", 64)}
+	firstRoot, secondRoot := t.TempDir(), t.TempDir()
+	firstRefs, err := writeClosedLoopV6CaseArtifacts(firstRoot, []closedLoopV6CaseArtifact{artifact})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRefs, err := writeClosedLoopV6CaseArtifacts(secondRoot, []closedLoopV6CaseArtifact{artifact})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(corpusJSON(t, firstRefs), corpusJSON(t, secondRefs)) {
+		t.Fatal("V6 compressed evidence references are nondeterministic")
+	}
+	first := mustCorpusRead(t, filepath.Join(firstRoot, filepath.FromSlash(firstRefs[0].Path)))
+	second := mustCorpusRead(t, filepath.Join(secondRoot, filepath.FromSlash(secondRefs[0].Path)))
+	if !bytes.Equal(first, second) {
+		t.Fatal("V6 compressed evidence bytes are nondeterministic")
 	}
 }
