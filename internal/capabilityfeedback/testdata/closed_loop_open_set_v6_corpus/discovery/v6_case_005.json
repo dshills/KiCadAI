@@ -1,0 +1,66 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "capacitance_frequency_monitor",
+    "title": "Capacitance-to-Frequency Monitor",
+    "description": "Express a bounded external capacitance as a logic waveform with separated frequency bands, stable duty cycle, and controlled supply loading."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "sensor_return", "kind": "reference", "source": "external"},
+      {"id": "sensor_supply", "kind": "supply", "min_voltage_v": 3.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.025, "source": "external"}
+    ],
+    "ports": [
+      {"id": "capacitance_terminal", "kind": "analog_voltage", "direction": "sink", "domain": "sensor_return", "electrical": {"min_voltage_v": 0.0, "max_voltage_v": 3.6, "input_impedance_min_ohm": 1000000.0}},
+      {"id": "frequency_output", "kind": "digital", "direction": "source", "domain": "sensor_supply", "electrical": {"min_voltage_v": 0.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.004}},
+      {"id": "sampling_enable", "kind": "digital", "direction": "sink", "domain": "sensor_supply", "electrical": {"min_voltage_v": 0.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "input_impedance_min_ohm": 100000.0, "default_state": "low"}},
+      {"id": "sensor_power", "kind": "power", "direction": "sink", "domain": "sensor_supply", "electrical": {"min_voltage_v": 3.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.025}},
+      {"id": "sensor_common", "kind": "reference", "direction": "bidirectional", "domain": "sensor_return", "electrical": {"nominal_voltage_v": 0.0}}
+    ],
+    "operating_cases": [
+      {
+        "id": "lower_capacitance_band",
+        "conditions": [
+          {"axis": "load_capacitance", "target": "capacitance_terminal", "min": 0.00000000008, "max": 0.00000000012, "unit": "F"},
+          {"axis": "supply_voltage", "target": "sensor_supply", "min": 3.0, "max": 3.6, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "frequency_output", "min": -20.0, "max": 70.0, "unit": "degC"},
+          {"axis": "model_corner", "target": "capacitance_terminal", "min": -1.0, "max": 1.0, "unit": "ratio"}
+        ]
+      },
+      {
+        "id": "upper_capacitance_band",
+        "conditions": [
+          {"axis": "load_capacitance", "target": "capacitance_terminal", "min": 0.00000000022, "max": 0.00000000028, "unit": "F"},
+          {"axis": "supply_voltage", "target": "sensor_supply", "min": 3.0, "max": 3.6, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "frequency_output", "min": -20.0, "max": 70.0, "unit": "degC"},
+          {"axis": "tolerance_corner", "target": "frequency_output", "min": -1.0, "max": 1.0, "unit": "ratio"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "lower_band_frequency", "metric": "oscillation_frequency", "analysis": "transient", "excitation": {"kind": "port", "id": "capacitance_terminal"}, "observation": {"kind": "port", "id": "frequency_output"}, "min": 18000.0, "max": 26000.0, "unit": "Hz", "operating_cases": ["lower_capacitance_band"], "critical": true},
+      {"id": "upper_band_frequency", "metric": "oscillation_frequency", "analysis": "transient", "excitation": {"kind": "port", "id": "capacitance_terminal"}, "observation": {"kind": "port", "id": "frequency_output"}, "min": 7000.0, "max": 12000.0, "unit": "Hz", "operating_cases": ["upper_capacitance_band"], "critical": true},
+      {"id": "waveform_balance", "metric": "duty_cycle", "analysis": "transient", "observation": {"kind": "port", "id": "frequency_output"}, "min": 35.0, "max": 65.0, "unit": "%", "operating_cases": ["lower_capacitance_band", "upper_capacitance_band"]},
+      {"id": "logic_high_level", "metric": "output_high_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "frequency_output"}, "min": 2.6, "max": 3.6, "unit": "V", "operating_cases": ["lower_capacitance_band", "upper_capacitance_band"]},
+      {"id": "supply_demand", "metric": "quiescent_current", "analysis": "electrothermal", "observation": {"kind": "port", "id": "sensor_power"}, "max": 0.012, "unit": "A", "operating_cases": ["lower_capacitance_band", "upper_capacitance_band"]}
+    ],
+    "constraints": {"max_components": 20, "max_width_mm": 36.0, "max_height_mm": 26.0}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

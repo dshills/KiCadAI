@@ -1,0 +1,41 @@
+{
+  "schema": "kicadai.closed-loop-open-set-authorship.v6",
+  "version": 6,
+  "author_context_identity": "isolated_author_1_context_20260811_121331z_corrections_discovery_power_observation_power_step_event_and_multi_output_case_coverage",
+  "author_slot": "author_1",
+  "authoring_tool_model_version": "OpenAI Codex, GPT-5",
+  "authoring_started_utc": "2026-08-11T13:51:56Z",
+  "authoring_ended_utc": "2026-08-11T13:58:40Z",
+  "per_author_packet_manifest": "AUTHOR_1_PACKET.sha256",
+  "per_author_packet_sha256": "6b771afed3616bc6c325f6296f489952fe848c2d41ae1563dc9a1d000fa8ae40",
+  "contract_binding_sha256": "efa6908048f41aa6dc8ce6b6c3429e04ae76c15a29c6b6b0826f063512f52487",
+  "assignment_sha256": "ba53ccdb54f1869feac1dce378e363289227bbcaffe7b41ea29302f3cdb4def5",
+  "returned_bundle_root": "author_1",
+  "requirement_source_sha256": [
+    {"path":"discovery/request_001.json","sha256":"9f7f5cedcd5512450aac38c93dceaed72bd731b189eee3dbc232c7d9661fb801"},
+    {"path":"discovery/request_002.json","sha256":"11b4d46cb2ae565c37a1fc351f1cb8faab7f35587d9619f1f3ee4f410dc82eec"},
+    {"path":"discovery/request_003.json","sha256":"00f20f17f82c2a21b03aee3e74c6feea1e949f79765c528d92c3d4c664ace428"},
+    {"path":"discovery/request_004.json","sha256":"885962bda05259d427473d3b003d28e6ffb55ac55097e869ed454460d7495be9"},
+    {"path":"discovery/request_005.json","sha256":"13ad7ee91b916dc67029b131d119b6a20459ed3acb7d0e627d494744448ec78c"},
+    {"path":"discovery/request_006.json","sha256":"60d6bcde29469a4d99cd398dce84df210061c669790b9efb2db70cef7511c199"},
+    {"path":"held_out/request_019.json","sha256":"7306f177528f0a4634333cd4cfda81542a704891c69e7e6c6d56add729a35091"},
+    {"path":"held_out/request_020.json","sha256":"84c357ba763e5a4923da9584f6bf36b250f2c21b5519a39806e41b5d54c5ea67"},
+    {"path":"held_out/request_021.json","sha256":"78c1dc9d64f9347309eab97026e83d2df5e325dcb6065a32a245f59480cf0217"},
+    {"path":"held_out/request_022.json","sha256":"75a494f23369a8a655f049e7b748f1488331aae9d7bcbe3c0af21c86975451fb"},
+    {"path":"held_out/request_023.json","sha256":"85bfd188abc7bb81dfa6c3f37bba9482b5af7ffcc4b57cc95bed770f3cefcc8b"},
+    {"path":"held_out/request_024.json","sha256":"d87c5d0429fda5431677ddcb47ba679bd46f520a704a06ad10a47b929178d14e"}
+  ],
+  "uncertainties": [],
+  "attestations": {
+    "packet_only_input": true,
+    "contract_bound_before_authoring": true,
+    "no_repository_or_prior_corpus_access": true,
+    "no_cross_author_assignment_or_content_access": true,
+    "independently_conceived_behavior_only_requirements": true,
+    "no_synthesis_simulation_classification_or_feasibility": true,
+    "fixed_discovery_held_out_membership": true,
+    "no_implementation_or_expected_outcome_prescription": true,
+    "no_post_evaluation_inspection_or_modification": true,
+    "all_uncertainties_disclosed": true
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "commanded_current_interface",
+    "title": "Commanded Current Interface",
+    "description": "Convert a low-voltage command into a proportional grounded-load current with enable control, bounded dynamic response, and low disabled leakage."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "interface_return", "kind": "reference", "source": "external"},
+      {"id": "drive_supply", "kind": "supply", "min_voltage_v": 10.8, "nominal_voltage_v": 12.0, "max_voltage_v": 13.2, "max_current_a": 0.35, "source": "external"},
+      {"id": "command_supply", "kind": "supply", "min_voltage_v": 3.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.015, "source": "external"}
+    ],
+    "ports": [
+      {"id": "current_command", "kind": "analog_voltage", "direction": "sink", "domain": "command_supply", "electrical": {"min_voltage_v": 0.1, "nominal_voltage_v": 1.5, "max_voltage_v": 3.0, "input_impedance_min_ohm": 50000.0}},
+      {"id": "drive_enable", "kind": "digital", "direction": "sink", "domain": "command_supply", "electrical": {"min_voltage_v": 0.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "input_impedance_min_ohm": 100000.0, "default_state": "low"}},
+      {"id": "load_current", "kind": "controlled_current", "direction": "source", "domain": "interface_return", "electrical": {"min_voltage_v": 0.0, "max_voltage_v": 10.0, "max_current_a": 0.32}},
+      {"id": "drive_power", "kind": "power", "direction": "sink", "domain": "drive_supply", "electrical": {"min_voltage_v": 10.8, "nominal_voltage_v": 12.0, "max_voltage_v": 13.2, "max_current_a": 0.35}},
+      {"id": "command_power", "kind": "power", "direction": "sink", "domain": "command_supply", "electrical": {"min_voltage_v": 3.0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.015}},
+      {"id": "interface_common", "kind": "reference", "direction": "bidirectional", "domain": "interface_return", "electrical": {"nominal_voltage_v": 0.0}}
+    ],
+    "operating_cases": [
+      {
+        "id": "enabled_transfer",
+        "conditions": [
+          {"axis": "input_voltage", "target": "current_command", "min": 0.1, "max": 3.0, "unit": "V"},
+          {"axis": "supply_voltage", "target": "drive_supply", "min": 10.8, "max": 13.2, "unit": "V"},
+          {"axis": "load_resistance", "target": "load_current", "min": 10.0, "max": 30.0, "unit": "ohm"},
+          {"axis": "ambient_temperature", "target": "load_current", "min": -10.0, "max": 65.0, "unit": "degC"},
+          {"axis": "tolerance_corner", "target": "current_command", "min": -1.0, "max": 1.0, "unit": "ratio"}
+        ],
+        "events": [
+          {"id": "enable_assertion", "kind": "input_step", "target": "drive_enable", "trigger_time_s": 0.001, "initial": 0.0, "applied": 3.3, "unit": "V"},
+          {"id": "command_change", "kind": "input_step", "target": "current_command", "trigger_time_s": 0.002, "initial": 0.5, "applied": 2.5, "unit": "V"}
+        ]
+      },
+      {
+        "id": "disabled_state",
+        "conditions": [
+          {"axis": "input_voltage", "target": "current_command", "min": 0.1, "max": 3.0, "unit": "V"},
+          {"axis": "supply_voltage", "target": "drive_supply", "min": 10.8, "max": 13.2, "unit": "V"},
+          {"axis": "load_resistance", "target": "load_current", "min": 10.0, "max": 30.0, "unit": "ohm"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "command_gain", "metric": "transconductance", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "current_command"}, "observation": {"kind": "port", "id": "load_current"}, "min": 0.097, "max": 0.103, "unit": "A/V", "operating_cases": ["enabled_transfer"], "critical": true},
+      {"id": "delivered_current", "metric": "output_current", "analysis": "dc_sweep", "excitation": {"kind": "port", "id": "current_command"}, "observation": {"kind": "port", "id": "load_current"}, "min": 0.009, "max": 0.31, "unit": "A", "operating_cases": ["enabled_transfer"]},
+      {"id": "current_settling", "metric": "settling_time", "analysis": "transient", "excitation": {"kind": "port", "id": "current_command"}, "observation": {"kind": "port", "id": "load_current"}, "max": 0.0015, "unit": "s", "operating_cases": ["enabled_transfer"]},
+      {"id": "small_signal_bandwidth", "metric": "bandwidth", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "current_command"}, "observation": {"kind": "port", "id": "load_current"}, "min": 2500.0, "unit": "Hz", "operating_cases": ["enabled_transfer"]},
+      {"id": "disabled_current", "metric": "off_state_current", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "load_current"}, "max": 0.00005, "unit": "A", "operating_cases": ["disabled_state"], "critical": true}
+    ],
+    "constraints": {"max_components": 26, "max_width_mm": 48.0, "max_height_mm": 30.0}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

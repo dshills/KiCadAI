@@ -1,0 +1,101 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "field_supply_regulator",
+    "title": "Wide-Input Regulated Field Supply",
+    "description": "Provide a stable low-voltage output from a varying external source with bounded startup, load-step, thermal, and fault behavior."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "power_return", "kind": "reference", "source": "external"},
+      {"id": "field_input", "kind": "supply", "min_voltage_v": 9.0, "nominal_voltage_v": 12.0, "max_voltage_v": 16.0, "max_current_a": 1.2, "source": "external"}
+    ],
+    "ports": [
+      {"id": "source_feed", "kind": "power", "direction": "sink", "domain": "field_input", "electrical": {"min_voltage_v": 9.0, "nominal_voltage_v": 12.0, "max_voltage_v": 16.0, "max_current_a": 1.2}},
+      {"id": "regulated_feed", "kind": "power", "direction": "source", "domain": "power_return", "electrical": {"min_voltage_v": 4.85, "nominal_voltage_v": 5.0, "max_voltage_v": 5.15, "max_current_a": 0.8}},
+      {"id": "run_command", "kind": "digital", "direction": "sink", "domain": "power_return", "electrical": {"min_voltage_v": 0.0, "nominal_voltage_v": 3.3, "max_voltage_v": 5.0, "input_impedance_min_ohm": 50000.0, "default_state": "low"}},
+      {"id": "power_common", "kind": "reference", "direction": "bidirectional", "domain": "power_return", "electrical": {"nominal_voltage_v": 0.0}}
+    ],
+    "operating_cases": [
+      {
+        "id": "steady_delivery",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "field_input", "min": 9.0, "max": 16.0, "unit": "V"},
+          {"axis": "load_current", "target": "regulated_feed", "min": 0.05, "max": 0.8, "unit": "A"},
+          {"axis": "ambient_temperature", "target": "regulated_feed", "min": -30.0, "max": 75.0, "unit": "degC"},
+          {"axis": "model_corner", "target": "source_feed", "min": -1.0, "max": 1.0, "unit": "ratio"}
+        ]
+      },
+      {
+        "id": "energization",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "field_input", "min": 9.0, "max": 16.0, "unit": "V"},
+          {"axis": "load_current", "target": "regulated_feed", "min": 0.0, "max": 0.4, "unit": "A"}
+        ],
+        "events": [
+          {"id": "input_applied", "kind": "startup", "target": "source_feed", "trigger_time_s": 0.001, "initial": 0.0, "applied": 12.0, "unit": "V"}
+        ]
+      },
+      {
+        "id": "load_transition",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "field_input", "min": 10.0, "max": 14.0, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "regulated_feed", "min": 20.0, "max": 55.0, "unit": "degC"}
+        ],
+        "events": [
+          {"id": "demand_change", "kind": "load_step", "target": "regulated_feed", "trigger_time_s": 0.01, "initial": 0.1, "applied": 0.7, "unit": "A"}
+        ]
+      },
+      {
+        "id": "bounded_output_fault",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "field_input", "min": 10.0, "max": 14.0, "unit": "V"},
+          {"axis": "ambient_temperature", "target": "regulated_feed", "min": 20.0, "max": 55.0, "unit": "degC"}
+        ],
+        "events": [
+          {"id": "bounded_short", "kind": "short_circuit", "target": "regulated_feed", "trigger_time_s": 0.03, "initial": 5.0, "applied": 0.0, "unit": "V"}
+        ]
+      },
+      {
+        "id": "input_power_transition",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "field_input", "min": 9.0, "max": 16.0, "unit": "V"},
+          {"axis": "load_current", "target": "regulated_feed", "min": 0.2, "max": 0.6, "unit": "A"},
+          {"axis": "ambient_temperature", "target": "regulated_feed", "min": 20.0, "max": 55.0, "unit": "degC"}
+        ],
+        "events": [
+          {"id": "input_power_change", "kind": "power_step", "target": "source_feed", "trigger_time_s": 0.01, "initial": 10.0, "applied": 15.0, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "regulated_level", "metric": "output_voltage", "analysis": "dc_operating_point", "excitation": {"kind": "domain", "id": "field_input"}, "observation": {"kind": "port", "id": "regulated_feed"}, "min": 4.85, "max": 5.15, "unit": "V", "operating_cases": ["steady_delivery"], "critical": true},
+      {"id": "delivered_power", "metric": "output_power", "analysis": "electrothermal", "excitation": {"kind": "port", "id": "source_feed"}, "observation": {"kind": "port", "id": "regulated_feed"}, "min": 0.24, "max": 4.12, "unit": "W", "operating_cases": ["steady_delivery"], "critical": true},
+      {"id": "power_efficiency", "metric": "conversion_efficiency", "analysis": "electrothermal", "excitation": {"kind": "port", "id": "source_feed"}, "observation": {"kind": "circuit", "id": "energy_transfer"}, "min": 82.0, "unit": "%", "operating_cases": ["steady_delivery"]},
+      {"id": "startup_peak", "metric": "startup_current", "analysis": "startup", "excitation": {"kind": "port", "id": "source_feed"}, "observation": {"kind": "port", "id": "source_feed"}, "max": 1.1, "unit": "A", "operating_cases": ["energization"]},
+      {"id": "startup_excursion", "metric": "startup_overshoot", "analysis": "startup", "observation": {"kind": "port", "id": "regulated_feed"}, "max": 0.25, "unit": "V", "operating_cases": ["energization"]},
+      {"id": "load_recovery", "metric": "settling_time", "analysis": "transient", "excitation": {"kind": "port", "id": "regulated_feed"}, "observation": {"kind": "port", "id": "regulated_feed"}, "max": 0.003, "unit": "s", "operating_cases": ["load_transition"]},
+      {"id": "line_step_recovery", "metric": "settling_time", "analysis": "transient", "excitation": {"kind": "port", "id": "source_feed"}, "observation": {"kind": "port", "id": "regulated_feed"}, "max": 0.004, "unit": "s", "operating_cases": ["input_power_transition"], "critical": true},
+      {"id": "fault_current_limit", "metric": "peak_current", "analysis": "transient", "observation": {"kind": "port", "id": "regulated_feed"}, "max": 1.0, "unit": "A", "operating_cases": ["bounded_output_fault"], "critical": true},
+      {"id": "thermal_ceiling", "metric": "junction_temperature", "analysis": "thermal", "observation": {"kind": "circuit", "id": "hottest_active_region"}, "max": 125.0, "unit": "degC", "operating_cases": ["steady_delivery"], "critical": true}
+    ],
+    "constraints": {"max_components": 32, "max_width_mm": 62.0, "max_height_mm": 44.0}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

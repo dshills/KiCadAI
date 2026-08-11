@@ -1,0 +1,43 @@
+{
+  "schema": "kicadai.closed-loop-open-set-authorship.v6",
+  "version": 6,
+  "author_context_identity": "v6-author-2-isolated-context-20260811t120257z",
+  "author_slot": "author_2",
+  "authoring_tool_model_version": "OpenAI Codex, GPT-5; exact runtime build not exposed",
+  "authoring_started_utc": "2026-08-11T12:02:57Z",
+  "authoring_ended_utc": "2026-08-11T13:09:36Z",
+  "per_author_packet_manifest": "AUTHOR_2_PACKET.sha256",
+  "per_author_packet_sha256": "ac577c6f55efb7e24fd7468f38e14a5610a250d250b6adb7e4ad712b34e1a8fd",
+  "contract_binding_sha256": "efa6908048f41aa6dc8ce6b6c3429e04ae76c15a29c6b6b0826f063512f52487",
+  "assignment_sha256": "ef7acd01b18ecf6e07b9a0cadd8681e2ebcfbaa5a474188a760345c87a8bf162",
+  "returned_bundle_root": "author_2",
+  "requirement_source_sha256": [
+    {"path": "discovery/request_007.json", "sha256": "931d7154856e2a94bc067292e86049f6594c285bb2e7fab2a7e3f0db68ebeb32"},
+    {"path": "discovery/request_008.json", "sha256": "d3a5345f7ff32b1ae09fa27d6e832b27f85dfeab2cf36bc04fac5e072be262cb"},
+    {"path": "discovery/request_009.json", "sha256": "e76a0df406149dfa620bbcb53dd2d9fee4027acd09a4c85095867e311db90d11"},
+    {"path": "discovery/request_010.json", "sha256": "04331619ce0efc486da0a2ef2b5253b3991ca59d9164f7f651bef52b68bee494"},
+    {"path": "discovery/request_011.json", "sha256": "8f83d498e9f87507f58bdd9e19ce58345b0fdd41af0ad09ea9fadfd0a329fbcd"},
+    {"path": "discovery/request_012.json", "sha256": "246f916a59e89b6ebe8b3709a7156aaedac7e28857320f1cd89aa2e3a6fa2e98"},
+    {"path": "held_out/request_025.json", "sha256": "293924521b328af385c6e29231dd171ec7e13ec7ab9d4ff7adc34ab9eddd4e96"},
+    {"path": "held_out/request_026.json", "sha256": "efc5513d69a9941cec853223eba283b323094c196f6effbbecc8843a4d4fa58e"},
+    {"path": "held_out/request_027.json", "sha256": "5f3bb8d33b8faf41d746cb06437363bfe1a7d598e5ac1f01a22c0faa3c7172cf"},
+    {"path": "held_out/request_028.json", "sha256": "596d76089a86f8842ab36aa1452cf8f9ea5fbddb11bb361edd3722f2ff63e694"},
+    {"path": "held_out/request_029.json", "sha256": "b9fc05141a2bec9fc67717329151f3ada7586588ce98920e89f6f227d79354ec"},
+    {"path": "held_out/request_030.json", "sha256": "a993c8f33adcaba119132e75790bfab5c081c507f9aa2423fa6616ce7de51904"}
+  ],
+  "uncertainties": [
+    "The exact runtime build identifier for the authoring tool/model is not exposed in this context; the available Codex and GPT-5 identity is recorded without guessing a build."
+  ],
+  "attestations": {
+    "packet_only_input": true,
+    "contract_bound_before_authoring": true,
+    "no_repository_or_prior_corpus_access": true,
+    "no_cross_author_assignment_or_content_access": true,
+    "independently_conceived_behavior_only_requirements": true,
+    "no_synthesis_simulation_classification_or_feasibility": true,
+    "fixed_discovery_held_out_membership": true,
+    "no_implementation_or_expected_outcome_prescription": true,
+    "no_post_evaluation_inspection_or_modification": true,
+    "all_uncertainties_disclosed": true
+  }
+}
