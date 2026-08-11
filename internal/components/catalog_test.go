@@ -1006,6 +1006,20 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 	}
 	requireSymbolFunctions(t, comparator, "Comparator:LMV331", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
 	requirePackagePads(t, comparator, "sot23_5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	fastComparator := requireCatalogRecord(t, catalog, "comparator.ti.lmv7235m5.sot23_5")
+	if fastComparator.Generic || fastComparator.Lifecycle != "active" || fastComparator.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("fast comparator evidence = %#v", fastComparator)
+	}
+	requireRatingMax(t, fastComparator, "propagation_delay", "0.15", "us")
+	requireSymbolFunctions(t, fastComparator, "Comparator:LMV7219M5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	requirePackagePads(t, fastComparator, "sot23_5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	lowVoltageFastComparator := requireCatalogRecord(t, catalog, "comparator.ti.tlv9021dbvr.sot23_5")
+	if lowVoltageFastComparator.Generic || lowVoltageFastComparator.Lifecycle != "active" || lowVoltageFastComparator.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("low-voltage fast comparator evidence = %#v", lowVoltageFastComparator)
+	}
+	requireRatingMax(t, lowVoltageFastComparator, "propagation_delay", "0.15", "us")
+	requireSymbolFunctions(t, lowVoltageFastComparator, "Comparator:LMV7219M5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	requirePackagePads(t, lowVoltageFastComparator, "sot23_5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
 
 	relay := requireCatalogRecord(t, catalog, "relay.omron.g5q_1a.dc12")
 	if relay.Family != "relay" || relay.Generic || relay.MPN == "" || relay.Verification.Confidence != ConfidenceVerified {

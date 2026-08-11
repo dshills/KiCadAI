@@ -612,12 +612,10 @@ func firstValuePrimitive(
 	return PrimitiveCandidate{}, false
 }
 
-func TestRatingsCoverRequirementRejectsPropagationDelayOutsideDynamicEnvelope(t *testing.T) {
+func TestRatingsCoverRequirementRejectsPropagationDelayOutsideFrequencyEnvelope(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
-	maximumRiseTimeS := 5e-9
 	minimumFrequencyHz := 50e6
 	requirement.Requirements.BehavioralRequirements = []BehavioralAssertion{
-		{ID: "edge", Metric: "rise_time", Max: &maximumRiseTimeS, Unit: "s"},
 		{ID: "rate", Metric: "oscillation_frequency", Min: &minimumFrequencyHz, Unit: "Hz"},
 	}
 	maximumDelayUS := 1.0
@@ -627,14 +625,46 @@ func TestRatingsCoverRequirementRejectsPropagationDelayOutsideDynamicEnvelope(t 
 		Maximum: &maximumDelayUS,
 	}}}
 	if ratingsCoverRequirement(requirement, primitive) {
-		t.Fatal("one-microsecond primitive covered a five-nanosecond, fifty-megahertz dynamic envelope")
+		t.Fatal("one-microsecond primitive covered a fifty-megahertz frequency envelope")
 	}
 
 	maximumDelayNS := 2.0
 	primitive.Ratings[0].Unit = "ns"
 	primitive.Ratings[0].Maximum = &maximumDelayNS
 	if !ratingsCoverRequirement(requirement, primitive) {
-		t.Fatal("two-nanosecond primitive did not cover a five-nanosecond, fifty-megahertz dynamic envelope")
+		t.Fatal("two-nanosecond primitive did not cover a fifty-megahertz frequency envelope")
+	}
+}
+
+func TestRatingsCoverRequirementKeepsEdgeShapeIndependentFromPropagationDelay(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
+	maximumEdgeTimeS := 120e-9
+	requirement.Requirements.BehavioralRequirements = []BehavioralAssertion{
+		{ID: "rise", Metric: "rise_time", Max: &maximumEdgeTimeS, Unit: "s"},
+		{ID: "fall", Metric: "fall_time", Max: &maximumEdgeTimeS, Unit: "s"},
+	}
+	maximumDelayNS := 150.0
+	primitive := PrimitiveCandidate{Ratings: []PrimitiveBound{{
+		Kind:    "propagation_delay",
+		Unit:    "ns",
+		Maximum: &maximumDelayNS,
+	}}}
+	if !ratingsCoverRequirement(requirement, primitive) {
+		t.Fatal("component propagation rating was incorrectly compared with circuit edge-shape assertions")
+	}
+
+	maximumPropagationDelayS := 100e-9
+	requirement.Requirements.BehavioralRequirements = append(
+		requirement.Requirements.BehavioralRequirements,
+		BehavioralAssertion{
+			ID:     "latency",
+			Metric: "propagation_delay",
+			Max:    &maximumPropagationDelayS,
+			Unit:   "s",
+		},
+	)
+	if ratingsCoverRequirement(requirement, primitive) {
+		t.Fatal("component propagation rating exceeded the explicit propagation-delay assertion")
 	}
 }
 

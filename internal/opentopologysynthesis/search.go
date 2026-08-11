@@ -8060,9 +8060,41 @@ func compareRepresentativePrimitives(left, right PrimitiveCandidate, required ma
 	return cmp.Or(
 		cmp.Compare(primitiveEvidencePenalty(left.Evidence), primitiveEvidencePenalty(right.Evidence)),
 		cmp.Compare(-primitiveAnalysisCoverage(left, required), -primitiveAnalysisCoverage(right, required)),
+		cmp.Compare(
+			primitiveRequiredAnalysisEvidencePenalty(left, required),
+			primitiveRequiredAnalysisEvidencePenalty(right, required),
+		),
 		comparePositiveArea(left.AreaMM2, right.AreaMM2),
 		cmp.Compare(left.Key, right.Key),
 	)
+}
+
+func primitiveRequiredAnalysisEvidencePenalty(primitive PrimitiveCandidate, required map[string]bool) int {
+	if !required[simmodel.AnalysisElectrothermal] {
+		return 0
+	}
+	for _, model := range primitive.Models {
+		if model.ThermalModel != nil ||
+			(model.SupportsTransientSOA && len(model.TransientSOA) != 0) ||
+			primitiveModelHasSteadyThermalEvidence(model) {
+			return 0
+		}
+	}
+	return 1
+}
+
+func primitiveModelHasSteadyThermalEvidence(model PrimitiveModelContract) bool {
+	hasMaximumTemperature := false
+	hasThermalResistance := false
+	for _, parameter := range model.Parameters {
+		switch parameter.Name {
+		case "max_temperature_c":
+			hasMaximumTemperature = parameter.Value > 0
+		case "thermal_resistance_c_per_w", "junction_to_ambient_c_per_w":
+			hasThermalResistance = parameter.Value > 0
+		}
+	}
+	return hasMaximumTemperature && hasThermalResistance
 }
 
 func primitiveAnalysisCoverage(primitive PrimitiveCandidate, required map[string]bool) int {

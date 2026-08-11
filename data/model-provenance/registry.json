@@ -1120,6 +1120,50 @@
       }
     },
     {
+      "catalog_id": "comparator.ti.tlv9021dbvr.sot23_5",
+      "family": "comparator",
+      "model_id": "mna_comparator_open_collector_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/tlv9021.pdf",
+        "revision": "SNOSDA3H TLV9021 datasheet electrical-characteristics bounds",
+        "sha256": "f5feb69f17eebc223cb08c40944b03d26a8cdf1f846dcba75539c835827d776e",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "startup",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "comparator.ti.lmv7235m5.sot23_5",
+      "family": "comparator",
+      "model_id": "mna_comparator_open_collector_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lmv7235.pdf",
+        "revision": "SNOS532O LMV7235 datasheet electrical-characteristics bounds",
+        "sha256": "f5feb69f17eebc223cb08c40944b03d26a8cdf1f846dcba75539c835827d776e",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "startup",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "comparator.ti.tlv1701aidbvr.sot23_5",
       "family": "comparator",
       "model_id": "mna_comparator_open_collector_v1",

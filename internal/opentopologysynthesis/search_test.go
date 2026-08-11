@@ -117,6 +117,38 @@ func TestPrimitiveTopologySearchIsBoundedDeterministicAndProviderIndependent(t *
 	}
 }
 
+func TestRepresentativePrimitivePrefersRequiredElectrothermalEvidence(t *testing.T) {
+	required := map[string]bool{simmodel.AnalysisElectrothermal: true}
+	model := func(parameters ...simmodel.NamedValue) PrimitiveModelContract {
+		return PrimitiveModelContract{
+			ModelID:         simmodel.PrimitiveComparatorOpenCollectorV1,
+			Parameters:      parameters,
+			AllowedAnalyses: []string{simmodel.AnalysisTransient},
+		}
+	}
+	withoutThermalEvidence := PrimitiveCandidate{
+		Key:     "comparator.alpha",
+		AreaMM2: 1,
+		Models: []PrimitiveModelContract{model(
+			simmodel.NamedValue{Name: "max_temperature_c", Value: 125},
+		)},
+	}
+	withThermalEvidence := PrimitiveCandidate{
+		Key:     "comparator.zeta",
+		AreaMM2: 2,
+		Models: []PrimitiveModelContract{model(
+			simmodel.NamedValue{Name: "max_temperature_c", Value: 125},
+			simmodel.NamedValue{Name: "junction_to_ambient_c_per_w", Value: 100},
+		)},
+	}
+	if compareRepresentativePrimitives(withThermalEvidence, withoutThermalEvidence, required) >= 0 {
+		t.Fatal("electrothermal representative ranking did not retain the primitive with complete thermal evidence")
+	}
+	if compareRepresentativePrimitives(withoutThermalEvidence, withThermalEvidence, map[string]bool{simmodel.AnalysisTransient: true}) >= 0 {
+		t.Fatal("non-electrothermal representative ranking did not preserve deterministic area ordering")
+	}
+}
+
 func TestBehaviorScoringRecognizesGenericBufferedTimeConstant(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
 	inventory, _ := testHeldOutSynthesisEnvironment(t)

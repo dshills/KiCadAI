@@ -7885,7 +7885,7 @@ func ratingsCoverRequirement(requirement Requirement, primitive PrimitiveCandida
 	}
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		switch assertion.Metric {
-		case "propagation_delay", "rise_time", "fall_time":
+		case "propagation_delay":
 			if assertion.Max != nil && *assertion.Max > 0 {
 				requiredMaximumDelayS = math.Min(requiredMaximumDelayS, *assertion.Max)
 			}
