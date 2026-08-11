@@ -1,0 +1,382 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection-policy.v7",
+  "version": 7,
+  "starting_commit": "156f7eb439ca5313471c504ddb91db1b8a8724f0",
+  "starting_commit_expected_artifact": "v6_retirement_commitment",
+  "corpus_constraints": {
+    "total_case_count": 36,
+    "role_case_count": {
+      "discovery": 18,
+      "held_out": 18
+    },
+    "authors": 3,
+    "cases_per_author": 12,
+    "cases_per_author_per_role": 6,
+    "reporting_domains": [
+      "analog",
+      "power",
+      "digital",
+      "mcu",
+      "sensor",
+      "mixed_signal"
+    ],
+    "cases_per_domain_per_role": 3,
+    "cases_per_domain_total": 6,
+    "cases_per_author_domain_role": 1,
+    "safety_impact_category_total_minimum": 6,
+    "safety_impact_category_total_maximum": 12,
+    "primary_behavioral_requirement": "smallest_id_by_raw_unsigned_utf8_bytes_no_locale_or_array_order",
+    "primary_analysis_total_maximum": 12,
+    "primary_metric_total_maximum": 9,
+    "identifier_normalized_port_supply_shape_total_maximum": 6,
+    "acceptance_gate_count_per_case": 14,
+    "duplicate_normalized_signature_within_author_role": "prohibited",
+    "discovery_held_out_paired_variants": "prohibited",
+    "global_comparison": [
+      "raw_hash",
+      "semantic_hash",
+      "identifier_normalized_semantic_hash",
+      "near_duplicate_signature"
+    ],
+    "maximum_correction_packets_per_author_context": 3,
+    "maximum_replacement_author_contexts_per_assignment": 2,
+    "invalid_final_replacement": "retire_before_synthesis"
+  },
+  "candidate_unit": "adaptive_causal_chain_round_bundle",
+  "atom_identity_fields": [
+    "scope",
+    "capability"
+  ],
+  "member_identity_fields": [
+    "stage",
+    "scope",
+    "capability",
+    "code"
+  ],
+  "identity_encoding": "ordered_utf8_fields_each_prefixed_by_u32_big_endian_byte_length",
+  "frontier_source": {
+    "root_members": "complete_normalized_typed_root_gaps",
+    "include_causal_suppression_edges": true,
+    "include_transition_lineage": true
+  },
+  "eligible_outcomes": [
+    "unsupported",
+    "exhausted"
+  ],
+  "adaptive_rounds": {
+    "maximum_rounds": 3,
+    "maximum_total_capability_atoms": 9,
+    "maximum_total_exact_members": 27,
+    "prior_atom_reselection": "prohibited",
+    "one_implementation_per_round": true,
+    "one_discovery_evaluation_per_round": true,
+    "stop_at_first_public_pass_uplift": true
+  },
+  "cohort": {
+    "expected_discovery_case_count": 18,
+    "generation_zero": "all_discovery_cases_with_eligible_outcomes",
+    "advancement_rule": {
+      "operator": "subset",
+      "left": "case.complete_current_frontier.exact_members",
+      "right": "round.bundle.exact_members"
+    },
+    "uncovered_case_rule": {
+      "frontier": "carry_forward_unchanged_unless_seal_bound_shared_effect_has_admitted_lineage",
+      "round_advancement_credit": false,
+      "later_round_eligibility": true
+    },
+    "regression_scope": "all_discovery_cases_in_every_round"
+  },
+  "bundle_generation": {
+    "discovery_only": true,
+    "maximum_round_capability_atoms": 3,
+    "maximum_round_exact_members": 9,
+    "maximum_candidate_bundles": 262144,
+    "minimum_atom_active_case_support": 2,
+    "require_minimal_frontier_cover": true,
+    "reject_empty_frontiers": true,
+    "reject_duplicate_atoms": true,
+    "reject_duplicate_members": true,
+    "reject_duplicate_cases": true,
+    "candidate_overflow": "fail_closed_no_truncation"
+  },
+  "eligibility": {
+    "minimum_advanced_active_cases": 2,
+    "minimum_reporting_domains": 2,
+    "applies_to_every_round": true,
+    "final_round_relaxation": false,
+    "rationale": "generic_reuse_evidence_is_required_even_near_the_round_ceiling"
+  },
+  "ranking": [
+    "covered_active_case_count_desc",
+    "covered_active_domain_count_desc",
+    "covered_active_safety_weight_desc",
+    "capability_atom_count_asc",
+    "exact_member_count_asc"
+  ],
+  "safety_weight_value_type": "nonnegative_integer",
+  "safety_weight_mapping": {
+    "non_safety": 0,
+    "review_required": 1,
+    "safety_relevant": 3,
+    "safety_critical": 5
+  },
+  "publication_order": "semantic_ranking_then_canonical_bundle_key_asc",
+  "tie_behavior": "publish_complete_semantic_co_rank_one_set_then_select_canonical_bundle_key_asc",
+  "tie_rationale": "fallback_is_reproducible_selection_among_equal_impact_candidates_not_additional_impact_evidence",
+  "round_plan_admission": {
+    "require_complete_generic_plan": true,
+    "require_all_atoms_planned": true,
+    "require_all_members_planned": true,
+    "prerequisite_admission": {
+      "must_be_listed_before_implementation": true,
+      "must_be_required_for_selected_capability_compile_execution_or_shared_invariant": true,
+      "must_have_no_independent_unselected_outcome_effect": true,
+      "must_map_every_changed_path_to_selected_member": true,
+      "mechanical_no_independent_effect_evidence": [
+        "reverse_call_graph",
+        "registry_references",
+        "configuration_loader_references",
+        "catalog_and_model_references",
+        "data_references",
+        "focused_runtime_consumer_trace"
+      ],
+      "unbounded_dynamic_lookup_or_unmapped_consumer": "reject",
+      "separable_or_unrelated_change": "reject"
+    },
+    "unexecutable_rank_one": "fail_closed_no_fallback"
+  },
+  "round_progress": {
+    "require_selected_member_removal_for_every_retained_case": true,
+    "require_nonempty_next_frontier_for_retained_nonpass": true,
+    "require_nonselected_gap_identity_or_admitted_successor": true,
+    "require_no_pass_regression": true,
+    "require_no_unsafe_to_pass": true,
+    "require_deterministic_replay": true,
+    "require_complete_physical_promotion_for_pass": true
+  },
+  "gap_stage_order": [
+    {
+      "ordinal": 0,
+      "stages": [
+        "schema",
+        "strict_decode",
+        "requirement",
+        "validation"
+      ]
+    },
+    {
+      "ordinal": 1,
+      "stages": [
+        "intent",
+        "requirement_realizability",
+        "behavioral_compilation"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "stages": [
+        "architecture",
+        "architecture_generation",
+        "architecture_search",
+        "topology_search",
+        "topology_repair",
+        "synthesis",
+        "open_topology_synthesis",
+        "lowering"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "stages": [
+        "equation_sizing",
+        "value_search"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "stages": [
+        "component_evidence",
+        "component_selection",
+        "electrical"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "stages": [
+        "simulation"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "stages": [
+        "schematic",
+        "physical",
+        "placement"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "stages": [
+        "connectivity",
+        "routing"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "stages": [
+        "writer"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "stages": [
+        "erc",
+        "drc",
+        "kicad_verification"
+      ]
+    },
+    {
+      "ordinal": 10,
+      "stages": [
+        "round_trip",
+        "integrity",
+        "replay",
+        "verification"
+      ]
+    }
+  ],
+  "gap_stage_aliases": {
+    "roundtrip": "round_trip"
+  },
+  "gap_stage_normalization": "apply_exact_alias_once_before_order_lookup_then_reject_unknown",
+  "unknown_gap_stage": "fail_closed",
+  "gap_lineage_successor": {
+    "same_case": true,
+    "same_assertion_observation_causal_token": true,
+    "same_scope": true,
+    "same_capability": true,
+    "stage_relation": "destination_ordinal_greater_than_or_equal_to_source_ordinal_in_gap_stage_order",
+    "required_evidence_relation": "equal_or_strict_superset",
+    "unrelated_beneficial_side_effect": "reject_as_ambiguous_selected_bundle_causality"
+  },
+  "unsafe_gate": {
+    "outcome": "unsafe",
+    "causes": [
+      "critical_safety_assertion_failed",
+      "required_safety_evidence_absent",
+      "safety_critical_physical_promotion_violation"
+    ],
+    "prior_unsafe_to_later_pass": "prohibited",
+    "unlock_or_advancement_credit": false
+  },
+  "deterministic_execution": {
+    "exact_environment_manifest": [
+      "operating_system",
+      "hardware_architecture",
+      "cpu_feature_set",
+      "go_toolchain",
+      "runtime",
+      "kicad_version",
+      "solver_versions"
+    ],
+    "fixed_worker_count": true,
+    "fixed_traversal_order": true,
+    "fixed_random_sources": true,
+    "fixed_locale_timezone_and_floating_point_mode": true,
+    "outcome_affecting_subprocess_concurrency": 1,
+    "byte_identical_complete_export_required": true
+  },
+  "environment_transition": {
+    "immutable": [
+      "evaluator",
+      "synthesis_policy",
+      "gap_transition_policy",
+      "selection_policy",
+      "budgets",
+      "seeds",
+      "simulation_environment",
+      "installed_kicad_promotion_environment"
+    ],
+    "catalog_inventory_model_delta": "allowed_only_for_selected_component_or_model_capability_with_exact_seal_mapping",
+    "unmapped_change": "fail_closed"
+  },
+  "public_admission": {
+    "require_total_pass_uplift": true,
+    "minimum_new_active_cohort_passes": 1,
+    "require_exact_unique_case_set": true,
+    "require_complete_lineage": true,
+    "require_no_pass_regression": true,
+    "require_no_unsafe_to_pass": true
+  },
+  "held_out_influence": "prohibited",
+  "unsafe_case_unlock_credit": "prohibited",
+  "external_key_management": {
+    "bytes": 32,
+    "generation": "operating_system_csprng",
+    "distinct_key_per_role": true,
+    "file_mode": "0600_owner_read_write_only",
+    "creation": "atomic_no_replace_outside_repository",
+    "storage": "dedicated_non_repository_non_synced_directory_on_encrypted_volume_owned_by_separate_least_privilege_custodian_principal",
+    "audit": "log_key_creation_open_and_deletion_without_key_material",
+    "implementation_principal_access": "prohibited",
+    "file_storage_preflight": "prove_local_posix_owner_and_permission_enforcement_or_require_admitted_secret_store_kms_or_hsm",
+    "stronger_substitute": "os_credential_store_kms_or_hsm_with_equivalent_separation_no_export_audit_and_atomic_role_binding",
+    "transport": "never_command_argument_or_environment_variable",
+    "cipher": "AES-256-GCM",
+    "nonce": "unique_random_12_bytes_96_bits_per_record",
+    "authenticated_metadata": "frozen_ordered_utf8_fields_each_prefixed_by_u32_big_endian_byte_length"
+  },
+  "evidence_authority": "committed_clean_tree_local_harness_self_hashes_exact_toolchain_isolated_replays_and_external_custodian_attestations",
+  "github_actions_role": "automatic_post_push_non_authoritative_regression_signal_only",
+  "blind_final_preflight": {
+    "maximum_retries": 2,
+    "reveal_boundary": "first_authenticated_plaintext_record_or_baseline_payload_produced",
+    "retry_requires_no_authenticated_plaintext_produced": true,
+    "retry_requires_no_evaluation_started": true,
+    "post_reveal_resume": {
+      "maximum_resumes": 2,
+      "allowed_failure_class": "signed_hardware_os_or_storage_infrastructure_failure",
+      "checkpoint": "encrypted_authenticated_hash_chained_case_boundary",
+      "require_no_human_plaintext_outcome_or_diagnostic_access": true,
+      "require_unchanged_execution_bindings": true,
+      "reevaluate_completed_case": false,
+      "incomplete_case": "restart_from_original_deterministic_inputs"
+    },
+    "unproven_or_third_post_reveal_failure": "consume_without_resume"
+  },
+  "held_out_success_causality": {
+    "evaluation_context": "isolated_custodian_only_not_implementation_or_public_artifact",
+    "case_transition": "baseline_nonpass_to_final_pass",
+    "coverage": {
+      "operator": "ordered_chain_covers_hidden_blocker_lineage",
+      "chain": "selected_rounds",
+      "lineage": "held_out_case.hidden_baseline_lineage"
+    },
+    "disclosure": "boolean_only"
+  },
+  "held_out_disclosure": {
+    "success_plaintext_fields": [
+      "total_case_count",
+      "baseline_pass_count",
+      "final_pass_count",
+      "pass_uplift",
+      "regression_count",
+      "unsafe_to_pass_count",
+      "causal_chain_covered",
+      "deterministic_replay_passed",
+      "complete_physical_evidence_passed"
+    ],
+    "prohibited_breakdowns": [
+      "domain",
+      "case",
+      "outcome_bucket",
+      "gap",
+      "diagnostic",
+      "frontier",
+      "lineage",
+      "timing"
+    ],
+    "terminal_failure": "non_revealing_permanent_audit_without_outcome_derived_aggregate"
+  }
+}
