@@ -1,0 +1,123 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v6",
+  "version": 6,
+  "selection_sha256": "9f1a9f8120d81b9c09a75dea382b6fcf6b94b15f620c05b37beb25217efab13b",
+  "selected_bundle_key": "39:10:simulation23:output_voltage_evidence30:8:topology17:complete_topology41:8:topology28:multi_obligation_composition34:9:component20:catalog_value_domain",
+  "implementation_commit": "0a2449f9d2249e98c9ea5e8778862280223b02df",
+  "review": "prism_reviewed_no_high_or_medium_findings",
+  "capability_bindings": [
+    {
+      "capability": "catalog_value_domain",
+      "artifact_paths": [
+        "data/components/audio_power.json",
+        "data/model-provenance/registry.json",
+        "internal/opentopologysynthesis/search.go",
+        "internal/opentopologysynthesis/value_domains.go"
+      ]
+    },
+    {
+      "capability": "complete_topology",
+      "artifact_paths": [
+        "internal/opentopologysynthesis/graph.go",
+        "internal/opentopologysynthesis/graph_validate.go",
+        "internal/opentopologysynthesis/nonlinear_switching_relationship.go",
+        "internal/opentopologysynthesis/search.go",
+        "internal/opentopologysynthesis/value_domains.go"
+      ]
+    },
+    {
+      "capability": "multi_obligation_composition",
+      "artifact_paths": [
+        "internal/opentopologysynthesis/graph.go",
+        "internal/opentopologysynthesis/multi_output_composition.go",
+        "internal/opentopologysynthesis/realizability.go",
+        "internal/opentopologysynthesis/search.go",
+        "internal/opentopologysynthesis/validate.go"
+      ]
+    },
+    {
+      "capability": "output_voltage_evidence",
+      "artifact_paths": [
+        "internal/opentopologysynthesis/nonlinear_switching_relationship.go",
+        "internal/opentopologysynthesis/search.go"
+      ]
+    }
+  ],
+  "production_artifacts": [
+    {
+      "path": "data/components/audio_power.json",
+      "sha256": "6701797391cc6c2e61fd28a0b584f0e88a855f9d36bf218831add6e6663b764b"
+    },
+    {
+      "path": "data/model-provenance/registry.json",
+      "sha256": "0d26168dae3083c70d28990c584e1400a7757f79e69de845d4630515fba99fd8"
+    },
+    {
+      "path": "internal/opentopologysynthesis/graph.go",
+      "sha256": "5741fad1c5b903360ac01820b706133ee148b453056875c05400669c75a249e1"
+    },
+    {
+      "path": "internal/opentopologysynthesis/graph_validate.go",
+      "sha256": "7eb5b2d09aca5b18b1d4847fb35454f2b6f2c26fb5ca93b7c35fce8889ba0fe4"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_output_composition.go",
+      "sha256": "233c0d4756e8c02bb7149308335acb99fe82419d520ba21e00d7f51ef7e9d86f"
+    },
+    {
+      "path": "internal/opentopologysynthesis/nonlinear_switching_relationship.go",
+      "sha256": "7558b5bd3b9c1d9a44a54514c3a8b31a97a5952d2edb05412e012a29af8a6681"
+    },
+    {
+      "path": "internal/opentopologysynthesis/realizability.go",
+      "sha256": "72ed3d24daf3ac80f90929a7ab8bf4ce4bc01377913998e52fd4e4d7599c54c1"
+    },
+    {
+      "path": "internal/opentopologysynthesis/search.go",
+      "sha256": "f899f48ff0d86281bd5d147cf8ae856f64ba0bba59d211ddfa1879a675da8a6b"
+    },
+    {
+      "path": "internal/opentopologysynthesis/validate.go",
+      "sha256": "98dfbddead3a4d96b28adba6b651bf8233745e2ea1e7a2f5777ecc9c2742f8a9"
+    },
+    {
+      "path": "internal/opentopologysynthesis/value_domains.go",
+      "sha256": "e8d859d661beff637f85b20340e523e4437622b2a17df8903d4bcb8d065cc766"
+    }
+  ],
+  "verification_artifacts": [
+    {
+      "path": "internal/components/catalog_test.go",
+      "sha256": "00bb15dd512be7d38db8ac5282e947a6b52be0553d7f9b27110893c615ab2c2d"
+    },
+    {
+      "path": "internal/components/testdata/golden/coverage_checked_in.json",
+      "sha256": "ab7d01243eda1071efee5ccfe1d7b32605db16d310c1314c266cd61ab33c891a"
+    },
+    {
+      "path": "internal/opentopologysynthesis/graph_test.go",
+      "sha256": "f23545f0b555748e784e4dd2b9009db07d15b8a44cf2f9078a446fab57317d3d"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_output_composition_test.go",
+      "sha256": "debb65a1f36b2c08131717fb5c81863b540bf536c007d5173d2ad2b4d94af698"
+    },
+    {
+      "path": "internal/opentopologysynthesis/nonlinear_switching_simulation_test.go",
+      "sha256": "8fea72b2703beac94a97ad1ee9e60c4ad437397faa3c3354ce9f2ed1e92088ef"
+    },
+    {
+      "path": "internal/opentopologysynthesis/realizability_test.go",
+      "sha256": "b300bab19f6446b904269dbb2d50dbd96e2441a5870134d10b0a99e98d75cfa9"
+    },
+    {
+      "path": "internal/opentopologysynthesis/search_test.go",
+      "sha256": "489aa830b6ad7417200ef38ee4fce83c98688c7b958a36587a01df34463fbcbe"
+    },
+    {
+      "path": "internal/opentopologysynthesis/value_domains_test.go",
+      "sha256": "359293ef6506a30d1d367161f755153979d9276cbfd61fe5127af0c833605d9b"
+    }
+  ],
+  "hash": "76ef8f3a2328b2de42ca2fe6af50e09d822b4365bd3bf5a4665a68edc9854c8e"
+}

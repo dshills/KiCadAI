@@ -15,14 +15,21 @@ const (
 )
 
 type closedLoopV6ImplementationSeal struct {
-	Schema               string                       `json:"schema"`
-	Version              int                          `json:"version"`
-	SelectionSHA256      string                       `json:"selection_sha256"`
-	SelectedBundleKey    string                       `json:"selected_bundle_key"`
-	ImplementationCommit string                       `json:"implementation_commit"`
-	Review               string                       `json:"review"`
-	Artifacts            []closedLoopArtifactEvidence `json:"artifacts"`
-	Hash                 string                       `json:"hash"`
+	Schema                string                          `json:"schema"`
+	Version               int                             `json:"version"`
+	SelectionSHA256       string                          `json:"selection_sha256"`
+	SelectedBundleKey     string                          `json:"selected_bundle_key"`
+	ImplementationCommit  string                          `json:"implementation_commit"`
+	Review                string                          `json:"review"`
+	CapabilityBindings    []closedLoopV6CapabilityBinding `json:"capability_bindings"`
+	ProductionArtifacts   []closedLoopArtifactEvidence    `json:"production_artifacts"`
+	VerificationArtifacts []closedLoopArtifactEvidence    `json:"verification_artifacts"`
+	Hash                  string                          `json:"hash"`
+}
+
+type closedLoopV6CapabilityBinding struct {
+	Capability    string   `json:"capability"`
+	ArtifactPaths []string `json:"artifact_paths"`
 }
 
 func TestClosedLoopV6ReviewedImplementationSealIsFrozen(t *testing.T) {
@@ -50,23 +57,31 @@ func TestUpdateClosedLoopV6ReviewedImplementationSeal(t *testing.T) {
 		}
 	}
 	selection := loadClosedLoopV6FrozenSelection(t)
-	paths := closedLoopV6ImplementationArtifactPaths()
 	moduleRoot := closedLoopModuleRoot(t)
-	artifacts := make([]closedLoopArtifactEvidence, 0, len(paths))
-	for _, path := range paths {
-		artifacts = append(artifacts, closedLoopArtifactEvidence{
-			Path:   path,
-			SHA256: corpusHash(mustCorpusRead(t, filepath.Join(moduleRoot, filepath.FromSlash(path)))),
-		})
+	artifactEvidence := func(paths []string) []closedLoopArtifactEvidence {
+		artifacts := make([]closedLoopArtifactEvidence, 0, len(paths))
+		for _, path := range paths {
+			artifacts = append(artifacts, closedLoopArtifactEvidence{
+				Path:   path,
+				SHA256: corpusHash(mustCorpusRead(t, filepath.Join(moduleRoot, filepath.FromSlash(path)))),
+			})
+		}
+		return artifacts
 	}
+	productionPaths := closedLoopV6ProductionArtifactPaths()
+	verificationPaths := closedLoopV6VerificationArtifactPaths()
+	productionArtifacts := artifactEvidence(productionPaths)
+	verificationArtifacts := artifactEvidence(verificationPaths)
 	seal := closedLoopV6ImplementationSeal{
-		Schema:               closedLoopV6ImplementationSealSchema,
-		Version:              closedLoopV6BaselineVersion,
-		SelectionSHA256:      selection.Hash,
-		SelectedBundleKey:    selection.Selected.Key,
-		ImplementationCommit: closedLoopV6ImplementationCommit,
-		Review:               closedLoopV6ImplementationReview,
-		Artifacts:            artifacts,
+		Schema:                closedLoopV6ImplementationSealSchema,
+		Version:               closedLoopV6BaselineVersion,
+		SelectionSHA256:       selection.Hash,
+		SelectedBundleKey:     selection.Selected.Key,
+		ImplementationCommit:  closedLoopV6ImplementationCommit,
+		Review:                closedLoopV6ImplementationReview,
+		CapabilityBindings:    closedLoopV6ImplementationCapabilityBindings(),
+		ProductionArtifacts:   productionArtifacts,
+		VerificationArtifacts: verificationArtifacts,
 	}
 	var err error
 	seal.Hash, err = hashClosedLoopV6ImplementationSeal(seal)
@@ -92,7 +107,8 @@ func loadClosedLoopV6HistoricalImplementationSeal(t *testing.T) closedLoopV6Impl
 	var seal closedLoopV6ImplementationSeal
 	decodeCorpusStrict(t, data, &seal)
 	selection := loadClosedLoopV6FrozenSelection(t)
-	paths := closedLoopV6ImplementationArtifactPaths()
+	productionPaths := closedLoopV6ProductionArtifactPaths()
+	verificationPaths := closedLoopV6VerificationArtifactPaths()
 	if seal.Schema != closedLoopV6ImplementationSealSchema {
 		t.Fatalf("V6 reviewed implementation schema = %q", seal.Schema)
 	}
@@ -108,14 +124,22 @@ func loadClosedLoopV6HistoricalImplementationSeal(t *testing.T) closedLoopV6Impl
 	if seal.Review != closedLoopV6ImplementationReview {
 		t.Fatalf("V6 reviewed implementation review = %q", seal.Review)
 	}
-	if len(seal.Artifacts) != len(paths) {
-		t.Fatalf("V6 reviewed implementation artifact count = %d, want %d", len(seal.Artifacts), len(paths))
+	wantBindings := closedLoopV6ImplementationCapabilityBindings()
+	if !equalClosedLoopV6CapabilityBindings(seal.CapabilityBindings, wantBindings) {
+		t.Fatalf("V6 reviewed implementation capability bindings = %#v, want %#v", seal.CapabilityBindings, wantBindings)
 	}
-	for index, artifact := range seal.Artifacts {
-		if artifact.Path != paths[index] || !closedLoopV6ValidHash(artifact.SHA256) {
-			t.Fatal("V6 reviewed implementation seal artifact set is invalid")
+	validateArtifacts := func(kind string, artifacts []closedLoopArtifactEvidence, paths []string) {
+		if len(artifacts) != len(paths) {
+			t.Fatalf("V6 reviewed implementation %s artifact count = %d, want %d", kind, len(artifacts), len(paths))
+		}
+		for index, artifact := range artifacts {
+			if artifact.Path != paths[index] || !closedLoopV6ValidHash(artifact.SHA256) {
+				t.Fatalf("V6 reviewed implementation %s artifact set is invalid", kind)
+			}
 		}
 	}
+	validateArtifacts("production", seal.ProductionArtifacts, productionPaths)
+	validateArtifacts("verification", seal.VerificationArtifacts, verificationPaths)
 	if want, err := hashClosedLoopV6ImplementationSeal(seal); err != nil || want != seal.Hash {
 		t.Fatal("V6 reviewed implementation seal hash is invalid")
 	}
@@ -126,36 +150,87 @@ func loadClosedLoopV6CurrentImplementationSeal(t *testing.T) closedLoopV6Impleme
 	t.Helper()
 	seal := loadClosedLoopV6HistoricalImplementationSeal(t)
 	moduleRoot := closedLoopModuleRoot(t)
-	for _, artifact := range seal.Artifacts {
-		path := filepath.Join(moduleRoot, filepath.FromSlash(artifact.Path))
-		if corpusHash(mustCorpusRead(t, path)) != artifact.SHA256 {
-			t.Fatalf("V6 reviewed implementation artifact drifted: %s", artifact.Path)
+	verifyArtifacts := func(artifacts []closedLoopArtifactEvidence) {
+		for _, artifact := range artifacts {
+			path := filepath.Join(moduleRoot, filepath.FromSlash(artifact.Path))
+			if corpusHash(mustCorpusRead(t, path)) != artifact.SHA256 {
+				t.Fatalf("V6 reviewed implementation artifact drifted: %s", artifact.Path)
+			}
 		}
 	}
+	verifyArtifacts(seal.ProductionArtifacts)
+	verifyArtifacts(seal.VerificationArtifacts)
 	return seal
 }
 
-func closedLoopV6ImplementationArtifactPaths() []string {
+func closedLoopV6ProductionArtifactPaths() []string {
 	return []string{
 		"data/components/audio_power.json",
 		"data/model-provenance/registry.json",
-		"internal/components/catalog_test.go",
-		"internal/components/testdata/golden/coverage_checked_in.json",
 		"internal/opentopologysynthesis/graph.go",
-		"internal/opentopologysynthesis/graph_test.go",
 		"internal/opentopologysynthesis/graph_validate.go",
 		"internal/opentopologysynthesis/multi_output_composition.go",
-		"internal/opentopologysynthesis/multi_output_composition_test.go",
 		"internal/opentopologysynthesis/nonlinear_switching_relationship.go",
-		"internal/opentopologysynthesis/nonlinear_switching_simulation_test.go",
 		"internal/opentopologysynthesis/realizability.go",
-		"internal/opentopologysynthesis/realizability_test.go",
 		"internal/opentopologysynthesis/search.go",
-		"internal/opentopologysynthesis/search_test.go",
 		"internal/opentopologysynthesis/validate.go",
 		"internal/opentopologysynthesis/value_domains.go",
+	}
+}
+
+func closedLoopV6VerificationArtifactPaths() []string {
+	return []string{
+		"internal/components/catalog_test.go",
+		"internal/components/testdata/golden/coverage_checked_in.json",
+		"internal/opentopologysynthesis/graph_test.go",
+		"internal/opentopologysynthesis/multi_output_composition_test.go",
+		"internal/opentopologysynthesis/nonlinear_switching_simulation_test.go",
+		"internal/opentopologysynthesis/realizability_test.go",
+		"internal/opentopologysynthesis/search_test.go",
 		"internal/opentopologysynthesis/value_domains_test.go",
 	}
+}
+
+func closedLoopV6ImplementationCapabilityBindings() []closedLoopV6CapabilityBinding {
+	return []closedLoopV6CapabilityBinding{
+		{Capability: "catalog_value_domain", ArtifactPaths: []string{
+			"data/components/audio_power.json", "data/model-provenance/registry.json",
+			"internal/opentopologysynthesis/search.go", "internal/opentopologysynthesis/value_domains.go",
+		}},
+		{Capability: "complete_topology", ArtifactPaths: []string{
+			"internal/opentopologysynthesis/graph.go", "internal/opentopologysynthesis/graph_validate.go",
+			"internal/opentopologysynthesis/nonlinear_switching_relationship.go",
+			"internal/opentopologysynthesis/search.go", "internal/opentopologysynthesis/value_domains.go",
+		}},
+		{Capability: "multi_obligation_composition", ArtifactPaths: []string{
+			"internal/opentopologysynthesis/graph.go",
+			"internal/opentopologysynthesis/multi_output_composition.go",
+			"internal/opentopologysynthesis/realizability.go", "internal/opentopologysynthesis/search.go",
+			"internal/opentopologysynthesis/validate.go",
+		}},
+		{Capability: "output_voltage_evidence", ArtifactPaths: []string{
+			"internal/opentopologysynthesis/nonlinear_switching_relationship.go",
+			"internal/opentopologysynthesis/search.go",
+		}},
+	}
+}
+
+func equalClosedLoopV6CapabilityBindings(left, right []closedLoopV6CapabilityBinding) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].Capability != right[index].Capability ||
+			len(left[index].ArtifactPaths) != len(right[index].ArtifactPaths) {
+			return false
+		}
+		for pathIndex := range left[index].ArtifactPaths {
+			if left[index].ArtifactPaths[pathIndex] != right[index].ArtifactPaths[pathIndex] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func hashClosedLoopV6ImplementationSeal(value closedLoopV6ImplementationSeal) (string, error) {
