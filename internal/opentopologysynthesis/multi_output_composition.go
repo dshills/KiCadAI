@@ -280,20 +280,42 @@ func mergeOutputTopologyCandidates(
 	state := initial
 	state.graph = CloneGraph(initial.graph)
 	state.operations = cloneGraphOperations(initial.operations)
-	externalNodes := map[string]bool{}
+	type externalNodeIdentity struct {
+		semanticKind string
+		semanticID   string
+		domain       string
+		role         string
+	}
+	externalNodes := map[externalNodeIdentity]string{}
 	for _, node := range state.graph.Nodes {
 		if node.Scope == "external" {
-			externalNodes[node.ID] = true
+			identity := externalNodeIdentity{
+				semanticKind: node.SemanticKind,
+				semanticID:   node.SemanticID,
+				domain:       node.Domain,
+				role:         node.Role,
+			}
+			if _, duplicate := externalNodes[identity]; duplicate {
+				return topologySearchState{}, false
+			}
+			externalNodes[identity] = node.ID
 		}
 	}
 	for _, candidate := range candidates {
 		nodeMapping := map[string]string{}
 		for _, node := range candidate.Graph.Nodes {
 			if node.Scope == "external" {
-				if !externalNodes[node.ID] {
+				identity := externalNodeIdentity{
+					semanticKind: node.SemanticKind,
+					semanticID:   node.SemanticID,
+					domain:       node.Domain,
+					role:         node.Role,
+				}
+				mappedNode, found := externalNodes[identity]
+				if !found {
 					return topologySearchState{}, false
 				}
-				nodeMapping[node.ID] = node.ID
+				nodeMapping[node.ID] = mappedNode
 				continue
 			}
 			var generatedNode string
@@ -351,7 +373,9 @@ func mergeOutputTopologyCandidates(
 		return topologySearchState{}, false
 	}
 	state.topology = topologyHash
-	state.score = scoreTopologyGraph(requirement, state.graph, inventoryByKey, state.hash)
+	state.score = scoreTopologyGraphWithPowerRequirements(
+		requirement, state.graph, inventoryByKey, state.hash, state.powerRequirements,
+	)
 	return state, true
 }
 

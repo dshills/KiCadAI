@@ -50,6 +50,119 @@ func TestNonlinearSwitchingRelationshipOperatorsProduceCompletePrimitiveGraphs(t
 	}
 }
 
+func TestStepDownRelationshipTiesEnableHighWithoutExternalControl(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(nonlinearSwitchingCorpusRoot(), "efficient_step_down_power.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	requirement.Requirements.Ports = slices.DeleteFunc(
+		requirement.Requirements.Ports,
+		func(port Port) bool { return port.ID == "enable" },
+	)
+	for index := range requirement.Requirements.OperatingCases {
+		operatingCase := &requirement.Requirements.OperatingCases[index]
+		operatingCase.Conditions = slices.DeleteFunc(
+			operatingCase.Conditions,
+			func(condition OperatingCondition) bool { return condition.Target == "enable" },
+		)
+		operatingCase.Events = slices.DeleteFunc(
+			operatingCase.Events,
+			func(event OperatingEvent) bool { return event.Target == "enable" },
+		)
+	}
+	requirement = Normalize(requirement)
+	if issues := Validate(requirement); len(issues) != 0 {
+		t.Fatalf("uncontrolled step-down requirement issues = %#v", issues)
+	}
+
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	var selected CandidateGraph
+	for _, candidate := range search.Candidates {
+		for _, instance := range candidate.Graph.Instances {
+			if instance.Kind != "synchronous_buck_regulator" {
+				continue
+			}
+			terminals := topologyTerminalNodes(instance)
+			if terminals["EN"] != terminals["PVIN"] || terminals["EN"] == "" {
+				t.Fatalf("uncontrolled step-down enable = %q, input rail = %q", terminals["EN"], terminals["PVIN"])
+			}
+			selected = CloneGraph(candidate.Graph)
+			break
+		}
+		if selected.Schema != "" {
+			break
+		}
+	}
+	if selected.Schema == "" {
+		t.Fatalf("uncontrolled step-down graph not found: status=%s rejections=%#v candidates=%d", search.Status, search.Rejections, len(search.Candidates))
+	}
+
+	var seriesNode string
+	selected, seriesNode = addInternalNode(selected, "power")
+	rewired := false
+	for instanceIndex := range selected.Instances {
+		instance := &selected.Instances[instanceIndex]
+		if instance.Kind != "inductor" {
+			continue
+		}
+		for terminalIndex := range instance.Terminals {
+			if instance.Terminals[terminalIndex].Node == "port_regulated_output" {
+				instance.Terminals[terminalIndex].Node = seriesNode
+				rewired = true
+			}
+		}
+	}
+	if !rewired {
+		t.Fatal("selected step-down graph lacks a direct output-inductor connection")
+	}
+	seriesResistor := topologyPrimitiveClosestValue(inventory.Primitives, "resistor", .1)
+	if seriesResistor.Key == "" {
+		t.Fatal("test inventory lacks a series resistor")
+	}
+	selected = AddPrimitive(
+		selected,
+		seriesResistor,
+		seedPrimitiveValue(seriesResistor),
+		topologyTwoTerminalPlacement(seriesNode, "port_regulated_output"),
+	)
+	index := newTopologyPowerEvidenceIndex(selected)
+	if !topologyGraphHasRegulatedPowerTransferToOutput(selected, index, "regulated_output") {
+		t.Fatal("step-down recognizer rejected a valid inductor path with a series sense element")
+	}
+}
+
+func TestRegulatedPowerRecognizerAllowsSeriesOutputElement(t *testing.T) {
+	graph := CandidateGraph{
+		Schema: CandidateGraphSchema, Version: CandidateGraphVersion,
+		Nodes: []GraphNode{
+			{ID: "port_input", Scope: "external", SemanticKind: "port", SemanticID: "input", Role: "supply"},
+			{ID: "port_ground", Scope: "external", SemanticKind: "port", SemanticID: "ground", Role: "reference"},
+			{ID: "port_output", Scope: "external", SemanticKind: "port", SemanticID: "output", Role: "output"},
+			{ID: "internal_filtered_input", Scope: "internal", Role: "power"},
+			{ID: "internal_sensed_ground", Scope: "internal", Role: "reference"},
+			{ID: "internal_sense", Scope: "internal", Role: "power"},
+		},
+		Instances: []GraphInstance{
+			{ID: "regulator", Kind: "fixed_voltage_regulator", Terminals: []TerminalConnection{
+				{Terminal: "VIN", Node: "internal_filtered_input"},
+				{Terminal: "VOUT", Node: "internal_sense"},
+				{Terminal: "GND", Node: "internal_sensed_ground"},
+			}},
+			{ID: "input_filter", Kind: "inductor", Terminals: topologyTwoTerminalPlacement("port_input", "internal_filtered_input")},
+			{ID: "ground_sense", Kind: "resistor", Terminals: topologyTwoTerminalPlacement("port_ground", "internal_sensed_ground")},
+			{ID: "sense", Kind: "resistor", Terminals: topologyTwoTerminalPlacement("internal_sense", "port_output")},
+		},
+	}
+	index := newTopologyPowerEvidenceIndex(graph)
+	if !topologyGraphHasRegulatedPowerTransferToOutput(graph, index, "output") {
+		t.Fatal("regulated-power recognizer rejected valid series rail and output elements")
+	}
+}
+
 func TestAutonomousPeriodicRelationshipUsesExternalTimingCapacitance(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,

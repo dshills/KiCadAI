@@ -511,6 +511,9 @@ func topologyStepDownRelationshipSeeds(
 	if highRail == "" || lowRail == "" || len(references) != 1 {
 		return nil, Consumption{}, map[string][]string{"relationship_gap": {"step-down energy transfer requires one ordered input supply and one reference"}}
 	}
+	if behavior.enable == "" && primitiveMaximumRating(regulator, "enable_voltage") < inputMax {
+		return nil, Consumption{}, map[string][]string{"dynamic_envelope_unsupported": {fmt.Sprintf("reviewed step-down primitive cannot tie enable to the %.12g V input envelope", inputMax)}}
+	}
 	frequency := primitiveModelParameter(regulator, simmodel.PrimitiveSynchronousBuckRegulatorV1, "switching_frequency_hz")
 	referenceV := primitiveModelParameter(regulator, simmodel.PrimitiveSynchronousBuckRegulatorV1, "reference_voltage_v")
 	if frequency <= 0 || referenceV <= 0 || outputVoltage <= referenceV {
@@ -552,7 +555,10 @@ func topologyStepDownRelationshipSeeds(
 	if switchNode == "" || feedbackNode == "" {
 		return nil, consumption, map[string][]string{"graph_limit": {"step-down energy transfer requires switch and feedback internal nodes"}}
 	}
-	outputNode, enableNode := "port_"+behavior.output, "port_"+behavior.enable
+	outputNode, enableNode := "port_"+behavior.output, highRail
+	if behavior.enable != "" {
+		enableNode = "port_" + behavior.enable
+	}
 	state = addRelationshipPrimitive(state, requirement, inventoryByKey, regulator, []TerminalConnection{
 		{Terminal: "PVIN", Node: highRail}, {Terminal: "SW", Node: switchNode}, {Terminal: "FB", Node: feedbackNode},
 		{Terminal: "AGND", Node: lowRail}, {Terminal: "PGND", Node: lowRail}, {Terminal: "EN", Node: enableNode},
@@ -717,7 +723,7 @@ func topologyStepDownBehavior(requirement Requirement) (topologyStepDownEnvelope
 	valid := finite(envelope.inputMinimumV) && envelope.inputMaximumV > envelope.inputMinimumV &&
 		envelope.outputVoltageV > 0 && envelope.outputVoltageV < envelope.inputMinimumV &&
 		envelope.outputCurrentA > 0 && envelope.minimumEfficiencyPct > 0 &&
-		envelope.output != "" && envelope.enable != ""
+		envelope.output != ""
 	return envelope, valid
 }
 

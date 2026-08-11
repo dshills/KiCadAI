@@ -1,7 +1,9 @@
 package opentopologysynthesis
 
 import (
+	"bytes"
 	"context"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -134,6 +136,88 @@ func TestMultiOutputCompositionMergesIndependentBehaviorConesDeterministically(t
 			t.Fatalf("composed topology left output %s disconnected: %#v", outputID, first.Candidates[0].Graph)
 		}
 	}
+}
+
+func TestMultiOutputObligationsPermitIndependentPowerTransfer(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(nonlinearSwitchingCorpusRoot(), "efficient_step_down_power.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("step-down requirement issues = %#v", issues)
+	}
+	requirement.Requirements.Ports = append(requirement.Requirements.Ports,
+		Port{ID: "status_command", Kind: "digital", Direction: "sink", Domain: "logic_supply"},
+		Port{ID: "status_output", Kind: "digital", Direction: "source", Domain: "logic_supply"},
+	)
+	requirement.Requirements.Domains = append(requirement.Requirements.Domains, Domain{
+		ID: "logic_supply", Kind: "supply", Source: "external",
+		MinVoltageV: graphFloat(3), NominalVoltageV: graphFloat(3.3), MaxVoltageV: graphFloat(3.6),
+	})
+	requirement.Requirements.BehavioralRequirements = append(
+		requirement.Requirements.BehavioralRequirements,
+		BehavioralAssertion{
+			ID: "status_high", Metric: "output_high_voltage", Analysis: "dc_operating_point",
+			Excitation:  &Observation{Kind: "port", ID: "status_command"},
+			Observation: Observation{Kind: "port", ID: "status_output"},
+			Min:         graphFloat(2.7), Unit: "V", OperatingCases: []string{"nominal_load"},
+		},
+	)
+	requirement = Normalize(requirement)
+	if issues := Validate(requirement); len(issues) != 0 {
+		t.Fatalf("mixed-output requirement issues = %#v", issues)
+	}
+
+	obligations := multiOutputObligations(requirement)
+	if len(obligations) != 2 {
+		t.Fatalf("multi-output obligations = %d, want 2", len(obligations))
+	}
+	for _, obligation := range obligations {
+		if obligation.outputID != "regulated_output" {
+			continue
+		}
+		for _, port := range obligation.requirement.Requirements.Ports {
+			if port.Kind == "digital" {
+				t.Fatalf("independent power-transfer obligation retained unrelated digital port %q", port.ID)
+			}
+		}
+		if issues := Validate(obligation.requirement); len(issues) != 0 {
+			t.Fatalf("independent power-transfer obligation issues = %#v", issues)
+		}
+		inventory, _ := testHeldOutSynthesisEnvironment(t)
+		policy := DefaultPolicy()
+		policy.MaxRetainedCandidates = 4
+		search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+		if search.Status != TopologySearchCandidates || len(search.Candidates) == 0 {
+			t.Fatalf("mixed-output topology search = status=%s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+		}
+		kinds := map[string]bool{}
+		buckNodes := map[string]bool{}
+		comparatorInputs := map[string]bool{}
+		for _, instance := range search.Candidates[0].Graph.Instances {
+			kinds[instance.Kind] = true
+			terminals := topologyTerminalNodes(instance)
+			if instance.Kind == "synchronous_buck_regulator" {
+				buckNodes[terminals["SW"]] = true
+				buckNodes[terminals["FB"]] = true
+			}
+			if instance.Kind == "comparator" {
+				comparatorInputs[terminals["IN_PLUS"]] = true
+				comparatorInputs[terminals["IN_MINUS"]] = true
+			}
+		}
+		if !kinds["synchronous_buck_regulator"] ||
+			!graphNodeHasConnection(search.Candidates[0].Graph, "port_status_output") {
+			t.Fatalf("highest-ranked mixed-output topology lacks independent power and status stages: kinds=%v score=%#v", kinds, search.Candidates[0].Score)
+		}
+		for node := range comparatorInputs {
+			if node != "" && buckNodes[node] {
+				t.Fatalf("independent status input was merged onto regulated power-stage node %q", node)
+			}
+		}
+		return
+	}
+	t.Fatal("regulated power-transfer obligation was not produced")
 }
 
 func topologyCandidateHashes(candidates []TopologyCandidate) []string {

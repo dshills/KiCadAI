@@ -225,7 +225,7 @@ func (validator *requirementValidator) validatePorts() {
 		if port.Direction == "source" || port.Kind == "controlled_current" {
 			outputs++
 		}
-		if port.Direction == "sink" && port.Kind != "power" && port.Kind != "reference" && port.Kind != "controlled_current" {
+		if port.Direction == "sink" && port.Kind != "reference" && port.Kind != "controlled_current" {
 			excitations++
 		}
 		validator.orderedElectrical(path+".electrical", port.Electrical.MinVoltageV, port.Electrical.NominalVoltageV, port.Electrical.MaxVoltageV)
@@ -239,7 +239,7 @@ func (validator *requirementValidator) validatePorts() {
 		validator.add("requirements.ports", "at least one source port is required")
 	}
 	if excitations == 0 {
-		validator.add("requirements.ports", "at least one non-power sink port is required")
+		validator.add("requirements.ports", "at least one sink excitation port is required")
 	}
 }
 

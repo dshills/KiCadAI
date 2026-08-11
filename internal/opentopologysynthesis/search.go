@@ -21,11 +21,18 @@ const (
 )
 
 type topologySearchState struct {
-	graph      CandidateGraph
-	hash       string
-	topology   string
-	score      TopologyScore
-	operations []GraphOperation
+	graph             CandidateGraph
+	hash              string
+	topology          string
+	score             TopologyScore
+	operations        []GraphOperation
+	powerRequirements topologyPowerRequirementProfile
+}
+
+type topologyPowerRequirementProfile struct {
+	initialized      bool
+	requiredOutputs  []string
+	regulatedOutputs []string
 }
 
 type topologyFrontier []topologySearchState
@@ -111,8 +118,14 @@ func searchPrimitiveTopologies(
 		MaxPrimitiveInstances: minPositive(result.Policy.MaxPrimitiveInstances, requirement.Requirements.Constraints.MaxComponents),
 		MaxInternalNodes:      result.Policy.MaxInternalNodes,
 	}
-	initialScore := scoreTopologyGraph(requirement, initial, inventoryByKey, initialHash)
-	initialState := topologySearchState{graph: initial, hash: initialHash, topology: initialTopology, score: initialScore}
+	powerRequirements := deriveTopologyPowerRequirementProfile(requirement)
+	initialScore := scoreTopologyGraphWithPowerRequirements(
+		requirement, initial, inventoryByKey, initialHash, powerRequirements,
+	)
+	initialState := topologySearchState{
+		graph: initial, hash: initialHash, topology: initialTopology, score: initialScore,
+		powerRequirements: powerRequirements,
+	}
 	frontier := &topologyFrontier{initialState}
 	heap.Init(frontier)
 	visited := map[string]bool{initialHash: true}
@@ -709,7 +722,9 @@ func exploreTopologyFrontier(
 				continue
 			}
 			expansion.hash = hash
-			expansion.score = scoreTopologyGraph(requirement, expansion.graph, inventoryByKey, hash)
+			expansion.score = scoreTopologyGraphWithPowerRequirements(
+				requirement, expansion.graph, inventoryByKey, hash, expansion.powerRequirements,
+			)
 			topologyHash, topologyErr := TopologyHash(expansion.graph)
 			if topologyErr != nil {
 				rejections["canonical_topology_hash_failed"] = append(rejections["canonical_topology_hash_failed"], topologyErr.Error())
@@ -3844,8 +3859,11 @@ func topologyPowerTransferRelationshipSeeds(
 		consumption.GeneratedGraphs++
 		return topologySearchState{
 			graph: graph, hash: hash,
-			score:      scoreTopologyGraph(requirement, graph, inventoryByKey, hash),
-			operations: operations,
+			score: scoreTopologyGraphWithPowerRequirements(
+				requirement, graph, inventoryByKey, hash, state.powerRequirements,
+			),
+			operations:        operations,
+			powerRequirements: state.powerRequirements,
 		}
 	}
 
@@ -6938,10 +6956,13 @@ func addRelationshipInternalNode(
 	})
 	consumption.GeneratedGraphs++
 	return topologySearchState{
-		graph:      graph,
-		hash:       hash,
-		score:      scoreTopologyGraph(requirement, graph, inventory, hash),
-		operations: operations,
+		graph: graph,
+		hash:  hash,
+		score: scoreTopologyGraphWithPowerRequirements(
+			requirement, graph, inventory, hash, state.powerRequirements,
+		),
+		operations:        operations,
+		powerRequirements: state.powerRequirements,
 	}, node
 }
 
@@ -7020,10 +7041,13 @@ func addRelationshipPrimitiveWithValue(
 	})
 	consumption.GeneratedGraphs++
 	return topologySearchState{
-		graph:      graph,
-		hash:       hash,
-		score:      scoreTopologyGraph(requirement, graph, inventory, hash),
-		operations: operations,
+		graph: graph,
+		hash:  hash,
+		score: scoreTopologyGraphWithPowerRequirements(
+			requirement, graph, inventory, hash, state.powerRequirements,
+		),
+		operations:        operations,
+		powerRequirements: state.powerRequirements,
 	}
 }
 
@@ -7078,8 +7102,11 @@ func topologyObligationSeeds(
 			topologyHash, _ := TopologyHash(graph)
 			base = topologySearchState{
 				graph: graph, hash: hash, topology: topologyHash,
-				score:      scoreTopologyGraph(requirement, graph, inventoryByKey, hash),
-				operations: append(cloneGraphOperations(base.operations), operation),
+				score: scoreTopologyGraphWithPowerRequirements(
+					requirement, graph, inventoryByKey, hash, base.powerRequirements,
+				),
+				operations:        append(cloneGraphOperations(base.operations), operation),
+				powerRequirements: base.powerRequirements,
 			}
 			baseStates = append(baseStates, base)
 			consumption.GeneratedGraphs++
@@ -7110,7 +7137,9 @@ func topologyObligationSeeds(
 						state.graph, primitive, seedPrimitiveValue(primitive), placement,
 					)
 					consumption.GeneratedGraphs++
-					score := scoreTopologyGraph(requirement, graph, inventoryByKey, "")
+					score := scoreTopologyGraphWithPowerRequirements(
+						requirement, graph, inventoryByKey, "", state.powerRequirements,
+					)
 					operations := cloneGraphOperations(state.operations)
 					operations = append(operations, GraphOperation{
 						Number: len(operations) + 1, Kind: "add_primitive",
@@ -7119,7 +7148,10 @@ func topologyObligationSeeds(
 						ValueSI:     seedPrimitiveValue(primitive), BeforeHash: state.hash,
 					})
 					next = append(next, topologySearchState{
-						graph: graph, score: score, operations: operations,
+						graph:             graph,
+						score:             score,
+						operations:        operations,
+						powerRequirements: state.powerRequirements,
 					})
 				}
 			}
@@ -7733,7 +7765,10 @@ primitiveExpansion:
 			})
 			result = append(result, topologySearchState{
 				graph: nextGraph, operations: operations,
-				score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+				score: scoreTopologyGraphWithPowerRequirements(
+					requirement, nextGraph, inventory, "", state.powerRequirements,
+				),
+				powerRequirements: state.powerRequirements,
 			})
 		}
 	}
@@ -7783,7 +7818,10 @@ primitiveExpansion:
 				})
 				result = append(result, topologySearchState{
 					graph: nextGraph, operations: operations,
-					score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+					score: scoreTopologyGraphWithPowerRequirements(
+						requirement, nextGraph, inventory, "", state.powerRequirements,
+					),
+					powerRequirements: state.powerRequirements,
 				})
 			}
 		}
@@ -7807,7 +7845,10 @@ primitiveExpansion:
 		})
 		result = append(result, topologySearchState{
 			graph: nextGraph, operations: operations,
-			score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+			score: scoreTopologyGraphWithPowerRequirements(
+				requirement, nextGraph, inventory, "", state.powerRequirements,
+			),
+			powerRequirements: state.powerRequirements,
 		})
 	}
 	slices.SortFunc(result, func(left, right topologySearchState) int {
@@ -8225,6 +8266,28 @@ func seedPrimitiveValue(primitive PrimitiveCandidate) *float64 {
 }
 
 func scoreTopologyGraph(requirement Requirement, graph CandidateGraph, inventory map[string]PrimitiveCandidate, fingerprint string) TopologyScore {
+	// Standalone callers and tests do not own a search state. The search hot
+	// path calls scoreTopologyGraphWithPowerRequirements with its precomputed
+	// profile instead of using this convenience wrapper.
+	return scoreTopologyGraphWithPowerRequirements(
+		requirement,
+		graph,
+		inventory,
+		fingerprint,
+		topologyPowerRequirementProfile{},
+	)
+}
+
+func scoreTopologyGraphWithPowerRequirements(
+	requirement Requirement,
+	graph CandidateGraph,
+	inventory map[string]PrimitiveCandidate,
+	fingerprint string,
+	powerRequirements topologyPowerRequirementProfile,
+) TopologyScore {
+	if !powerRequirements.initialized {
+		powerRequirements = deriveTopologyPowerRequirementProfile(requirement)
+	}
 	degrees := map[string]int{}
 	adjacency := map[string][]string{}
 	evidencePenalty := 0
@@ -8242,7 +8305,9 @@ func scoreTopologyGraph(requirement Requirement, graph CandidateGraph, inventory
 		}
 	}
 	score := TopologyScore{
-		BehaviorGap:       topologyBehaviorGap(requirement, graph, inventory),
+		BehaviorGap: topologyBehaviorGapWithPowerRequirements(
+			requirement, graph, inventory, powerRequirements,
+		),
 		RedundantActive:   topologyRedundantActiveCount(requirement, graph),
 		EndpointAccess:    topologyEndpointAccessPenalty(requirement, graph),
 		PrimitiveCount:    len(graph.Instances),
@@ -8399,6 +8464,20 @@ func topologyBehaviorGap(
 	requirement Requirement,
 	graph CandidateGraph,
 	inventory map[string]PrimitiveCandidate,
+) int {
+	return topologyBehaviorGapWithPowerRequirements(
+		requirement,
+		graph,
+		inventory,
+		deriveTopologyPowerRequirementProfile(requirement),
+	)
+}
+
+func topologyBehaviorGapWithPowerRequirements(
+	requirement Requirement,
+	graph CandidateGraph,
+	inventory map[string]PrimitiveCandidate,
+	powerRequirements topologyPowerRequirementProfile,
 ) int {
 	_, boundedBipolarTransfer := topologyBoundedBipolarEnvelope(requirement)
 	requireActive := false
@@ -8596,11 +8675,374 @@ func topologyBehaviorGap(
 	if requireSOA && !hasSOA {
 		gap++
 	}
+	powerEvidence := topologyPowerEvidenceIndex{}
+	if len(powerRequirements.requiredOutputs) != 0 || len(powerRequirements.regulatedOutputs) != 0 {
+		powerEvidence = newTopologyPowerEvidenceIndex(graph)
+	}
+	for _, outputID := range powerRequirements.requiredOutputs {
+		if !topologyGraphHasPowerTransferToOutput(graph, powerEvidence, outputID) {
+			gap++
+		}
+	}
+	for _, outputID := range powerRequirements.regulatedOutputs {
+		if !topologyGraphHasRegulatedPowerTransferToOutput(graph, powerEvidence, outputID) {
+			gap++
+		}
+	}
 	if decisionCount < minimumDecisionStages {
 		gap += minimumDecisionStages - decisionCount
 	}
 	gap += topologySwitchedLoadEnvelopeGap(requirement, graph, inventory)
 	return gap
+}
+
+func deriveTopologyPowerRequirementProfile(requirement Requirement) topologyPowerRequirementProfile {
+	powerOutputs := map[string]bool{}
+	for _, port := range requirement.Requirements.Ports {
+		if port.Kind == "power" && port.Direction == "source" {
+			powerOutputs[port.ID] = true
+		}
+	}
+	requiredOutputs := map[string]bool{}
+	regulatedOutputs := map[string]bool{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Observation.Kind != "port" || !powerOutputs[assertion.Observation.ID] {
+			continue
+		}
+		requiredOutputs[assertion.Observation.ID] = true
+		switch assertion.Metric {
+		case "output_voltage", "line_regulation", "load_regulation", "output_ripple", "conversion_efficiency":
+			regulatedOutputs[assertion.Observation.ID] = true
+		}
+	}
+	return topologyPowerRequirementProfile{
+		initialized:      true,
+		requiredOutputs:  sortedTopologyOutputIDs(requiredOutputs),
+		regulatedOutputs: sortedTopologyOutputIDs(regulatedOutputs),
+	}
+}
+
+type topologyTwoTerminalConnection struct {
+	kind  string
+	left  string
+	right string
+}
+
+type topologyTwoTerminalEndpoint struct {
+	kind string
+	node string
+}
+
+type topologyPassiveEdge struct {
+	node string
+	kind string
+}
+
+type topologyNodePair struct {
+	left  string
+	right string
+}
+
+type topologyPowerEvidenceIndex struct {
+	passiveAdjacency           map[string][]string
+	resistorAdjacency          map[string][]string
+	railAdjacency              map[string][]string
+	twoTerminal                map[topologyTwoTerminalConnection]bool
+	twoTerminalAdjacency       map[topologyTwoTerminalEndpoint][]string
+	passiveEdges               map[string][]topologyPassiveEdge
+	inductivePathKnown         map[topologyNodePair]bool
+	inductivePath              map[topologyNodePair]bool
+	references                 []string
+	referenceResistorReachable map[string]bool
+	railSupplyReachable        map[string]bool
+	railReferenceReachable     map[string]bool
+}
+
+func sortedTopologyOutputIDs(outputs map[string]bool) []string {
+	result := make([]string, 0, len(outputs))
+	for outputID := range outputs {
+		result = append(result, outputID)
+	}
+	slices.Sort(result)
+	return result
+}
+
+func newTopologyPowerEvidenceIndex(graph CandidateGraph) topologyPowerEvidenceIndex {
+	index := topologyPowerEvidenceIndex{
+		passiveAdjacency:     map[string][]string{},
+		resistorAdjacency:    map[string][]string{},
+		railAdjacency:        map[string][]string{},
+		twoTerminal:          map[topologyTwoTerminalConnection]bool{},
+		twoTerminalAdjacency: map[topologyTwoTerminalEndpoint][]string{},
+		passiveEdges:         map[string][]topologyPassiveEdge{},
+		inductivePathKnown:   map[topologyNodePair]bool{},
+		inductivePath:        map[topologyNodePair]bool{},
+	}
+	supplyNodes := []string{}
+	for _, node := range graph.Nodes {
+		if node.Scope != "external" {
+			continue
+		}
+		switch node.Role {
+		case "supply":
+			supplyNodes = append(supplyNodes, node.ID)
+		case "reference":
+			index.references = append(index.references, node.ID)
+		}
+	}
+	for _, instance := range graph.Instances {
+		if len(instance.Terminals) != 2 {
+			continue
+		}
+		left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+		switch instance.Kind {
+		case "resistor", "inductor", "diode", "signal_diode", "clamp_diode":
+			index.passiveAdjacency[left] = append(index.passiveAdjacency[left], right)
+			index.passiveAdjacency[right] = append(index.passiveAdjacency[right], left)
+			index.passiveEdges[left] = append(index.passiveEdges[left], topologyPassiveEdge{node: right, kind: instance.Kind})
+			index.passiveEdges[right] = append(index.passiveEdges[right], topologyPassiveEdge{node: left, kind: instance.Kind})
+		}
+		if instance.Kind == "resistor" {
+			index.resistorAdjacency[left] = append(index.resistorAdjacency[left], right)
+			index.resistorAdjacency[right] = append(index.resistorAdjacency[right], left)
+		}
+		if instance.Kind == "resistor" || instance.Kind == "inductor" {
+			index.railAdjacency[left] = append(index.railAdjacency[left], right)
+			index.railAdjacency[right] = append(index.railAdjacency[right], left)
+		}
+		if left > right {
+			left, right = right, left
+		}
+		index.twoTerminal[topologyTwoTerminalConnection{
+			kind: instance.Kind, left: left, right: right,
+		}] = true
+		index.twoTerminalAdjacency[topologyTwoTerminalEndpoint{
+			kind: instance.Kind, node: left,
+		}] = append(index.twoTerminalAdjacency[topologyTwoTerminalEndpoint{
+			kind: instance.Kind, node: left,
+		}], right)
+		index.twoTerminalAdjacency[topologyTwoTerminalEndpoint{
+			kind: instance.Kind, node: right,
+		}] = append(index.twoTerminalAdjacency[topologyTwoTerminalEndpoint{
+			kind: instance.Kind, node: right,
+		}], left)
+	}
+	slices.Sort(supplyNodes)
+	slices.Sort(index.references)
+	index.referenceResistorReachable = topologyReachableNodes(
+		index.resistorAdjacency, index.references...,
+	)
+	index.railSupplyReachable = topologyReachableNodes(index.railAdjacency, supplyNodes...)
+	index.railReferenceReachable = topologyReachableNodes(index.railAdjacency, index.references...)
+	return index
+}
+
+func topologyReachableNodes(adjacency map[string][]string, starts ...string) map[string]bool {
+	visited := map[string]bool{}
+	queue := append([]string(nil), starts...)
+	for len(queue) != 0 {
+		node := queue[0]
+		queue = queue[1:]
+		if node == "" || visited[node] {
+			continue
+		}
+		visited[node] = true
+		queue = append(queue, adjacency[node]...)
+	}
+	return visited
+}
+
+func topologyPowerEvidenceHasInductivePath(
+	index topologyPowerEvidenceIndex,
+	left,
+	right string,
+) bool {
+	if left == "" || right == "" {
+		return false
+	}
+	pair := topologyNodePair{left: left, right: right}
+	if pair.left > pair.right {
+		pair.left, pair.right = pair.right, pair.left
+	}
+	if index.inductivePathKnown[pair] {
+		return index.inductivePath[pair]
+	}
+	type pathState struct {
+		node      string
+		inductive bool
+	}
+	visited := map[pathState]bool{}
+	queue := []pathState{{node: left}}
+	found := false
+	for len(queue) != 0 {
+		state := queue[0]
+		queue = queue[1:]
+		if visited[state] {
+			continue
+		}
+		visited[state] = true
+		if state.node == right && state.inductive {
+			found = true
+			break
+		}
+		for _, edge := range index.passiveEdges[state.node] {
+			queue = append(queue, pathState{
+				node:      edge.node,
+				inductive: state.inductive || edge.kind == "inductor",
+			})
+		}
+	}
+	index.inductivePathKnown[pair] = true
+	index.inductivePath[pair] = found
+	return found
+}
+
+func topologyGraphHasPowerTransferToOutput(
+	graph CandidateGraph,
+	index topologyPowerEvidenceIndex,
+	outputID string,
+) bool {
+	outputNode := "port_" + outputID
+	reachable := topologyReachableNodes(index.passiveAdjacency, outputNode)
+	for _, instance := range graph.Instances {
+		terminals := topologyTerminalNodes(instance)
+		var transferTerminals []string
+		switch instance.Kind {
+		case "fixed_voltage_regulator", "adjustable_voltage_regulator":
+			transferTerminals = []string{"VOUT"}
+		case "synchronous_buck_regulator":
+			transferTerminals = []string{"SW"}
+		case "n_channel_mosfet", "p_channel_mosfet":
+			transferTerminals = []string{"DRAIN", "SOURCE"}
+		case "npn_bjt", "pnp_bjt":
+			transferTerminals = []string{"COLLECTOR", "EMITTER"}
+		default:
+			continue
+		}
+		for _, terminal := range transferTerminals {
+			node := terminals[terminal]
+			if reachable[node] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type topologyPowerOutputReachability struct {
+	passive           map[string]bool
+	resistive         map[string]bool
+	referenceResistor map[string]bool
+	railSupply        map[string]bool
+	railReference     map[string]bool
+}
+
+func topologyGraphHasRegulatedPowerTransferToOutput(
+	graph CandidateGraph,
+	index topologyPowerEvidenceIndex,
+	outputID string,
+) bool {
+	outputNode := "port_" + outputID
+	reachability := topologyPowerOutputReachability{
+		passive:           topologyReachableNodes(index.passiveAdjacency, outputNode),
+		resistive:         topologyReachableNodes(index.resistorAdjacency, outputNode),
+		referenceResistor: index.referenceResistorReachable,
+		railSupply:        index.railSupplyReachable,
+		railReference:     index.railReferenceReachable,
+	}
+	for _, instance := range graph.Instances {
+		terminals := topologyTerminalNodes(instance)
+		switch instance.Kind {
+		case "fixed_voltage_regulator":
+			if topologyIntegratedRegulatorConnectsOutput(index, reachability, terminals, false) {
+				return true
+			}
+		case "adjustable_voltage_regulator":
+			if topologyIntegratedRegulatorConnectsOutput(index, reachability, terminals, true) {
+				return true
+			}
+		case "synchronous_buck_regulator":
+			if topologySynchronousBuckConnectsOutput(index, reachability, terminals, outputNode) {
+				return true
+			}
+		}
+	}
+	return topologyGraphHasReferenceRegulatedOutputAtNodeWithAdjacency(
+		graph,
+		false,
+		outputNode,
+		index.passiveAdjacency,
+	)
+}
+
+func topologyIntegratedRegulatorConnectsOutput(
+	index topologyPowerEvidenceIndex,
+	reachability topologyPowerOutputReachability,
+	terminals map[string]string,
+	adjustable bool,
+) bool {
+	if !reachability.passive[terminals["VOUT"]] || !reachability.railSupply[terminals["VIN"]] {
+		return false
+	}
+	if !adjustable {
+		return reachability.railReference[terminals["GND"]]
+	}
+	if !reachability.resistive[terminals["ADJ"]] {
+		return false
+	}
+	return reachability.referenceResistor[terminals["ADJ"]]
+}
+
+func topologySynchronousBuckConnectsOutput(
+	index topologyPowerEvidenceIndex,
+	reachability topologyPowerOutputReachability,
+	terminals map[string]string,
+	outputNode string,
+) bool {
+	if !reachability.railSupply[terminals["PVIN"]] ||
+		!reachability.railReference[terminals["AGND"]] ||
+		!reachability.railReference[terminals["PGND"]] ||
+		!topologyPowerEvidenceHasInductivePath(index, terminals["SW"], outputNode) {
+		return false
+	}
+	if !reachability.resistive[terminals["FB"]] ||
+		!reachability.referenceResistor[terminals["FB"]] {
+		return false
+	}
+	return topologyPowerEvidenceHasTwoTerminalToReachable(
+		index, "capacitor", outputNode, reachability.railReference,
+	) && topologyPowerEvidenceHasTwoTerminalToReachable(
+		index, "capacitor", terminals["PVIN"], reachability.railReference,
+	)
+}
+
+func topologyPowerEvidenceHasTwoTerminalToReachable(
+	index topologyPowerEvidenceIndex,
+	kind,
+	left string,
+	reachable map[string]bool,
+) bool {
+	for _, right := range index.twoTerminalAdjacency[topologyTwoTerminalEndpoint{kind: kind, node: left}] {
+		if reachable[right] {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyPowerEvidenceHasTwoTerminal(
+	index topologyPowerEvidenceIndex,
+	kind,
+	left,
+	right string,
+) bool {
+	if left == "" || right == "" {
+		return false
+	}
+	if left > right {
+		left, right = right, left
+	}
+	return index.twoTerminal[topologyTwoTerminalConnection{kind: kind, left: left, right: right}]
 }
 
 func topologyGraphHasExternalReactiveTimeConstant(requirement Requirement, graph CandidateGraph) bool {
@@ -9021,14 +9463,41 @@ func topologyGraphHasReferenceRegulatedOutput(
 	graph CandidateGraph,
 	requireTimeConstant bool,
 ) bool {
+	return topologyGraphHasReferenceRegulatedOutputAtNode(graph, requireTimeConstant, "")
+}
+
+func topologyGraphHasReferenceRegulatedOutputAtNode(
+	graph CandidateGraph,
+	requireTimeConstant bool,
+	outputNode string,
+) bool {
+	return topologyGraphHasReferenceRegulatedOutputAtNodeWithAdjacency(
+		graph,
+		requireTimeConstant,
+		outputNode,
+		topologyPassiveNodeAdjacency(graph, true),
+	)
+}
+
+func topologyGraphHasReferenceRegulatedOutputAtNodeWithAdjacency(
+	graph CandidateGraph,
+	requireTimeConstant bool,
+	outputNode string,
+	passiveAdjacency map[string][]string,
+) bool {
 	supplies := topologyNodesByRole(graph, "supply")
 	references := topologyNodesByRole(graph, "reference")
 	commands := topologyNodesByRole(graph, "input", "control")
 	outputs := topologyNodesByRole(graph, "output")
+	if outputNode != "" {
+		if !slices.Contains(outputs, outputNode) {
+			return false
+		}
+		outputs = []string{outputNode}
+	}
 	if len(supplies) == 0 || len(references) == 0 || len(outputs) == 0 {
 		return false
 	}
-	passive := topologyPassiveNodeAdjacency(graph, true)
 	if requireTimeConstant && !topologyGraphHasPassiveTimeConstant(graph) {
 		return false
 	}
@@ -9055,14 +9524,14 @@ func topologyGraphHasReferenceRegulatedOutput(
 				}
 			}
 			for _, command := range commands {
-				setpointDriven = setpointDriven || topologyNodePathExists(passive, command, setpointTerminal)
+				setpointDriven = setpointDriven || topologyNodePathExists(passiveAdjacency, command, setpointTerminal)
 			}
 			if !setpointDriven || !topologyNodeIsInternal(graph, feedbackTerminal) {
 				continue
 			}
 			feedback := false
 			for _, output := range outputs {
-				feedback = feedback || topologyNodePathExists(passive, output, feedbackTerminal)
+				feedback = feedback || topologyNodePathExists(passiveAdjacency, output, feedbackTerminal)
 			}
 			if !feedback {
 				continue
@@ -9072,7 +9541,7 @@ func topologyGraphHasReferenceRegulatedOutput(
 					continue
 				}
 				passTerminals := topologyTerminalNodes(passDevice)
-				driven := topologyNodePathExists(passive, terminals["OUT"], passTerminals["BASE"])
+				driven := topologyNodePathExists(passiveAdjacency, terminals["OUT"], passTerminals["BASE"])
 				if invertedDrive {
 					driven = false
 					for _, driver := range graph.Instances {
@@ -9081,8 +9550,8 @@ func topologyGraphHasReferenceRegulatedOutput(
 						}
 						driverTerminals := topologyTerminalNodes(driver)
 						if slices.Contains(supplies, driverTerminals["EMITTER"]) &&
-							topologyNodePathExists(passive, terminals["OUT"], driverTerminals["BASE"]) &&
-							topologyNodePathExists(passive, driverTerminals["COLLECTOR"], passTerminals["BASE"]) {
+							topologyNodePathExists(passiveAdjacency, terminals["OUT"], driverTerminals["BASE"]) &&
+							topologyNodePathExists(passiveAdjacency, driverTerminals["COLLECTOR"], passTerminals["BASE"]) {
 							driven = true
 							break
 						}
@@ -9092,7 +9561,7 @@ func topologyGraphHasReferenceRegulatedOutput(
 					continue
 				}
 				for _, output := range outputs {
-					if topologyNodePathExists(passive, passTerminals["EMITTER"], output) {
+					if topologyNodePathExists(passiveAdjacency, passTerminals["EMITTER"], output) {
 						return true
 					}
 				}
