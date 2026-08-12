@@ -1,0 +1,169 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v7",
+  "version": 7,
+  "selection_sha256": "87915abf1d8371b94a652c939df8122e05ee0d0bd18d2b674af7504f9813738d",
+  "generic_plan_sha256": "c020b6116610d8d392eb580cbaeebfa39655cf65219617781d698827364e1d93",
+  "implementation_commit": "4c6a5733ebd29797c1d8c8b657f8a12d3e16184f",
+  "review": "prism_reviewed_no_actionable_findings",
+  "capability_bindings": [
+    {
+      "capability": "causal_topology_repair",
+      "member_code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+      "artifact_paths": [
+        "internal/opentopologysynthesis/causal_repair.go",
+        "internal/opentopologysynthesis/causal_topology_repair.go"
+      ]
+    },
+    {
+      "capability": "dc_operating_point_solver",
+      "member_code": "SIMULATION_INVALID",
+      "artifact_paths": [
+        "internal/simmodel/mna_measurements.go",
+        "internal/simmodel/mna_registry.go",
+        "internal/simmodel/mna_solver.go"
+      ]
+    },
+    {
+      "capability": "multi_obligation_composition",
+      "member_code": "OPEN_TOPOLOGY_MULTI_CONTROL_COMPOSITION_REQUIRED",
+      "artifact_paths": [
+        "internal/opentopologysynthesis/multi_obligation_composition.go",
+        "internal/opentopologysynthesis/multi_output_composition.go",
+        "internal/opentopologysynthesis/realizability.go",
+        "internal/opentopologysynthesis/search.go"
+      ]
+    }
+  ],
+  "production_artifacts": [
+    {
+      "path": "internal/opentopologysynthesis/causal_repair.go",
+      "sha256": "2a63f17bcbf9fa720bfd3fa4e38a5681a3291bd68768f5567458bcb99b951d3b"
+    },
+    {
+      "path": "internal/opentopologysynthesis/causal_topology_repair.go",
+      "sha256": "a93a4d552609f6bb3878e783c03bdb882377cfba4d7c4ef23234128ec001289a"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_obligation_composition.go",
+      "sha256": "478f25384836081b68f2a972385ebeb27c2159e66032adbd0df34bbbfa99990e"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_output_composition.go",
+      "sha256": "b7173895f315da6f5bff08619534ea7c0ac07221691a53771ad4fd7a05f184fd"
+    },
+    {
+      "path": "internal/opentopologysynthesis/realizability.go",
+      "sha256": "9e6e9261a5ce38d758f2f6fc0585824a8309b0b17b3cb9a957dabdd8406b339a"
+    },
+    {
+      "path": "internal/opentopologysynthesis/search.go",
+      "sha256": "b9f06c214fbc5ed4e80d1b6690c2df42e9be6ffaa9fad3388d02ed26e59439aa"
+    },
+    {
+      "path": "internal/simmodel/mna_measurements.go",
+      "sha256": "25735688eeb180b4bfc61344c7c6f3103592948997c743c7c7e3eb2b85c8c63c"
+    },
+    {
+      "path": "internal/simmodel/mna_registry.go",
+      "sha256": "28d1ddfb18f1cb9e8cc27c1e71abd58e3ad086e70ca80ee2801e532c842353cf"
+    },
+    {
+      "path": "internal/simmodel/mna_solver.go",
+      "sha256": "35c1fe3ce63ab97f478c785c221dff0757971015a0b494dd8f5939f45a236430"
+    }
+  ],
+  "verification_artifacts": [
+    {
+      "path": "internal/capabilityfeedback/v5_reviewed_implementation_test.go",
+      "sha256": "3a896971cee703d2a06ec3e8b76107069ef11549b20ee82b20e5c4648e72763c"
+    },
+    {
+      "path": "internal/capabilityfeedback/v6_reviewed_implementation_test.go",
+      "sha256": "9ee3b41ebefcd9f53f18d5b8f4c76d264aea1812e11b4b4b01534fd7c7bf497b"
+    },
+    {
+      "path": "internal/opentopologysynthesis/causal_topology_repair_test.go",
+      "sha256": "e3e94d762c2ffc4697eb4e137f98c0c992513de35649c608996dfe84355674df"
+    },
+    {
+      "path": "internal/opentopologysynthesis/dc_input_impedance_simulation_test.go",
+      "sha256": "9ad6fc28c19368af48508b200eaf5380fd9e015c8aaefed0a3fca7ea0e5b73bd"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_obligation_composition_test.go",
+      "sha256": "e74622a3e81fbbf1d144b26a17b359e75e319208173fa61c6c368906d399a93b"
+    },
+    {
+      "path": "internal/opentopologysynthesis/realizability_test.go",
+      "sha256": "b83d813ea5160e5f256ead6ea68c2c35a5412f91dec2fa9b3875812d76ec5161"
+    },
+    {
+      "path": "internal/simmodel/mna_dc_input_impedance_test.go",
+      "sha256": "bc49622a2b143f9ebe64423abfdebd90a071ec6aa76b99bfa6546d4fc1a22c64"
+    }
+  ],
+  "historical_projections": [
+    {
+      "round": 5,
+      "path": "internal/simmodel/mna_registry.go",
+      "before_sha256": "c46b1f47bc498c89d72b4a10113098ee88287544c7c15b56ab91c4c247aaa7eb",
+      "after_sha256": "28d1ddfb18f1cb9e8cc27c1e71abd58e3ad086e70ca80ee2801e532c842353cf",
+      "capability": "dc_operating_point_solver"
+    },
+    {
+      "round": 6,
+      "path": "internal/opentopologysynthesis/multi_output_composition.go",
+      "before_sha256": "233c0d4756e8c02bb7149308335acb99fe82419d520ba21e00d7f51ef7e9d86f",
+      "after_sha256": "b7173895f315da6f5bff08619534ea7c0ac07221691a53771ad4fd7a05f184fd",
+      "capability": "multi_obligation_composition"
+    },
+    {
+      "round": 6,
+      "path": "internal/opentopologysynthesis/realizability.go",
+      "before_sha256": "72ed3d24daf3ac80f90929a7ab8bf4ce4bc01377913998e52fd4e4d7599c54c1",
+      "after_sha256": "9e6e9261a5ce38d758f2f6fc0585824a8309b0b17b3cb9a957dabdd8406b339a",
+      "capability": "multi_obligation_composition"
+    },
+    {
+      "round": 6,
+      "path": "internal/opentopologysynthesis/realizability_test.go",
+      "before_sha256": "b300bab19f6446b904269dbb2d50dbd96e2441a5870134d10b0a99e98d75cfa9",
+      "after_sha256": "b83d813ea5160e5f256ead6ea68c2c35a5412f91dec2fa9b3875812d76ec5161",
+      "capability": "multi_obligation_composition"
+    },
+    {
+      "round": 6,
+      "path": "internal/opentopologysynthesis/search.go",
+      "before_sha256": "f899f48ff0d86281bd5d147cf8ae856f64ba0bba59d211ddfa1879a675da8a6b",
+      "after_sha256": "b9f06c214fbc5ed4e80d1b6690c2df42e9be6ffaa9fad3388d02ed26e59439aa",
+      "capability": "multi_obligation_composition"
+    }
+  ],
+  "prerequisite_consumers": [
+    {
+      "path": "internal/capabilityfeedback/v5_reviewed_implementation_test.go",
+      "static_tests": [
+        "TestClosedLoopV5ReviewedImplementationSealIsFrozen"
+      ],
+      "runtime_tests": [
+        "TestClosedLoopV5PublicAdmissionArtifactsAreFrozen",
+        "TestClosedLoopV5ReviewedImplementationSealIsFrozen"
+      ],
+      "production_use": false
+    },
+    {
+      "path": "internal/capabilityfeedback/v6_reviewed_implementation_test.go",
+      "static_tests": [
+        "TestClosedLoopV6PublicAdmissionArtifactsAreFrozen",
+        "TestClosedLoopV6ReviewedImplementationSealIsFrozen",
+        "TestUpdateClosedLoopV6ReviewedImplementationSeal"
+      ],
+      "runtime_tests": [
+        "TestClosedLoopV6PublicAdmissionArtifactsAreFrozen",
+        "TestClosedLoopV6ReviewedImplementationSealIsFrozen"
+      ],
+      "production_use": false
+    }
+  ],
+  "hash": "d100661ee8927acc1759250682d64c94b5c9bbe7b4acad485de4778ad63cdc43"
+}
