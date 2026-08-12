@@ -29,8 +29,11 @@ const (
 	// absent: the freeze test skips before consulting them. They are populated
 	// exactly once after this outcome-neutral harness is committed and the
 	// custodian publication succeeds; any artifact appearing first fails closed.
-	closedLoopV7HeldOutPublisherCommit    = ""
-	closedLoopV7HeldOutManifestCommitment = ""
+	closedLoopV7HeldOutPublisherCommit = "294ed4eb1bee64e69c41ddeb0d6e2b4517f3f2b3"
+	// The semantic commitment authenticates manifest fields in the V7 wire
+	// protocol; the file hash separately freezes the canonical JSON bytes.
+	closedLoopV7HeldOutManifestCommitment = "b830b34b5b41dc4c7af71740e6d46349e28400e932583a63398c9d3de334045a"
+	closedLoopV7HeldOutManifestFileHash   = "3225a2b4645cfc2b16e6260e033631fcbf69307e724f4fbdff7cb8f28ae5dc2c"
 )
 
 type closedLoopV7HeldOutPayload struct {
@@ -68,6 +71,9 @@ func TestClosedLoopV7HeldOutBaselineSealIsFrozen(t *testing.T) {
 	manifest, err := blindbaseline.VerifyV7(closedLoopV7HeldOutBaselineRoot)
 	if err != nil {
 		t.Fatalf("verify V7 held-out baseline seal: %v", err)
+	}
+	if got := corpusHash(mustCorpusRead(t, filepath.Join(closedLoopV7HeldOutBaselineRoot, blindbaseline.ManifestFile))); got != closedLoopV7HeldOutManifestFileHash {
+		t.Fatalf("V7 held-out baseline manifest file hash = %s, want %s", got, closedLoopV7HeldOutManifestFileHash)
 	}
 	corpus := loadClosedLoopV7Manifest(t)
 	discovery := loadClosedLoopV7FrozenBaselineReport(t)
