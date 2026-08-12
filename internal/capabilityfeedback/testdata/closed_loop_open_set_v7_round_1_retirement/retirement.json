@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-retirement.v7",
+  "version": 7,
+  "generation": 1,
+  "infrastructure_commit": "e3e350f402eb5c6ed162c54a36e0178c88599172",
+  "implementation_seal_sha256": "d100661ee8927acc1759250682d64c94b5c9bbe7b4acad485de4778ad63cdc43",
+  "input_selection_sha256": "87915abf1d8371b94a652c939df8122e05ee0d0bd18d2b674af7504f9813738d",
+  "input_frontier_sha256": "871e673e3b07c38b7369a0e595dcc8b48976c335f5e3a10ada519bf4a027837b",
+  "reason": "case v7_case_002 gap topology_search:topology:complete_topology:OPEN_TOPOLOGY_SEARCH_EXHAUSTED has 0 admissible successors",
+  "held_out_opened": false,
+  "hash": "828ef0f1fda982dcf60d444ee6a5d1f321cc9d9752de6632e2623f6e17db1bc1"
+}
