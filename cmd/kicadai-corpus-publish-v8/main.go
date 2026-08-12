@@ -20,7 +20,7 @@ const (
 	v8StartingCommit       = "7333f7d604fcadc447bbe75f38255bfc56566262"
 	v8ContractFreezeCommit = "03bdfefa161c135ef7d8a4fef07d35445fbdfc2b"
 	v8AuthorPacketCommit   = "58cea3d17af74033a3f3f9ca23c9549a12b8eb4c"
-	v8ValidatorCommit      = "1acb5bcc813a95b52229da250f5af51bfdfebb9e"
+	v8ValidatorCommit      = "a930943cc8d2b7aa08a6f771a26d6239bf2be01f"
 )
 
 type bundleFlags []string
