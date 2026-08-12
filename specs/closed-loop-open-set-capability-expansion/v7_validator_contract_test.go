@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const v7ValidatorManifestHash = "cdb36868a54e22403531cdcb9631b3b8de1b4046383fda9a9d5668e18a3817f5"
+const v7ValidatorManifestHash = "9278fccec4e4322fca8a4f594db8d3d21d9e6792034004ae092de31512064bc6"
 
 func TestVersionSevenValidatorIsFrozenAndOutcomeNeutral(t *testing.T) {
 	directory := v7ContractDirectory(t)
@@ -91,6 +91,7 @@ func v7VerifyValidatorManifest(t *testing.T, root, name string, wantPaths []stri
 func TestVersionSevenValidatorRootManifest(t *testing.T) {
 	v7VerifyPacketChecksumManifest(t, v7ContractDirectory(t), "V7_VALIDATOR_CONTRACT.sha256", []string{
 		"V7_VALIDATOR.sha256",
+		"V7_VALIDATOR_REFREEZE.md",
 		"v7_validator_contract_test.go",
 	})
 }

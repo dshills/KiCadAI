@@ -15,7 +15,7 @@ b1270cb4f532131deed35419135fb41904b379ee42ec7c45226248dcef43959e  ../../internal
 b1b65ff449ecdfbb2afef81faf284dabdf1190d0b59723d5139f725ade34e195  ../../internal/corpusfreeze/secure_open_windows.go
 4c26e145849007968ab2cb1a2d4f9cad9175e25f0fca27a1838ead2583d7abef  ../../internal/corpusfreeze/validate.go
 f0369f73f1dd3c80f5de39ca4b341ca0bb7af252ef811cab0fea16aacb7b72ca  ../../internal/corpusfreeze/validate_test.go
-47cc3555fd0e74ba47e68cbf8a118bbe4433987a01a3291edb644955c8deab2a  ../../internal/corpusfreezev6/history.go
+c9e87947d52278e6eb77c5e5d1a6ecdba047b8d69dce95f5edb40d9ee89552ca  ../../internal/corpusfreezev6/history.go
 db93ef4c955e9e7ddde5f6d7d0c38e9488745843b1c1953f21be866c3c2de24b  ../../internal/corpusfreezev6/history_test.go
 2b0588303eb77d3bcab7b25595873d7448a33e26aa46b19c22e9041f3c9ba0ad  ../../internal/corpusfreezev6/policy.go
 4383732f648783f37bf776a33972851b70622bf0ca8d40ffb9119ac2f7af03d9  ../../internal/corpusfreezev6/policy_test.go
