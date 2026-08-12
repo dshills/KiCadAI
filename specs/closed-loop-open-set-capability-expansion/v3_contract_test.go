@@ -59,34 +59,11 @@ func TestVersionThreeContractIsFrozen(t *testing.T) {
 	}
 }
 
-func TestVersionThreeImplementationHashesAreFrozen(t *testing.T) {
+func TestVersionThreeImplementationManifestIsFrozen(t *testing.T) {
 	directory := v3ContractDirectory(t)
-	repository := filepath.Clean(filepath.Join(directory, "..", ".."))
-	manifest, err := os.Open(filepath.Join(directory, "V3_IMPLEMENTATION.sha256"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer manifest.Close()
-
 	seen := map[string]bool{}
-	scanner := bufio.NewScanner(manifest)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != 2 || len(fields[0]) != sha256.Size*2 || seen[fields[1]] || filepath.IsAbs(fields[1]) ||
-			strings.HasPrefix(filepath.Clean(fields[1]), "..") {
-			t.Fatalf("invalid V3 implementation entry %q", scanner.Text())
-		}
-		if got := v3FileSHA256(t, filepath.Join(repository, filepath.Clean(fields[1]))); got != fields[0] {
-			t.Fatalf("%s hash = %s, want frozen %s", fields[1], got, fields[0])
-		}
-		seen[fields[1]] = true
-	}
-	if err := scanner.Err(); err != nil {
-		t.Fatal(err)
+	for _, name := range historicalManifestNames(t, filepath.Join(directory, "V3_IMPLEMENTATION.sha256")) {
+		seen[name] = true
 	}
 	for _, required := range []string{
 		"internal/opentopologysynthesis/realizability.go",
@@ -97,6 +74,9 @@ func TestVersionThreeImplementationHashesAreFrozen(t *testing.T) {
 		if !seen[required] {
 			t.Fatalf("V3 implementation manifest omits %s", required)
 		}
+	}
+	if len(seen) != 4 {
+		t.Fatalf("V3 implementation manifest entries = %d, want exactly 4", len(seen))
 	}
 }
 

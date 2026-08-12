@@ -9,7 +9,6 @@ import (
 
 func TestVersionFiveOutcomeBlindValidatorIsFrozen(t *testing.T) {
 	directory := v5ContractDirectory(t)
-	repositoryRoot := filepath.Clean(filepath.Join(directory, "..", ".."))
 	want := map[string]bool{
 		"specs/closed-loop-open-set-capability-expansion/V5_QUARANTINE_PROTOCOL.md":             true,
 		"specs/closed-loop-open-set-capability-expansion/V5_HISTORICAL_COMMITMENTS.json":        true,
@@ -38,12 +37,12 @@ func TestVersionFiveOutcomeBlindValidatorIsFrozen(t *testing.T) {
 		"internal/opentopologysynthesis/decode.go":                                              true,
 		"internal/opentopologysynthesis/normalize.go":                                           true,
 		"internal/opentopologysynthesis/validate.go":                                            true,
-		"internal/reports/issue.go":                                                              true,
-		"internal/reports/diagnostics.go":                                                        true,
+		"internal/reports/issue.go":                                                             true,
+		"internal/reports/diagnostics.go":                                                       true,
 	}
 	got := map[string]bool{}
 	manifestPath := filepath.Join(directory, "V5_VALIDATOR.sha256")
-	for _, name := range v5PacketManifestNamesAt(t, manifestPath, repositoryRoot) {
+	for _, name := range historicalManifestNames(t, manifestPath) {
 		if !want[name] || got[name] {
 			t.Fatalf("V5 validator manifest contains unexpected or duplicate entry %q", name)
 		}

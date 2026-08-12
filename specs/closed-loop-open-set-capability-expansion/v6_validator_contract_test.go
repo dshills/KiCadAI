@@ -10,7 +10,6 @@ import (
 
 func TestVersionSixOutcomeBlindValidatorIsFrozen(t *testing.T) {
 	directory := v6ContractDirectory(t)
-	repositoryRoot := filepath.Clean(filepath.Join(directory, "..", ".."))
 	want := map[string]bool{
 		"specs/closed-loop-open-set-capability-expansion/V6_QUARANTINE_PROTOCOL.md":             true,
 		"specs/closed-loop-open-set-capability-expansion/V6_HISTORICAL_COMMITMENTS.json":        true,
@@ -51,7 +50,7 @@ func TestVersionSixOutcomeBlindValidatorIsFrozen(t *testing.T) {
 	}
 	got := map[string]bool{}
 	manifestPath := filepath.Join(directory, "V6_VALIDATOR.sha256")
-	for _, name := range v5PacketManifestNamesAt(t, manifestPath, repositoryRoot) {
+	for _, name := range historicalManifestNames(t, manifestPath) {
 		if !want[name] || got[name] {
 			t.Fatalf("V6 validator manifest contains unexpected or duplicate entry %q", name)
 		}
