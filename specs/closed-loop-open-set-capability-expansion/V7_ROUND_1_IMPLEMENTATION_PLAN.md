@@ -139,7 +139,39 @@ Admitted verification paths:
 - `internal/opentopologysynthesis/search_test.go`
 - `internal/opentopologysynthesis/multi_obligation_composition_test.go`
 
-## 4. Admitted shared-invariant prerequisite
+## 4. Admitted shared-invariant prerequisites
+
+### 4.1 V5 historical evidence projection
+
+The V5 reviewed-implementation seal includes `mna_registry.go` because the V5
+electrothermal capability used the shared MNA assertion registry. The selected
+V7 `dc_operating_point_solver` member must extend that shared assertion validation, so
+the V5 live-worktree byte comparison would otherwise reject an authorized V7
+change even though V5 evidence remains immutable.
+
+The admitted prerequisite changes only the V5 verification harness. Every V5
+artifact except the selected shared `mna_registry.go` remains byte-compared
+with its V5 hash. The shared file is not ignored: the harness projects it
+through the original V5 tests and frozen public-evidence replay, while the V7
+implementation seal records its exact V5-before/V7-after hashes and selected
+DC-solver member mapping. V7 final admission fails on any V5 replay regression,
+missing original V5 verification, or missing replacement hash coverage.
+
+Admitted path:
+
+- `internal/capabilityfeedback/v5_reviewed_implementation_test.go`
+
+Selected-member mapping:
+
+- `dc_operating_point_solver`, because its assertion validator is implemented
+  in the shared MNA registry file.
+
+Static consumer boundary:
+
+- `TestClosedLoopV5ReviewedImplementationSealIsFrozen`
+- V5 frozen public-evidence verification
+
+### 4.2 V6 historical evidence projection
 
 The V6 reviewed-implementation seal currently compares historical V6 artifact
 hashes with the live worktree. That makes any later, selected evolution of a
