@@ -12,12 +12,12 @@ import (
 func TestVersionEightValidatorIsFrozenAndOutcomeNeutral(t *testing.T) {
 	directory := v7ContractDirectory(t)
 	var freeze struct {
-		Schema string `json:"schema"`
-		Version int `json:"version"`
-		ValidatorManifestSHA256 string `json:"validator_manifest_sha256"`
+		Schema                      string `json:"schema"`
+		Version                     int    `json:"version"`
+		ValidatorManifestSHA256     string `json:"validator_manifest_sha256"`
 		HistoricalCommitmentsSHA256 string `json:"historical_commitments_sha256"`
-		PacketSetSHA256 string `json:"packet_set_sha256"`
-		HeldOutOpened bool `json:"held_out_opened"`
+		PacketSetSHA256             string `json:"packet_set_sha256"`
+		HeldOutOpened               bool   `json:"held_out_opened"`
 	}
 	if err := json.Unmarshal(v7ReadFile(t, filepath.Join(directory, "V8_VALIDATOR_FREEZE.json")), &freeze); err != nil {
 		t.Fatal(err)
