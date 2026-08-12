@@ -1,6 +1,7 @@
 package capabilityfeedback
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -39,12 +40,12 @@ const (
 	// These are populated exactly once in the selection-freeze commit. Their
 	// empty infrastructure values make an accidentally published baseline fail
 	// closed until its exact bytes have been reviewed and frozen.
-	closedLoopV7InfrastructureCommit = ""
-	closedLoopV7BaselineHash         = ""
-	closedLoopV7FrontierHash         = ""
-	closedLoopV7RankingHash          = ""
-	closedLoopV7GenericPlanHash      = ""
-	closedLoopV7SelectionHash        = ""
+	closedLoopV7InfrastructureCommit = "109302c2cfe3af18fca0ec0e4ab3d6ee15d72206"
+	closedLoopV7BaselineHash         = "de66137f7692693714a58a46101a9279417f12c4eba6604e4a263c01e7f86813"
+	closedLoopV7FrontierHash         = "871e673e3b07c38b7369a0e595dcc8b48976c335f5e3a10ada519bf4a027837b"
+	closedLoopV7RankingHash          = "69d8888ff5f45d124d064f9bba32a4078daae7368617917fae83482463f004b2"
+	closedLoopV7GenericPlanHash      = "c020b6116610d8d392eb580cbaeebfa39655cf65219617781d698827364e1d93"
+	closedLoopV7SelectionHash        = "87915abf1d8371b94a652c939df8122e05ee0d0bd18d2b674af7504f9813738d"
 )
 
 type closedLoopV7CaseArtifact struct {
@@ -175,7 +176,7 @@ func TestClosedLoopV7DiscoveryBaselineIsFrozen(t *testing.T) {
 	if closedLoopV7InfrastructureCommit == "" || closedLoopV7BaselineHash == "" || closedLoopV7FrontierHash == "" || closedLoopV7RankingHash == "" || closedLoopV7GenericPlanHash == "" || closedLoopV7SelectionHash == "" {
 		t.Fatal("V7 discovery baseline exists without literal freeze commitments")
 	}
-	if _, err := corpuspublication.VerifyChecksumManifest(closedLoopV7BaselineRoot, filepath.Join(closedLoopV7BaselineRoot, corpuspublication.ChecksumFile)); err != nil {
+	if err := verifyClosedLoopV7BaselineChecksums(closedLoopV7BaselineRoot); err != nil {
 		t.Fatalf("verify V7 discovery baseline checksums: %v", err)
 	}
 	var report closedLoopV7BaselineReport
@@ -725,6 +726,57 @@ func assertClosedLoopV7BaselineFileSet(t *testing.T) {
 			t.Fatalf("V7 baseline contains forbidden file %s", path)
 		}
 	}
+}
+
+func verifyClosedLoopV7BaselineChecksums(root string) error {
+	manifestPath := filepath.Join(root, corpuspublication.ChecksumFile)
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil || len(manifest) == 0 || len(manifest) > 1<<20 {
+		return fmt.Errorf("V7 baseline checksum manifest is invalid")
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(manifest))
+	seen := map[string]bool{}
+	previous := ""
+	for scanner.Scan() {
+		digest, relative, ok := strings.Cut(scanner.Text(), "  ")
+		if !ok || !closedLoopV7ValidHash(digest) || relative <= previous || seen[relative] || filepath.IsAbs(relative) || filepath.ToSlash(filepath.Clean(relative)) != relative || relative == "." || strings.HasPrefix(relative, "../") {
+			return fmt.Errorf("V7 baseline checksum manifest contains an invalid entry")
+		}
+		seen[relative] = true
+		previous = relative
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		info, statErr := os.Lstat(path)
+		if statErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 64<<20 {
+			return fmt.Errorf("V7 baseline checksum source is not a bounded regular file")
+		}
+		realPath, realErr := filepath.EvalSymlinks(path)
+		rel, relErr := filepath.Rel(root, realPath)
+		if realErr != nil || relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("V7 baseline checksum source escapes its root")
+		}
+		file, openErr := os.Open(realPath)
+		if openErr != nil {
+			return openErr
+		}
+		hash := sha256.New()
+		_, copyErr := io.Copy(hash, file)
+		closeErr := file.Close()
+		if copyErr != nil || closeErr != nil || hex.EncodeToString(hash.Sum(nil)) != digest {
+			return fmt.Errorf("V7 baseline checksum entry does not match its commitment")
+		}
+	}
+	if err := scanner.Err(); err != nil || len(seen) == 0 {
+		return fmt.Errorf("V7 baseline checksum manifest is empty or unreadable")
+	}
+	return nil
 }
 
 func TestClosedLoopV7RankingIgnoresHeldOutByConstruction(t *testing.T) {
