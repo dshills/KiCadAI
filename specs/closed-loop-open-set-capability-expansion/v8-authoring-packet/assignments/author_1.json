@@ -1,0 +1,13 @@
+{
+  "schema": "kicadai.closed-loop-open-set-author-assignment.v8",
+  "version": 8,
+  "author_slot": "author_1",
+  "entries": [
+    {"id":"v8_case_001","role":"discovery","domain":"analog_signal_path","circuit_role":"source_bias","safety_impact":"non_safety","source_id":"v8_source_001","requirement_file":"discovery/request_001.json"},
+    {"id":"v8_case_002","role":"discovery","domain":"power_energy_conversion","circuit_role":"amplification_conditioning","safety_impact":"review_required","source_id":"v8_source_002","requirement_file":"discovery/request_002.json"},
+    {"id":"v8_case_003","role":"discovery","domain":"digital_control","circuit_role":"conversion_regulation","safety_impact":"safety_relevant","source_id":"v8_source_003","requirement_file":"discovery/request_003.json"},
+    {"id":"v8_case_019","role":"held_out","domain":"mixed_signal_data_conversion","circuit_role":"sensing_measurement","safety_impact":"safety_relevant","source_id":"v8_source_019","requirement_file":"held_out/request_019.json"},
+    {"id":"v8_case_020","role":"held_out","domain":"sensing_instrumentation","circuit_role":"interface_control","safety_impact":"safety_critical","source_id":"v8_source_020","requirement_file":"held_out/request_020.json"},
+    {"id":"v8_case_021","role":"held_out","domain":"protection_power_integrity","circuit_role":"protection_supervision","safety_impact":"non_safety","source_id":"v8_source_021","requirement_file":"held_out/request_021.json"}
+  ]
+}
