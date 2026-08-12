@@ -1,0 +1,231 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection-policy.v8",
+  "version": 8,
+  "predecessor": {
+    "version": 7,
+    "required_terminal_state": "public_retirement",
+    "required_generation": 1,
+    "require_held_out_opened_false": true,
+    "reuse_predecessor_corpus": false,
+    "reuse_predecessor_keys": false
+  },
+  "corpus": {
+    "author_count": 6,
+    "requirements_per_author": 6,
+    "discovery_per_author": 3,
+    "held_out_per_author": 3,
+    "discovery_case_count": 18,
+    "held_out_case_count": 18,
+    "reporting_domains": [
+      "analog_signal_path",
+      "power_energy_conversion",
+      "digital_control",
+      "mixed_signal_data_conversion",
+      "sensing_instrumentation",
+      "protection_power_integrity"
+    ],
+    "circuit_roles": [
+      "source_bias",
+      "amplification_conditioning",
+      "conversion_regulation",
+      "sensing_measurement",
+      "interface_control",
+      "protection_supervision"
+    ],
+    "safety_impacts": [
+      "non_safety",
+      "review_required",
+      "safety_relevant",
+      "safety_critical"
+    ],
+    "safety_impact_global_count_each": 9,
+    "maximum_fresh_replacements_per_assignment": 2
+  },
+  "eligible_outcomes": [
+    "unsupported",
+    "exhausted"
+  ],
+  "all_outcomes": [
+    "pass",
+    "unsupported",
+    "unsafe",
+    "exhausted"
+  ],
+  "gap_categories": [
+    "topology",
+    "component",
+    "model",
+    "simulation",
+    "physical_design",
+    "verification"
+  ],
+  "obligation_anchor": {
+    "digest": "sha256",
+    "encoding": "ordered_utf8_fields_each_prefixed_by_u32_big_endian_byte_length",
+    "fields": [
+      "corpus_manifest_sha256",
+      "role",
+      "case_id",
+      "operating_case_id",
+      "assertion_id",
+      "observation_kind",
+      "observation_id",
+      "output_id"
+    ],
+    "exclude_outcome_and_failure_classification": true,
+    "publisher_derived": true,
+    "duplicate_anchor": "retire_before_synthesis"
+  },
+  "causal_path": {
+    "generation_zero_leaf_count": 1,
+    "successor_requires_exact_prior_prefix": true,
+    "successor_appended_leaf_count": 1,
+    "minimum_successors_for_still_failing_obligation": 1,
+    "maximum_successors_per_removed_leaf": 4,
+    "successor_same_obligation_anchor": true,
+    "successor_unique_member_and_path": true,
+    "successor_required_evidence": "equal_or_strict_superset",
+    "successor_stage_relation": "same_or_higher_with_different_current_member",
+    "path_rewrite_or_truncation": "retire",
+    "unknown_stage": "retire",
+    "stage_ordinal": {
+      "topology": 1,
+      "component": 2,
+      "model": 3,
+      "simulation": 4,
+      "physical_design": 5,
+      "verification": 6
+    }
+  },
+  "effect_closure": {
+    "required_before_implementation": true,
+    "construction_may_use_corpus_outcomes": false,
+    "required_mechanical_evidence": [
+      "reverse_call_graph",
+      "registry_references",
+      "configuration_loader_references",
+      "catalog_model_references",
+      "data_references",
+      "focused_non_corpus_runtime_consumer_trace"
+    ],
+    "unbounded_dynamic_lookup": "reject_plan",
+    "unmapped_outcome_affecting_consumer": "reject_plan",
+    "independent_separable_effect": "count_as_capability_member",
+    "atoms_and_members_count_against_all_budgets": true,
+    "changed_gap_outside_selection_or_closure": "retire"
+  },
+  "adaptive_rounds": {
+    "maximum_rounds": 3,
+    "maximum_total_capability_atoms": 9,
+    "maximum_total_exact_members": 27,
+    "maximum_round_capability_atoms": 3,
+    "maximum_round_exact_members": 9,
+    "maximum_candidate_bundles": 262144,
+    "minimum_atom_active_case_support": 2,
+    "minimum_advanced_active_cases": 2,
+    "minimum_reporting_domains": 2,
+    "minimum_circuit_roles": 2,
+    "prior_atom_reselection": "prohibited",
+    "one_implementation_per_round": true,
+    "one_discovery_evaluation_per_round": true,
+    "stop_at_first_public_pass_uplift": true
+  },
+  "candidate_generation": {
+    "discovery_only": true,
+    "complete_nonempty_case_subset_union_closure": true,
+    "exact_deduplication": true,
+    "exact_dominance_pruning": true,
+    "truncation": "prohibited",
+    "overflow": "fail_closed",
+    "require_complete_current_frontier_cover": true,
+    "reject_empty_frontiers": true,
+    "reject_duplicate_atoms": true,
+    "reject_duplicate_members": true,
+    "reject_duplicate_cases": true
+  },
+  "ranking": [
+    "covered_active_case_count_desc",
+    "covered_reporting_domain_count_desc",
+    "covered_circuit_role_count_desc",
+    "covered_safety_weight_desc",
+    "capability_atom_count_including_closure_asc",
+    "exact_member_count_including_closure_asc"
+  ],
+  "safety_weights": {
+    "non_safety": 0,
+    "review_required": 1,
+    "safety_relevant": 3,
+    "safety_critical": 5
+  },
+  "tie_behavior": "publish_complete_semantic_co_rank_one_set_then_select_canonical_bundle_key_asc",
+  "identity_order_is_impact_evidence": false,
+  "round_gates": {
+    "require_exact_case_set": true,
+    "require_all_selected_leaves_disappear": true,
+    "require_nonselected_nonclosure_gaps_byte_identical": true,
+    "require_complete_successor_paths": true,
+    "require_nonempty_frontier_for_retained_nonpass": true,
+    "require_no_pass_regression": true,
+    "require_no_unsafe_to_pass": true,
+    "require_deterministic_replay": true,
+    "require_complete_physical_promotion": true,
+    "require_seal_bound_environment": true
+  },
+  "public_admission": {
+    "require_strict_total_pass_uplift": true,
+    "minimum_new_active_cohort_passes": 1,
+    "stop_immediately_on_admission": true
+  },
+  "validation_gates": [
+    "requirement_contract",
+    "complete_topology",
+    "electrical_connectivity",
+    "component_catalog_realization",
+    "model_coverage",
+    "simulation_execution",
+    "behavioral_assertions",
+    "safety_evidence",
+    "clean_erc",
+    "strict_drc",
+    "route_completion",
+    "writer_correctness",
+    "zero_round_trip_diffs",
+    "deterministic_replay"
+  ],
+  "deterministic_execution": {
+    "outcome_affecting_subprocess_concurrency": 1,
+    "synthesis_replays_per_case": 2,
+    "physical_promotions_per_pass": 2,
+    "byte_identical_complete_export_required": true,
+    "fixed_worker_count": true,
+    "fixed_traversal_order": true,
+    "fixed_random_sources": true,
+    "fixed_locale_timezone_and_floating_point_mode": true
+  },
+  "held_out": {
+    "influence_on_selection_or_implementation": "prohibited",
+    "source_key_distinct": true,
+    "baseline_key_distinct": true,
+    "final_result_key_distinct": true,
+    "key_bytes": 32,
+    "key_file_mode": "0600",
+    "cipher": "AES-256-GCM",
+    "nonce_bytes": 12,
+    "blind_final_requires_public_admission": true,
+    "require_strict_pass_uplift": true,
+    "minimum_new_lineage_covered_passes": 1,
+    "disclose_case_or_outcome_detail": false
+  },
+  "prohibitions": [
+    "fixture_specific_templates",
+    "fixture_specific_coordinates",
+    "corpus_identity_dispatch",
+    "author_identity_dispatch",
+    "expected_outcome_dispatch",
+    "manual_selection_override",
+    "post_synthesis_corpus_mutation",
+    "budget_or_gate_relaxation",
+    "held_out_disclosure",
+    "manual_github_actions_run"
+  ]
+}
