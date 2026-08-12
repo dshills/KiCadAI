@@ -1,0 +1,51 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "sequenced_control_interface",
+    "title": "Sequenced Control Interface",
+    "description": "Translate a control transition into two ordered output transitions while maintaining bounded logic levels over supply and capacitive-load corners."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"control_return","kind":"reference","source":"external","nominal_voltage_v":0},
+      {"id":"control_supply","kind":"supply","source":"external","min_voltage_v":3,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.025}
+    ],
+    "ports": [
+      {"id":"sequence_request","kind":"digital","direction":"sink","domain":"control_return","electrical":{"min_voltage_v":0,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"input_impedance_min_ohm":75000,"default_state":"low"}},
+      {"id":"first_control","kind":"digital","direction":"source","domain":"control_return","electrical":{"min_voltage_v":0,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.004,"default_state":"low"}},
+      {"id":"second_control","kind":"digital","direction":"source","domain":"control_return","electrical":{"min_voltage_v":0,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.004,"default_state":"low"}},
+      {"id":"control_power","kind":"power","direction":"sink","domain":"control_supply","electrical":{"min_voltage_v":3,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.025}},
+      {"id":"control_common","kind":"reference","direction":"bidirectional","domain":"control_return","electrical":{"nominal_voltage_v":0}}
+    ],
+    "operating_cases": [
+      {"id":"request_asserted","conditions":[{"axis":"input_voltage","target":"sequence_request","min":2.1,"max":3.6,"unit":"V"},{"axis":"load_capacitance","target":"first_control","min":0,"max":0.0000000001,"unit":"F"},{"axis":"load_capacitance","target":"second_control","min":0,"max":0.0000000001,"unit":"F"},{"axis":"supply_voltage","target":"control_supply","min":3,"max":3.6,"unit":"V"}]},
+      {"id":"request_released","conditions":[{"axis":"input_voltage","target":"sequence_request","min":0,"max":0.7,"unit":"V"},{"axis":"load_capacitance","target":"first_control","min":0,"max":0.0000000001,"unit":"F"},{"axis":"load_capacitance","target":"second_control","min":0,"max":0.0000000001,"unit":"F"},{"axis":"supply_voltage","target":"control_supply","min":3,"max":3.6,"unit":"V"}]},
+      {"id":"assert_sequence","conditions":[{"axis":"input_voltage","target":"sequence_request","min":0,"max":3.6,"unit":"V"},{"axis":"load_capacitance","target":"first_control","min":0.00000000002,"max":0.0000000001,"unit":"F"},{"axis":"load_capacitance","target":"second_control","min":0.00000000002,"max":0.0000000001,"unit":"F"},{"axis":"ambient_temperature","target":"control_common","min":-20,"max":70,"unit":"degC"}],"events":[{"id":"request_rise","kind":"input_step","target":"sequence_request","trigger_time_s":0.00001,"initial":0,"applied":3.3,"unit":"V"}]}
+    ],
+    "behavioral_requirements": [
+      {"id":"first_asserted_level","metric":"output_high_voltage","analysis":"dc_operating_point","excitation":{"kind":"port","id":"sequence_request"},"observation":{"kind":"port","id":"first_control"},"min":2.5,"unit":"V","operating_cases":["request_asserted"]},
+      {"id":"second_asserted_level","metric":"output_high_voltage","analysis":"dc_operating_point","excitation":{"kind":"port","id":"sequence_request"},"observation":{"kind":"port","id":"second_control"},"min":2.5,"unit":"V","operating_cases":["request_asserted"]},
+      {"id":"released_levels","metric":"output_low_voltage","analysis":"dc_operating_point","excitation":{"kind":"port","id":"sequence_request"},"observation":{"kind":"circuit","id":"control_outputs"},"max":0.35,"unit":"V","operating_cases":["request_released"],"critical":true},
+      {"id":"first_response","metric":"propagation_delay","analysis":"transient","excitation":{"kind":"port","id":"sequence_request"},"observation":{"kind":"port","id":"first_control"},"min":0.00001,"max":0.00003,"unit":"s","operating_cases":["assert_sequence"],"critical":true},
+      {"id":"second_response","metric":"propagation_delay","analysis":"transient","excitation":{"kind":"port","id":"sequence_request"},"observation":{"kind":"port","id":"second_control"},"min":0.00006,"max":0.0001,"unit":"s","operating_cases":["assert_sequence"],"critical":true}
+    ],
+    "constraints": {"max_components":20,"max_width_mm":30,"max_height_mm":22}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema":"kicadai.open-topology-requirement.v1",
+  "version":1,
+  "project":{"name":"differential_sensor_readout","title":"Differential sensor readout","description":"Convert a small externally supplied differential signal into a bounded voltage and a discrete alarm indication across supply, temperature, and source-range variations."},
+  "requirements":{
+    "domains":[
+      {"id":"sensor_reference","kind":"reference","source":"external","min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0},
+      {"id":"sensor_supply","kind":"supply","source":"external","min_voltage_v":4.5,"nominal_voltage_v":5,"max_voltage_v":5.5,"max_current_a":0.06}
+    ],
+    "ports":[
+      {"id":"positive_sense","kind":"analog_voltage","direction":"sink","domain":"sensor_supply","electrical":{"min_voltage_v":1.8,"nominal_voltage_v":2.5,"max_voltage_v":3.2,"max_current_a":0.00002,"input_impedance_min_ohm":1000000}},
+      {"id":"negative_sense","kind":"analog_voltage","direction":"sink","domain":"sensor_supply","electrical":{"min_voltage_v":1.8,"nominal_voltage_v":2.5,"max_voltage_v":3.2,"max_current_a":0.00002,"input_impedance_min_ohm":1000000}},
+      {"id":"measurement_output","kind":"analog_voltage","direction":"source","domain":"sensor_supply","electrical":{"min_voltage_v":0.2,"nominal_voltage_v":2.5,"max_voltage_v":4.8,"max_current_a":0.003}},
+      {"id":"alarm_output","kind":"digital","direction":"source","domain":"sensor_supply","electrical":{"min_voltage_v":0,"nominal_voltage_v":2.5,"max_voltage_v":5.5,"max_current_a":0.005,"default_state":"low"}},
+      {"id":"sensor_power","kind":"power","direction":"sink","domain":"sensor_supply","electrical":{"min_voltage_v":4.5,"nominal_voltage_v":5,"max_voltage_v":5.5,"max_current_a":0.06}},
+      {"id":"sensor_return","kind":"reference","direction":"bidirectional","domain":"sensor_reference","electrical":{"min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0,"max_current_a":0.06}}
+    ],
+    "operating_cases":[
+      {"id":"measurement_span","conditions":[
+        {"axis":"ambient_temperature","target":"sensor_reference","min":-40,"max":85,"unit":"degC"},
+        {"axis":"supply_voltage","target":"sensor_supply","min":4.5,"max":5.5,"unit":"V"},
+        {"axis":"input_voltage","target":"positive_sense","min":2.45,"max":2.62,"unit":"V"},
+        {"axis":"input_voltage","target":"negative_sense","min":2.38,"max":2.55,"unit":"V"},
+        {"axis":"load_resistance","target":"measurement_output","min":10000,"max":100000,"unit":"ohm"}
+      ]},
+      {"id":"alarm_crossing","conditions":[
+        {"axis":"ambient_temperature","target":"sensor_reference","min":-40,"max":85,"unit":"degC"},
+        {"axis":"supply_voltage","target":"sensor_supply","min":4.5,"max":5.5,"unit":"V"},
+        {"axis":"input_voltage","target":"negative_sense","min":2.45,"max":2.55,"unit":"V"},
+        {"axis":"load_capacitance","target":"alarm_output","min":0,"max":0.0000000001,"unit":"F"}
+      ],"events":[{"id":"sense_increase","kind":"input_step","target":"positive_sense","trigger_time_s":0.002,"initial":2.5,"applied":2.61,"unit":"V"}]}
+    ],
+    "behavioral_requirements":[
+      {"id":"source_loading","metric":"input_impedance","analysis":"dc_operating_point","observation":{"kind":"port","id":"positive_sense"},"min":1000000,"unit":"ohm","operating_cases":["measurement_span"]},
+      {"id":"differential_gain","metric":"voltage_gain","analysis":"dc_sweep","excitation":{"kind":"port","id":"positive_sense"},"observation":{"kind":"port","id":"measurement_output"},"min":18,"max":22,"unit":"ratio","operating_cases":["measurement_span"],"critical":true},
+      {"id":"measurement_range","metric":"output_voltage","analysis":"dc_sweep","observation":{"kind":"port","id":"measurement_output"},"min":0.3,"max":4.7,"unit":"V","operating_cases":["measurement_span"],"critical":true},
+      {"id":"alarm_trip_level","metric":"threshold_voltage","analysis":"dc_sweep","excitation":{"kind":"port","id":"positive_sense"},"observation":{"kind":"port","id":"alarm_output"},"min":2.585,"max":2.615,"unit":"V","operating_cases":["alarm_crossing"],"critical":true},
+      {"id":"alarm_latency","metric":"propagation_delay","analysis":"transient","excitation":{"kind":"port","id":"positive_sense"},"observation":{"kind":"port","id":"alarm_output"},"max":0.0005,"unit":"s","operating_cases":["alarm_crossing"],"critical":true},
+      {"id":"alarm_active_level","metric":"output_high_voltage","analysis":"transient","observation":{"kind":"port","id":"alarm_output"},"min":4,"unit":"V","operating_cases":["alarm_crossing"]}
+    ],
+    "constraints":{"max_components":28,"max_width_mm":38,"max_height_mm":28}
+  },
+  "acceptance":{"require_primitive_only":true,"require_topology_search":true,"require_simulation":true,"require_all_corners":true,"require_model_provenance":true,"require_closed_loop_evidence":true,"require_complete_routing":true,"require_connectivity":true,"require_writer_correctness":true,"require_round_trip_zero_diff":true,"require_erc":true,"require_strict_drc":true,"require_deterministic_replay":true,"require_fail_closed":true}
+}

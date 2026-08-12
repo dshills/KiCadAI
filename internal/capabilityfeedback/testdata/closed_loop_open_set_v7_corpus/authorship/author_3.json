@@ -1,0 +1,41 @@
+{
+  "schema": "kicadai.closed-loop-open-set-authorship.v7",
+  "version": 7,
+  "author_context_identity": "/root/v7_author_3_replacement_2",
+  "author_slot": "author_3",
+  "authoring_tool_model_version": "OpenAI Codex GPT-5",
+  "authoring_started_utc": "2026-08-12T13:11:11Z",
+  "authoring_ended_utc": "2026-08-12T13:23:43Z",
+  "per_author_packet_manifest": "AUTHOR_3_PACKET.sha256",
+  "per_author_packet_sha256": "569df64dad4f4348a5bcfda36d3177330bdaa36e7e853deb0ebaffb12c050168",
+  "contract_binding_sha256": "a05533b2f7cd05bf45d5b0e0209d7dfde63d98f3071d4d9ee9ccadf58b66f77b",
+  "assignment_sha256": "c065aa28758671edb065722da24476f46f302d3ed8de94a545733330a5c0f91b",
+  "returned_bundle_root": "author_3_replacement_2",
+  "requirement_source_sha256": [
+    {"path":"discovery/request_013.json","sha256":"41653f597d50285a9ebf30ad016f1a8723ea11db26f1f783460966772b832b54"},
+    {"path":"discovery/request_014.json","sha256":"9c84719d1240caf5a820c062292c640136f16b90acbdbc360b3808482b1e4d43"},
+    {"path":"discovery/request_015.json","sha256":"cb0d4132764d78b5de83db54f4e282d92cb9e3f848c568cd7a3e40af996ea3aa"},
+    {"path":"discovery/request_016.json","sha256":"d751c244ed8f223aeb4b89c399d848f5a3a632049cb1577bb4fadc2dca85b327"},
+    {"path":"discovery/request_017.json","sha256":"8bc37b28c427457bcbcac5a0a13c16867d1058845a16cc0b20998cab536f3366"},
+    {"path":"discovery/request_018.json","sha256":"9d884b64619b4555cca84673d3b02866fcea5c0e0bba5bde44e99285bd80ec9a"},
+    {"path":"held_out/request_031.json","sha256":"c83390eb5eb05af005b3a6952e5bb7351d53d23872f74db132ea61aef28c8a88"},
+    {"path":"held_out/request_032.json","sha256":"5ec8976dfdfbf1335f7223e0a7c6e6a6792a538b6c73f299882dd46559c38fe5"},
+    {"path":"held_out/request_033.json","sha256":"557ea216cf713055e44a15be39a0519a44e1b5383fcfad5c7c3ec9d02ffc8338"},
+    {"path":"held_out/request_034.json","sha256":"fd2e2825393de3025e5ccdff0a66411932502542e9a4c8e8ba67ec9001576918"},
+    {"path":"held_out/request_035.json","sha256":"675b5d5b68d3e1a54030c8309b7ca3b426f1675cb8928227539983222a36dfa1"},
+    {"path":"held_out/request_036.json","sha256":"6192d8831ac1e147854762e47ff5e27947ff7bed4f168978c12dc82259583ba3"}
+  ],
+  "uncertainties": [],
+  "attestations": {
+    "packet_only_input": true,
+    "contract_bound_before_authoring": true,
+    "no_repository_or_prior_corpus_access": true,
+    "no_cross_author_assignment_or_content_access": true,
+    "independently_conceived_behavior_only_requirements": true,
+    "no_synthesis_simulation_classification_or_feasibility": true,
+    "fixed_discovery_held_out_membership": true,
+    "no_implementation_or_expected_outcome_prescription": true,
+    "no_post_evaluation_inspection_or_modification": true,
+    "all_uncertainties_disclosed": true
+  }
+}
