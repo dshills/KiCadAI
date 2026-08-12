@@ -1,0 +1,8 @@
+{
+  "schema": "kicadai.closed-loop-open-set-validator-freeze.v8",
+  "version": 8,
+  "validator_manifest_sha256": "6e0986698fd78af54b0d7e5432028a612390bcc3276918e785adcc096e5948aa",
+  "historical_commitments_sha256": "f56d30c27b30e90f4c8568e06870718bac7e9db7d29ed24dac6c768ad163cebf",
+  "packet_set_sha256": "5a243103b6dee088470a521617a88f33685cf2bfb170c68cffa0e1f93bfacc76",
+  "held_out_opened": false
+}
