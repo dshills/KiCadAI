@@ -822,6 +822,36 @@ func dcDeviceValue(result AnalysisResult, assertion Assertion) (float64, *Diagno
 	return 0, advancedAssertionDiagnostic(assertion, "device-current assertion component is absent from the solved point")
 }
 
+func dcInputImpedanceValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	if len(result.Points) != 1 {
+		return 0, advancedAssertionDiagnostic(assertion, "DC input-impedance assertion requires exactly one operating point")
+	}
+	point := result.Points[0]
+	input, inputFound := analysisNodeReal(point, assertion.Node)
+	reference, referenceFound := analysisNodeReal(point, assertion.ReferenceNode)
+	current, currentFound := 0.0, false
+	for _, device := range point.Devices {
+		if device.Component != assertion.Component {
+			continue
+		}
+		current = math.Abs(device.CurrentA)
+		currentFound = true
+		break
+	}
+	if !inputFound || !referenceFound || !currentFound {
+		return 0, advancedAssertionDiagnostic(assertion, "DC input-impedance assertion requires solved input/reference voltages and the excitation-source current")
+	}
+	voltage := normalizedMNAFloat(math.Abs(input - reference))
+	current = normalizedMNAFloat(current)
+	if current == 0 {
+		if voltage == 0 {
+			return 0, advancedAssertionDiagnostic(assertion, "DC input impedance is undefined for zero differential voltage and zero excitation-source current")
+		}
+		return maximumTrustedOpenCircuitImpedanceOhm, nil
+	}
+	return math.Min(maximumTrustedOpenCircuitImpedanceOhm, normalizedMNAFloat(voltage/current)), nil
+}
+
 func dcSweepDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
 	switch assertion.Quantity {
 	case QuantityFallingThresholdVoltageV:

@@ -235,7 +235,8 @@ func requirementObligationFindings(
 			continue
 		}
 		byOutput[output.ID] = append(byOutput[output.ID], assertion)
-		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" && assertion.Excitation.ID != output.ID {
+		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" && assertion.Excitation.ID != output.ID &&
+			requirementPortIsIndependentControl(ports, assertion.Excitation.ID) {
 			if controlsByOutput[output.ID] == nil {
 				controlsByOutput[output.ID] = map[string]bool{}
 			}

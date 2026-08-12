@@ -150,17 +150,47 @@ func loadClosedLoopV6CurrentImplementationSeal(t *testing.T) closedLoopV6Impleme
 	t.Helper()
 	seal := loadClosedLoopV6HistoricalImplementationSeal(t)
 	moduleRoot := closedLoopModuleRoot(t)
+	selectedV7SharedPaths := closedLoopV7SelectedSharedV6ArtifactPaths()
+	selectedV7Shared := make(map[string]struct{}, len(selectedV7SharedPaths))
+	for _, path := range selectedV7SharedPaths {
+		selectedV7Shared[path] = struct{}{}
+	}
+	driftedSelected := map[string]struct{}{}
 	verifyArtifacts := func(artifacts []closedLoopArtifactEvidence) {
 		for _, artifact := range artifacts {
 			path := filepath.Join(moduleRoot, filepath.FromSlash(artifact.Path))
-			if corpusHash(mustCorpusRead(t, path)) != artifact.SHA256 {
-				t.Fatalf("V6 reviewed implementation artifact drifted: %s", artifact.Path)
+			if corpusHash(mustCorpusRead(t, path)) == artifact.SHA256 {
+				continue
 			}
+			if _, selected := selectedV7Shared[artifact.Path]; selected {
+				driftedSelected[artifact.Path] = struct{}{}
+				continue
+			}
+			t.Fatalf("V6 reviewed implementation artifact drifted: %s", artifact.Path)
 		}
 	}
 	verifyArtifacts(seal.ProductionArtifacts)
 	verifyArtifacts(seal.VerificationArtifacts)
+	for _, path := range selectedV7SharedPaths {
+		if _, drifted := driftedSelected[path]; !drifted {
+			t.Fatalf("V7 selected shared V6 artifact did not drift as declared: %s", path)
+		}
+	}
 	return seal
+}
+
+// closedLoopV7SelectedSharedV6ArtifactPaths is the exact verification-only
+// projection admitted by the frozen V7 round-one implementation plan. Every
+// other V6 artifact remains byte-compared above. These shared paths must all
+// drift, remain covered by the original V6 tests/public evidence replay, and
+// receive exact before/after coverage in the V7 implementation seal.
+func closedLoopV7SelectedSharedV6ArtifactPaths() []string {
+	return []string{
+		"internal/opentopologysynthesis/multi_output_composition.go",
+		"internal/opentopologysynthesis/realizability.go",
+		"internal/opentopologysynthesis/realizability_test.go",
+		"internal/opentopologysynthesis/search.go",
+	}
 }
 
 func closedLoopV6ProductionArtifactPaths() []string {

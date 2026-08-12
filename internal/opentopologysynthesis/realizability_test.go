@@ -162,6 +162,12 @@ func TestRequirementRealizabilityLeavesComposableOutputsAndClassifiesIndependent
 	if assessment := AssessRequirementRealizability(singleControl); findingWithCode(assessment.Findings, CodeMultiControlCompositionRequired) != nil {
 		t.Fatalf("repeated single control was misclassified: %#v", assessment)
 	}
+
+	powerExcitation := multiControl
+	powerExcitation.Requirements.BehavioralRequirements[2].Excitation.ID = "supply_in"
+	if assessment := AssessRequirementRealizability(powerExcitation); findingWithCode(assessment.Findings, CodeMultiControlCompositionRequired) != nil {
+		t.Fatalf("power input was misclassified as an independent control: %#v", assessment)
+	}
 }
 
 func TestRequirementRealizabilityRejectsInvalidAndReplaysDeterministically(t *testing.T) {

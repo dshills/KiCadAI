@@ -55,15 +55,23 @@ func (frontier *topologyFrontier) Pop() any {
 }
 
 func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inventory PrimitiveInventory, policy Policy) TopologySearchResult {
-	return searchPrimitiveTopologies(ctx, requirement, inventory, policy, true)
+	return searchPrimitiveTopologies(ctx, requirement, inventory, policy, topologyCompositionAll)
 }
+
+type topologyCompositionMode uint8
+
+const (
+	topologyCompositionNone topologyCompositionMode = iota
+	topologyCompositionControlsOnly
+	topologyCompositionAll
+)
 
 func searchPrimitiveTopologies(
 	ctx context.Context,
 	requirement Requirement,
 	inventory PrimitiveInventory,
 	policy Policy,
-	allowMultiOutputComposition bool,
+	compositionMode topologyCompositionMode,
 ) TopologySearchResult {
 	result := TopologySearchResult{
 		Schema:        TopologySearchSchema,
@@ -152,7 +160,7 @@ func searchPrimitiveTopologies(
 			retainedTopology[candidate.TopologyHash] = candidate
 		}
 	}
-	if allowMultiOutputComposition {
+	if compositionMode == topologyCompositionAll {
 		compositionCandidates, compositionConsumption, compositionRejections := topologyMultiOutputCompositionSeeds(
 			ctx,
 			requirement,
@@ -181,6 +189,35 @@ func searchPrimitiveTopologies(
 			// parent can only build one output cone and leave another output
 			// incomplete; a successful merge is therefore the bounded-search
 			// completion point, not a shortcut around an unexplored provider.
+			combined := make([]TopologyCandidate, 0, len(retainedTopology))
+			for _, candidate := range retainedTopology {
+				combined = append(combined, candidate)
+			}
+			return finalizeComposedTopologySearchResult(result, combined, rejections)
+		}
+	}
+	if compositionMode != topologyCompositionNone {
+		compositionCandidates, compositionConsumption, compositionRejections := topologyMultiControlCompositionSeeds(
+			ctx,
+			requirement,
+			inventory,
+			representatives,
+			inventoryByKey,
+			limits,
+			result.Policy,
+			initialState,
+		)
+		addSearchConsumption(&result.Consumption, compositionConsumption)
+		for code, samples := range compositionRejections {
+			rejections[code] = append(rejections[code], samples...)
+		}
+		for _, candidate := range compositionCandidates {
+			if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+				compareTopologyCandidates(candidate, existing) < 0 {
+				retainedTopology[candidate.TopologyHash] = candidate
+			}
+		}
+		if len(compositionCandidates) != 0 {
 			combined := make([]TopologyCandidate, 0, len(retainedTopology))
 			for _, candidate := range retainedTopology {
 				combined = append(combined, candidate)

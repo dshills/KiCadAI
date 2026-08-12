@@ -1261,8 +1261,18 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "cutoff/bandwidth assertion requires AC sweep and a voltage-reference node or current-excitation component"})
 			}
 		case QuantityInputImpedanceOhm:
-			if kind != AnalysisACSweep || strings.TrimSpace(assertion.ReferenceNode) == "" || assertion.FrequencyHz <= 0 {
-				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "input-impedance assertion requires AC sweep, a positive frequency, a reference node, and the excitation-source component"})
+			if strings.TrimSpace(assertion.ReferenceNode) == "" && kind != AnalysisDCOperatingPoint {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "input-impedance assertion requires a reference node and the excitation-source component"})
+			} else if kind == AnalysisACSweep {
+				if assertion.FrequencyHz <= 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "AC input-impedance assertion requires a positive frequency"})
+				}
+			} else if kind == AnalysisDCOperatingPoint {
+				if assertion.FrequencyHz != 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "DC input-impedance assertion does not accept a frequency"})
+				}
+			} else {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "input-impedance assertion requires AC sweep or DC operating-point analysis"})
 			}
 		case QuantityTransimpedanceOhm:
 			if kind == AnalysisACSweep {
@@ -1441,6 +1451,23 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	if len(diagnostics) != 0 {
 		return Plan{}, diagnostics
 	}
+	assertions := append([]Assertion(nil), intent.Assertions...)
+	for index := range assertions {
+		analysis, found := analysisByID(intent.Analyses, assertions[index].AnalysisID)
+		if !found {
+			// validateMNAIntent rejects this before topology resolution. Keep the
+			// resolver fail-closed if that invariant is ever changed.
+			return Plan{}, []Diagnostic{{Path: "assertions", Message: "assertion analysis is absent during topology resolution"}}
+		}
+		if assertions[index].Quantity == QuantityInputImpedanceOhm &&
+			analysis.Kind == AnalysisDCOperatingPoint &&
+			strings.TrimSpace(assertions[index].ReferenceNode) == "" {
+			if ground == "" {
+				return Plan{}, []Diagnostic{{Path: "assertions", Message: "DC input impedance requires a resolved ground reference"}}
+			}
+			assertions[index].ReferenceNode = ground
+		}
+	}
 	referencedSources := map[string]struct{}{}
 	for _, analysis := range intent.Analyses {
 		for _, excitation := range analysis.Excitations {
@@ -1572,7 +1599,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	plan := Plan{
 		RegistryVersion: RegistryVersion, RegistryHash: RegistryHash(), CatalogID: catalogID, CatalogHash: catalogHash,
 		ModelID: intent.ModelID, GroundNode: ground, Nodes: nodeNames, Devices: devices,
-		Analyses: canonicalAnalyses(intent.Analyses), Assertions: append([]Assertion(nil), intent.Assertions...), WorstCase: intent.WorstCase,
+		Analyses: canonicalAnalyses(intent.Analyses), Assertions: assertions, WorstCase: intent.WorstCase,
 		Uncertainties: append([]Uncertainty(nil), uncertainties...),
 	}
 	slices.SortStableFunc(plan.Uncertainties, func(a, b Uncertainty) int { return strings.Compare(a.Target, b.Target) })

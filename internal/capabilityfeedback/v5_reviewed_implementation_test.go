@@ -41,11 +41,21 @@ func loadClosedLoopV5HistoricalImplementationSeal(t *testing.T) closedLoopV5Impl
 func loadClosedLoopV5CurrentImplementationSeal(t *testing.T) closedLoopV5ImplementationSeal {
 	t.Helper()
 	seal := loadClosedLoopV5HistoricalImplementationSeal(t)
+	const selectedV7SharedPath = "internal/simmodel/mna_registry.go"
+	sharedPathDrifted := false
 	for _, artifact := range seal.Artifacts {
 		path := filepath.Join(closedLoopModuleRoot(t), filepath.FromSlash(artifact.Path))
-		if corpusHash(mustCorpusRead(t, path)) != artifact.SHA256 {
-			t.Fatalf("V5 reviewed implementation artifact drifted: %s", artifact.Path)
+		if corpusHash(mustCorpusRead(t, path)) == artifact.SHA256 {
+			continue
 		}
+		if artifact.Path == selectedV7SharedPath {
+			sharedPathDrifted = true
+			continue
+		}
+		t.Fatalf("V5 reviewed implementation artifact drifted: %s", artifact.Path)
+	}
+	if !sharedPathDrifted {
+		t.Fatalf("V7 selected shared V5 artifact did not drift as declared: %s", selectedV7SharedPath)
 	}
 	return seal
 }

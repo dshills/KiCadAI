@@ -145,7 +145,10 @@ func analyzeCausalRepairs(
 
 	if analysis.Consumption.Trials < analysis.Budget.Trials &&
 		analysis.Consumption.CoordinatedTrials < analysis.Budget.CoordinatedTrials {
-		for _, candidate := range coordinatedCausalCandidates(graph, evaluated, analysis.Budget.CoordinatedTrials) {
+		coordinated := coordinatedCausalCandidates(graph, evaluated, analysis.Budget.CoordinatedTrials)
+		remainingCoordinated := max(0, analysis.Budget.CoordinatedTrials-len(coordinated))
+		coordinated = append(coordinated, coordinatedTopologyValueCandidates(graph, evaluated, remainingCoordinated)...)
+		for _, candidate := range coordinated {
 			if !evaluate(candidate) {
 				break
 			}

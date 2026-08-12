@@ -1775,6 +1775,9 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityDeviceCurrentA || assertion.Quantity == QuantityTotalSupplyCurrentA || assertion.Quantity == QuantityTransimpedanceOhm) {
 			return dcDeviceValue(result, assertion)
 		}
+		if result.Kind == AnalysisDCOperatingPoint && assertion.Quantity == QuantityInputImpedanceOhm {
+			return dcInputImpedanceValue(result, assertion)
+		}
 		if result.Kind == AnalysisDCOperatingPoint &&
 			(assertion.Quantity == QuantityDCSweepVoltageSpanV ||
 				assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA ||

@@ -57,7 +57,7 @@ func topologyMultiOutputCompositionSeeds(
 			obligation.requirement,
 			inventory,
 			perObligationPolicy,
-			false,
+			topologyCompositionControlsOnly,
 		)
 		addSearchConsumption(&consumption, search.Consumption)
 		if len(search.Candidates) == 0 {
@@ -99,6 +99,7 @@ func topologyMultiOutputCompositionSeeds(
 			requirement,
 			initial,
 			combination,
+			nil,
 			inventory,
 			inventoryByKey,
 			limits,
@@ -272,6 +273,7 @@ func mergeOutputTopologyCandidates(
 	requirement Requirement,
 	initial topologySearchState,
 	candidates []TopologyCandidate,
+	isolatedOutputIDs []string,
 	inventory PrimitiveInventory,
 	inventoryByKey map[string]PrimitiveCandidate,
 	limits GraphLimits,
@@ -301,10 +303,25 @@ func mergeOutputTopologyCandidates(
 			externalNodes[identity] = node.ID
 		}
 	}
-	for _, candidate := range candidates {
+	for candidateIndex, candidate := range candidates {
 		nodeMapping := map[string]string{}
 		for _, node := range candidate.Graph.Nodes {
 			if node.Scope == "external" {
+				if candidateIndex < len(isolatedOutputIDs) && isolatedOutputIDs[candidateIndex] != "" &&
+					node.SemanticKind == "port" && node.SemanticID == isolatedOutputIDs[candidateIndex] {
+					var generatedNode string
+					state, generatedNode = addRelationshipInternalNode(
+						state,
+						requirement,
+						inventoryByKey,
+						consumption,
+					)
+					if generatedNode == "" {
+						return topologySearchState{}, false
+					}
+					nodeMapping[node.ID] = generatedNode
+					continue
+				}
 				identity := externalNodeIdentity{
 					semanticKind: node.SemanticKind,
 					semanticID:   node.SemanticID,
