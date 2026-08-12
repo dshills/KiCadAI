@@ -18,8 +18,8 @@ bb2b3f25d723069e04e8f09d94375155eb198070076aa72e80dec6e0183bfc7d  ../../internal
 11bf9e1b949c262afa96962d7917cf405806c2d4ad1b3f68ad68847c24ea777a  ../../internal/corpusfreezev8/normalize.go
 de3f76e7b64f9b22b66af3163fb905f614d7d892dace2f8c26c46312de96da4b  ../../internal/corpusfreezev8/output.go
 17e6f28dacf2dda4151b27cae01cb7ec52fa33d04ab96258f003a626542dcccf  ../../internal/corpusfreezev8/policy.go
-28be680979c591627cbe78ec6a907f02badcced156239fa161b75a06d0c08bb5  ../../internal/corpusfreezev8/validate.go
-50e6c41a7b46ce8961728b1af161ad2e62af9f58cc4381bb5db90b9ae18a4bfc  ../../internal/corpusfreezev8/validator_test.go
+f129e696e39c632daccedb05101ae6cb562d37b4debe971e58c29b0cd3d219c4  ../../internal/corpusfreezev8/validate.go
+e516dea2174a859eb0a01293ad758e6fb120560fc67433ddb4061c4d509bfe43  ../../internal/corpusfreezev8/validator_test.go
 76e6a72b36a44164c360f08fef5b9340106e725ff6ee2b9a305ae4d8c4202458  ../../internal/opentopologysynthesis/decode.go
 efff207c93a4ade03deca68c455d9e858f416cabacb9fba2a4d7bd4e76fff539  ../../internal/opentopologysynthesis/model.go
 b7c713ccd75807aa9d44bc80af9c006b291ea0749a33d6b34b7887ad0f901867  ../../internal/opentopologysynthesis/normalize.go

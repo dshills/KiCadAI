@@ -2,6 +2,7 @@ package corpusfreezev8
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -195,12 +196,50 @@ func prohibitedPattern(terms []string) (*regexp.Regexp, error) {
 }
 
 func containsProhibited(data []byte, identityPrefixes []string, implementationPattern *regexp.Regexp) bool {
-	for _, prefix := range identityPrefixes {
-		if bytes.Contains(data, []byte(prefix)) {
-			return true
+	var document any
+	if err := json.Unmarshal(data, &document); err != nil {
+		return true
+	}
+	root, objectRoot := document.(map[string]any)
+	if !objectRoot {
+		return containsProhibitedValue(document, identityPrefixes, implementationPattern)
+	}
+	// DecodeStrict has already required the exact public schema discriminator.
+	// Exclude only that protocol-owned value; scanning raw JSON would otherwise
+	// reject every valid document because the mandatory schema name contains the
+	// frozen prohibited implementation term "topology". Scan every remaining
+	// key and value recursively: strict decoding currently owns the keys, while
+	// scanning them also prevents a future nested-map extension from becoming a
+	// bypass. Whole-word matching keeps canonical keys such as
+	// "require_topology_search" admissible.
+	delete(root, "schema")
+	return containsProhibitedValue(root, identityPrefixes, implementationPattern)
+}
+
+func containsProhibitedValue(value any, identityPrefixes []string, implementationPattern *regexp.Regexp) bool {
+	stack := []any{value}
+	for len(stack) != 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		switch item := current.(type) {
+		case string:
+			for _, prefix := range identityPrefixes {
+				if strings.Contains(item, prefix) {
+					return true
+				}
+			}
+			if implementationPattern.MatchString(item) {
+				return true
+			}
+		case []any:
+			stack = append(stack, item...)
+		case map[string]any:
+			for key, value := range item {
+				stack = append(stack, key, value)
+			}
 		}
 	}
-	return implementationPattern.Match(data)
+	return false
 }
 
 type aggregateEvidence struct {

@@ -129,3 +129,28 @@ func TestV8ReportFailsClosed(t *testing.T) {
 		t.Fatal("empty report was accepted")
 	}
 }
+
+func TestProhibitedScanExcludesOnlyProtocolSchemaValue(t *testing.T) {
+	pattern, err := prohibitedPattern([]string{"topology", "fixture"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := []byte(`{"schema":"kicadai.open-topology-requirement.v1","project":{"name":"bounded_behavior","description":"A neutral behavior study."},"acceptance":{"require_topology_search":true}}`)
+	if containsProhibited(valid, []string{"v8_case_", "v8_source_"}, pattern) {
+		t.Fatal("protocol-owned schema or key triggered prohibited-value scan")
+	}
+	if containsProhibited([]byte(`["neutral behavior"]`), []string{"v8_case_", "v8_source_"}, pattern) {
+		t.Fatal("neutral non-object JSON triggered prohibited-value scan")
+	}
+	for name, data := range map[string][]byte{
+		"implementation term": []byte(`{"schema":"kicadai.open-topology-requirement.v1","project":{"description":"Use a fixture."}}`),
+		"manifest identity":   []byte(`{"schema":"kicadai.open-topology-requirement.v1","project":{"name":"v8_case_001"}}`),
+		"prohibited key":      []byte(`{"schema":"kicadai.open-topology-requirement.v1","fixture":true}`),
+		"non-object term":     []byte(`["fixture"]`),
+		"invalid JSON":        []byte(`{"schema":`),
+	} {
+		if !containsProhibited(data, []string{"v8_case_", "v8_source_"}, pattern) {
+			t.Fatalf("%s did not fail closed", name)
+		}
+	}
+}
