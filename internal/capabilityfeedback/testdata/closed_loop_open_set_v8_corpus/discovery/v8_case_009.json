@@ -1,0 +1,86 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "commanded_load_channel",
+    "title": "Commanded Load Channel",
+    "description": "A bounded command controls an externally loaded output while an independent status indication reports the delivered state under steady and changing loads."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"control_reference","kind":"reference","source":"external"},
+      {"id":"load_supply","kind":"supply","source":"external","min_voltage_v":10,"nominal_voltage_v":12,"max_voltage_v":14,"max_current_a":0.8}
+    ],
+    "ports": [
+      {"id":"command_input","kind":"digital","direction":"sink","domain":"control_reference","electrical":{"min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":3.6,"input_impedance_min_ohm":10000,"default_state":"low"}},
+      {"id":"load_output","kind":"analog_voltage","direction":"source","domain":"control_reference","electrical":{"min_voltage_v":0,"nominal_voltage_v":9,"max_voltage_v":14,"max_current_a":0.5}},
+      {"id":"state_output","kind":"digital","direction":"source","domain":"control_reference","electrical":{"min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":3.6,"max_current_a":0.006,"default_state":"low"}},
+      {"id":"external_return","kind":"reference","direction":"bidirectional","domain":"control_reference","electrical":{"nominal_voltage_v":0,"max_current_a":0.8}},
+      {"id":"energy_input","kind":"power","direction":"sink","domain":"load_supply","electrical":{"min_voltage_v":10,"nominal_voltage_v":12,"max_voltage_v":14,"max_current_a":0.8}}
+    ],
+    "operating_cases": [
+      {
+        "id": "enabled_steady",
+        "conditions": [
+          {"axis":"supply_voltage","target":"load_supply","min":10,"max":14,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":2.4,"max":3.6,"unit":"V"},
+          {"axis":"load_resistance","target":"load_output","min":24,"max":180,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"control_reference","min":-10,"max":60,"unit":"degC"}
+        ]
+      },
+      {
+        "id": "disabled_steady",
+        "conditions": [
+          {"axis":"supply_voltage","target":"load_supply","min":10,"max":14,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":0,"max":0.4,"unit":"V"},
+          {"axis":"load_resistance","target":"load_output","min":24,"max":180,"unit":"ohm"}
+        ]
+      },
+      {
+        "id": "enable_transition",
+        "conditions": [
+          {"axis":"supply_voltage","target":"load_supply","min":10,"max":14,"unit":"V"},
+          {"axis":"load_resistance","target":"load_output","min":40,"max":120,"unit":"ohm"}
+        ],
+        "events": [
+          {"id":"command_asserted","kind":"input_step","target":"command_input","trigger_time_s":0.001,"initial":0,"applied":3.3,"unit":"V"}
+        ]
+      },
+      {
+        "id": "load_change",
+        "conditions": [
+          {"axis":"supply_voltage","target":"load_supply","min":10,"max":14,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":2.4,"max":3.6,"unit":"V"}
+        ],
+        "events": [
+          {"id":"output_load_increase","kind":"load_step","target":"load_output","trigger_time_s":0.002,"initial":0.08,"applied":0.35,"unit":"A"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"a_activation_delay","metric":"propagation_delay","analysis":"transient","excitation":{"kind":"port","id":"command_input"},"observation":{"kind":"port","id":"load_output"},"max":0.005,"unit":"s","operating_cases":["enable_transition"]},
+      {"id":"b_delivered_voltage","metric":"output_voltage","analysis":"dc_sweep","excitation":{"kind":"domain","id":"load_supply"},"observation":{"kind":"port","id":"load_output"},"min":8.5,"max":9.5,"unit":"V","operating_cases":["enabled_steady"]},
+      {"id":"c_state_high_level","metric":"output_high_voltage","analysis":"dc_operating_point","observation":{"kind":"port","id":"state_output"},"min":2.4,"unit":"V","operating_cases":["enabled_steady"]},
+      {"id":"d_disabled_leakage","metric":"off_state_current","analysis":"dc_operating_point","observation":{"kind":"port","id":"load_output"},"max":0.001,"unit":"A","operating_cases":["disabled_steady"]},
+      {"id":"e_load_settling","metric":"settling_time","analysis":"transient","excitation":{"kind":"port","id":"load_output"},"observation":{"kind":"port","id":"load_output"},"max":0.003,"unit":"s","operating_cases":["load_change"]},
+      {"id":"f_stability_margin","metric":"phase_margin","analysis":"stability","observation":{"kind":"port","id":"load_output"},"min":45,"unit":"deg","operating_cases":["enabled_steady"],"frequency_hz":1000}
+    ],
+    "constraints": {"max_components":24,"max_width_mm":55,"max_height_mm":40}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

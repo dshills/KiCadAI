@@ -1,0 +1,81 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "dual_observation_signal_response",
+    "title": "Dual observation signal response",
+    "description": "Study two bounded analog responses to a shared external excitation across supply, load, temperature, and overdrive conditions."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"signal_reference","kind":"reference","source":"external"},
+      {"id":"energy_input","kind":"supply","source":"external","min_voltage_v":10.0,"nominal_voltage_v":12.0,"max_voltage_v":14.0,"max_current_a":0.12}
+    ],
+    "ports": [
+      {"id":"signal_in","kind":"analog_voltage","direction":"sink","domain":"signal_reference","electrical":{"min_voltage_v":-0.6,"nominal_voltage_v":0.0,"max_voltage_v":0.6,"input_impedance_min_ohm":50000.0}},
+      {"id":"conditioned_out","kind":"analog_voltage","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":-4.8,"nominal_voltage_v":0.0,"max_voltage_v":4.8,"max_current_a":0.01}},
+      {"id":"guard_out","kind":"analog_voltage","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":-2.0,"nominal_voltage_v":0.0,"max_voltage_v":2.0,"max_current_a":0.005}},
+      {"id":"supply_in","kind":"power","direction":"sink","domain":"energy_input","electrical":{"min_voltage_v":10.0,"nominal_voltage_v":12.0,"max_voltage_v":14.0,"max_current_a":0.12}},
+      {"id":"return","kind":"reference","direction":"bidirectional","domain":"signal_reference","electrical":{"min_voltage_v":0.0,"nominal_voltage_v":0.0,"max_voltage_v":0.0,"max_current_a":0.12}}
+    ],
+    "operating_cases": [
+      {
+        "id": "nominal_signal",
+        "conditions": [
+          {"axis":"supply_voltage","target":"energy_input","min":12.0,"max":12.0,"unit":"V"},
+          {"axis":"input_voltage","target":"signal_in","min":-0.1,"max":0.1,"unit":"V"},
+          {"axis":"load_resistance","target":"conditioned_out","min":10000.0,"max":100000.0,"unit":"ohm"},
+          {"axis":"load_resistance","target":"guard_out","min":20000.0,"max":200000.0,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"signal_reference","min":20.0,"max":30.0,"unit":"degC"}
+        ]
+      },
+      {
+        "id": "environment_corners",
+        "conditions": [
+          {"axis":"supply_voltage","target":"energy_input","min":10.0,"max":14.0,"unit":"V"},
+          {"axis":"input_voltage","target":"signal_in","min":-0.1,"max":0.1,"unit":"V"},
+          {"axis":"load_resistance","target":"conditioned_out","min":10000.0,"max":100000.0,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"signal_reference","min":-20.0,"max":70.0,"unit":"degC"},
+          {"axis":"tolerance_corner","target":"conditioned_out","min":-1.0,"max":1.0,"unit":"ratio"}
+        ]
+      },
+      {
+        "id": "bounded_overdrive",
+        "conditions": [
+          {"axis":"supply_voltage","target":"energy_input","min":10.0,"max":14.0,"unit":"V"},
+          {"axis":"input_voltage","target":"signal_in","min":-0.6,"max":0.6,"unit":"V"},
+          {"axis":"load_resistance","target":"conditioned_out","min":10000.0,"max":20000.0,"unit":"ohm"}
+        ],
+        "events": [
+          {"id":"overdrive_transition","kind":"input_step","target":"signal_in","trigger_time_s":0.001,"initial":0.0,"applied":0.6,"unit":"V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"a_overdrive_peak","metric":"peak_voltage","analysis":"transient","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"conditioned_out"},"max":4.8,"unit":"V","operating_cases":["bounded_overdrive"],"critical":true},
+      {"id":"b_conditioned_gain","metric":"voltage_gain_at_frequency","analysis":"ac_sweep","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"conditioned_out"},"min":8.0,"max":12.0,"unit":"ratio","operating_cases":["nominal_signal","environment_corners"],"frequency_hz":1000.0,"critical":true},
+      {"id":"c_guard_gain","metric":"voltage_gain_at_frequency","analysis":"ac_sweep","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"guard_out"},"min":2.0,"max":4.0,"unit":"ratio","operating_cases":["nominal_signal","environment_corners"],"frequency_hz":1000.0},
+      {"id":"d_response_margin","metric":"phase_margin","analysis":"stability","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"circuit","id":"bounded_signal_response"},"min":45.0,"unit":"deg","operating_cases":["nominal_signal","environment_corners"],"frequency_hz":1000.0},
+      {"id":"e_guard_settling","metric":"settling_time","analysis":"transient","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"guard_out"},"max":0.0005,"unit":"s","operating_cases":["bounded_overdrive"]},
+      {"id":"f_output_noise","metric":"output_noise_rms","analysis":"noise","observation":{"kind":"port","id":"conditioned_out"},"max":0.002,"unit":"V_rms","operating_cases":["nominal_signal","environment_corners"],"frequency_hz":20000.0},
+      {"id":"g_conditioned_distortion","metric":"total_harmonic_distortion","analysis":"distortion","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"conditioned_out"},"max":1.0,"unit":"%","operating_cases":["nominal_signal"],"frequency_hz":1000.0}
+    ],
+    "constraints": {"max_components":24,"max_width_mm":70.0,"max_height_mm":45.0}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

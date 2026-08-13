@@ -1,0 +1,50 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "bounded_current_observer",
+    "title": "Bounded Current Observer",
+    "description": "Observe a unidirectional external current as a proportional voltage and indicate when the upper portion of the measurement range is reached."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"signal_reference","kind":"reference","source":"external"},
+      {"id":"measurement_supply","kind":"supply","source":"external","min_voltage_v":4.75,"nominal_voltage_v":5.0,"max_voltage_v":5.25,"max_current_a":0.08}
+    ],
+    "ports": [
+      {"id":"external_return","kind":"reference","direction":"bidirectional","domain":"signal_reference","electrical":{"nominal_voltage_v":0.0,"max_current_a":0.08}},
+      {"id":"sensed_current","kind":"analog_current","direction":"sink","domain":"signal_reference","electrical":{"min_voltage_v":0.0,"max_voltage_v":0.2,"max_current_a":0.002}},
+      {"id":"measurement_voltage","kind":"analog_voltage","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":0.05,"nominal_voltage_v":1.0,"max_voltage_v":2.2,"max_current_a":0.002}},
+      {"id":"range_indication","kind":"digital","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":0.0,"nominal_voltage_v":5.0,"max_voltage_v":5.25,"max_current_a":0.002,"default_state":"low"}},
+      {"id":"supply_input","kind":"power","direction":"sink","domain":"measurement_supply","electrical":{"min_voltage_v":4.75,"nominal_voltage_v":5.0,"max_voltage_v":5.25,"max_current_a":0.08}}
+    ],
+    "operating_cases": [
+      {"id":"low_range","conditions":[{"axis":"input_current","target":"sensed_current","min":0.0001,"max":0.0005,"unit":"A"},{"axis":"supply_voltage","target":"measurement_supply","min":4.75,"max":5.25,"unit":"V"}]},
+      {"id":"upper_range","conditions":[{"axis":"input_current","target":"sensed_current","min":0.0015,"max":0.002,"unit":"A"},{"axis":"supply_voltage","target":"measurement_supply","min":4.75,"max":5.25,"unit":"V"}]},
+      {"id":"environment_corners","conditions":[{"axis":"input_current","target":"sensed_current","min":0.0001,"max":0.002,"unit":"A"},{"axis":"ambient_temperature","target":"signal_reference","min":-20,"max":70,"unit":"degC"},{"axis":"tolerance_corner","target":"measurement_voltage","min":-1,"max":1,"unit":"ratio"}]}
+    ],
+    "behavioral_requirements": [
+      {"id":"a_dc_transfer","metric":"transimpedance","analysis":"dc_sweep","excitation":{"kind":"port","id":"sensed_current"},"observation":{"kind":"port","id":"measurement_voltage"},"min":900,"max":1100,"unit":"V/A","operating_cases":["low_range","upper_range","environment_corners"]},
+      {"id":"b_low_indication","metric":"output_low_voltage","analysis":"dc_operating_point","excitation":{"kind":"port","id":"sensed_current"},"observation":{"kind":"port","id":"range_indication"},"max":0.4,"unit":"V","operating_cases":["low_range"]},
+      {"id":"c_high_indication","metric":"output_high_voltage","analysis":"dc_operating_point","excitation":{"kind":"port","id":"sensed_current"},"observation":{"kind":"port","id":"range_indication"},"min":4.0,"unit":"V","operating_cases":["upper_range"]},
+      {"id":"d_measurement_noise","metric":"output_noise_rms","analysis":"noise","excitation":{"kind":"port","id":"sensed_current"},"observation":{"kind":"port","id":"measurement_voltage"},"max":0.004,"unit":"V_rms","operating_cases":["environment_corners"],"frequency_hz":10000}
+    ],
+    "constraints": {"max_components":18,"max_width_mm":45,"max_height_mm":32}
+  },
+  "acceptance": {
+    "require_primitive_only":true,
+    "require_topology_search":true,
+    "require_simulation":true,
+    "require_all_corners":true,
+    "require_model_provenance":true,
+    "require_closed_loop_evidence":true,
+    "require_complete_routing":true,
+    "require_connectivity":true,
+    "require_writer_correctness":true,
+    "require_round_trip_zero_diff":true,
+    "require_erc":true,
+    "require_strict_drc":true,
+    "require_deterministic_replay":true,
+    "require_fail_closed":true
+  }
+}

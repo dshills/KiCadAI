@@ -1,0 +1,181 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "enabled_low_voltage_delivery",
+    "title": "Commanded low-voltage delivery with readiness indication",
+    "description": "Study a command-governed output that maintains a bounded voltage under input and load variation and exposes its delivery state through a separate observable signal."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "power_reference",
+        "kind": "reference",
+        "source": "external",
+        "min_voltage_v": 0,
+        "nominal_voltage_v": 0,
+        "max_voltage_v": 0
+      },
+      {
+        "id": "input_supply",
+        "kind": "supply",
+        "source": "external",
+        "min_voltage_v": 9,
+        "nominal_voltage_v": 12,
+        "max_voltage_v": 15,
+        "max_current_a": 0.25
+      }
+    ],
+    "ports": [
+      {
+        "id": "power_input",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "input_supply",
+        "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 12, "max_voltage_v": 15, "max_current_a": 0.25}
+      },
+      {
+        "id": "reference_return",
+        "kind": "reference",
+        "direction": "bidirectional",
+        "domain": "power_reference",
+        "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 0, "max_voltage_v": 0, "max_current_a": 0.25}
+      },
+      {
+        "id": "enable_control",
+        "kind": "digital",
+        "direction": "sink",
+        "domain": "power_reference",
+        "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.0001, "input_impedance_min_ohm": 100000, "default_state": "low"}
+      },
+      {
+        "id": "regulated_output",
+        "kind": "analog_voltage",
+        "direction": "source",
+        "domain": "power_reference",
+        "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 3.3, "max_voltage_v": 3.45, "max_current_a": 0.35}
+      },
+      {
+        "id": "ready_output",
+        "kind": "digital",
+        "direction": "source",
+        "domain": "power_reference",
+        "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.6, "max_current_a": 0.002, "default_state": "low"}
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "enabled_delivery",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "input_supply", "min": 9, "max": 15, "unit": "V"},
+          {"axis": "input_voltage", "target": "enable_control", "min": 2, "max": 3.6, "unit": "V"},
+          {"axis": "load_current", "target": "regulated_output", "min": 0.02, "max": 0.3, "unit": "A"},
+          {"axis": "ambient_temperature", "target": "regulated_output", "min": -20, "max": 75, "unit": "degC"},
+          {"axis": "model_corner", "target": "regulated_output", "min": 0, "max": 1, "unit": "ratio"},
+          {"axis": "tolerance_corner", "target": "regulated_output", "min": 0, "max": 1, "unit": "ratio"}
+        ]
+      },
+      {
+        "id": "disabled_delivery",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "input_supply", "min": 9, "max": 15, "unit": "V"},
+          {"axis": "input_voltage", "target": "enable_control", "min": 0, "max": 0.4, "unit": "V"},
+          {"axis": "load_resistance", "target": "regulated_output", "min": 1000, "max": 10000, "unit": "ohm"},
+          {"axis": "ambient_temperature", "target": "regulated_output", "min": -20, "max": 75, "unit": "degC"}
+        ]
+      },
+      {
+        "id": "input_rail_interruption",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "input_supply", "min": 12, "max": 12, "unit": "V"},
+          {"axis": "input_voltage", "target": "enable_control", "min": 3.3, "max": 3.3, "unit": "V"},
+          {"axis": "load_current", "target": "regulated_output", "min": 0.1, "max": 0.1, "unit": "A"},
+          {"axis": "ambient_temperature", "target": "regulated_output", "min": 20, "max": 30, "unit": "degC"}
+        ],
+        "events": [
+          {"id": "remove_input_rail", "kind": "rail_loss", "target": "power_input", "trigger_time_s": 0.005, "initial": 12, "applied": 0, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "enabled_voltage_accuracy",
+        "metric": "output_voltage",
+        "analysis": "dc_sweep",
+        "excitation": {"kind": "port", "id": "enable_control"},
+        "observation": {"kind": "port", "id": "regulated_output"},
+        "min": 3.2,
+        "max": 3.4,
+        "unit": "V",
+        "operating_cases": ["enabled_delivery"],
+        "critical": true
+      },
+      {
+        "id": "enabled_conversion_efficiency",
+        "metric": "conversion_efficiency",
+        "analysis": "dc_sweep",
+        "observation": {"kind": "circuit", "id": "delivery_assembly"},
+        "min": 72,
+        "unit": "%",
+        "operating_cases": ["enabled_delivery"]
+      },
+      {
+        "id": "enabled_ready_level",
+        "metric": "output_high_voltage",
+        "analysis": "dc_operating_point",
+        "excitation": {"kind": "port", "id": "enable_control"},
+        "observation": {"kind": "port", "id": "ready_output"},
+        "min": 2.4,
+        "unit": "V",
+        "operating_cases": ["enabled_delivery"]
+      },
+      {
+        "id": "disabled_output_leakage",
+        "metric": "off_state_current",
+        "analysis": "dc_operating_point",
+        "excitation": {"kind": "port", "id": "enable_control"},
+        "observation": {"kind": "port", "id": "regulated_output"},
+        "max": 0.001,
+        "unit": "A",
+        "operating_cases": ["disabled_delivery"]
+      },
+      {
+        "id": "disabled_ready_level",
+        "metric": "output_low_voltage",
+        "analysis": "dc_operating_point",
+        "excitation": {"kind": "port", "id": "enable_control"},
+        "observation": {"kind": "port", "id": "ready_output"},
+        "max": 0.4,
+        "unit": "V",
+        "operating_cases": ["disabled_delivery"]
+      },
+      {
+        "id": "rail_loss_ready_fall",
+        "metric": "fall_time",
+        "analysis": "transient",
+        "excitation": {"kind": "port", "id": "power_input"},
+        "observation": {"kind": "port", "id": "ready_output"},
+        "max": 0.002,
+        "unit": "s",
+        "operating_cases": ["input_rail_interruption"]
+      }
+    ],
+    "constraints": {"max_components": 28, "max_width_mm": 48, "max_height_mm": 32}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

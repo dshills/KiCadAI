@@ -1,0 +1,73 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "bounded_sensor_excitation",
+    "title": "Bounded Sensor Excitation",
+    "description": "Provides a controlled current to an external sensing element across supply, load, and temperature ranges, including a finite low-resistance disturbance."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"measurement_reference","kind":"reference","source":"external"},
+      {"id":"excitation_supply","kind":"supply","source":"external","min_voltage_v":4.5,"nominal_voltage_v":5.0,"max_voltage_v":5.5,"max_current_a":0.08}
+    ],
+    "ports": [
+      {"id":"supply_input","kind":"power","direction":"sink","domain":"excitation_supply","electrical":{"min_voltage_v":4.5,"nominal_voltage_v":5.0,"max_voltage_v":5.5,"max_current_a":0.08}},
+      {"id":"excitation_output","kind":"controlled_current","direction":"source","domain":"measurement_reference","electrical":{"min_voltage_v":0,"nominal_voltage_v":2.0,"max_voltage_v":4.0,"max_current_a":0.03}},
+      {"id":"external_return","kind":"reference","direction":"bidirectional","domain":"measurement_reference","electrical":{"min_voltage_v":-0.05,"nominal_voltage_v":0,"max_voltage_v":0.05,"max_current_a":0.08}}
+    ],
+    "operating_cases": [
+      {
+        "id": "rated_load",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":4.5,"max":5.5,"unit":"V"},
+          {"axis":"load_resistance","target":"excitation_output","min":100,"max":300,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"measurement_reference","min":0,"max":50,"unit":"degC"},
+          {"axis":"tolerance_corner","target":"excitation_output","min":-1,"max":1,"unit":"ratio"}
+        ]
+      },
+      {
+        "id": "extended_temperature",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":4.5,"max":5.5,"unit":"V"},
+          {"axis":"load_resistance","target":"excitation_output","min":150,"max":250,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"measurement_reference","min":-20,"max":70,"unit":"degC"}
+        ]
+      },
+      {
+        "id": "bounded_low_resistance",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":4.5,"max":5.5,"unit":"V"},
+          {"axis":"ambient_temperature","target":"measurement_reference","min":0,"max":50,"unit":"degC"}
+        ],
+        "events": [
+          {"id":"load_resistance_drop","kind":"short_circuit","target":"excitation_output","trigger_time_s":0.002,"initial":200,"applied":5,"unit":"ohm"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"a_excitation_accuracy","metric":"output_current","analysis":"dc_sweep","observation":{"kind":"port","id":"excitation_output"},"min":0.0095,"max":0.0105,"unit":"A","operating_cases":["rated_load","extended_temperature"],"critical":true},
+      {"id":"b_supply_span_current","metric":"output_current","analysis":"dc_sweep","excitation":{"kind":"domain","id":"excitation_supply"},"observation":{"kind":"port","id":"excitation_output"},"min":0.0095,"max":0.0105,"unit":"A","operating_cases":["rated_load"],"critical":true},
+      {"id":"c_fault_peak_current","metric":"peak_current","analysis":"transient","excitation":{"kind":"port","id":"excitation_output"},"observation":{"kind":"port","id":"excitation_output"},"max":0.025,"unit":"A","operating_cases":["bounded_low_resistance"],"critical":true},
+      {"id":"d_fault_recovery_time","metric":"settling_time","analysis":"transient","excitation":{"kind":"port","id":"excitation_output"},"observation":{"kind":"port","id":"excitation_output"},"max":0.002,"unit":"s","operating_cases":["bounded_low_resistance"],"critical":true},
+      {"id":"e_temperature_limit","metric":"junction_temperature","analysis":"thermal","observation":{"kind":"circuit","id":"assembly_temperature"},"max":95,"unit":"degC","operating_cases":["rated_load","extended_temperature"],"critical":true}
+    ],
+    "constraints": {"max_components":18,"max_width_mm":40,"max_height_mm":30}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

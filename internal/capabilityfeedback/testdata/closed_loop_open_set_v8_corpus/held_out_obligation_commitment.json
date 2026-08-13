@@ -1,0 +1,7 @@
+{
+  "schema": "kicadai.closed-loop-open-set-held-out-obligation-commitment.v8",
+  "version": 8,
+  "corpus_manifest_sha256": "548d8f38cdbc6186a737d9c1cfdea73906a25f6b1948b9a367e00897f7c66f1c",
+  "obligation_count": 139,
+  "aggregate_sha256": "d3f66f5a0966349f0060efc331e08f04552d7ca30762405d756778ae95a4be28"
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "sensor_excitation_converter",
+    "title": "Sensor Excitation Converter",
+    "description": "Convert a bounded command voltage into a regulated sensor excitation current over supply, load, temperature, and tolerance variation."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"signal_reference","kind":"reference","source":"external"},
+      {"id":"excitation_supply","kind":"supply","source":"external","min_voltage_v":9.0,"nominal_voltage_v":12.0,"max_voltage_v":15.0,"max_current_a":0.12}
+    ],
+    "ports": [
+      {"id":"supply_input","kind":"power","direction":"sink","domain":"excitation_supply","electrical":{"min_voltage_v":9.0,"nominal_voltage_v":12.0,"max_voltage_v":15.0,"max_current_a":0.12}},
+      {"id":"external_return","kind":"reference","direction":"bidirectional","domain":"signal_reference","electrical":{"nominal_voltage_v":0,"max_current_a":0.12}},
+      {"id":"command_input","kind":"analog_voltage","direction":"sink","domain":"signal_reference","electrical":{"min_voltage_v":0.5,"nominal_voltage_v":1.5,"max_voltage_v":2.5,"input_impedance_min_ohm":50000}},
+      {"id":"excitation_output","kind":"analog_current","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":0.0,"max_voltage_v":8.0,"max_current_a":0.025}}
+    ],
+    "operating_cases": [
+      {
+        "id": "nominal_conversion",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":11.5,"max":12.5,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":0.5,"max":2.5,"unit":"V"},
+          {"axis":"load_resistance","target":"excitation_output","min":100,"max":300,"unit":"ohm"}
+        ]
+      },
+      {
+        "id": "corner_conversion",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":9.0,"max":15.0,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":0.5,"max":2.5,"unit":"V"},
+          {"axis":"load_resistance","target":"excitation_output","min":100,"max":300,"unit":"ohm"},
+          {"axis":"ambient_temperature","target":"signal_reference","min":-30,"max":85,"unit":"degC"},
+          {"axis":"tolerance_corner","target":"excitation_output","min":-1,"max":1,"unit":"ratio"}
+        ]
+      },
+      {
+        "id": "capacitive_load",
+        "conditions": [
+          {"axis":"supply_voltage","target":"excitation_supply","min":9.0,"max":15.0,"unit":"V"},
+          {"axis":"input_voltage","target":"command_input","min":1.0,"max":2.0,"unit":"V"},
+          {"axis":"load_capacitance","target":"excitation_output","min":0.000000001,"max":0.0000001,"unit":"F"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"a_static_current_transfer","metric":"transconductance","analysis":"dc_sweep","observation":{"kind":"port","id":"excitation_output"},"min":0.0095,"max":0.0105,"unit":"A/V","operating_cases":["nominal_conversion","corner_conversion"]},
+      {"id":"current_ceiling","metric":"output_current","analysis":"dc_operating_point","observation":{"kind":"port","id":"excitation_output"},"max":0.025,"unit":"A","operating_cases":["nominal_conversion","corner_conversion","capacitive_load"]},
+      {"id":"line_regulation_bound","metric":"line_regulation","analysis":"dc_sweep","observation":{"kind":"port","id":"excitation_output"},"max":0.8,"unit":"%","operating_cases":["corner_conversion"]},
+      {"id":"load_regulation_bound","metric":"load_regulation","analysis":"dc_sweep","observation":{"kind":"port","id":"excitation_output"},"max":1.2,"unit":"%","operating_cases":["corner_conversion"]},
+      {"id":"stability_margin","metric":"phase_margin","analysis":"stability","observation":{"kind":"port","id":"excitation_output"},"min":50,"unit":"deg","operating_cases":["capacitive_load"]}
+    ],
+    "constraints": {"max_components":20,"max_width_mm":42,"max_height_mm":28}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "supply_current_monitor",
+    "title": "Supply Current Monitor",
+    "description": "Map bidirectional supply-path current to a ground-referenced measurement voltage and indicate a bounded overcurrent condition."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"signal_reference","kind":"reference","source":"external"},
+      {"id":"monitor_supply","kind":"supply","source":"external","min_voltage_v":3.0,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.06}
+    ],
+    "ports": [
+      {"id":"supply_input","kind":"power","direction":"sink","domain":"monitor_supply","electrical":{"min_voltage_v":3.0,"nominal_voltage_v":3.3,"max_voltage_v":3.6,"max_current_a":0.06}},
+      {"id":"external_return","kind":"reference","direction":"bidirectional","domain":"signal_reference","electrical":{"nominal_voltage_v":0,"max_current_a":0.06}},
+      {"id":"measured_current","kind":"analog_current","direction":"sink","domain":"signal_reference","electrical":{"min_voltage_v":-0.1,"nominal_voltage_v":0.0,"max_voltage_v":0.1,"max_current_a":5.0}},
+      {"id":"measurement_voltage","kind":"analog_voltage","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":0.1,"nominal_voltage_v":1.65,"max_voltage_v":3.2,"max_current_a":0.01}},
+      {"id":"overcurrent_flag","kind":"digital","direction":"source","domain":"signal_reference","electrical":{"min_voltage_v":0.0,"max_voltage_v":3.6,"max_current_a":0.008,"default_state":"low"}}
+    ],
+    "operating_cases": [
+      {
+        "id": "measurement_range",
+        "conditions": [
+          {"axis":"supply_voltage","target":"monitor_supply","min":3.0,"max":3.6,"unit":"V"},
+          {"axis":"input_current","target":"measured_current","min":-3.0,"max":3.0,"unit":"A"},
+          {"axis":"ambient_temperature","target":"signal_reference","min":-25,"max":85,"unit":"degC"}
+        ]
+      },
+      {
+        "id": "positive_overcurrent",
+        "conditions": [
+          {"axis":"supply_voltage","target":"monitor_supply","min":3.0,"max":3.6,"unit":"V"},
+          {"axis":"input_current","target":"measured_current","min":3.2,"max":4.5,"unit":"A"}
+        ]
+      },
+      {
+        "id": "negative_overcurrent",
+        "conditions": [
+          {"axis":"supply_voltage","target":"monitor_supply","min":3.0,"max":3.6,"unit":"V"},
+          {"axis":"input_current","target":"measured_current","min":-4.5,"max":-3.2,"unit":"A"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"a_static_measurement_gain","metric":"transimpedance","analysis":"dc_sweep","observation":{"kind":"port","id":"measurement_voltage"},"min":0.48,"max":0.52,"unit":"V/A","operating_cases":["measurement_range"],"critical":true},
+      {"id":"center_voltage","metric":"output_voltage","analysis":"dc_operating_point","observation":{"kind":"port","id":"measurement_voltage"},"min":1.55,"max":1.75,"unit":"V","operating_cases":["measurement_range"],"critical":true},
+      {"id":"flag_asserted","metric":"output_high_voltage","analysis":"dc_operating_point","observation":{"kind":"port","id":"overcurrent_flag"},"min":2.6,"unit":"V","operating_cases":["positive_overcurrent","negative_overcurrent"],"critical":true},
+      {"id":"flag_inactive","metric":"output_low_voltage","analysis":"dc_sweep","observation":{"kind":"port","id":"overcurrent_flag"},"max":0.4,"unit":"V","operating_cases":["measurement_range"]},
+      {"id":"input_burden","metric":"peak_voltage","analysis":"dc_sweep","observation":{"kind":"port","id":"measured_current"},"max":0.1,"unit":"V","operating_cases":["measurement_range","positive_overcurrent","negative_overcurrent"],"critical":true}
+    ],
+    "constraints": {"max_components":24,"max_width_mm":48,"max_height_mm":30}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}
