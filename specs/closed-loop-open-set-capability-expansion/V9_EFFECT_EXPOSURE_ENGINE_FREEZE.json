@@ -1,0 +1,13 @@
+{
+  "schema": "kicadai.closed-loop-open-set-effect-exposure-freeze.v9",
+  "version": 9,
+  "freeze_commit_parent": "5a09283f69ead9915a08ee32d9db0da234cf6149",
+  "engine_manifest": "V9_EFFECT_EXPOSURE_ENGINE.sha256",
+  "engine_manifest_sha256": "df9ffdde265221ab1746c346d6df799ea9ed6f94645adfae180b90eba13995d7",
+  "discovery_count": 24,
+  "maximum_rounds": 2,
+  "maximum_total_atoms": 6,
+  "maximum_total_members": 18,
+  "real_frontier_loaded": false,
+  "held_out_opened": false
+}

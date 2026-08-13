@@ -1,0 +1,9 @@
+5f045b375a824215343593c6e8fdb02315619b302348c1dc64bcfa2391722458  ../../internal/capabilityroundsv9/advance.go
+65e277c36664174bc0f69bf75b10f3b033eb3f88d77bd8227a65cbf8109b4d5d  ../../internal/capabilityroundsv9/advance_test.go
+16190f70bfcf7a1ff2fa87a56bd02b173cf353971e5e6fa332e50d1fd107a02a  ../../internal/capabilityroundsv9/exposure_test.go
+f7eb3a6d88dcb0bab8d1850585497d449860f7cb56e585e5eeb644bba52f3109  ../../internal/capabilityroundsv9/identity.go
+5eb046cf021e6fcdaf5a786ba18a19bfaf3723e46748d539bbd9ba3bee88df2a  ../../internal/capabilityroundsv9/identity_test.go
+b33c230cd66f864d37bcf09d105f22684c182dd930ef59ad2926a44b2d45f08e  ../../internal/capabilityroundsv9/model.go
+3058631d78e2f2567234d4411d20e2a2d0d95cfbe9ef56d7298dcecdd4a7513a  ../../internal/capabilityroundsv9/select.go
+a1c27c04bca9a82547cf6b71df5f63f6818b42135b3cf9e28014b2ab389072a6  ../../internal/capabilityroundsv9/select_test.go
+eddb833b44e64be627685e3621b9d7de0feb3bf957aa7cc76a1d723e3360f313  V9_EFFECT_EXPOSURE_ENGINE.md
