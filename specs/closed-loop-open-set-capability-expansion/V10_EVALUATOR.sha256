@@ -1,0 +1,13 @@
+88f6880f97bfaf757cae1d572bf0ba594347ebee4e74ac115bb6ef26564864c6  ../../cmd/kicadai-discovery-baseline-v10/main.go
+c1b44a2f1159543240b4fb0be669fcdd65858ec8e1a59e42e53139f43d46c58c  ../../cmd/kicadai-discovery-baseline-v10/main_test.go
+a5a21e337278bd0c2f0b8f299d2eb561507ad3e2e7794b295b07a8e2c5290939  ../../go.mod
+6eee5c8722b41ef5d1a156f9814ac865807af4486a9a46268635d1991cc6c3a6  ../../go.sum
+67916adabb6614eef10f92d2e471cf4d1f8ce9d2d5a84906c0369f9b508aed31  ../../internal/capabilityexecutorv10/corpus.go
+daf70e2998922b6119650d670792f909792e8531dcbb570116a8f7c656fb6ba4  ../../internal/capabilityexecutorv10/corpus_test.go
+7c3dec04fcddb4005d64b51d3623ac288a679bba9e6bcbb9f9aa9396f09c77b7  ../../internal/capabilityexecutorv10/environment.go
+8f832d2d4d0d587760a1afb078506987ce153dc594efbca426e11e45e528e30e  ../../internal/capabilityexecutorv10/environment_test.go
+c08420e7035050ffae6d69c4c4b71219a298c1ca0562f2c74852e7410796c73f  ../../internal/capabilityexecutorv10/frontier.go
+1dbefb4a0808c89eeb616504c64a22aceac4438dc0d2427190a94c88a779dbbb  ../../internal/capabilityexecutorv10/model.go
+f530f9c95e99a3da6c3cbce1f37fada35481d1b75db50636b6ad5b353a7a8326  ../../internal/capabilityexecutorv10/runner.go
+40f567dee2652bd482ea931ef73c1d4e0a4ce2e63c780ef63dfe60e3f5715d41  ../../internal/capabilityexecutorv10/runner_test.go
+fd93252a2ab565345ea4db683ab93d4e331954f5c1a5e53caf6ba62cb55be266  V10_EVALUATOR_PROTOCOL.md

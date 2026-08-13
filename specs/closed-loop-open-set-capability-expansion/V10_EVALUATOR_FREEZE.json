@@ -1,0 +1,15 @@
+{
+  "schema": "kicadai.closed-loop-open-set-evaluator-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "cb887a8146d26922a1ebe7e4f3d2cb9ea51faf2c",
+  "evaluator_manifest": "V10_EVALUATOR.sha256",
+  "evaluator_manifest_sha256": "4ef5c4fab2c90998676b9944cb2ff68fc9f2d7e97b89b9c9751fa8ae2f29c276",
+  "discovery_case_count": 24,
+  "replays_per_case": 2,
+  "maximum_parallel_cases": 4,
+  "outer_promotions_per_pass": 2,
+  "production_path": true,
+  "held_out_access_surface": false,
+  "real_corpus_evaluated": false,
+  "external_key_opened": false
+}
