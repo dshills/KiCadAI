@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-baseline-publisher-cli-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "592ce44b630a1fcd9375c9604b0e1d24f4f6c4a4",
+  "cli_manifest": "V10_BASELINE_PUBLISHER_CLI.sha256",
+  "cli_manifest_sha256": "f81f965d5d718b0c1c1746d8c1496239ffc8d8a47a6e63a474dfcab2544e39c1",
+  "publisher_manifest_sha256": "ac59be26ba83f8f8e8e3268ca732a3646c73d761446d0bd5c39bbba96029eab9",
+  "discovery_case_count": 24,
+  "production_path": true,
+  "held_out_access_surface": false,
+  "real_report_loaded": false
+}
