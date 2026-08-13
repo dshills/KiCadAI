@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-baseline-evidence-freeze.v10",
+  "version": 10,
+  "freeze_commit_parent": "f508ae2f25bc2ea4f2c6d468c22a7abd8e05d847",
+  "evidence_manifest": "V10_BASELINE_EVIDENCE.sha256",
+  "evidence_manifest_sha256": "8cdd4e32fe8d0a9ce6d6c5e1629fdd73ea614cf7c821f70c7e8f02bd87ed8e5e",
+  "discovery_count": 24,
+  "mandatory_gate_count": 14,
+  "pass_promotion_count": 2,
+  "real_corpus_evaluated": false,
+  "held_out_opened": false
+}
