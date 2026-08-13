@@ -1,0 +1,9 @@
+573c5867153be551e3864afe0b96bd962222925e1d8af6eec1032ea0b22f7aec  ../../cmd/kicadai-capability-rank-v10/main.go
+21d2053e4a67ff18fbdea7fcf480f9e04738d878aebefb495691e7141afda220  ../../cmd/kicadai-capability-rank-v10/main_test.go
+a5a21e337278bd0c2f0b8f299d2eb561507ad3e2e7794b295b07a8e2c5290939  ../../go.mod
+6eee5c8722b41ef5d1a156f9814ac865807af4486a9a46268635d1991cc6c3a6  ../../go.sum
+007250bfbbe31ba52c9d49b2a662efc078897a76da839aaea157b5b47fac1654  ../../internal/capabilityselectionv10/model.go
+2271847f7d4cde2ca13dfa65018d29f0b29175fe1ba53c262df2635ec408d1a4  ../../internal/capabilityselectionv10/select.go
+4c1ea19b39a9be63d50e9c7fa60adcad0411893a7c519d70e371bab5687efdd4  ../../internal/capabilityselectionv10/select_test.go
+0a5eb7a45b62d62c817c14ed72af0b2d7c061b90507a0c845e13ff04f5dcc575  V10_SELECTION_RUNNER_PROTOCOL.md
+31ab6c328a37d95376bcf4d8eacc8459bebfdd2aea62f7e1ceadd70a155c7b0a  v10_selection_runner_contract_test.go

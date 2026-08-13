@@ -1,0 +1,14 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection-runner-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "5a39fadd319961d2e4eb911b24965765f27d1294",
+  "runner_manifest": "V10_SELECTION_RUNNER.sha256",
+  "runner_manifest_sha256": "b21ebddf222c956bd7d922c4d0aca419c240b1243bbcc74cda845b0b05117d16",
+  "effect_exposure_engine_manifest_sha256": "e8f2e796efe5a10a6c2d88039685112b9e4efa2a43dd607bf7b3174b8dce6c2e",
+  "discovery_case_count": 24,
+  "maximum_plan_set_bytes": 33554432,
+  "production_path": true,
+  "static_effect_evidence_required": true,
+  "real_frontier_loaded": false,
+  "held_out_access_surface": false
+}
