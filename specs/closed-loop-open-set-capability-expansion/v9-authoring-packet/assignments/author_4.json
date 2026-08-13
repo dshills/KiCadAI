@@ -1,0 +1,111 @@
+{
+  "schema": "kicadai.closed-loop-open-set-author-assignment.v9",
+  "version": 9,
+  "author_slot": "author_4",
+  "entries": [
+    {
+      "id": "v9_case_013",
+      "role": "discovery",
+      "domain": "analog_signal_path",
+      "circuit_role": "conversion_regulation",
+      "safety_impact": "safety_relevant",
+      "primary_class": "static",
+      "required_primary_analysis": "electrothermal",
+      "output_multiplicity": "multiple",
+      "require_off_nominal": false,
+      "source_id": "v9_source_013",
+      "requirement_file": "discovery/request_013.json"
+    },
+    {
+      "id": "v9_case_014",
+      "role": "discovery",
+      "domain": "power_energy_conversion",
+      "circuit_role": "sensing_measurement",
+      "safety_impact": "safety_critical",
+      "primary_class": "dynamic",
+      "required_primary_analysis": "transient",
+      "output_multiplicity": "single",
+      "require_off_nominal": false,
+      "source_id": "v9_source_014",
+      "requirement_file": "discovery/request_014.json"
+    },
+    {
+      "id": "v9_case_015",
+      "role": "discovery",
+      "domain": "digital_control",
+      "circuit_role": "interface_control",
+      "safety_impact": "non_safety",
+      "primary_class": "static",
+      "required_primary_analysis": "dc_sweep",
+      "output_multiplicity": "single",
+      "require_off_nominal": true,
+      "source_id": "v9_source_015",
+      "requirement_file": "discovery/request_015.json"
+    },
+    {
+      "id": "v9_case_016",
+      "role": "discovery",
+      "domain": "mixed_signal_data_conversion",
+      "circuit_role": "protection_supervision",
+      "safety_impact": "review_required",
+      "primary_class": "dynamic",
+      "required_primary_analysis": "startup",
+      "output_multiplicity": "single",
+      "require_off_nominal": false,
+      "source_id": "v9_source_016",
+      "requirement_file": "discovery/request_016.json"
+    },
+    {
+      "id": "v9_case_037",
+      "role": "held_out",
+      "domain": "digital_control",
+      "circuit_role": "amplification_conditioning",
+      "safety_impact": "safety_relevant",
+      "primary_class": "dynamic",
+      "required_primary_analysis": "stability",
+      "output_multiplicity": "single",
+      "require_off_nominal": false,
+      "source_id": "v9_source_037",
+      "requirement_file": "held_out/request_037.json"
+    },
+    {
+      "id": "v9_case_038",
+      "role": "held_out",
+      "domain": "mixed_signal_data_conversion",
+      "circuit_role": "conversion_regulation",
+      "safety_impact": "safety_critical",
+      "primary_class": "static",
+      "required_primary_analysis": "dc_operating_point",
+      "output_multiplicity": "multiple",
+      "require_off_nominal": false,
+      "source_id": "v9_source_038",
+      "requirement_file": "held_out/request_038.json"
+    },
+    {
+      "id": "v9_case_039",
+      "role": "held_out",
+      "domain": "sensing_instrumentation",
+      "circuit_role": "sensing_measurement",
+      "safety_impact": "non_safety",
+      "primary_class": "dynamic",
+      "required_primary_analysis": "ac_sweep",
+      "output_multiplicity": "single",
+      "require_off_nominal": false,
+      "source_id": "v9_source_039",
+      "requirement_file": "held_out/request_039.json"
+    },
+    {
+      "id": "v9_case_040",
+      "role": "held_out",
+      "domain": "protection_power_integrity",
+      "circuit_role": "interface_control",
+      "safety_impact": "review_required",
+      "primary_class": "static",
+      "required_primary_analysis": "thermal",
+      "output_multiplicity": "single",
+      "require_off_nominal": true,
+      "source_id": "v9_source_040",
+      "requirement_file": "held_out/request_040.json"
+    }
+  ]
+}
