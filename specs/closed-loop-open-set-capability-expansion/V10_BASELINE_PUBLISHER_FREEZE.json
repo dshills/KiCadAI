@@ -1,0 +1,11 @@
+{
+  "schema": "kicadai.closed-loop-open-set-baseline-publisher-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "aa39fae8a5adcc4a040f72469dcc401bf4a5c71e",
+  "publisher_manifest": "V10_BASELINE_PUBLISHER.sha256",
+  "publisher_manifest_sha256": "6e8afca3e326dc7e7cc62b22275b8d086fc3f405dcc720c64b30f2dba18aa3d4",
+  "discovery_count": 24,
+  "held_out_access_surface": false,
+  "real_corpus_evaluated": false,
+  "external_key_opened": false
+}
