@@ -1,0 +1,16 @@
+{
+  "schema": "kicadai.closed-loop-open-set-advancement-runner-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "5fa84f9ae8af0d9f127ab530d83d6969ad775c0a",
+  "runner_manifest": "V10_ADVANCEMENT_RUNNER.sha256",
+  "runner_manifest_sha256": "2d58e945f71d067183df472e7bf4db5876efb8fc9604035daeeca7753e4e03b7",
+  "discovery_case_count": 24,
+  "minimum_advanced_cases": 2,
+  "minimum_advanced_domains": 2,
+  "minimum_advanced_roles": 2,
+  "maximum_rounds": 2,
+  "production_path": true,
+  "exact_effect_confinement": true,
+  "real_successor_loaded": false,
+  "held_out_access_surface": false
+}

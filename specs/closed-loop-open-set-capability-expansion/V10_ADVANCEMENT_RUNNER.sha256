@@ -1,0 +1,9 @@
+79444149a102427e80c1531c6c142c4293305432c8acbb1d1210b6d52c490835  ../../cmd/kicadai-capability-advance-v10/main.go
+5ed0bdf934f6a5afdcb5c76e3a0b03156de0d31ec97a31332e84382e938e2658  ../../cmd/kicadai-capability-advance-v10/main_test.go
+a5a21e337278bd0c2f0b8f299d2eb561507ad3e2e7794b295b07a8e2c5290939  ../../go.mod
+6eee5c8722b41ef5d1a156f9814ac865807af4486a9a46268635d1991cc6c3a6  ../../go.sum
+4e7f9cd4c3cb6d7201526def183fcf18351595cc7a6a4b5c95d6ca232f6aa17e  ../../internal/capabilityadvancementv10/advance.go
+f06f2395c66f355d02e89e8a4e9472671953a543db85b87534033507d6fe3e34  ../../internal/capabilityadvancementv10/advance_test.go
+fa56f69fd695851fc45a8e9a113752fb7c625c0ea034b11db231509a0c1500f2  ../../internal/capabilityadvancementv10/model.go
+4be448bd06a64d49f1f192b742d02327a11e7ccc286b978da340d344a6127b9a  V10_ADVANCEMENT_RUNNER_PROTOCOL.md
+0f018c876749fe3d7eabc7b005b56e36250230d57a9ce46b7d32fe0caa0cf1dc  v10_advancement_runner_contract_test.go
