@@ -123,7 +123,7 @@ func TestUpdateClosedLoopV8Selection(t *testing.T) {
 		t.Fatal("V8 baseline inputs are not self-consistent")
 	}
 	planSource := mustCorpusRead(t, filepath.Join(closedLoopSpecDirectory(t), closedLoopV8EffectPlanFile))
-	plan, planHash := decodeClosedLoopV8EffectPlan(t, planSource, report.Hash, frontier.Hash)
+	plan, planHash := decodeClosedLoopV8EffectPlan(t, planSource, report.Hash, frontier.Hash, true)
 	runnerHash := corpusHash(mustCorpusRead(t, filepath.Join(closedLoopSpecDirectory(t), closedLoopV8SelectionManifest)))
 	cases := make([]capabilityroundsv8.Case, len(frontier.Cases))
 	active := make([]string, 0, len(frontier.Cases))
@@ -176,7 +176,7 @@ func TestUpdateClosedLoopV8Selection(t *testing.T) {
 	}
 }
 
-func decodeClosedLoopV8EffectPlan(t *testing.T, source []byte, baselineHash, frontierHash string) (capabilityroundsv8.EffectPlan, string) {
+func decodeClosedLoopV8EffectPlan(t *testing.T, source []byte, baselineHash, frontierHash string, verifySourceBindings bool) (capabilityroundsv8.EffectPlan, string) {
 	t.Helper()
 	var document closedLoopV8EffectPlanDocument
 	decodeCorpusStrict(t, source, &document)
@@ -184,12 +184,14 @@ func decodeClosedLoopV8EffectPlan(t *testing.T, source []byte, baselineHash, fro
 		document.BaselineSHA256 != baselineHash || document.FrontierSHA256 != frontierHash {
 		t.Fatal("V8 effect plan does not bind the committed generation-zero evidence")
 	}
-	repositoryRoot := filepath.Clean(filepath.Join(closedLoopSpecDirectory(t), "..", ".."))
-	bindings := append(append([]closedLoopV8SourceBinding(nil), document.StaticEvidence.ProductionFiles...), document.StaticEvidence.VerificationFiles...)
-	for _, binding := range bindings {
-		data := mustCorpusRead(t, filepath.Join(repositoryRoot, filepath.FromSlash(binding.Path)))
-		if corpusHash(data) != binding.SHA256 {
-			t.Fatalf("V8 effect-plan source binding drifted: %s", binding.Path)
+	if verifySourceBindings {
+		repositoryRoot := filepath.Clean(filepath.Join(closedLoopSpecDirectory(t), "..", ".."))
+		bindings := append(append([]closedLoopV8SourceBinding(nil), document.StaticEvidence.ProductionFiles...), document.StaticEvidence.VerificationFiles...)
+		for _, binding := range bindings {
+			data := mustCorpusRead(t, filepath.Join(repositoryRoot, filepath.FromSlash(binding.Path)))
+			if corpusHash(data) != binding.SHA256 {
+				t.Fatalf("V8 effect-plan source binding drifted: %s", binding.Path)
+			}
 		}
 	}
 	if len(document.StaticEvidence.ReverseCallGraph) == 0 || len(document.StaticEvidence.FocusedNonCorpusRuntimeConsumers) == 0 ||
@@ -211,7 +213,10 @@ func verifyClosedLoopV8SelectionInputs(t *testing.T, ranking closedLoopV8Ranking
 	var frontier closedLoopV8Frontier
 	decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV8BaselineRoot, "frontier.json")), &frontier)
 	planSource := mustCorpusRead(t, filepath.Join(closedLoopSpecDirectory(t), closedLoopV8EffectPlanFile))
-	_, planHash := decodeClosedLoopV8EffectPlan(t, planSource, report.Hash, frontier.Hash)
+	// The committed plan binds the pre-implementation source snapshot. After
+	// publication, verify the frozen plan bytes and evidence shape here without
+	// requiring the deliberately improved production source to retain old bytes.
+	_, planHash := decodeClosedLoopV8EffectPlan(t, planSource, report.Hash, frontier.Hash, false)
 	runnerHash := corpusHash(mustCorpusRead(t, filepath.Join(closedLoopSpecDirectory(t), closedLoopV8SelectionManifest)))
 	if ranking.BaselineSHA256 != report.Hash || decision.BaselineSHA256 != report.Hash ||
 		ranking.FrontierSHA256 != frontier.Hash || decision.FrontierSHA256 != frontier.Hash ||

@@ -130,10 +130,10 @@ func loadClosedLoopV7CurrentImplementationSeal(t *testing.T) closedLoopV7Impleme
 	if seal.ImplementationCommit != closedLoopV7ImplementationCommit || seal.Review != closedLoopV7ImplementationReview {
 		t.Fatal("V7 reviewed implementation commit or review binding is invalid")
 	}
-	if !slices.Equal(seal.ProductionArtifacts, currentClosedLoopV7ArtifactEvidence(t, closedLoopV7ProductionArtifactPaths())) ||
-		!slices.Equal(seal.VerificationArtifacts, currentClosedLoopV7ArtifactEvidence(t, closedLoopV7VerificationArtifactPaths())) {
-		t.Fatal("V7 reviewed implementation artifacts drifted")
-	}
+	assertClosedLoopV7LaterRoundEvolution(t, "production", seal.ProductionArtifacts, closedLoopV7ProductionArtifactPaths(), map[string]bool{})
+	assertClosedLoopV7LaterRoundEvolution(t, "verification", seal.VerificationArtifacts, closedLoopV7VerificationArtifactPaths(), map[string]bool{
+		"internal/capabilityfeedback/v5_reviewed_implementation_test.go": false,
+	})
 	if !slices.EqualFunc(seal.CapabilityBindings, closedLoopV7ImplementationCapabilityBindings(), func(left, right closedLoopV7CapabilityBinding) bool {
 		return left.Capability == right.Capability && left.MemberCode == right.MemberCode && slices.Equal(left.ArtifactPaths, right.ArtifactPaths)
 	}) {
@@ -151,6 +151,37 @@ func loadClosedLoopV7CurrentImplementationSeal(t *testing.T) closedLoopV7Impleme
 		t.Fatal("V7 reviewed implementation seal hash is invalid")
 	}
 	return seal
+}
+
+func assertClosedLoopV7LaterRoundEvolution(
+	t *testing.T,
+	kind string,
+	sealed []closedLoopArtifactEvidence,
+	paths []string,
+	allowedDrift map[string]bool,
+) {
+	t.Helper()
+	current := currentClosedLoopV7ArtifactEvidence(t, paths)
+	if len(current) != len(sealed) {
+		t.Fatalf("V7 reviewed %s artifact count drifted", kind)
+	}
+	for index := range sealed {
+		if current[index].Path != sealed[index].Path {
+			t.Fatalf("V7 reviewed %s artifact ordering drifted", kind)
+		}
+		if current[index].SHA256 == sealed[index].SHA256 {
+			continue
+		}
+		if _, admitted := allowedDrift[sealed[index].Path]; !admitted {
+			t.Fatalf("V7 reviewed %s artifact drifted outside a later selected boundary: %s", kind, sealed[index].Path)
+		}
+		allowedDrift[sealed[index].Path] = true
+	}
+	for path, drifted := range allowedDrift {
+		if !drifted {
+			t.Fatalf("declared later-round V7 %s artifact did not drift: %s", kind, path)
+		}
+	}
 }
 
 func loadClosedLoopV7FrozenGenericPlan(t *testing.T) closedLoopV7GenericPlan {

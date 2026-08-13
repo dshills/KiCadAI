@@ -3032,7 +3032,7 @@ func currentLoadStepEnvelopeDiagnostics(
 }
 
 func dcSweepUsesDeviceValue(requirement Requirement, assertion BehavioralAssertion, source string) bool {
-	if assertion.Metric != "load_regulation" || source == "" {
+	if source == "" {
 		return false
 	}
 	for _, caseID := range assertion.OperatingCases {
@@ -4134,7 +4134,97 @@ func sweepSourceAndRange(
 			return loadInstanceID(targetID, loadAxis), minimum, maximum, true
 		}
 	}
+	if assertion.Analysis == "dc_sweep" {
+		return boundedSemanticDCSweepRange(requirement, assertion, operatingCase, graph)
+	}
 	return "", 0, 0, false
+}
+
+// boundedSemanticDCSweepRange resolves an implicit DC-sweep axis only when the
+// authored operating envelope identifies one unique external source. A signal
+// input takes precedence over an output load because transfer assertions often
+// declare both. Load inference is limited to the observed output. Ambiguous,
+// fixed, reversed, nonfinite, or unmapped conditions fail closed.
+func boundedSemanticDCSweepRange(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	operatingCase OperatingCase,
+	graph CandidateGraph,
+) (string, float64, float64, bool) {
+	type candidate struct {
+		source  string
+		axis    string
+		minimum float64
+		maximum float64
+	}
+	merge := func(candidates map[string]candidate, current candidate) bool {
+		if current.source == "" || !finite(current.minimum) || !finite(current.maximum) ||
+			current.maximum <= current.minimum {
+			return false
+		}
+		key := current.source + "\x00" + current.axis
+		if previous, found := candidates[key]; found {
+			previous.minimum = math.Min(previous.minimum, current.minimum)
+			previous.maximum = math.Max(previous.maximum, current.maximum)
+			candidates[key] = previous
+		} else {
+			candidates[key] = current
+		}
+		return true
+	}
+	unique := func(candidates map[string]candidate) (string, float64, float64, bool) {
+		if len(candidates) != 1 {
+			return "", 0, 0, false
+		}
+		for _, current := range candidates {
+			return current.source, current.minimum, current.maximum, true
+		}
+		return "", 0, 0, false
+	}
+
+	inputs := map[string]candidate{}
+	loads := map[string]candidate{}
+	observationNode := observationNodeID(graph, requirement, assertion.Observation)
+	for _, condition := range simulationHarnessConditions(requirement, assertion, operatingCase) {
+		target, found := externalNodeForSemanticTarget(graph, condition.Target)
+		if !found {
+			continue
+		}
+		switch condition.Axis {
+		case "input_voltage", "control_voltage", "input_current":
+			if target.Role != "input" && target.Role != "control" {
+				continue
+			}
+			if !merge(inputs, candidate{source: sourceInstanceForNode(target), axis: condition.Axis, minimum: condition.Min, maximum: condition.Max}) {
+				return "", 0, 0, false
+			}
+		case "load_current", "load_resistance":
+			if observationNode == "" || target.ID != observationNode {
+				continue
+			}
+			if !merge(loads, candidate{source: loadInstanceID(condition.Target, condition.Axis), axis: condition.Axis, minimum: condition.Min, maximum: condition.Max}) {
+				return "", 0, 0, false
+			}
+		}
+	}
+	if len(inputs) == 0 {
+		for _, port := range requirement.Requirements.Ports {
+			if port.Electrical.MinVoltageV == nil || port.Electrical.MaxVoltageV == nil {
+				continue
+			}
+			target, found := externalNodeForSemanticTarget(graph, port.ID)
+			if !found || (target.Role != "input" && target.Role != "control") {
+				continue
+			}
+			if !merge(inputs, candidate{source: sourceInstanceForNode(target), axis: "input_voltage", minimum: *port.Electrical.MinVoltageV, maximum: *port.Electrical.MaxVoltageV}) {
+				return "", 0, 0, false
+			}
+		}
+	}
+	if len(inputs) != 0 {
+		return unique(inputs)
+	}
+	return unique(loads)
 }
 
 func cornerAmbientTemperature(operatingCase OperatingCase, corner operatingCorner) float64 {

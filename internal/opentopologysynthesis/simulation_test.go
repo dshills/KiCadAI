@@ -1564,6 +1564,84 @@ func TestFixedExcitationUsesBoundedLocalSweep(t *testing.T) {
 	}
 }
 
+func TestDCSweepInfersOnlyUniqueBoundedSemanticRange(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []OperatingCondition
+		nodes      []GraphNode
+		ports      []Port
+		wantSource string
+		wantStart  float64
+		wantStop   float64
+		wantOK     bool
+	}{
+		{
+			name:       "voltage input",
+			conditions: []OperatingCondition{{Axis: "input_voltage", Target: "command", Min: .5, Max: 2.5}},
+			nodes:      []GraphNode{{ID: "port_command", Scope: "external", SemanticKind: "port", SemanticID: "command", Role: "input"}},
+			wantSource: "source_port_command", wantStart: .5, wantStop: 2.5, wantOK: true,
+		},
+		{
+			name:       "current input",
+			conditions: []OperatingCondition{{Axis: "input_current", Target: "sense", Min: -3, Max: 3}},
+			nodes:      []GraphNode{{ID: "port_sense", Scope: "external", SemanticKind: "port", SemanticID: "sense", Role: "input"}},
+			wantSource: "source_port_sense", wantStart: -3, wantStop: 3, wantOK: true,
+		},
+		{
+			name:       "port voltage envelope",
+			nodes:      []GraphNode{{ID: "port_command", Scope: "external", SemanticKind: "port", SemanticID: "command", Role: "input"}},
+			ports:      []Port{{ID: "command", Electrical: Electrical{MinVoltageV: graphFloat(.25), MaxVoltageV: graphFloat(1.75)}}},
+			wantSource: "source_port_command", wantStart: .25, wantStop: 1.75, wantOK: true,
+		},
+		{
+			name:       "observed output load",
+			conditions: []OperatingCondition{{Axis: "load_resistance", Target: "output", Min: 100, Max: 1000}},
+			wantSource: loadInstanceID("output", "load_resistance"), wantStart: 100, wantStop: 1000, wantOK: true,
+		},
+		{
+			name: "signal input precedes output load",
+			conditions: []OperatingCondition{
+				{Axis: "input_voltage", Target: "command", Min: .5, Max: 2.5},
+				{Axis: "load_resistance", Target: "output", Min: 100, Max: 300},
+			},
+			nodes:      []GraphNode{{ID: "port_command", Scope: "external", SemanticKind: "port", SemanticID: "command", Role: "input"}},
+			wantSource: "source_port_command", wantStart: .5, wantStop: 2.5, wantOK: true,
+		},
+		{
+			name: "ambiguous inputs fail closed",
+			conditions: []OperatingCondition{
+				{Axis: "input_voltage", Target: "command_a", Min: 0, Max: 1},
+				{Axis: "input_voltage", Target: "command_b", Min: 0, Max: 1},
+			},
+			nodes: []GraphNode{
+				{ID: "port_command_a", Scope: "external", SemanticKind: "port", SemanticID: "command_a", Role: "input"},
+				{ID: "port_command_b", Scope: "external", SemanticKind: "port", SemanticID: "command_b", Role: "input"},
+			},
+		},
+		{
+			name:       "nonfinite range fails closed",
+			conditions: []OperatingCondition{{Axis: "input_voltage", Target: "command", Min: 0, Max: math.Inf(1)}},
+			nodes:      []GraphNode{{ID: "port_command", Scope: "external", SemanticKind: "port", SemanticID: "command", Role: "input"}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			output := GraphNode{ID: "port_output", Scope: "external", SemanticKind: "port", SemanticID: "output", Role: "output"}
+			graph := CandidateGraph{Nodes: append(append([]GraphNode(nil), test.nodes...), output)}
+			operatingCase := OperatingCase{ID: "bounded_case", Conditions: test.conditions}
+			requirement := Requirement{Requirements: Requirements{Ports: test.ports, OperatingCases: []OperatingCase{operatingCase}}}
+			assertion := BehavioralAssertion{ID: "transfer", Analysis: "dc_sweep", Metric: "transconductance", Observation: Observation{Kind: "port", ID: "output"}, OperatingCases: []string{operatingCase.ID}}
+			source, start, stop, ok := sweepSourceAndRange(requirement, assertion, operatingCase, operatingCorner{Values: map[string]float64{}}, graph)
+			if source != test.wantSource || start != test.wantStart || stop != test.wantStop || ok != test.wantOK {
+				t.Fatalf("sweep = %q %.12g..%.12g ok=%t, want %q %.12g..%.12g ok=%t", source, start, stop, ok, test.wantSource, test.wantStart, test.wantStop, test.wantOK)
+			}
+			if ok && source == loadInstanceID("output", "load_resistance") && !dcSweepUsesDeviceValue(requirement, assertion, source) {
+				t.Fatal("inferred load-resistance sweep was not classified as a device-value sweep")
+			}
+		})
+	}
+}
+
 func TestControlledCurrentSinkLoadHarnessUsesDominantExternalSupply(t *testing.T) {
 	_, _, _, environment := testSimulationFixture(t)
 	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
