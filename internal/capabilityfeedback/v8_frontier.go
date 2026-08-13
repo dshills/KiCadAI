@@ -55,9 +55,12 @@ func buildV8DiscoveryRoundCases(
 	report AggregateReport,
 ) ([]capabilityroundsv8.Case, error) {
 	policy := capabilityroundsv8.FrozenPolicy()
+	// The V8 public manifest intentionally lists only discovery identities.
+	// Held-out identities stay encrypted and are represented here solely by
+	// the aggregate header and authenticated record count.
 	if manifest.Schema != corpuspublication.ManifestSchemaV8 || manifest.Version != corpuspublication.ManifestVersionV8 ||
 		manifest.DiscoveryCaseCount != policy.ExpectedDiscoveryCases || manifest.HeldOutCaseCount != policy.ExpectedDiscoveryCases ||
-		len(manifest.Entries) != 2*policy.ExpectedDiscoveryCases {
+		manifest.HeldOutSource.RecordCount != policy.ExpectedDiscoveryCases || len(manifest.Entries) != policy.ExpectedDiscoveryCases {
 		return nil, fmt.Errorf("invalid V8 corpus manifest shape")
 	}
 	if obligations.Schema != discoveryObligationsSchemaV8 || obligations.Version != corpuspublication.ManifestVersionV8 ||
@@ -72,30 +75,16 @@ func buildV8DiscoveryRoundCases(
 	discoveryEntries := make([]corpuspublication.EntryV8, 0, policy.ExpectedDiscoveryCases)
 	entryByID := make(map[string]corpuspublication.EntryV8, policy.ExpectedDiscoveryCases)
 	seenManifestIDs := make(map[string]bool, len(manifest.Entries))
-	heldOutCount := 0
 	for _, entry := range manifest.Entries {
 		if entry.ID == "" || seenManifestIDs[entry.ID] {
 			return nil, fmt.Errorf("duplicate or empty V8 manifest case identity")
 		}
 		seenManifestIDs[entry.ID] = true
-		switch entry.Role {
-		case string(RoleDiscovery):
-			if entry.Sealed {
-				return nil, fmt.Errorf("discovery case %q is unexpectedly sealed", entry.ID)
-			}
-			discoveryEntries = append(discoveryEntries, entry)
-			entryByID[entry.ID] = entry
-		case string(RoleHeldOut):
-			if !entry.Sealed {
-				return nil, fmt.Errorf("held-out case %q is unexpectedly public", entry.ID)
-			}
-			heldOutCount++
-		default:
-			return nil, fmt.Errorf("case %q has invalid corpus role %q", entry.ID, entry.Role)
+		if entry.Role != string(RoleDiscovery) || entry.Sealed {
+			return nil, fmt.Errorf("public manifest entry %q is not an unsealed discovery case", entry.ID)
 		}
-	}
-	if len(discoveryEntries) != policy.ExpectedDiscoveryCases || heldOutCount != policy.ExpectedDiscoveryCases {
-		return nil, fmt.Errorf("invalid V8 corpus role allocation")
+		discoveryEntries = append(discoveryEntries, entry)
+		entryByID[entry.ID] = entry
 	}
 
 	obligationsByCase := make(map[string][]corpuspublication.ObligationV8, policy.ExpectedDiscoveryCases)

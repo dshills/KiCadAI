@@ -138,6 +138,7 @@ func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilit
 	manifest := corpuspublication.ManifestV8{
 		Schema: corpuspublication.ManifestSchemaV8, Version: corpuspublication.ManifestVersionV8,
 		DiscoveryCaseCount: policy.ExpectedDiscoveryCases, HeldOutCaseCount: policy.ExpectedDiscoveryCases,
+		HeldOutSource: corpuspublication.HeldOutSealV8{RecordCount: policy.ExpectedDiscoveryCases},
 	}
 	evidence := make([]CaseEvidence, 0, policy.ExpectedDiscoveryCases)
 	for index := 1; index <= policy.ExpectedDiscoveryCases; index++ {
@@ -163,12 +164,6 @@ func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilit
 			ID: id, Role: "discovery", Domain: domains[(index-1)%len(domains)],
 			CircuitRole: roles[(index-1)%len(roles)], SafetyImpact: safety[(index-1)%len(safety)],
 			RequirementSHA256: current.RequirementHash,
-		})
-	}
-	for index := 1; index <= policy.ExpectedDiscoveryCases; index++ {
-		manifest.Entries = append(manifest.Entries, corpuspublication.EntryV8{
-			ID:   fmt.Sprintf("v8_case_%03d", policy.ExpectedDiscoveryCases+index),
-			Role: "held_out", Sealed: true,
 		})
 	}
 	manifestSource, err := json.Marshal(manifest)
