@@ -1,0 +1,28 @@
+{
+  "schema": "kicadai.closed-loop-open-set-prepublication-retirement.v9",
+  "version": 9,
+  "stage": "aggregate_validation",
+  "infrastructure_commit": "d4fac116d1da7f9e345d615214ab1b7c09c27b53",
+  "contract_manifest_sha256": "5636cd4829f1a1323c19bd98720ddaa46465cb716410ac86919eaa063b3753e4",
+  "author_packet_manifest_sha256": "1a6cb9932c88dcb8409c40033620c7e22a80ac909a8bf4a693572af711f40242",
+  "packet_set_sha256": "276c9741b299a75e9838bd2aab6e48683634fad7d8db77446eb5676e4a6af6a1",
+  "historical_commitments_sha256": "eea2e5aba73be6469052ec3a73da5bb1994f11251708c89d31d5268d6359fb2e",
+  "validator_commit": "a4c93d5f1d2c7c54093b4275824f7dec7a6e4493",
+  "reason": "frozen_assignment_validator_inconsistent",
+  "validator_error": "V9_CIRCUIT_ROLE_BALANCE",
+  "discovery_missing_high_safety_circuit_roles": [
+    "amplification_conditioning"
+  ],
+  "held_out_missing_high_safety_circuit_roles": [
+    "source_bias"
+  ],
+  "corpus_published": false,
+  "baseline_started": false,
+  "held_out_source_key_created": false,
+  "held_out_source_opened": false,
+  "held_out_baseline_key_created": false,
+  "held_out_baseline_opened": false,
+  "author_quarantines_retained": true,
+  "terminal_state": "permanently_retired",
+  "hash": "0229af1186ff8206e17b52160b8e6dbe07a2e3c6c7c60f5060851291e88a6fe5"
+}
