@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-blind-baseline-publisher-freeze.v10",
+  "version": 10,
+  "freeze_parent_commit": "ce9457de56de5fb0ad8cacafbcd3db2adf371879",
+  "publisher_manifest": "V10_BLIND_BASELINE_PUBLISHER.sha256",
+  "publisher_manifest_sha256": "a1dab7c56616f24f468d60721a9dccf3d61f9a9ce68188cba55cdf2877b015fc",
+  "held_out_count": 24,
+  "record_encryption": "AES-256-GCM",
+  "real_corpus_evaluated": false,
+  "external_key_created": false,
+  "external_key_opened": false
+}
