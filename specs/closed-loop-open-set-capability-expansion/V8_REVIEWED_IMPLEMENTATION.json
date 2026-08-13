@@ -1,0 +1,131 @@
+{
+  "schema": "kicadai.closed-loop-open-set-reviewed-implementation.v8",
+  "version": 8,
+  "selection_sha256": "13299d97ba0ca4eace70cd2fb2cb47e935de584cac8b94ac8a2b4e37d163cb13",
+  "effect_plan_sha256": "2eb6483762431dc760bf6a06d10cb5ac427e7314f79bce27814a795d108820ee",
+  "implementation_commit": "e8cda322d450ea97c8feed97e08afd415ffee06a",
+  "review": "prism_reviewed_no_high_or_medium_findings",
+  "direct_member_keys": [
+    "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08"
+  ],
+  "closure_member_keys": [],
+  "required_evidence": [
+    "catalog_model_references",
+    "configuration_loader_references",
+    "data_references",
+    "focused_non_corpus_runtime_consumer_trace",
+    "registry_references",
+    "reverse_call_graph"
+  ],
+  "artifacts": [
+    {
+      "path": "internal/capabilityfeedback/v5_reviewed_implementation_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "3a896971cee703d2a06ec3e8b76107069ef11549b20ee82b20e5c4648e72763c",
+      "after_sha256": "caf011e1ec71e482c93e624b6a85f0fb84fd1110cb2e2b209f9624a3c3ff487e"
+    },
+    {
+      "path": "internal/capabilityfeedback/v7_reviewed_implementation_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "f88f1125b9164e704e3369a2c9d27ac381cef4aa3378060726cd39b52ce37689",
+      "after_sha256": "973a6d9d857cd5113b1685eeb620b945388564ed6d179ed3b16d618c508fb340"
+    },
+    {
+      "path": "internal/capabilityfeedback/v8_round1_public_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "absent",
+      "after_sha256": "b3d08a6419abd9f6e8f52c013e123abc3899d38702df74f919baee52cb38c8ef"
+    },
+    {
+      "path": "internal/capabilityfeedback/v8_selection_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "f03a9248b4e9f6aeebea3a9146d2d9dec62592a95a0cdb68f8f11bc090270607",
+      "after_sha256": "975c823d4f98e39c17732e37051576ad6621b4defaf0b9bc41f5a36e613c3cd1"
+    },
+    {
+      "path": "internal/opentopologysynthesis/causal_repair.go",
+      "kind": "production",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "2a63f17bcbf9fa720bfd3fa4e38a5681a3291bd68768f5567458bcb99b951d3b",
+      "after_sha256": "2a63f17bcbf9fa720bfd3fa4e38a5681a3291bd68768f5567458bcb99b951d3b"
+    },
+    {
+      "path": "internal/opentopologysynthesis/cross_stage_adapter.go",
+      "kind": "production",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "e309e663b5691f45b5932e288a48a6e77a0cf76f09146ece56af854ff65e3a0e",
+      "after_sha256": "e309e663b5691f45b5932e288a48a6e77a0cf76f09146ece56af854ff65e3a0e"
+    },
+    {
+      "path": "internal/opentopologysynthesis/current_relationship_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "7c0e249b15480f0fb0cf97e702bb25013e2be8b00b2587cebef2594f0bf3d852",
+      "after_sha256": "7c0e249b15480f0fb0cf97e702bb25013e2be8b00b2587cebef2594f0bf3d852"
+    },
+    {
+      "path": "internal/opentopologysynthesis/multi_stage_decision_search_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "630de76f6930e4cd3850ed4e73bdd5aa21b6bfd78e74d7b3ffdecef9f221947c",
+      "after_sha256": "630de76f6930e4cd3850ed4e73bdd5aa21b6bfd78e74d7b3ffdecef9f221947c"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation.go",
+      "kind": "production",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "1244a9963050037c41ba31635f7cfcb76dea6f285372ab89403a75041e207188",
+      "after_sha256": "066f3f616dfcf1f4d6aa66e7e7b5dadeb4ef4fca3650c610c47e8525d8677eff"
+    },
+    {
+      "path": "internal/opentopologysynthesis/simulation_test.go",
+      "kind": "verification",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "43bb21e20f996001ee93db310e69be835c9412dcfd321d18f860ae24b34f09f2",
+      "after_sha256": "9a1fc6111ba6664ce8194f4eeb55f3e02c406c23afa20c367a0b216e6418edc9"
+    },
+    {
+      "path": "internal/opentopologysynthesis/synthesis.go",
+      "kind": "production",
+      "member_key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+      "before_sha256": "3b3ba3a84315e05fbfd9de412336e42437e436ce300fbf212654b7543837bc24",
+      "after_sha256": "3b3ba3a84315e05fbfd9de412336e42437e436ce300fbf212654b7543837bc24"
+    }
+  ],
+  "prerequisite_consumers": [
+    {
+      "path": "internal/capabilityfeedback/v5_reviewed_implementation_test.go",
+      "reason": "preserve the immutable V5 seal while admitting only the selected shared simulation files",
+      "tests": ["TestClosedLoopV5ReviewedImplementationSealIsFrozen"]
+    },
+    {
+      "path": "internal/capabilityfeedback/v7_reviewed_implementation_test.go",
+      "reason": "preserve the immutable V7 seal while admitting only the declared later-round V5 projection",
+      "tests": ["TestClosedLoopV7ReviewedImplementationSealIsFrozen", "TestClosedLoopV7Round1DiscoveryStateIsFrozen"]
+    },
+    {
+      "path": "internal/capabilityfeedback/v8_selection_test.go",
+      "reason": "separate the frozen preimplementation source snapshot from postimplementation seal enforcement",
+      "tests": ["TestClosedLoopV8SelectionIsStructurallyFrozen"]
+    }
+  ],
+  "reverse_call_graph": [
+    "sweepSourceAndRange -> simulationIntentParts",
+    "simulationIntentParts -> evaluateAssertionCorner",
+    "evaluateAssertionCorner -> EvaluateCandidate",
+    "EvaluateCandidate -> Synthesize",
+    "EvaluateCandidate -> causalRepairSearch",
+    "EvaluateCandidate -> CausalCrossStageTarget"
+  ],
+  "focused_runtime_consumers": [
+    "direct candidate evaluation",
+    "bounded causal repair evaluation",
+    "cross-stage target evaluation",
+    "top-level open-topology synthesis evaluation"
+  ],
+  "hash": "8e94c9baeaa913af53a8980dbd07ff8ce6d99d8c8f0f3b97a83e8be2a5250af4"
+}
