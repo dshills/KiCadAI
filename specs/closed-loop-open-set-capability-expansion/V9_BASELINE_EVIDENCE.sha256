@@ -1,0 +1,4 @@
+b0b5f30c89cdda5bd7daa719f6c2ba0bec5e2b9e2a5b4fd2e11cc26f706762b9  ../../internal/capabilitybaselinev9/model.go
+53cf7406c47d6ba2951fe7a7d7a464f3cc60127038c2e43828607694ddb8e262  ../../internal/capabilitybaselinev9/validate.go
+bdaa67feb7419e2a7e4207f9d22bddbd04f06e9dcc54710fcb33b3685bf63908  ../../internal/capabilitybaselinev9/validate_test.go
+c26485b42ffb542ec7aed1114eb86e0b8e6d8baf8026c8250ebb5aee991612ce  V9_BASELINE_EVIDENCE_ENVELOPE.md
