@@ -1,0 +1,61 @@
+{
+  "schema": "kicadai.closed-loop-open-set-effect-plan.v8",
+  "version": 8,
+  "generation": 0,
+  "baseline_sha256": "04a3fa5e0dba7dfabb50a51f6d4d3bedfb230cbe73a394a6eeeb5f8a0cd22cfb",
+  "frontier_sha256": "8a18f38b56e92184207264561ad096bfedd06147fd294ec3594856cdcfb97372",
+  "direct_atom_keys": [
+    "atom:dfc8b72e1072c124fbbcda14533e68178f88b4075959bccd995236ed8c58118b"
+  ],
+  "direct_member_keys": [
+    "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08"
+  ],
+  "closure_atoms": [],
+  "closure_members": [],
+  "planned_member_keys": [
+    "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08"
+  ],
+  "required_evidence": [
+    "catalog_model_references",
+    "configuration_loader_references",
+    "data_references",
+    "focused_non_corpus_runtime_consumer_trace",
+    "registry_references",
+    "reverse_call_graph"
+  ],
+  "executable": true,
+  "mechanically_proven": true,
+  "unbounded_dynamic_lookup": false,
+  "unmapped_consumers": [],
+  "static_evidence": {
+    "production_files": [
+      {"path": "internal/opentopologysynthesis/causal_repair.go", "sha256": "2a63f17bcbf9fa720bfd3fa4e38a5681a3291bd68768f5567458bcb99b951d3b"},
+      {"path": "internal/opentopologysynthesis/cross_stage_adapter.go", "sha256": "e309e663b5691f45b5932e288a48a6e77a0cf76f09146ece56af854ff65e3a0e"},
+      {"path": "internal/opentopologysynthesis/simulation.go", "sha256": "1244a9963050037c41ba31635f7cfcb76dea6f285372ab89403a75041e207188"},
+      {"path": "internal/opentopologysynthesis/synthesis.go", "sha256": "3b3ba3a84315e05fbfd9de412336e42437e436ce300fbf212654b7543837bc24"}
+    ],
+    "verification_files": [
+      {"path": "internal/opentopologysynthesis/current_relationship_test.go", "sha256": "7c0e249b15480f0fb0cf97e702bb25013e2be8b00b2587cebef2594f0bf3d852"},
+      {"path": "internal/opentopologysynthesis/multi_stage_decision_search_test.go", "sha256": "630de76f6930e4cd3850ed4e73bdd5aa21b6bfd78e74d7b3ffdecef9f221947c"},
+      {"path": "internal/opentopologysynthesis/simulation_test.go", "sha256": "43bb21e20f996001ee93db310e69be835c9412dcfd321d18f860ae24b34f09f2"}
+    ],
+    "reverse_call_graph": [
+      "sweepSourceAndRange -> simulationIntentParts",
+      "simulationIntentParts -> evaluateAssertionCorner",
+      "evaluateAssertionCorner -> EvaluateCandidate",
+      "EvaluateCandidate -> Synthesize",
+      "EvaluateCandidate -> causalRepairSearch",
+      "EvaluateCandidate -> CausalCrossStageTarget"
+    ],
+    "registry_references": [],
+    "configuration_loader_references": [],
+    "catalog_model_references": [],
+    "data_references": [],
+    "focused_non_corpus_runtime_consumers": [
+      "direct candidate evaluation",
+      "bounded causal repair evaluation",
+      "cross-stage target evaluation",
+      "top-level open-topology synthesis evaluation"
+    ]
+  }
+}
