@@ -1,0 +1,10 @@
+{
+  "schema": "kicadai.closed-loop-open-set-history-custodian-freeze.v9",
+  "version": 9,
+  "custodian_manifest_sha256": "35148e3c2bca0036a33da267c5f22c761475b04a0f045876fc97c1ba5a9cbf3a",
+  "predecessor_history_sha256": "f56d30c27b30e90f4c8568e06870718bac7e9db7d29ed24dac6c768ad163cebf",
+  "v8_corpus_checksums_sha256": "6f5713d542698832bc9df54608ef927cd89f449101d8c4a9cfc5575ca023174e",
+  "v8_publisher_manifest_sha256": "cd448701a7bf4fe413a5d2cd8d4bea3fedfd58865d0c8df60da4ad60f523974d",
+  "v9_contract_manifest_sha256": "5636cd4829f1a1323c19bd98720ddaa46465cb716410ac86919eaa063b3753e4",
+  "held_out_opened": false
+}

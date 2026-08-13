@@ -1,0 +1,14 @@
+ff2a8fe48cbc72a36d4903e73f09cff75a22da8b470b6be8e8a1d7cf4841443e  ../../.gitattributes
+ff2c5faab89e8c5bc1e724ae9583c7d40db502c84b77dc0a87efd9a73960ef05  ../../cmd/kicadai-v9-history-custodian/main.go
+57bb2af4b5fab1bdca509daf3197afe6914b3c0c4e8922cb7657111fbef6a083  ../../cmd/kicadai-v9-history-custodian/main_test.go
+6f5713d542698832bc9df54608ef927cd89f449101d8c4a9cfc5575ca023174e  ../../internal/capabilityfeedback/testdata/closed_loop_open_set_v8_corpus/CHECKSUMS.sha256
+f1450a750854c91a2e038f00101acb414ecaae2215c64fb9a43a94c469e493c7  ../../internal/corpushistoryv9/history.go
+054bd9841a7075a25762d1bba70c94f4b55e5f480282dee45b0ff16b860ef65f  ../../internal/corpushistoryv9/history_test.go
+f2c08c268f290a8699bd93606206acf4646259e3b3072ce143de2dd6703fad6e  ../../internal/corpuspublication/v9_history_bridge.go
+dea5b8b248238791662ec90b092bf3710c512ae2307dad2f0a57b16e8ee64448  ../../internal/corpuspublication/v9_history_bridge_test.go
+611eff45ae0b97667141f652a5dcc462b4786a17ad4992dfe69e461731594db3  ../../internal/externalkey/key.go
+f56d30c27b30e90f4c8568e06870718bac7e9db7d29ed24dac6c768ad163cebf  V8_HISTORICAL_COMMITMENTS.json
+cd448701a7bf4fe413a5d2cd8d4bea3fedfd58865d0c8df60da4ad60f523974d  V8_PUBLISHER.sha256
+5636cd4829f1a1323c19bd98720ddaa46465cb716410ac86919eaa063b3753e4  V9_CONTRACT.sha256
+2295a48cae1c8c4999c280902f2b569bbe2e4a94660ed6f7a53c3b7d7b7f450b  V9_HISTORY_CUSTODIAN_FREEZE.md
+7e70ba88b8a89cd0a3e14e2b739d1bed5521fd695d3093a3384ff72a6972436a  v9_history_custodian_contract_test.go

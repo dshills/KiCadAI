@@ -13,7 +13,7 @@ import (
 
 	"kicadai/internal/corpusfreeze"
 	"kicadai/internal/corpusfreezev8"
-	"kicadai/internal/corpusfreezev9"
+	"kicadai/internal/corpushistoryv9"
 	"kicadai/internal/corpuspublication"
 )
 
@@ -164,11 +164,11 @@ func TestRunAuthenticatesSyntheticV8AndPublishesDigestOnlyHistory(t *testing.T) 
 	if strings.Contains(stdout.String(), "v8_case_") || strings.Contains(stdout.String(), "held_out") {
 		t.Fatalf("custodian output disclosed held-out identity: %q", stdout.String())
 	}
-	history, err := corpusfreezev9.LoadHistoricalCommitments(output)
+	history, err := corpushistoryv9.LoadHistoricalCommitments(output)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := corpusfreezev9.ValidateHistoricalBoundary(history); err != nil {
+	if err := corpushistoryv9.ValidateHistoricalBoundary(history); err != nil {
 		t.Fatal(err)
 	}
 }

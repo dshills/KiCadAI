@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"kicadai/internal/corpusfreezev9"
+	"kicadai/internal/corpushistoryv9"
 	"kicadai/internal/corpuspublication"
 	"kicadai/internal/externalkey"
 )
@@ -106,18 +106,18 @@ func run(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	data, err := corpusfreezev9.ExtendHistoricalCommitments(previous, entries)
+	data, err := corpushistoryv9.ExtendHistoricalCommitments(previous, entries)
 	if err != nil {
 		return err
 	}
 	digest := sha256.Sum256(data)
 	digestText := hex.EncodeToString(digest[:])
 	if err := publishExclusive(outputPath, data, 0o644, func(stage string) error {
-		loaded, err := corpusfreezev9.LoadHistoricalCommitments(stage)
+		loaded, err := corpushistoryv9.LoadHistoricalCommitments(stage)
 		if err != nil {
 			return err
 		}
-		if err := corpusfreezev9.ValidateHistoricalBoundary(loaded); err != nil {
+		if err := corpushistoryv9.ValidateHistoricalBoundary(loaded); err != nil {
 			return err
 		}
 		if loaded.Base.SourceSHA256 != digestText {
@@ -128,7 +128,7 @@ func run(arguments []string, stdout io.Writer) error {
 		return err
 	}
 	_, err = fmt.Fprintf(stdout, "published V9 historical commitments sha256=%s raw=%d neutral=%d normalized=%d\n",
-		digestText, corpusfreezev9.HistoricalRawCount, corpusfreezev9.HistoricalNeutralCount, corpusfreezev9.HistoricalNormalizedCount)
+		digestText, corpushistoryv9.HistoricalRawCount, corpushistoryv9.HistoricalNeutralCount, corpushistoryv9.HistoricalNormalizedCount)
 	return err
 }
 
@@ -196,7 +196,7 @@ func verifyV8CorpusSet(root string, checksums []byte, manifest corpuspublication
 	return nil
 }
 
-func combineCommitments(discovery, heldOut []corpuspublication.EntryV8) ([]corpusfreezev9.CommitmentEntry, error) {
+func combineCommitments(discovery, heldOut []corpuspublication.EntryV8) ([]corpushistoryv9.CommitmentEntry, error) {
 	if len(discovery) != 18 || len(heldOut) != 18 {
 		return nil, fmt.Errorf("V8 commitment partitions must contain 18 entries each")
 	}
@@ -214,9 +214,9 @@ func combineCommitments(discovery, heldOut []corpuspublication.EntryV8) ([]corpu
 		all = append(all, entry)
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].SourceID < all[j].SourceID })
-	result := make([]corpusfreezev9.CommitmentEntry, len(all))
+	result := make([]corpushistoryv9.CommitmentEntry, len(all))
 	for index, entry := range all {
-		result[index] = corpusfreezev9.CommitmentEntry{SourceID: entry.SourceID, RequirementSHA256: entry.RequirementSHA256,
+		result[index] = corpushistoryv9.CommitmentEntry{SourceID: entry.SourceID, RequirementSHA256: entry.RequirementSHA256,
 			NeutralSemanticSHA256: entry.NeutralSemanticSHA256, NormalizedSemanticSHA256: entry.NormalizedSemanticSHA256}
 	}
 	return result, nil
