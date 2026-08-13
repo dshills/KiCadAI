@@ -1,0 +1,15 @@
+{
+  "schema": "kicadai.closed-loop-open-set-retirement.v8",
+  "version": 8,
+  "generation": 1,
+  "infrastructure_commit": "3919b72a63f72736ca1cece0ab0b2ddbb08195f6",
+  "runner_manifest_sha256": "0e22dadb0ed869e3682c466986102fcbe227872603d410eb5d3dfd08da0594c3",
+  "implementation_commit": "e8cda322d450ea97c8feed97e08afd415ffee06a",
+  "implementation_seal_sha256": "8e94c9baeaa913af53a8980dbd07ff8ce6d99d8c8f0f3b97a83e8be2a5250af4",
+  "implementation_seal_file_sha256": "5f5e9402edca9fc36fc44232d637593a27f3380281300c2de4eda2b350ffb4fe",
+  "input_selection_sha256": "13299d97ba0ca4eace70cd2fb2cb47e935de584cac8b94ac8a2b4e37d163cb13",
+  "input_frontier_sha256": "8a18f38b56e92184207264561ad096bfedd06147fd294ec3594856cdcfb97372",
+  "reason": "causal_lineage_invalid",
+  "held_out_opened": false,
+  "hash": "3fd5a3466117d439963a286aabb83a4426470d82147294793685fa3807b37e6f"
+}
