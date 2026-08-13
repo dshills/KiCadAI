@@ -9,13 +9,21 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"kicadai/internal/corpusassignment"
 )
 
 type v9RetirementAssignment struct {
-	Role         string `json:"role"`
-	CircuitRole  string `json:"circuit_role"`
-	SafetyImpact string `json:"safety_impact"`
+	ID                 string `json:"id"`
+	Role               string `json:"role"`
+	Domain             string `json:"domain"`
+	CircuitRole        string `json:"circuit_role"`
+	SafetyImpact       string `json:"safety_impact"`
+	PrimaryClass       string `json:"primary_class"`
+	OutputMultiplicity string `json:"output_multiplicity"`
+	RequireOffNominal  bool   `json:"require_off_nominal"`
 }
 
 func TestVersionNineRetiredOnFrozenAssignmentValidatorInconsistency(t *testing.T) {
@@ -86,6 +94,40 @@ func TestVersionNineRetiredOnFrozenAssignmentValidatorInconsistency(t *testing.T
 	digest := sha256.Sum256(canonicalBytes)
 	if got := hex.EncodeToString(digest[:]); got != retirement.Hash {
 		t.Fatalf("V9 retirement hash = %s, want %s", retirement.Hash, got)
+	}
+}
+
+func TestVersionNineAssignmentPreflightReproducesRetirementBeforeAuthoring(t *testing.T) {
+	directory := v9BaselinePublisherContractDirectory(t)
+	var entries []corpusassignment.Entry
+	for author := 1; author <= 6; author++ {
+		var assignment struct {
+			AuthorSlot string                   `json:"author_slot"`
+			Entries    []v9RetirementAssignment `json:"entries"`
+		}
+		filePath := filepath.Join(directory, "v9-authoring-packet", "assignments", fmt.Sprintf("author_%d.json", author))
+		if err := json.Unmarshal(v9BaselinePublisherReadFile(t, filePath), &assignment); err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range assignment.Entries {
+			entries = append(entries, corpusassignment.Entry{ID: entry.ID, Author: assignment.AuthorSlot, Partition: entry.Role, Domain: entry.Domain,
+				CircuitRole: entry.CircuitRole, SafetyImpact: entry.SafetyImpact, PrimaryClass: entry.PrimaryClass,
+				OutputMultiplicity: entry.OutputMultiplicity, RequireOffNominal: entry.RequireOffNominal})
+		}
+	}
+	policy := corpusassignment.Policy{
+		Authors: []string{"author_1", "author_2", "author_3", "author_4", "author_5", "author_6"}, Partitions: []string{"discovery", "held_out"},
+		Domains:       []string{"analog_signal_path", "power_energy_conversion", "digital_control", "mixed_signal_data_conversion", "sensing_instrumentation", "protection_power_integrity"},
+		CircuitRoles:  []string{"source_bias", "amplification_conditioning", "conversion_regulation", "sensing_measurement", "interface_control", "protection_supervision"},
+		SafetyImpacts: []string{"non_safety", "review_required", "safety_relevant", "safety_critical"}, HighSafetyImpacts: []string{"safety_relevant", "safety_critical"},
+		CasesPerAuthor: 8, CasesPerPartition: 24, DimensionCountPerPartition: 4, SafetyCountPerPartition: 6,
+		MinimumStaticPerAuthor: 4, MinimumDynamicPerAuthor: 4, MinimumMultiOutputPerPartition: 6, MinimumOffNominalPerAuthor: 2,
+		RequireHighSafetyDomains: true, RequireHighSafetyCircuitRoles: true,
+	}
+	report, err := corpusassignment.Validate(entries, policy)
+	if err == nil || !strings.Contains(err.Error(), "discovery high-safety coverage is infeasible") || len(report.Partitions) != 2 ||
+		!slices.Equal(report.Partitions[0].MissingHighSafetyRoles, []string{"amplification_conditioning"}) {
+		t.Fatalf("V9 preflight did not reproduce retirement: report=%+v error=%v", report, err)
 	}
 }
 
