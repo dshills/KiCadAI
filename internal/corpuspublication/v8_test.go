@@ -33,6 +33,15 @@ func TestPublishV8RecordSealsAndObligations(t *testing.T) {
 	if hashBytes(manifestBytes) != result.ManifestSHA256 {
 		t.Fatal("V8 manifest hash mismatch")
 	}
+	validationBytes, err := os.ReadFile(filepath.Join(request.DestinationRoot, ValidationFileV8))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var validation PublicValidationReportV8
+	if err := json.Unmarshal(validationBytes, &validation); err != nil {
+		t.Fatal(err)
+	}
+	stablePaths := make(map[string]string, len(result.Manifest.Entries))
 	for _, entry := range result.Manifest.Entries {
 		if entry.Role != "discovery" || entry.Sealed {
 			t.Fatalf("public manifest disclosed a held-out entry: %+v", entry)
@@ -41,6 +50,12 @@ func TestPublishV8RecordSealsAndObligations(t *testing.T) {
 		data, err := os.ReadFile(publishedPath)
 		if err != nil || !bytes.Equal(data, sources[entry.ID]) {
 			t.Fatalf("discovery mismatch: %s", entry.ID)
+		}
+		stablePaths[entry.ID] = entry.StablePath
+	}
+	for _, entry := range validation.DiscoveryEntries {
+		if entry.RequirementFile != stablePaths[entry.ID] {
+			t.Fatalf("validation path %q does not match published path %q", entry.RequirementFile, stablePaths[entry.ID])
 		}
 	}
 	for _, name := range []string{ManifestFileV8, ValidationFileV8, DiscoveryObligationsFileV8, AuditFileV8} {

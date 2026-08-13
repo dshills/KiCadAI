@@ -67,6 +67,7 @@ func prepareV8(request RequestV8) (preparedCorpusV8, error) {
 	entries := toV8Entries(request.Report.Entries)
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
 	manifestEntries := make([]EntryV8, 0, len(entries))
+	discoveryStablePaths := make(map[string]string, expectedDiscoveryV8)
 	discovery := map[string][]byte{}
 	heldOut := make([]heldOutCaseV8, 0, expectedHeldOutV8)
 	for author, bundle := range request.Bundles {
@@ -109,6 +110,7 @@ func prepareV8(request RequestV8) (preparedCorpusV8, error) {
 		roleCounts[evidence.Role]++
 		if evidence.Role == "discovery" {
 			manifestEntries = append(manifestEntries, entry)
+			discoveryStablePaths[evidence.ID] = stablePath
 			discovery[stablePath] = append([]byte(nil), source...)
 		} else {
 			heldOut = append(heldOut, heldOutCaseV8{Entry: entry, Source: append([]byte(nil), source...)})
@@ -117,7 +119,7 @@ func prepareV8(request RequestV8) (preparedCorpusV8, error) {
 	if roleCounts["discovery"] != expectedDiscoveryV8 || roleCounts["held_out"] != expectedHeldOutV8 {
 		return preparedCorpusV8{}, fmt.Errorf("V8 role counts are invalid")
 	}
-	publicReport, err := publicValidationReportV8(request.Report)
+	publicReport, err := publicValidationReportV8(request.Report, discoveryStablePaths)
 	if err != nil {
 		return preparedCorpusV8{}, err
 	}
@@ -300,11 +302,16 @@ func decodeHeldOutRecordV8(data []byte) (heldOutCaseV8, error) {
 	return heldOutCaseV8{Entry: entry, Source: source}, nil
 }
 
-func publicValidationReportV8(report corpusfreezev8.Report) (PublicValidationReportV8, error) {
+func publicValidationReportV8(report corpusfreezev8.Report, discoveryStablePaths map[string]string) (PublicValidationReportV8, error) {
 	discovery := []corpusfreezev8.EntryEvidence{}
 	heldOutDigests := []string{}
 	for _, entry := range report.Entries {
 		if entry.Role == "discovery" {
+			stablePath, exists := discoveryStablePaths[entry.ID]
+			if !exists {
+				return PublicValidationReportV8{}, fmt.Errorf("V8 public validation discovery path missing")
+			}
+			entry.RequirementFile = stablePath
 			discovery = append(discovery, entry)
 			continue
 		}
@@ -319,7 +326,7 @@ func publicValidationReportV8(report corpusfreezev8.Report) (PublicValidationRep
 	}
 	sort.Slice(discovery, func(i, j int) bool { return discovery[i].ID < discovery[j].ID })
 	sort.Strings(heldOutDigests)
-	if len(discovery) != expectedDiscoveryV8 || len(heldOutDigests) != expectedHeldOutV8 {
+	if len(discovery) != expectedDiscoveryV8 || len(discoveryStablePaths) != expectedDiscoveryV8 || len(heldOutDigests) != expectedHeldOutV8 {
 		return PublicValidationReportV8{}, fmt.Errorf("V8 public validation counts invalid")
 	}
 	return PublicValidationReportV8{Schema: "kicadai.behavior-corpus-public-validation-report.v8", Version: 8,
