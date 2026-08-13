@@ -6,8 +6,9 @@ case has been synthesized and no held-out key or record has been opened.
 The V10 baseline validator accepts exactly 24 public discovery records in
 canonical `v10_case_001` through `v10_case_024` order. Every record is bound to
 one requirement hash, one frozen evaluator manifest, one frozen environment,
-and exactly two identical full-run replay hashes. Environment or evaluator
-drift between cases fails the entire baseline.
+exactly two identical full-run replay hashes, and two distinct clean-root
+commitments. Environment or evaluator drift between cases, replay drift, or
+clean-root reuse fails the entire baseline.
 
 Every case has exactly one terminal classification: `pass`, `unsupported`,
 `unsafe`, or `exhausted`. Unknown, skipped, partial, conflicting, or timeout

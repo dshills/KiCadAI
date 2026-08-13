@@ -120,7 +120,8 @@ func testReport(t *testing.T) capabilitybaselinev10.Report {
 		records = append(records, capabilitybaselinev10.CaseEvidence{Schema: capabilitybaselinev10.CaseEvidenceSchema, Version: capabilitybaselinev10.Version,
 			Case: current, RequirementSHA256: testDigest("requirement-" + id), EnvironmentSHA256: testDigest("environment"),
 			EvaluatorManifestSHA256: testDigest("evaluator"), ReplaySHA256: []string{replay, replay},
-			Gates: capabilitybaselinev10.GateEvidence{DeterministicReplay: true, FailClosed: true}})
+			ReplayRootSHA256: []string{testDigest("root-a-" + id), testDigest("root-b-" + id)},
+			Gates:            capabilitybaselinev10.GateEvidence{DeterministicReplay: true, FailClosed: true}})
 	}
 	report, err := capabilitybaselinev10.Build(testDigest("corpus"), records)
 	if err != nil {

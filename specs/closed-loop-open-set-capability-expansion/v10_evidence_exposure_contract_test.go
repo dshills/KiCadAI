@@ -13,7 +13,10 @@ import (
 	"kicadai/internal/capabilityroundsv10"
 )
 
-const v10EvaluationFreezeParent = "f508ae2f25bc2ea4f2c6d468c22a7abd8e05d847"
+const (
+	v10BaselineEvidenceFreezeParent = "da0e8c41c5cbdf4fa4b62c5e8c9609e63ca88610"
+	v10ExposureFreezeParent         = "f508ae2f25bc2ea4f2c6d468c22a7abd8e05d847"
+)
 
 func TestVersionTenBaselineEvidenceRulesAreFrozenAndOutcomeBlind(t *testing.T) {
 	directory := v7ContractDirectory(t)
@@ -33,7 +36,7 @@ func TestVersionTenBaselineEvidenceRulesAreFrozenAndOutcomeBlind(t *testing.T) {
 		t.Fatal(err)
 	}
 	if freeze.Schema != "kicadai.closed-loop-open-set-baseline-evidence-freeze.v10" || freeze.Version != 10 ||
-		freeze.FreezeCommitParent != v10EvaluationFreezeParent {
+		freeze.FreezeCommitParent != v10BaselineEvidenceFreezeParent {
 		t.Fatalf("V10 baseline freeze boundary = %q/%d/%q", freeze.Schema, freeze.Version, freeze.FreezeCommitParent)
 	}
 	if freeze.EvidenceManifest != "V10_BASELINE_EVIDENCE.sha256" ||
@@ -70,7 +73,7 @@ func TestVersionTenEffectExposureEngineIsFrozenAndCorpusBlind(t *testing.T) {
 		t.Fatal(err)
 	}
 	if freeze.Schema != "kicadai.closed-loop-open-set-effect-exposure-freeze.v10" || freeze.Version != 10 ||
-		freeze.FreezeCommitParent != v10EvaluationFreezeParent {
+		freeze.FreezeCommitParent != v10ExposureFreezeParent {
 		t.Fatalf("V10 exposure freeze boundary = %q/%d/%q", freeze.Schema, freeze.Version, freeze.FreezeCommitParent)
 	}
 	if freeze.EngineManifest != "V10_EFFECT_EXPOSURE_ENGINE.sha256" ||

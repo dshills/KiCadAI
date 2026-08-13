@@ -85,10 +85,20 @@ func validateCase(record CaseEvidence) (CaseEvidence, error) {
 	if _, exists := policy.SafetyWeights[record.Case.SafetyImpact]; !exists {
 		return CaseEvidence{}, fmt.Errorf("%w: safety impact", ErrInvalidEvidence)
 	}
-	if !slices.Contains(outcomeOrder, record.Case.Outcome) || !digestPattern.MatchString(record.RequirementSHA256) ||
-		!digestPattern.MatchString(record.EnvironmentSHA256) || !digestPattern.MatchString(record.EvaluatorManifestSHA256) ||
-		len(record.ReplaySHA256) != 2 || !digestPattern.MatchString(record.ReplaySHA256[0]) || record.ReplaySHA256[0] != record.ReplaySHA256[1] {
-		return CaseEvidence{}, fmt.Errorf("%w: classification or replay", ErrInvalidEvidence)
+	if !slices.Contains(outcomeOrder, record.Case.Outcome) {
+		return CaseEvidence{}, fmt.Errorf("%w: terminal classification", ErrInvalidEvidence)
+	}
+	if !digestPattern.MatchString(record.RequirementSHA256) || !digestPattern.MatchString(record.EnvironmentSHA256) ||
+		!digestPattern.MatchString(record.EvaluatorManifestSHA256) {
+		return CaseEvidence{}, fmt.Errorf("%w: evidence binding digest", ErrInvalidEvidence)
+	}
+	if len(record.ReplaySHA256) != 2 || !digestPattern.MatchString(record.ReplaySHA256[0]) ||
+		!digestPattern.MatchString(record.ReplaySHA256[1]) || record.ReplaySHA256[0] != record.ReplaySHA256[1] {
+		return CaseEvidence{}, fmt.Errorf("%w: deterministic replay", ErrInvalidEvidence)
+	}
+	if len(record.ReplayRootSHA256) != 2 || !digestPattern.MatchString(record.ReplayRootSHA256[0]) ||
+		!digestPattern.MatchString(record.ReplayRootSHA256[1]) || record.ReplayRootSHA256[0] == record.ReplayRootSHA256[1] {
+		return CaseEvidence{}, fmt.Errorf("%w: distinct replay roots", ErrInvalidEvidence)
 	}
 	if err := validateFrontier(record.Case, policy); err != nil {
 		return CaseEvidence{}, err

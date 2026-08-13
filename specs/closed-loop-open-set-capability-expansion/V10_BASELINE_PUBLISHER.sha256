@@ -1,6 +1,6 @@
 e5e83278119d3a3a262d6377eeac1ef213399dd7a6d8a4120bac02a3db844a06  ../../internal/capabilitybaselinepublicationv10/canonical.go
 8b5bc88bed8293345220d99aa4698dd91fa0ceb12a23cef762f045262050c411  ../../internal/capabilitybaselinepublicationv10/model.go
-d43d6c3481252cbd58f6d901daeb181ad65bc1b6e5a9563654fc8966c694de23  ../../internal/capabilitybaselinepublicationv10/publication_test.go
+97d858c2652eae573f9d7ab1d4983541937fa9be226be950f4204e2187d24910  ../../internal/capabilitybaselinepublicationv10/publication_test.go
 f57450bab46872656dd658c9ad9ce158db75e4ba879a74c232049a2bfd053745  ../../internal/capabilitybaselinepublicationv10/publish.go
 b0773ef6e9643fa47bb4ffcbbcae3ccd6c0504970e47858ac2fab96506f0f321  ../../internal/capabilitybaselinepublicationv10/verify.go
 eb16ea13638d148288bc465242238811369dbd259c96c52e49dc460c1ec6d001  V10_BASELINE_PUBLISHER.md

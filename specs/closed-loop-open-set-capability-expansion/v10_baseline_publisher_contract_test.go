@@ -29,7 +29,7 @@ func TestVersionTenBaselinePublisherIsFrozenAndPublicOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	if freeze.Schema != "kicadai.closed-loop-open-set-baseline-publisher-freeze.v10" || freeze.Version != 10 ||
-		freeze.FreezeParentCommit != "aa39fae8a5adcc4a040f72469dcc401bf4a5c71e" {
+		freeze.FreezeParentCommit != "da0e8c41c5cbdf4fa4b62c5e8c9609e63ca88610" {
 		t.Fatalf("invalid V10 baseline publisher freeze: %+v", freeze)
 	}
 	if freeze.PublisherManifest != "V10_BASELINE_PUBLISHER.sha256" ||

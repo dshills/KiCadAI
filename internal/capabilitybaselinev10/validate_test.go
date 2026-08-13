@@ -44,6 +44,8 @@ func TestBuildFailsClosedOnIncompleteOrConflictingEvidence(t *testing.T) {
 		"case order":             func(records []CaseEvidence) { records[0].Case.ID = "v10_case_024" },
 		"environment drift":      func(records []CaseEvidence) { records[1].EnvironmentSHA256 = strings.Repeat("f", 64) },
 		"replay drift":           func(records []CaseEvidence) { records[0].ReplaySHA256[1] = strings.Repeat("f", 64) },
+		"replay root reused":     func(records []CaseEvidence) { records[0].ReplayRootSHA256[1] = records[0].ReplayRootSHA256[0] },
+		"replay root missing":    func(records []CaseEvidence) { records[0].ReplayRootSHA256 = records[0].ReplayRootSHA256[:1] },
 		"nonpass replay gate":    func(records []CaseEvidence) { records[1].Gates.DeterministicReplay = false },
 		"nonpass fail closed":    func(records []CaseEvidence) { records[1].Gates.FailClosed = false },
 		"pass gate failure":      func(records []CaseEvidence) { records[0].Gates.StrictDRC = false },
@@ -125,7 +127,8 @@ func baselineRecords() []CaseEvidence {
 		replay := digest("replay-" + id)
 		result = append(result, CaseEvidence{Schema: CaseEvidenceSchema, Version: Version, Case: current,
 			RequirementSHA256: digest("requirement-" + id), EnvironmentSHA256: strings.Repeat("b", 64), EvaluatorManifestSHA256: strings.Repeat("c", 64),
-			ReplaySHA256: []string{replay, replay}, Gates: gates, Promotions: promotions})
+			ReplaySHA256: []string{replay, replay}, ReplayRootSHA256: []string{digest("replay-root-a-" + id), digest("replay-root-b-" + id)},
+			Gates: gates, Promotions: promotions})
 	}
 	return result
 }

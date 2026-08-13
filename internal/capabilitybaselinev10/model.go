@@ -44,6 +44,7 @@ type CaseEvidence struct {
 	EnvironmentSHA256       string                   `json:"environment_sha256"`
 	EvaluatorManifestSHA256 string                   `json:"evaluator_manifest_sha256"`
 	ReplaySHA256            []string                 `json:"replay_sha256"`
+	ReplayRootSHA256        []string                 `json:"replay_root_sha256"`
 	Gates                   GateEvidence             `json:"gates"`
 	Promotions              []PromotionEvidence      `json:"promotions"`
 	Hash                    string                   `json:"hash"`
