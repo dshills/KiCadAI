@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.closed-loop-open-set-selection.v8",
+  "version": 8,
+  "generation": 0,
+  "baseline_sha256": "04a3fa5e0dba7dfabb50a51f6d4d3bedfb230cbe73a394a6eeeb5f8a0cd22cfb",
+  "frontier_sha256": "8a18f38b56e92184207264561ad096bfedd06147fd294ec3594856cdcfb97372",
+  "effect_plan_sha256": "2eb6483762431dc760bf6a06d10cb5ac427e7314f79bce27814a795d108820ee",
+  "selection_runner_sha256": "036f9cf6d72f945567c584d06690fe02e3f17ce08c4892191a417c23c740bb26",
+  "selected": {
+    "key": "bundle:83d9cea7f37da1654f90476f32d864c65a09d036fa7a9601ec4b502777f15b74",
+    "direct_atom_keys": [
+      "atom:dfc8b72e1072c124fbbcda14533e68178f88b4075959bccd995236ed8c58118b"
+    ],
+    "direct_member_keys": [
+      "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08"
+    ],
+    "atoms": [
+      {
+        "key": "atom:dfc8b72e1072c124fbbcda14533e68178f88b4075959bccd995236ed8c58118b",
+        "category": "simulation",
+        "scope": "simulation",
+        "capability": "dc_sweep_solver"
+      }
+    ],
+    "members": [
+      {
+        "key": "member:ec58c2558c270601d541840bebd3a5542c30c949667159480306c926915a5b08",
+        "stage": "simulation",
+        "category": "simulation",
+        "scope": "simulation",
+        "capability": "dc_sweep_solver",
+        "code": "SIMULATION_INVALID"
+      }
+    ],
+    "covered_case_ids": [
+      "v8_case_001",
+      "v8_case_008",
+      "v8_case_013",
+      "v8_case_014",
+      "v8_case_015"
+    ],
+    "reporting_domains": [
+      "analog_signal_path",
+      "power_energy_conversion",
+      "protection_power_integrity",
+      "sensing_instrumentation"
+    ],
+    "circuit_roles": [
+      "conversion_regulation",
+      "protection_supervision",
+      "sensing_measurement",
+      "source_bias"
+    ],
+    "safety_weight": 9,
+    "required_evidence": [
+      "catalog_model_references",
+      "configuration_loader_references",
+      "data_references",
+      "dc_sweep_solver: trusted deterministic analysis, convergence, corner, and assertion evidence",
+      "focused_non_corpus_runtime_consumer_trace",
+      "registry_references",
+      "reverse_call_graph"
+    ],
+    "effect_plan_sha256": "2eb6483762431dc760bf6a06d10cb5ac427e7314f79bce27814a795d108820ee"
+  },
+  "hash": "13299d97ba0ca4eace70cd2fb2cb47e935de584cac8b94ac8a2b4e37d163cb13"
+}
