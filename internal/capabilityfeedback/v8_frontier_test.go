@@ -112,6 +112,31 @@ func TestV8RootFrontierMapsOneCausalGapToMultipleObligationAnchors(t *testing.T)
 	}
 }
 
+func TestV8RootFrontierResolvesOnlyValidExpandedOperatingCases(t *testing.T) {
+	obligation := corpuspublication.ObligationV8{
+		Anchor: strings.Repeat("3", 64), Role: "discovery", CaseID: "v8_case_001",
+		OperatingCaseID: "steady_load", AssertionID: "gain", ObservationKind: "port",
+		ObservationID: "output", OutputID: "output",
+	}
+	gap := Gap{
+		Stage: "simulation", Scope: ScopeSimulation, Capability: "gain_evidence", Code: "ASSERTION_BELOW_MINIMUM",
+		RequirementIDs: []string{"gain"}, OperatingCases: []string{"steady_load/nominal"},
+		RequiredEvidence: []string{"trusted simulation"}, EvidenceHashes: []string{feedbackHash("expanded-case")},
+	}
+	frontier, _, err := v8RootFrontier([]corpuspublication.ObligationV8{obligation}, []Gap{gap})
+	if err != nil || len(frontier) != 1 || frontier[0].ObligationAnchor != obligation.Anchor {
+		t.Fatalf("expanded operating case did not resolve: %#v, %v", frontier, err)
+	}
+	gap.OperatingCases = []string{"steady_load/nominal/extra"}
+	if _, _, err := v8RootFrontier([]corpuspublication.ObligationV8{obligation}, []Gap{gap}); err == nil {
+		t.Fatal("multi-level expanded operating case was accepted")
+	}
+	gap.OperatingCases = []string{"unknown/nominal"}
+	if _, _, err := v8RootFrontier([]corpuspublication.ObligationV8{obligation}, []Gap{gap}); err == nil {
+		t.Fatal("unknown expanded operating case was accepted")
+	}
+}
+
 func TestV8GapCategoryUsesFrozenCausalCategories(t *testing.T) {
 	tests := map[GapScope]string{
 		ScopeTopology: "topology", ScopeComponent: "component", ScopeModel: "model",

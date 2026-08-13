@@ -10,6 +10,7 @@ import (
 	"io"
 	"slices"
 	"sort"
+	"strings"
 
 	"kicadai/internal/capabilityevaluation"
 	"kicadai/internal/capabilityroundsv8"
@@ -232,7 +233,10 @@ func v8RootFrontier(obligations []corpuspublication.ObligationV8, gaps []Gap) ([
 			return nil, nil, err
 		}
 		requirementIDs := stringSetV8(gap.RequirementIDs)
-		operatingCases := stringSetV8(gap.OperatingCases)
+		operatingCases, err := v8OperatingCaseSet(gap.OperatingCases, knownCases)
+		if err != nil {
+			return nil, nil, err
+		}
 		if err := v8ValidateGapSelectors(knownRequirements, knownCases, requirementIDs, operatingCases); err != nil {
 			return nil, nil, err
 		}
@@ -296,6 +300,24 @@ func v8RootFrontier(obligations []corpuspublication.ObligationV8, gaps []Gap) ([
 	}
 	sort.Strings(satisfied)
 	return frontier, satisfied, nil
+}
+
+func v8OperatingCaseSet(values []string, knownCases map[string]bool) (map[string]bool, error) {
+	result := make(map[string]bool, len(values))
+	for _, value := range values {
+		base := value
+		if before, after, found := strings.Cut(value, "/"); found {
+			if before == "" || after == "" || strings.Contains(after, "/") {
+				return nil, fmt.Errorf("causal gap has malformed expanded operating case %q", value)
+			}
+			base = before
+		}
+		if !knownCases[base] {
+			return nil, fmt.Errorf("causal gap references unknown operating case %q", value)
+		}
+		result[base] = true
+	}
+	return result, nil
 }
 
 func v8GapCategory(scope GapScope) (string, error) {
