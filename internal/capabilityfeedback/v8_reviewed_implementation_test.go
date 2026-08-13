@@ -52,11 +52,17 @@ type closedLoopV8Prerequisite struct {
 func TestClosedLoopV8ReviewedImplementationSealIsFrozen(t *testing.T) {
 	path := filepath.Join(closedLoopSpecDirectory(t), closedLoopV8ImplementationSealFile)
 	data := mustCorpusRead(t, path)
-	assertArtifactChecksum(t, filepath.Join(closedLoopSpecDirectory(t), "V8_REVIEWED_IMPLEMENTATION.sha256"), filepath.Base(path), data)
 	var seal closedLoopV8ImplementationSeal
 	decodeCorpusStrict(t, data, &seal)
 	var selection closedLoopV8SelectionDecision
 	decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV8SelectionRoot, "selection.json")), &selection)
+	verifyClosedLoopV8ImplementationSeal(t, data, seal, selection)
+}
+
+func verifyClosedLoopV8ImplementationSeal(t *testing.T, data []byte, seal closedLoopV8ImplementationSeal, selection closedLoopV8SelectionDecision) {
+	t.Helper()
+	path := filepath.Join(closedLoopSpecDirectory(t), closedLoopV8ImplementationSealFile)
+	assertArtifactChecksum(t, filepath.Join(closedLoopSpecDirectory(t), "V8_REVIEWED_IMPLEMENTATION.sha256"), filepath.Base(path), data)
 	var plan closedLoopV8EffectPlanDocument
 	planSource := mustCorpusRead(t, filepath.Join(closedLoopSpecDirectory(t), closedLoopV8EffectPlanFile))
 	decodeCorpusStrict(t, planSource, &plan)
