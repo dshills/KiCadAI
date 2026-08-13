@@ -1,1 +1,3 @@
 third_party/kicad/** -whitespace
+specs/closed-loop-open-set-capability-expansion/V8_HISTORICAL_COMMITMENTS.json text eol=lf
+specs/closed-loop-open-set-capability-expansion/V9_HISTORICAL_COMMITMENTS.json text eol=lf
