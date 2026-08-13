@@ -213,7 +213,12 @@ func TestUpdateClosedLoopV8Round1Discovery(t *testing.T) {
 func loadClosedLoopV8RoundInputs(t *testing.T) closedLoopV8RoundInputs {
 	t.Helper()
 	repositoryRoot := closedLoopModuleRoot(t)
-	for _, name := range []string{"V8_EVALUATOR.sha256", closedLoopV8SelectionManifest, closedLoopV8Round1RunnerManifest} {
+	// The generation-zero selection records the hash of its pre-implementation
+	// runner, while the selected implementation intentionally changes one of
+	// that runner's files. verifyClosedLoopV8SelectionInputs validates the raw
+	// runner commitment; only manifests whose current source closure must remain
+	// byte-identical are replayed here.
+	for _, name := range []string{"V8_EVALUATOR.sha256", closedLoopV8Round1RunnerManifest} {
 		if _, err := corpuspublication.VerifyChecksumManifest(repositoryRoot, filepath.Join(closedLoopSpecDirectory(t), name)); err != nil {
 			t.Fatalf("verify frozen V8 manifest %s: %v", name, err)
 		}
