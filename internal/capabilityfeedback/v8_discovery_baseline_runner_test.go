@@ -120,6 +120,7 @@ func TestUpdateClosedLoopV8DiscoveryBaseline(t *testing.T) {
 	registry, synthesisPolicy := closedLoopV4Policies(t)
 	inventory, environment := closedLoopSynthesisEnvironment(t)
 	promotionEnvironment := resolveClosedLoopV8PromotionEnvironment(t, repositoryRoot)
+	requirementSources := loadClosedLoopV8DiscoveryRequirements(t, manifest)
 	artifacts := runClosedLoopV8Discovery(t, manifest, synthesisPolicy, inventory, environment, promotionEnvironment)
 	evidence := make([]CaseEvidence, len(artifacts))
 	for index := range artifacts {
@@ -129,7 +130,7 @@ func TestUpdateClosedLoopV8DiscoveryBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roundCases, err := BuildV8DiscoveryRoundCases(manifestSource, obligationSource, discovery, registry)
+	roundCases, err := BuildV8DiscoveryRoundCases(manifestSource, obligationSource, requirementSources, discovery, registry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,6 +168,23 @@ func TestUpdateClosedLoopV8DiscoveryBaseline(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func loadClosedLoopV8DiscoveryRequirements(t *testing.T, manifest corpuspublication.ManifestV8) map[string][]byte {
+	t.Helper()
+	result := make(map[string][]byte, len(manifest.Entries))
+	for _, entry := range manifest.Entries {
+		data := mustCorpusRead(t, filepath.Join(closedLoopV8CorpusRoot, filepath.FromSlash(entry.StablePath)))
+		if corpusHash(data) != entry.RequirementSHA256 {
+			t.Fatalf("V8 discovery requirement %s differs from its raw commitment", entry.ID)
+		}
+		_, issues := ots.DecodeStrict(bytes.NewReader(data))
+		if len(issues) != 0 {
+			t.Fatalf("V8 discovery requirement %s violates the frozen contract", entry.ID)
+		}
+		result[entry.ID] = data
+	}
+	return result
 }
 
 func runClosedLoopV8Discovery(t *testing.T, manifest corpuspublication.ManifestV8, policy ots.Policy, inventory ots.PrimitiveInventory, environment ots.SimulationEnvironment, promotionEnvironment closedLoopV5ResolvedPromotionEnvironment) []closedLoopV8CaseArtifact {

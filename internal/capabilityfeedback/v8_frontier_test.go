@@ -1,10 +1,12 @@
 package capabilityfeedback
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,11 +15,12 @@ import (
 	"kicadai/internal/capabilityroundsv8"
 	"kicadai/internal/corpuspublication"
 	"kicadai/internal/obligationanchor"
+	ots "kicadai/internal/opentopologysynthesis"
 )
 
 func TestBuildV8DiscoveryRoundCasesBindsAndAnchorsCompleteFrontier(t *testing.T) {
-	manifestSource, obligationSource, report, registry := v8FrontierFixture(t)
-	cases, err := BuildV8DiscoveryRoundCases(manifestSource, obligationSource, report, registry)
+	manifestSource, obligationSource, requirementSources, report, registry := v8FrontierFixture(t)
+	cases, err := BuildV8DiscoveryRoundCases(manifestSource, obligationSource, requirementSources, report, registry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,9 +49,9 @@ func TestBuildV8DiscoveryRoundCasesBindsAndAnchorsCompleteFrontier(t *testing.T)
 }
 
 func TestBuildV8DiscoveryRoundCasesRejectsManifestDriftAndAnchorTampering(t *testing.T) {
-	manifestSource, obligationSource, report, registry := v8FrontierFixture(t)
+	manifestSource, obligationSource, requirementSources, report, registry := v8FrontierFixture(t)
 	driftedManifest := append(append([]byte(nil), manifestSource...), '\n')
-	if _, err := BuildV8DiscoveryRoundCases(driftedManifest, obligationSource, report, registry); err == nil {
+	if _, err := BuildV8DiscoveryRoundCases(driftedManifest, obligationSource, requirementSources, report, registry); err == nil {
 		t.Fatal("byte-drifted manifest retained its obligation binding")
 	}
 
@@ -61,7 +64,7 @@ func TestBuildV8DiscoveryRoundCasesRejectsManifestDriftAndAnchorTampering(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := BuildV8DiscoveryRoundCases(manifestSource, tampered, report, registry); err == nil {
+	if _, err := BuildV8DiscoveryRoundCases(manifestSource, tampered, requirementSources, report, registry); err == nil {
 		t.Fatal("tampered obligation anchor was accepted")
 	}
 }
@@ -123,7 +126,7 @@ func TestV8GapCategoryUsesFrozenCausalCategories(t *testing.T) {
 	}
 }
 
-func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilityevaluation.ImpactRegistry) {
+func v8FrontierFixture(t *testing.T) ([]byte, []byte, map[string][]byte, AggregateReport, capabilityevaluation.ImpactRegistry) {
 	t.Helper()
 	policy := capabilityroundsv8.FrozenPolicy()
 	domains := []string{
@@ -141,6 +144,16 @@ func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilit
 		HeldOutSource: corpuspublication.HeldOutSealV8{RecordCount: policy.ExpectedDiscoveryCases},
 	}
 	evidence := make([]CaseEvidence, 0, policy.ExpectedDiscoveryCases)
+	requirementSource := mustCorpusRead(t, filepath.Join(closedLoopV8CorpusRoot, "discovery", "v8_case_001.json"))
+	requirement, issues := ots.DecodeStrict(bytes.NewReader(requirementSource))
+	if len(issues) != 0 {
+		t.Fatal("frozen V8 fixture requirement is invalid")
+	}
+	requirementHash, err := ots.CanonicalHash(requirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirementSources := make(map[string][]byte, policy.ExpectedDiscoveryCases)
 	for index := 1; index <= policy.ExpectedDiscoveryCases; index++ {
 		id := fmt.Sprintf("v8_case_%03d", index)
 		feedbackDomain, err := v8FeedbackDomain(domains[(index-1)%len(domains)])
@@ -159,11 +172,17 @@ func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilit
 			capabilityevaluation.SafetyImpact(safety[(index-1)%len(safety)]),
 			[]string{"dc_operating_point"}, gap,
 		)
+		current.RequirementHash = requirementHash
+		current.Hash, err = caseEvidenceHash(current)
+		if err != nil {
+			t.Fatal(err)
+		}
+		requirementSources[id] = requirementSource
 		evidence = append(evidence, current)
 		manifest.Entries = append(manifest.Entries, corpuspublication.EntryV8{
 			ID: id, Role: "discovery", Domain: domains[(index-1)%len(domains)],
 			CircuitRole: roles[(index-1)%len(roles)], SafetyImpact: safety[(index-1)%len(safety)],
-			RequirementSHA256: current.RequirementHash,
+			RequirementSHA256: corpusHash(requirementSource),
 		})
 	}
 	manifestSource, err := json.Marshal(manifest)
@@ -193,7 +212,7 @@ func v8FrontierFixture(t *testing.T) ([]byte, []byte, AggregateReport, capabilit
 	if err != nil {
 		t.Fatal(err)
 	}
-	return manifestSource, obligationSource, report, registry
+	return manifestSource, obligationSource, requirementSources, report, registry
 }
 
 func v8FixtureObligation(t *testing.T, manifestHash, caseID, assertionID string) corpuspublication.ObligationV8 {

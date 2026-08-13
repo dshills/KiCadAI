@@ -15,6 +15,7 @@ import (
 	"kicadai/internal/capabilityroundsv8"
 	"kicadai/internal/corpuspublication"
 	"kicadai/internal/obligationanchor"
+	"kicadai/internal/opentopologysynthesis"
 )
 
 const discoveryObligationsSchemaV8 = "kicadai.closed-loop-open-set-discovery-obligations.v8"
@@ -25,6 +26,7 @@ const discoveryObligationsSchemaV8 = "kicadai.closed-loop-open-set-discovery-obl
 func BuildV8DiscoveryRoundCases(
 	manifestSource []byte,
 	obligationSource []byte,
+	requirementSources map[string][]byte,
 	report AggregateReport,
 	registry capabilityevaluation.ImpactRegistry,
 ) ([]capabilityroundsv8.Case, error) {
@@ -40,10 +42,34 @@ func BuildV8DiscoveryRoundCases(
 		return nil, fmt.Errorf("validate V8 discovery report: %w", err)
 	}
 	manifestDigest := sha256.Sum256(manifestSource)
+	if len(requirementSources) != len(manifest.Entries) {
+		return nil, fmt.Errorf("V8 discovery requirement source cohort differs from the manifest")
+	}
+	requirementHashes := make(map[string]string, len(manifest.Entries))
+	for _, entry := range manifest.Entries {
+		source, exists := requirementSources[entry.ID]
+		if !exists {
+			return nil, fmt.Errorf("missing V8 discovery requirement %q", entry.ID)
+		}
+		rawDigest := sha256.Sum256(source)
+		if hex.EncodeToString(rawDigest[:]) != entry.RequirementSHA256 {
+			return nil, fmt.Errorf("raw V8 discovery requirement %q differs from its manifest commitment", entry.ID)
+		}
+		requirement, issues := opentopologysynthesis.DecodeStrict(bytes.NewReader(source))
+		if len(issues) != 0 {
+			return nil, fmt.Errorf("V8 discovery requirement %q violates the frozen contract", entry.ID)
+		}
+		digest, err := opentopologysynthesis.CanonicalHash(requirement)
+		if err != nil {
+			return nil, fmt.Errorf("hash V8 discovery requirement %q: %w", entry.ID, err)
+		}
+		requirementHashes[entry.ID] = digest
+	}
 	return buildV8DiscoveryRoundCases(
 		manifest,
 		hex.EncodeToString(manifestDigest[:]),
 		obligations,
+		requirementHashes,
 		report,
 	)
 }
@@ -52,6 +78,7 @@ func buildV8DiscoveryRoundCases(
 	manifest corpuspublication.ManifestV8,
 	manifestSHA256 string,
 	obligations corpuspublication.DiscoveryObligationsV8,
+	requirementHashes map[string]string,
 	report AggregateReport,
 ) ([]capabilityroundsv8.Case, error) {
 	policy := capabilityroundsv8.FrozenPolicy()
@@ -134,7 +161,7 @@ func buildV8DiscoveryRoundCases(
 			return nil, fmt.Errorf("case %q: %w", entry.ID, domainErr)
 		}
 		if !exists || evidence.Case.Role != RoleDiscovery || evidence.Case.Domain != feedbackDomain ||
-			string(evidence.Case.SafetyImpact) != entry.SafetyImpact || evidence.RequirementHash != entry.RequirementSHA256 {
+			string(evidence.Case.SafetyImpact) != entry.SafetyImpact || evidence.RequirementHash != requirementHashes[entry.ID] {
 			return nil, fmt.Errorf("discovery evidence does not match manifest case %q", entry.ID)
 		}
 		if !policy.ReportingDomains[entry.Domain] || !policy.CircuitRoles[entry.CircuitRole] {
@@ -158,7 +185,7 @@ func buildV8DiscoveryRoundCases(
 		})
 	}
 	if len(evidenceByID) != len(result) {
-		return nil, fmt.Errorf("V8 discovery report contains an unknown case")
+		return nil, fmt.Errorf("V8 discovery report, manifest, and requirement cohorts differ")
 	}
 	return result, nil
 }
