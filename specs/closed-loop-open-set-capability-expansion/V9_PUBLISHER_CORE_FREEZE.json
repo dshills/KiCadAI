@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.closed-loop-open-set-publisher-core-freeze.v9",
+  "version": 9,
+  "freeze_commit_parent": "36492bb0609c77a4f789fc30552549fdd1cf83cb",
+  "publisher_core_manifest": "V9_PUBLISHER_CORE.sha256",
+  "publisher_core_manifest_sha256": "05743dd64a0dab5fa008f22c4dd58fdb3e4408c871ee2d2b7dcd48022aeba97c",
+  "case_count": 48,
+  "discovery_count": 24,
+  "held_out_count": 24,
+  "real_key_opened": false,
+  "real_corpus_evaluated": false
+}
