@@ -78,8 +78,10 @@ a declared port or domain. Conditions are unique by axis plus target.
 
 An event has `id`, `kind`, `target`, nonnegative `trigger_time_s`, finite
 `initial` and `applied`, and `unit`. Allowed kinds are `input_step`, `load_step`,
-`power_step`, `rail_loss`, `short_circuit`, `shutdown`, and `startup`. The
-target references a declared port.
+`power_step`, `rail_loss`, `short_circuit`, and `startup`. The target references
+a declared port. Shutdown behavior uses a bounded `rail_loss` or de-asserting
+`power_step` event and a `transient` assertion; `shutdown` is not a separate
+analysis or event kind.
 
 ### Behavioral requirements
 
@@ -96,8 +98,8 @@ circuit observation to the `@circuit` output sentinel; authors never write that
 sentinel or any obligation-anchor hash.
 
 Allowed analyses are `ac_sweep`, `dc_operating_point`, `dc_sweep`,
-`distortion`, `electrothermal`, `noise`, `shutdown`, `stability`, `startup`,
-`thermal`, and `transient`.
+`distortion`, `electrothermal`, `noise`, `stability`, `startup`, `thermal`, and
+`transient`.
 
 Allowed metrics are `bandwidth`, `cutoff_frequency`, `dc_current`, `dc_voltage`,
 `duty_cycle`, `fall_time`, `falling_threshold`, `hysteresis`, `input_impedance`,
@@ -107,8 +109,8 @@ Allowed metrics are `bandwidth`, `cutoff_frequency`, `dc_current`, `dc_voltage`,
 `output_noise_rms`, `output_power`, `output_ripple`, `output_swing`,
 `output_voltage`, `peak_current`, `peak_voltage`, `phase_margin`,
 `propagation_delay`, `quiescent_current`, `rise_time`, `rising_threshold`,
-`settling_time`, `shutdown_current`, `shutdown_output_voltage`, `shutdown_time`,
-`soa_margin`, `startup_current`, `startup_output_voltage`, `startup_overshoot`,
+`settling_time`, `soa_margin`, `startup_current`, `startup_output_voltage`,
+`startup_overshoot`,
 `threshold_current`, `threshold_voltage`, `total_harmonic_distortion`,
 `transconductance`, `transimpedance`, `upper_threshold`, `voltage_gain`,
 `voltage_gain_at_frequency`, and `conversion_efficiency`. The alias `thd` is

@@ -44,7 +44,7 @@ var (
 	}
 	v10AuthorSafety    = []string{"non_safety", "review_required", "safety_relevant", "safety_critical"}
 	v10StaticAnalyses  = []string{"dc_operating_point", "dc_sweep", "thermal", "electrothermal"}
-	v10DynamicAnalyses = []string{"transient", "ac_sweep", "startup", "shutdown", "stability", "distortion", "noise"}
+	v10DynamicAnalyses = []string{"transient", "ac_sweep", "startup", "stability", "distortion", "noise"}
 )
 
 type v10PacketBinding struct {

@@ -94,3 +94,12 @@ the same production preflight, including complete high-safety domain and
 circuit-role coverage in both partitions. No author was dispatched, no
 requirement was authored, no key was accessed or created, and no synthesis,
 simulation, feasibility, outcome, ranking, or held-out operation occurred.
+
+Before author dispatch, a production-compatibility audit found that the earlier
+Prism remediation had introduced `shutdown` as a new event and analysis even
+though the frozen synthesis stack supports shutdown behavior through transient
+rail-loss or de-asserting power-step envelopes. Adding a production capability
+before baseline would contaminate the experiment. The public contract therefore
+uses the existing canonical transient/event vocabulary for shutdown behavior,
+removes the unsupported standalone tokens, and regenerates all packet hashes.
+Startup/shutdown behavioral coverage remains mandatory.
