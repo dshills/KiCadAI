@@ -1,0 +1,20 @@
+{
+  "schema": "kicadai.closed-loop-open-set-authoring-packet-binding.v10",
+  "version": 10,
+  "contract_freeze_commit": "2bc33a1857feb88011d53a0f5f405569468ae2d1",
+  "contract_manifest": "V10_CONTRACT.sha256",
+  "contract_manifest_sha256": "9a04332c0483b4b42285932d3761fbf2356854994fcf2177a835cedd4af6cedf",
+  "predecessor_retirement_sha256": "e80a9bcc3098719cede0f1b2c8ee3f946040c2b683e172c7b1451e1ee0940826",
+  "retired_versions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "retired_held_out_reuse": "prohibited"
+}
