@@ -1,0 +1,1707 @@
+{
+  "schema": "kicadai.closed-loop-open-set-discovery-obligations.v10",
+  "version": 10,
+  "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
+  "obligations": [
+    {
+      "anchor": "08914e6bac4c80352e9b235761acc1be2f61073b8ddec2f8c1fb8882b2b7cd63",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "low_rail_start",
+      "assertion_id": "status_startup_delay",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "097ac2baa67a9a16f9010d5e404a2d62aa11a1f76b270c316f43e94c7a3eb5ff",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "rising_excursion",
+      "assertion_id": "limit_separation",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "0b1be329f202d2572193f328160388467d40fdcbce9bdc77276cc97d8c15cef1",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "normal_load",
+      "assertion_id": "thermal_ceiling",
+      "observation_kind": "circuit",
+      "observation_id": "temperature_margin",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "0ca75aeb970a944c7eec10271653b70ca813654b52e3b93347ff5a9c8f470c26",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "normal_operating_margin",
+      "observation_kind": "circuit",
+      "observation_id": "electrical_margin",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "1141ed2cae70d59ab34a2d8d0ed29b59f615dede3c64512336b771357f3cf12a",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "low_rail_loaded_start",
+      "assertion_id": "startup_settling_bound",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "11a823f01c429f79f02e10e91dbf190e69ee06c579e2310c525ead955bcab110",
+      "role": "discovery",
+      "case_id": "v10_case_019",
+      "operating_case_id": "measurement_range",
+      "assertion_id": "b_current_conversion_ratio",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "133aa828c5e2654c88921de73048eda653ca57e5b33a29e2bca8f08af7d808df",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "upper_range_hot",
+      "assertion_id": "assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "thermal_state",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "14149b6846bca7d679b23c6c99cfa0791edb76feea685687438ee543845ad859",
+      "role": "discovery",
+      "case_id": "v10_case_022",
+      "operating_case_id": "command_transition",
+      "assertion_id": "command_step_peak",
+      "observation_kind": "port",
+      "observation_id": "current_out",
+      "output_id": "current_out"
+    },
+    {
+      "anchor": "157209f00009fa767e04c5803568d61121bce88b615a7857409c81e8ba05c436",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "nominal_loads",
+      "assertion_id": "voltage_output_accuracy",
+      "observation_kind": "port",
+      "observation_id": "voltage_output",
+      "output_id": "voltage_output"
+    },
+    {
+      "anchor": "16de514a3bbf58c84f15b81499042467e50778894d20da87ea560882e5140408",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "edge_range",
+      "assertion_id": "measurement_loading",
+      "observation_kind": "port",
+      "observation_id": "measured_in",
+      "output_id": "measured_in"
+    },
+    {
+      "anchor": "1a804e6a92af6809e023b928fd18c546d0d3aaa590e3ebb6ddb504753166f131",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "nominal_transfer",
+      "assertion_id": "d_output_swing",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "1ba0f3eceea68d525d0d536e5c8ca67828a00b8cf21bb4e9c4e63679906863c7",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "nominal_start",
+      "assertion_id": "status_overshoot",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "1c4eef88da331ca6c13dee35712d8b648978447e1c53558ac207047294fa208e",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "supply_and_temperature_edges",
+      "assertion_id": "d_current_load_regulation",
+      "observation_kind": "port",
+      "observation_id": "current_excitation",
+      "output_id": "current_excitation"
+    },
+    {
+      "anchor": "1cd3b6e8006728cbaa0b60cf3c326bf59e0eec11b7d084679dfabdd15432290b",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "nominal_loading",
+      "assertion_id": "d_current_load_regulation",
+      "observation_kind": "port",
+      "observation_id": "current_excitation",
+      "output_id": "current_excitation"
+    },
+    {
+      "anchor": "1d72f17be5edd310a3bad383663c111c9384eedf8887f34e09a4da52c83d8eb8",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "moderate_level",
+      "assertion_id": "measurement_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "1e3878b4d22cbcf9c29114cfa2128d1744510e13319c1a4676e8fa3571b5c67e",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "high_input_hot_range",
+      "assertion_id": "measurement_line_stability",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "204705161b16903af8c547f4d6ccc6ddefbf256e9b92a5168c189e9f7845c28a",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "nominal_load_range",
+      "assertion_id": "load_range_variation",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "22fb397b9e4195a27d20aeb96144383269fc0dfc904f7eb0bb3356b1a14527ee",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "nominal_energization",
+      "assertion_id": "startup_overshoot_bound",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "23c0c3e5a1f4956d9d62d21b70bbbf23942d0a0dd13e333a0fd4bb682e4511a1",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "primary_noise",
+      "observation_kind": "port",
+      "observation_id": "primary_out",
+      "output_id": "primary_out"
+    },
+    {
+      "anchor": "27112e08de4d5b471f967538a090b7d6694dea4027421ad0ae279564652eced4",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "falling_excursion",
+      "assertion_id": "deasserted_output",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "291b930dc7d249b28202b6ae0b0a4cb61eabe7bde6019f80da8a13cde34dde52",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "normal_load",
+      "assertion_id": "loaded_voltage_gain",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "2ad62e0c4a01a99eed08029df599fc60daca977b60d2fa2ba3a832ec3539a0fe",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "nominal_delivery",
+      "assertion_id": "energy_efficiency",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "3023fb8a28dfa10a2cc9e8ac3405f6aefa5c816e6a564d1af6b9c51f58381d88",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "upper_excursion",
+      "assertion_id": "excursion_state_level",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    },
+    {
+      "anchor": "319272c2329285565f9b7f5a0c6e5ff5eed698d4780a3ffc3d5ad12c2215d4a6",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "nominal_command_response",
+      "assertion_id": "c_output_current_range",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "353e9c777da83da1254849f48a226a3ab43064a547e82d8e00b1498a58b5ac49",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "upper_range_hot",
+      "assertion_id": "primary_gain",
+      "observation_kind": "port",
+      "observation_id": "primary_out",
+      "output_id": "primary_out"
+    },
+    {
+      "anchor": "37b5abbe0dc87997bdeb1b75701fab052bf73cd7fe2cc78b58cef0a26fa1a9a3",
+      "role": "discovery",
+      "case_id": "v10_case_023",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "bounded_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "assembly_temperature",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "386aaf9e876cacaba72609110a856456f2bc9e9521f491568cc5c38ff7828b45",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "supply_temperature_corners",
+      "assertion_id": "voltage_output_corner_bound",
+      "observation_kind": "port",
+      "observation_id": "voltage_output",
+      "output_id": "voltage_output"
+    },
+    {
+      "anchor": "38b503b6a7fecd0c50113e6116cc560bf555677143990fa969d1d6060239e92a",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "nominal_transfer",
+      "assertion_id": "c_signal_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "38c33bd0fbbdf446a8712807dbaebce992693cfc70557beaef5868b6ae616fa7",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "edge_range",
+      "assertion_id": "level_tracking",
+      "observation_kind": "port",
+      "observation_id": "level_out",
+      "output_id": "level_out"
+    },
+    {
+      "anchor": "3a369ffe73fda804308fecced0413315c8c31a33fbcc1bda134603b1dafdce81",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "nominal_loading",
+      "assertion_id": "b_current_excitation_level",
+      "observation_kind": "port",
+      "observation_id": "current_excitation",
+      "output_id": "current_excitation"
+    },
+    {
+      "anchor": "3b47e9a502414046d576e9ace007b4965619ea4c27cc031b3b9c7c253f9a5e0a",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "falling_excursion",
+      "assertion_id": "limit_separation",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "3cc610a70dadcf4c1f5a32a63a98c80576d56f940b76c4be46ad5a7b61b02bef",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "nominal_delivery",
+      "assertion_id": "waveform_distortion",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "3ce81dbed1b0e2e57913e2a4b59fbe1ac12022d72bb4ce037f746437c9c10cb4",
+      "role": "discovery",
+      "case_id": "v10_case_022",
+      "operating_case_id": "command_range",
+      "assertion_id": "command_to_current_ratio",
+      "observation_kind": "port",
+      "observation_id": "current_out",
+      "output_id": "current_out"
+    },
+    {
+      "anchor": "3cf8fa12fe13a8222ce5b9b84bbdab78fd2e923d07804fc0a9ee090c1b950250",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "falling_excursion",
+      "assertion_id": "falling_limit",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "3dfd20d09523d98274f225d57aff74a1e7e3cfa64fd7cf00e3c195afbe03502f",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "supply_load_edges",
+      "assertion_id": "b_command_transconductance",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "3ff7de034f48fb24bb00bdc4a83ddbf0798d5821b1d1c959551ee087cd0f27af",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "hot_full_load_range",
+      "assertion_id": "hot_load_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "bounded_output_assembly",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "4068381c56c9c7d24e2435f3984a84a32fae0ec91764fd48bc1019c1a9aab37a",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "moderate_level",
+      "assertion_id": "measurement_noise",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "435a3ea136996f5456eec4c2fa3d0c70d428a1d55d9f7aa1cf68527197451555",
+      "role": "discovery",
+      "case_id": "v10_case_004",
+      "operating_case_id": "enabled_measurement",
+      "assertion_id": "closed_loop_phase_margin",
+      "observation_kind": "circuit",
+      "observation_id": "measurement_response",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "435d2901e19e1df2529a57b797ff315b37b6c16bd97ad9306408441694b9ecb4",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "upper_range_hot",
+      "assertion_id": "monitor_level",
+      "observation_kind": "port",
+      "observation_id": "monitor_out",
+      "output_id": "monitor_out"
+    },
+    {
+      "anchor": "445d325b4f705efab1f2e06912f80059536c15de17ca75a2f00a4b9132cba630",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "nominal_delivery",
+      "assertion_id": "delivered_power",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "4612bbcd8bc6b3aea311606de05d593ca8cc548412971dd9624ea16fbcc6a409",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "hot_full_load_range",
+      "assertion_id": "bounded_dc_level",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "4696e362dbfe69835825c8f6a3efb6e0af772a5664264a0ef2ae8e8f21f7b071",
+      "role": "discovery",
+      "case_id": "v10_case_022",
+      "operating_case_id": "command_transition",
+      "assertion_id": "command_step_settling",
+      "observation_kind": "port",
+      "observation_id": "current_out",
+      "output_id": "current_out"
+    },
+    {
+      "anchor": "4881a97dab5911833bb8044369fff8556bc51075bba6e01601a4455c2fbec2ef",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "hot_full_load_range",
+      "assertion_id": "supply_range_variation",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "4990fc713d8d471566cd01952860da59b7217d6a8ed3b8e68535d884b002d69f",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "supply_model_corners",
+      "assertion_id": "transfer_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "4e014b75abe150efb7e61eba1462ea04cacfe95c662ae65bc1f1baece24fa87b",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "nominal_loading",
+      "assertion_id": "a_voltage_excitation_level",
+      "observation_kind": "port",
+      "observation_id": "voltage_excitation",
+      "output_id": "voltage_excitation"
+    },
+    {
+      "anchor": "4e0649f09c0d0d884de5db222183847b63fbbd0d4de7c254545ac3bd51f98470",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "bounded_rail_loss",
+      "assertion_id": "unpowered_output_current",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "4f5022e11bc80089f52560d6017a01017fa9789a086b3e44ff50c70972325e02",
+      "role": "discovery",
+      "case_id": "v10_case_004",
+      "operating_case_id": "gate_transition",
+      "assertion_id": "gate_settling_time",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "51f41b3435404da7669dbf3031d3fde22bcfd342f3865a51dbadef571c23a79d",
+      "role": "discovery",
+      "case_id": "v10_case_023",
+      "operating_case_id": "normal_measurement",
+      "assertion_id": "bounded_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "assembly_temperature",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "588099600d2f234dace137ed77120cefe4122f95a0e23b63b0ebc25148967e80",
+      "role": "discovery",
+      "case_id": "v10_case_019",
+      "operating_case_id": "bounded_overrange_step",
+      "assertion_id": "c_overrange_peak_voltage",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "59768afcda9a95d5fd0e195478c378ae5544a8270ba554f67fbd2a5a56ebcdc1",
+      "role": "discovery",
+      "case_id": "v10_case_021",
+      "operating_case_id": "complete_input_sweep",
+      "assertion_id": "low_boundary",
+      "observation_kind": "port",
+      "observation_id": "low_indication",
+      "output_id": "low_indication"
+    },
+    {
+      "anchor": "5c0f679ed8476256372f246de1143e70224dfd6838c1f0165fccc17025ef392e",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "nominal_transfer",
+      "assertion_id": "b_transfer_gain",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "5c290f310eef218943e7fb270bc5176ceebf774f51adf732ba8d0ad722ed3b05",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "supply_and_source_edges",
+      "assertion_id": "c_signal_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "5d19d91f6aa9c111681359e503cdaf1e7bf776ab39417fe61bd687c6561c145d",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "nominal_energization",
+      "assertion_id": "steady_output_band",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "5dad2f23c5a5fe40b7a5c323d435d8edb2e532f8d35311e919493ee1130aecb9",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "upper_range_hot",
+      "assertion_id": "monitor_line_change",
+      "observation_kind": "port",
+      "observation_id": "monitor_out",
+      "output_id": "monitor_out"
+    },
+    {
+      "anchor": "5dfaea008be337eaca4ab5613086d5923d841dd1d01d905ab7476fd515aaf729",
+      "role": "discovery",
+      "case_id": "v10_case_019",
+      "operating_case_id": "bounded_overrange_step",
+      "assertion_id": "d_overrange_settling",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "5dfbe7f2fd9d45dadd4a46dd23c541c82346da76384cf5550aa991e752d50042",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "nominal_delivery",
+      "assertion_id": "delivered_gain",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "5ebbae7cb46bb4b5646bf035987762c7cbf566614e33d812ad71e3234877ac75",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "supply_and_source_edges",
+      "assertion_id": "b_transfer_gain",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "5f9e3165584984f3e729255943602b40c93a24f3036c8b67f40edb77d604996d",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "low_input_range",
+      "assertion_id": "low_state_level",
+      "observation_kind": "port",
+      "observation_id": "state_output",
+      "output_id": "state_output"
+    },
+    {
+      "anchor": "5fb3fb0ed95a59ae581bff99ddb66a727d71232f953ed37953d20b2d70866722",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "supply_and_source_edges",
+      "assertion_id": "a_output_noise",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "61232eef8e91097c6ec3acdba98a3fde453b334a5e2a629dbe71ffe4eb9545b1",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "high_level_hot",
+      "assertion_id": "thermal_limit",
+      "observation_kind": "circuit",
+      "observation_id": "thermal_state",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "631124305710356ce5650f2e45c363ccaf733cd40556708aa128256274f400d2",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "low_rail_loaded_start",
+      "assertion_id": "startup_overshoot_bound",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "63789d50392f18df3e4ca849ee827dfe32c3147ecda0deed75b6985dcdef0f3d",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "nominal_command_response",
+      "assertion_id": "b_command_transconductance",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "656f2d265395a1c87177da7083685eb0f31df98c10517ca6115b572c1bc2cb00",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "high_input_hot_range",
+      "assertion_id": "measurement_tracking",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "65ba82a0549d656cf1470f623fc640b33e5d21b5f2a4b17e5acc23d77272b8b1",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_low_reference",
+      "assertion_id": "settled_selection_response",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "65f4909273d66e862deef03977aced8244e3481ef6158574fa976a8d47419fec",
+      "role": "discovery",
+      "case_id": "v10_case_003",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "fault_safe_area_margin",
+      "observation_kind": "circuit",
+      "observation_id": "fault_operating_margin",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "66936c471f67de16d754ffeebcfecd19c2bb19c01296eaaf624855a08b35623f",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "nominal_range",
+      "assertion_id": "level_tracking",
+      "observation_kind": "port",
+      "observation_id": "level_out",
+      "output_id": "level_out"
+    },
+    {
+      "anchor": "6e09d9c9e7dabaca90ab93cf4aebbd37c5122c396a52f2fd7ce66710952d5bf5",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "finite_output_overload",
+      "assertion_id": "overload_peak_current",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    },
+    {
+      "anchor": "6e6a3c3cba091697726d699e80e79917b7b0ac3c08efb855c4a3b97ab09eeb40",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "edge_range",
+      "assertion_id": "window_upper_boundary",
+      "observation_kind": "port",
+      "observation_id": "window_out",
+      "output_id": "window_out"
+    },
+    {
+      "anchor": "714cfc90d9c57dec9fa79fccf78d911174cf1092d0949071f38d0d77479d7aef",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "nominal_loads",
+      "assertion_id": "current_output_accuracy",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "72f075d7d75e604fbb0e3916fe9b210e6596b00255f23e15474bfddfc1b010cb",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "normal_sweep",
+      "assertion_id": "asserted_level",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "73f3e4499549c63d9d0ab4326ba2e3b0363c1ba603db2411f5deeba8a56fda7f",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "nominal_transfer",
+      "assertion_id": "a_output_noise",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "74654f25dc2f386f8494eaaba701d2d543f3d0cbea86a5bdb289d5e78ed57f2b",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "moderate_level",
+      "assertion_id": "thermal_limit",
+      "observation_kind": "circuit",
+      "observation_id": "thermal_state",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "747584f66ae5ca9dd43466e8f16e5c74e3d5d5138822b8d5172e605a56d07590",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "nominal_loading",
+      "assertion_id": "c_voltage_load_regulation",
+      "observation_kind": "port",
+      "observation_id": "voltage_excitation",
+      "output_id": "voltage_excitation"
+    },
+    {
+      "anchor": "76b096812eb3010979809e326b0ee0f0075ab29c459005c604d1eb56a1c44451",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "nominal_load_range",
+      "assertion_id": "bounded_dc_level",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "76c9757aa1df704857516c10de4ff749e0b2ba912f7ea455cf30f6d68acd33dd",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "nominal_loads",
+      "assertion_id": "input_current_limit",
+      "observation_kind": "port",
+      "observation_id": "supply_input",
+      "output_id": "supply_input"
+    },
+    {
+      "anchor": "777e509337fc40c5902e4b9e652ff014194bf3e37115d00cab8be70fc7433bc0",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "normal_load",
+      "assertion_id": "normal_output_excursion",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "78b2b8bc530b9d6cfa1daeb3bddbf5e9970f10a765b63456cd488c44afe14c2e",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_low_reference",
+      "assertion_id": "reference_tracking",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "7925763e6c61246dd904baae76caaf2b57a5dff7c6ee899c6aef956433196d7a",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "low_rail_loaded_start",
+      "assertion_id": "steady_output_band",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "79edd6fa3b0913b41d115b4bd8dd94d6e792331f89d67da7ab3547d9e3382209",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "normal_sweep",
+      "assertion_id": "falling_trip_level",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "7c6f2522c707fe1318d45f527b3786e8714eeef15d7c6d546c1ec97b52a6de54",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "wide_delivery",
+      "assertion_id": "energy_efficiency",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "7f77c752546bd2d219603cae7046abe6253703987f3c473f4e15eba2e48d3ffe",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_high_reference",
+      "assertion_id": "settled_selection_response",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "8398ce55b6a7b44fd3d5b7b027d4b8473f5526435521e85d4118e9c7b58f05fa",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "wide_delivery",
+      "assertion_id": "waveform_distortion",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "8663f5f269e73117fa4aae81ea069209742542f374b329f3c843398a9153b959",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "low_input_range",
+      "assertion_id": "measurement_tracking",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "868ec80da72610c2d97ddbde346c2c6b825438fa1ec9aacecf8686a476457884",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "nominal_range",
+      "assertion_id": "window_upper_boundary",
+      "observation_kind": "port",
+      "observation_id": "window_out",
+      "output_id": "window_out"
+    },
+    {
+      "anchor": "88bc85ce5afca7f368a574bb77335c36a48589bb597c5983a86cb15cd08e4ee4",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "nominal_load_range",
+      "assertion_id": "integrated_output_noise",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "8942d67b36fdd4c19b9ba96d4c2cadc3883e0ccdba666392e3c18f9cb07e14f4",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "rising_excursion",
+      "assertion_id": "rise_response_time",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "8b03e76dec84eca9371dfb455587fbdc500382ea94e9d08ee457cfdd64f90db3",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "monitor_line_change",
+      "observation_kind": "port",
+      "observation_id": "monitor_out",
+      "output_id": "monitor_out"
+    },
+    {
+      "anchor": "8d1a9643468199746719400ca4ab429ae84db5732132151af7090d2c6fb9b913",
+      "role": "discovery",
+      "case_id": "v10_case_004",
+      "operating_case_id": "enabled_measurement",
+      "assertion_id": "enabled_transfer_accuracy",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "8d1c1225bf1db232dcd385a6a6656394688ab25ead6f1f070bc5ada1dd947067",
+      "role": "discovery",
+      "case_id": "v10_case_021",
+      "operating_case_id": "interior_window",
+      "assertion_id": "high_output_inactive_level",
+      "observation_kind": "port",
+      "observation_id": "high_indication",
+      "output_id": "high_indication"
+    },
+    {
+      "anchor": "8fe80a1b2d37f02d6d181246ebb73607c2cdc217da996a9ba7446654d29e579f",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "fault_peak_limit",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "93439908e0e68eaf9a200f92593470b93a3a1b9a425000e8d32a4bc7aef943dc",
+      "role": "discovery",
+      "case_id": "v10_case_022",
+      "operating_case_id": "command_range",
+      "assertion_id": "bounded_output_current",
+      "observation_kind": "port",
+      "observation_id": "current_out",
+      "output_id": "current_out"
+    },
+    {
+      "anchor": "944187b45ae848e3f1dee62d7c0d2a6f43f27fb823cf8fb29cdf5282fce04bdc",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "nominal_frequency_response",
+      "assertion_id": "output_excursion",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "950b8c6696d362f11c9a8359fcc1606d63ca141c18554c4a654bcdf614cdd828",
+      "role": "discovery",
+      "case_id": "v10_case_023",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "fault_peak_current",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "95e21e76c60700db3ccd1b1079bec4505c5c7fa61b4e9410144294d825931af7",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "supply_load_edges",
+      "assertion_id": "a_command_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "969a171deeadf9901ef9d6957f4ff89e5e379434a613eb5b662ddfbbe28ee690",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "supply_and_temperature_edges",
+      "assertion_id": "b_current_excitation_level",
+      "observation_kind": "port",
+      "observation_id": "current_excitation",
+      "output_id": "current_excitation"
+    },
+    {
+      "anchor": "970e8c688abcc1921e91249f92eefb3c6162a883cdfba01240c2dee4c5bb5df8",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "nominal_start",
+      "assertion_id": "startup_supply_draw",
+      "observation_kind": "port",
+      "observation_id": "status_power_in",
+      "output_id": "status_power_in"
+    },
+    {
+      "anchor": "98ff3b2bc4e5acfebcaa9cf16000882eb0f27dd9c2401fcb8c8227cf16a965bc",
+      "role": "discovery",
+      "case_id": "v10_case_019",
+      "operating_case_id": "bounded_overrange_step",
+      "assertion_id": "a_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "complete_assembly",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "993a586563b7cc4189136a04b3fa2dc790a186dfef14b9bb14c68fc72b29b0bb",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "primary_gain",
+      "observation_kind": "port",
+      "observation_id": "primary_out",
+      "output_id": "primary_out"
+    },
+    {
+      "anchor": "9a654ac84ff1d6ed6f715a27d8d2d850306399ae154db6b94b696c119e4b0d14",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "wide_delivery",
+      "assertion_id": "delivered_power",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "9f71e2cbd6e41e57045c66b5723d4837528c58666fd76d88f346cb4e5c806a2e",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "nominal_range",
+      "assertion_id": "window_lower_boundary",
+      "observation_kind": "port",
+      "observation_id": "window_out",
+      "output_id": "window_out"
+    },
+    {
+      "anchor": "a1447771f11a8902d3ad5f8a1361ffd7e89548291f6eba041656929b593d703e",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "supply_model_corners",
+      "assertion_id": "corner_transfer",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "a14ff4fc588f8ca121084ba6c703d5596473086fd060c14c516f20291d336891",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "upper_excursion",
+      "assertion_id": "upper_transition_point",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    },
+    {
+      "anchor": "a1888d9ab2c6a8025bd8eb1f2be10b7ada41b29b89918c721ba95e96e12f0523",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "nominal_energization",
+      "assertion_id": "startup_settling_bound",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "a3d97845d90da6b126356a86400b4e924a80b77232cb0b738fc1b81ad278b226",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "monitor_level",
+      "observation_kind": "port",
+      "observation_id": "monitor_out",
+      "output_id": "monitor_out"
+    },
+    {
+      "anchor": "a42ac86a5d0f5462bcedf567eb47764f825062fd92987fb258fa0fe0943b479d",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "supply_and_temperature_edges",
+      "assertion_id": "a_voltage_excitation_level",
+      "observation_kind": "port",
+      "observation_id": "voltage_excitation",
+      "output_id": "voltage_excitation"
+    },
+    {
+      "anchor": "a79a82e484755741f96f8a5f6d32ccc23181895df22b986eae7bf218f7613b69",
+      "role": "discovery",
+      "case_id": "v10_case_008",
+      "operating_case_id": "wide_delivery",
+      "assertion_id": "delivered_gain",
+      "observation_kind": "port",
+      "observation_id": "delivered_out",
+      "output_id": "delivered_out"
+    },
+    {
+      "anchor": "aaab5740489494d259cf88b49005c2204478e9c68107c7b67b866c0d60f582fe",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "low_rail_start",
+      "assertion_id": "status_overshoot",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "aaba9dd577f00d0aa91c7033cb4e249035922b87cb099f718cb8703889f40e25",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "thermal_ceiling",
+      "observation_kind": "circuit",
+      "observation_id": "temperature_margin",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "accb3788fbef596fad5f9c81b8d3fda6b3552529db283c7658a2d403781bdadf",
+      "role": "discovery",
+      "case_id": "v10_case_003",
+      "operating_case_id": "asserted_rated_load",
+      "assertion_id": "rated_output_voltage",
+      "observation_kind": "port",
+      "observation_id": "controlled_output",
+      "output_id": "controlled_output"
+    },
+    {
+      "anchor": "b052a1e5aac3744075f05ad4a65ca0ea68759de6c99634fc39ddd55f6e036dc3",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "nominal_load_range",
+      "assertion_id": "supply_range_variation",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "b055e6124d9ef11b96172db4ec01b821d06acde3a2fc9ae95f6b9fe7fdab243a",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "low_rail_loaded_start",
+      "assertion_id": "startup_output_band",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "b458f4f2a948d2e8f056105cb3e5918fe17009fcd598659379f4ff346c3b9520",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_low_reference",
+      "assertion_id": "bounded_output_swing",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "b460915bbd5d7cba2ac939f2a911324292c1e1dc2d4cad23e3255b91dea9fa95",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "supply_load_edges",
+      "assertion_id": "c_output_current_range",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "b57c8ec2ebb32bdb4047902dfacc4854f4ceda464ec9a9ebd9ed584d69a62e55",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "nominal_command_response",
+      "assertion_id": "a_command_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "b71970e5a8a43f2e94b0ffcca783a2573d214e9fddcc95d351d603a5225634e0",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "high_level_hot",
+      "assertion_id": "measurement_ratio",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "b7d24e2712efa77cb702529d3d164861758706086a16847822f8d4c5d768d118",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "supply_temperature_corners",
+      "assertion_id": "current_output_corner_bound",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "b8b7fae123a9c85ff8b3d0d9dc802f7afc5f28b6c4dfce470742b96e099d9bd0",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "high_level_hot",
+      "assertion_id": "waveform_distortion",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "bacbb585f42028bcf307b694c3ad050208e4a462c0f40724eb8151caaceb0841",
+      "role": "discovery",
+      "case_id": "v10_case_001",
+      "operating_case_id": "supply_temperature_corners",
+      "assertion_id": "input_current_limit",
+      "observation_kind": "port",
+      "observation_id": "supply_input",
+      "output_id": "supply_input"
+    },
+    {
+      "anchor": "bbc319cad0e2d57a2f945c9d77639c4ae6eb3a2333688251e20a747022776116",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "nominal_range",
+      "assertion_id": "measurement_loading",
+      "observation_kind": "port",
+      "observation_id": "measured_in",
+      "output_id": "measured_in"
+    },
+    {
+      "anchor": "c2c3d6d57a7c0605712a78821f7407ee71fb29a5de55f0fb99308810bb23b99c",
+      "role": "discovery",
+      "case_id": "v10_case_021",
+      "operating_case_id": "complete_input_sweep",
+      "assertion_id": "high_boundary",
+      "observation_kind": "port",
+      "observation_id": "high_indication",
+      "output_id": "high_indication"
+    },
+    {
+      "anchor": "c5e1fea95be7a05f7d6535c3e41c2e17f7e1bfd50377311cdda703ad62dc946a",
+      "role": "discovery",
+      "case_id": "v10_case_023",
+      "operating_case_id": "normal_measurement",
+      "assertion_id": "static_scaling",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "c618291a26480736bbaa2f34758ab848402efa875315672a003760557a9633bd",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_high_reference",
+      "assertion_id": "closed_response_phase_margin",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "c63706c4a42e64bb6f026b0728520c77023fcd16148085af4daaafbdef11a9a8",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "high_input_hot_range",
+      "assertion_id": "bounded_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "assembly_thermal_response",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "cb05e64d16a0288cd54739e28aab70ef0c14834bd3c9cc183a184c2a9d2814a3",
+      "role": "discovery",
+      "case_id": "v10_case_004",
+      "operating_case_id": "gate_transition",
+      "assertion_id": "gate_output_overshoot",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "cca211285148b05cb3a80caf699ba7b13844cd97877ada654dd0d98616d3ec73",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "falling_excursion",
+      "assertion_id": "fall_response_time",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "cd759a94d21b895e9d7aa0f1d6b8c0ae43c567cc531ea5bde59b997690581465",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "low_input_range",
+      "assertion_id": "bounded_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "assembly_thermal_response",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "d0339b6fae340607c37f6e188bb7e6d90e85ebe129f7ee94a6cdec91c061fca2",
+      "role": "discovery",
+      "case_id": "v10_case_024",
+      "operating_case_id": "nominal_energization",
+      "assertion_id": "startup_output_band",
+      "observation_kind": "port",
+      "observation_id": "regulated_out",
+      "output_id": "regulated_out"
+    },
+    {
+      "anchor": "d15f3c8431839f5bfdb687d991072c167c98f53104795bdd73545b4d99de1504",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "nominal_start",
+      "assertion_id": "valid_status_level",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "d34360dff3616734b2dd5f174a59bdf208a111daaa4625ba0cf4b5a88e936631",
+      "role": "discovery",
+      "case_id": "v10_case_003",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "fault_peak_current",
+      "observation_kind": "port",
+      "observation_id": "controlled_output",
+      "output_id": "controlled_output"
+    },
+    {
+      "anchor": "d72a0f9f2815c82c52154d421ebd9ae153c5eadb6cb44f39750d451f617f1482",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "upper_range_hot",
+      "assertion_id": "primary_line_change",
+      "observation_kind": "port",
+      "observation_id": "primary_out",
+      "output_id": "primary_out"
+    },
+    {
+      "anchor": "d9fd6fe99fde5e45ff2c920219a22e4f5cc2d60cb739f0d0b2b5d7ff42625bd1",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "nominal_frequency_response",
+      "assertion_id": "midband_transfer",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "db0a09094979cc98a509ef5a23784ea53d9c4334d7f0010aa49d3520d4c49f0e",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "normal_sweep",
+      "assertion_id": "deasserted_level",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "db47a37a094ed052d6bda7986d274070fb487fc43fe72496228731811c6aa3a6",
+      "role": "discovery",
+      "case_id": "v10_case_007",
+      "operating_case_id": "normal_load",
+      "assertion_id": "normal_operating_margin",
+      "observation_kind": "circuit",
+      "observation_id": "electrical_margin",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "db7f21c4305fd55b08ae40a3494fa70dd5783d1aa425283965e8aff8b5787021",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "high_level_hot",
+      "assertion_id": "measurement_noise",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "dcba4a02482353a568ccee9bcefb1cb3f8dabeffc2028f8b08680a96f92eab58",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "moderate_level",
+      "assertion_id": "measurement_ratio",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "dd1ce0164cb21d2aa7bea50225fa3dcf929084188f5f0fb8d4cd7309e4895979",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "rising_excursion",
+      "assertion_id": "asserted_output",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "de75e87fe52b582974632cf8878e2ed14b66f52f9647d1effa8f19331b9ece93",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "nominal_frequency_response",
+      "assertion_id": "integrated_output_noise",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "df5e8bf35e5d058a3ad2a76a0fe87d69c4538f367383a7e57bf918c1d207d1b9",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "normal_sweep",
+      "assertion_id": "rising_trip_level",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "dfba6b1863dee7c7a9033a7865c3f3697006c3bfbec38c0c343c633b1dce36f9",
+      "role": "discovery",
+      "case_id": "v10_case_004",
+      "operating_case_id": "enabled_measurement",
+      "assertion_id": "measurement_noise",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "dfcbf08e702f8a2dbdd333461b39b51320eff5cfbf602a11f438f6cc00465b36",
+      "role": "discovery",
+      "case_id": "v10_case_017",
+      "operating_case_id": "supply_and_temperature_edges",
+      "assertion_id": "c_voltage_load_regulation",
+      "observation_kind": "port",
+      "observation_id": "voltage_excitation",
+      "output_id": "voltage_excitation"
+    },
+    {
+      "anchor": "e0f821928894cd3145f02e28e128e36981fc2df7c46ac4a4f9fe7052e96fac46",
+      "role": "discovery",
+      "case_id": "v10_case_019",
+      "operating_case_id": "measurement_range",
+      "assertion_id": "a_assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "complete_assembly",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "e22cc8a283ba0f6e57c79251c7edede127ab41147c70d850fd9ec4742b07cc10",
+      "role": "discovery",
+      "case_id": "v10_case_018",
+      "operating_case_id": "supply_and_source_edges",
+      "assertion_id": "d_output_swing",
+      "observation_kind": "port",
+      "observation_id": "conditioned_output",
+      "output_id": "conditioned_output"
+    },
+    {
+      "anchor": "e2ad612bc54276981e30cb91ead5ace2319c813c91f6e608d90cf56d0464c206",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "bounded_rail_loss",
+      "assertion_id": "rail_loss_deassertion",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "e4c51f4246ed9c98d0c68d771a56465fe526ede2c3efabda1f5cfbb36692abb2",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_low_reference",
+      "assertion_id": "closed_response_phase_margin",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "e63f504fda39b084a6b6a0c4fb7c8af268901565815984efb0e39c6feea9b993",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "primary_line_change",
+      "observation_kind": "port",
+      "observation_id": "primary_out",
+      "output_id": "primary_out"
+    },
+    {
+      "anchor": "e65f7213c1499773bba358337652b25d1c8b744f2ce4503646723968b5b66e0d",
+      "role": "discovery",
+      "case_id": "v10_case_016",
+      "operating_case_id": "rising_excursion",
+      "assertion_id": "rising_limit",
+      "observation_kind": "port",
+      "observation_id": "trip_out",
+      "output_id": "trip_out"
+    },
+    {
+      "anchor": "e6e2fc53406c2007d2383442c2b34db35ae1174f509aeaff8f83390d895f333f",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "nominal_start",
+      "assertion_id": "status_startup_delay",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "e7a1b0e2d8f64c75d9103f83b5f62e903e6a7048632f6733e82576aa98985cdd",
+      "role": "discovery",
+      "case_id": "v10_case_023",
+      "operating_case_id": "normal_measurement",
+      "assertion_id": "normal_output_span",
+      "observation_kind": "port",
+      "observation_id": "signal_out",
+      "output_id": "signal_out"
+    },
+    {
+      "anchor": "e7c5fdd2013ecf8680e7b8e6c9f2cf900c2a9b4559673ddafef31ee6e991fa88",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "low_rail_start",
+      "assertion_id": "low_rail_status_level",
+      "observation_kind": "port",
+      "observation_id": "status_out",
+      "output_id": "status_out"
+    },
+    {
+      "anchor": "e942034442e6ba66c1266d59c6ee1aeb2085057dfee83e6e3d48d77b33998c1c",
+      "role": "discovery",
+      "case_id": "v10_case_002",
+      "operating_case_id": "nominal_frequency_response",
+      "assertion_id": "transfer_bandwidth",
+      "observation_kind": "port",
+      "observation_id": "signal_output",
+      "output_id": "signal_output"
+    },
+    {
+      "anchor": "e98e8d0c60ef29463c4fb81d38959e04b89b0d0cf4e23d74269c927772c26ac7",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_high_reference",
+      "assertion_id": "reference_tracking",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "ea0b0da457313fd679f5f855950dd7962ce3d5d98ea15d122fa0a830df8b8353",
+      "role": "discovery",
+      "case_id": "v10_case_010",
+      "operating_case_id": "active_high_reference",
+      "assertion_id": "bounded_output_swing",
+      "observation_kind": "port",
+      "observation_id": "response_output",
+      "output_id": "response_output"
+    },
+    {
+      "anchor": "eac980bf898fac1fa2c187af09feff90c0d44c59bc48f580e427e3e9f5df9e0b",
+      "role": "discovery",
+      "case_id": "v10_case_003",
+      "operating_case_id": "asserted_rated_load",
+      "assertion_id": "rated_junction_limit",
+      "observation_kind": "circuit",
+      "observation_id": "assembly_temperature",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "eb7838ec1fccabc133ce92a4eee3fa636a8b837ffd066fde5359e0d0abf2bf4c",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "supply_load_edges",
+      "assertion_id": "d_command_settling",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "ebb6defedd5fb095212e7c182ef7e9840e284b09bad998b84dd0b2191030baa5",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "normal_window",
+      "assertion_id": "normal_state_level",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    },
+    {
+      "anchor": "ebb867b4c87e4ea2547551d7166bae0fd5df724a6bb3d867c19fd96a532827d5",
+      "role": "discovery",
+      "case_id": "v10_case_013",
+      "operating_case_id": "midrange",
+      "assertion_id": "assembly_temperature",
+      "observation_kind": "circuit",
+      "observation_id": "thermal_state",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "ec645c231e35388aa1cedac40b6b6f83e308250ac45d54df106b161d730c61ec",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "moderate_level",
+      "assertion_id": "waveform_distortion",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "ee994efbd1e78bd712f6cf871328ce4a2f88bed883e12f20bfaa2d4740c3d695",
+      "role": "discovery",
+      "case_id": "v10_case_020",
+      "operating_case_id": "nominal_command_response",
+      "assertion_id": "d_command_settling",
+      "observation_kind": "port",
+      "observation_id": "current_output",
+      "output_id": "current_output"
+    },
+    {
+      "anchor": "f0087fc40314f68c28f9caa0c3dc9277e1d6997c36417cbf6f60c49d34d34575",
+      "role": "discovery",
+      "case_id": "v10_case_003",
+      "operating_case_id": "bounded_output_fault",
+      "assertion_id": "fault_junction_limit",
+      "observation_kind": "circuit",
+      "observation_id": "fault_temperature",
+      "output_id": "@circuit"
+    },
+    {
+      "anchor": "f145c08f67a1651b1eb921e7bd0399ea2ed0298f69da927ed307e3c3d66bb270",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "high_input_hot_range",
+      "assertion_id": "high_state_level",
+      "observation_kind": "port",
+      "observation_id": "state_output",
+      "output_id": "state_output"
+    },
+    {
+      "anchor": "f397ee6298f8c0ca060249f441e5a8975d500725fb41a0f0fe4f5cfa753b3608",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "hot_full_load_range",
+      "assertion_id": "integrated_output_noise",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "f4e7e6608322a5a3eec6a38d380d662d0430d9565a0369020a3c02c4ea347be5",
+      "role": "discovery",
+      "case_id": "v10_case_005",
+      "operating_case_id": "edge_range",
+      "assertion_id": "window_lower_boundary",
+      "observation_kind": "port",
+      "observation_id": "window_out",
+      "output_id": "window_out"
+    },
+    {
+      "anchor": "f5e51a7fb552642b4ac2b1c61d709dee033247214811f107bd06ca176028aee6",
+      "role": "discovery",
+      "case_id": "v10_case_014",
+      "operating_case_id": "high_level_hot",
+      "assertion_id": "measurement_swing",
+      "observation_kind": "port",
+      "observation_id": "measurement_out",
+      "output_id": "measurement_out"
+    },
+    {
+      "anchor": "f82ab14acb7e673674f424f12811cdf85514ac59c29e93f5737c8906fd9545d0",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "upper_excursion",
+      "assertion_id": "excursion_response_delay",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    },
+    {
+      "anchor": "f87ecd9416cffb3dd71e13f6012623f0850b9e8b56fe901929de651a04c5a7a1",
+      "role": "discovery",
+      "case_id": "v10_case_006",
+      "operating_case_id": "low_rail_start",
+      "assertion_id": "startup_supply_draw",
+      "observation_kind": "port",
+      "observation_id": "status_power_in",
+      "output_id": "status_power_in"
+    },
+    {
+      "anchor": "f8a82f98e69c38d2e1be9d5fbc3aeff3e0eddea97d2d989d6b6a2e833b82fc69",
+      "role": "discovery",
+      "case_id": "v10_case_009",
+      "operating_case_id": "low_input_range",
+      "assertion_id": "measurement_line_stability",
+      "observation_kind": "port",
+      "observation_id": "measurement_output",
+      "output_id": "measurement_output"
+    },
+    {
+      "anchor": "f99bb360779945f342070bd74c81ae19502ad744be3266e4c3ba80715e78ef1e",
+      "role": "discovery",
+      "case_id": "v10_case_012",
+      "operating_case_id": "hot_full_load_range",
+      "assertion_id": "load_range_variation",
+      "observation_kind": "port",
+      "observation_id": "bounded_output",
+      "output_id": "bounded_output"
+    },
+    {
+      "anchor": "faa34b687e592a99bd376270d255da3f36416e03b7c801651c59939838e8d346",
+      "role": "discovery",
+      "case_id": "v10_case_021",
+      "operating_case_id": "interior_window",
+      "assertion_id": "low_output_inactive_level",
+      "observation_kind": "port",
+      "observation_id": "low_indication",
+      "output_id": "low_indication"
+    },
+    {
+      "anchor": "fc1694d121daad59bb47915ed2c260e09b2ff1bb4449521b67becf594b5d229a",
+      "role": "discovery",
+      "case_id": "v10_case_015",
+      "operating_case_id": "normal_sweep",
+      "assertion_id": "threshold_separation",
+      "observation_kind": "port",
+      "observation_id": "control_out",
+      "output_id": "control_out"
+    },
+    {
+      "anchor": "fd63fa4c86d200f17debd8e20ce3978088f7bacbe16faebb9fd71a28c831e85e",
+      "role": "discovery",
+      "case_id": "v10_case_011",
+      "operating_case_id": "normal_window",
+      "assertion_id": "upper_transition_point",
+      "observation_kind": "port",
+      "observation_id": "indication_output",
+      "output_id": "indication_output"
+    }
+  ]
+}

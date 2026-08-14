@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "dual_response_study",
+    "title": "Dual Response Study",
+    "description": "Study of two externally observable responses over bounded input, loading, supply, and temperature conditions."
+  },
+  "requirements": {
+    "domains": [
+      {"id":"signal_ref","kind":"reference","source":"external","min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0,"max_current_a":0.2},
+      {"id":"bias_supply","kind":"supply","source":"external","min_voltage_v":9,"nominal_voltage_v":12,"max_voltage_v":15,"max_current_a":0.2}
+    ],
+    "ports": [
+      {"id":"signal_in","kind":"analog_voltage","direction":"sink","domain":"signal_ref","electrical":{"min_voltage_v":-2,"nominal_voltage_v":0,"max_voltage_v":2,"max_current_a":0.001,"input_impedance_min_ohm":100000}},
+      {"id":"primary_out","kind":"analog_voltage","direction":"source","domain":"signal_ref","electrical":{"min_voltage_v":-5,"nominal_voltage_v":0,"max_voltage_v":5,"max_current_a":0.02}},
+      {"id":"monitor_out","kind":"analog_voltage","direction":"source","domain":"signal_ref","electrical":{"min_voltage_v":0,"nominal_voltage_v":2.5,"max_voltage_v":5,"max_current_a":0.005}},
+      {"id":"supply_in","kind":"power","direction":"sink","domain":"bias_supply","electrical":{"min_voltage_v":9,"nominal_voltage_v":12,"max_voltage_v":15,"max_current_a":0.2}},
+      {"id":"signal_return","kind":"reference","direction":"bidirectional","domain":"signal_ref","electrical":{"min_voltage_v":0,"nominal_voltage_v":0,"max_voltage_v":0,"max_current_a":0.2}}
+    ],
+    "operating_cases": [
+      {
+        "id": "midrange",
+        "conditions": [
+          {"axis":"ambient_temperature","target":"signal_ref","min":-20,"max":70,"unit":"degC"},
+          {"axis":"input_voltage","target":"signal_in","min":-1,"max":1,"unit":"V"},
+          {"axis":"load_resistance","target":"primary_out","min":10000,"max":1000000,"unit":"ohm"},
+          {"axis":"load_resistance","target":"monitor_out","min":50000,"max":1000000,"unit":"ohm"},
+          {"axis":"supply_voltage","target":"bias_supply","min":9,"max":15,"unit":"V"}
+        ]
+      },
+      {
+        "id": "upper_range_hot",
+        "conditions": [
+          {"axis":"ambient_temperature","target":"signal_ref","min":70,"max":85,"unit":"degC"},
+          {"axis":"input_voltage","target":"signal_in","min":1,"max":2,"unit":"V"},
+          {"axis":"load_resistance","target":"primary_out","min":10000,"max":100000,"unit":"ohm"},
+          {"axis":"load_resistance","target":"monitor_out","min":50000,"max":250000,"unit":"ohm"},
+          {"axis":"supply_voltage","target":"bias_supply","min":9,"max":15,"unit":"V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id":"primary_gain","metric":"voltage_gain","analysis":"electrothermal","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"primary_out"},"min":1.95,"max":2.05,"unit":"ratio","operating_cases":["midrange","upper_range_hot"],"critical":true},
+      {"id":"monitor_level","metric":"output_voltage","analysis":"electrothermal","excitation":{"kind":"port","id":"signal_in"},"observation":{"kind":"port","id":"monitor_out"},"min":0.45,"max":4.55,"unit":"V","operating_cases":["midrange","upper_range_hot"],"critical":true},
+      {"id":"assembly_temperature","metric":"junction_temperature","analysis":"electrothermal","observation":{"kind":"circuit","id":"thermal_state"},"max":125,"unit":"degC","operating_cases":["midrange","upper_range_hot"],"critical":true},
+      {"id":"primary_line_change","metric":"line_regulation","analysis":"dc_sweep","excitation":{"kind":"domain","id":"bias_supply"},"observation":{"kind":"port","id":"primary_out"},"max":0.5,"unit":"%","operating_cases":["midrange","upper_range_hot"]},
+      {"id":"monitor_line_change","metric":"line_regulation","analysis":"dc_sweep","excitation":{"kind":"domain","id":"bias_supply"},"observation":{"kind":"port","id":"monitor_out"},"max":0.8,"unit":"%","operating_cases":["midrange","upper_range_hot"]},
+      {"id":"primary_noise","metric":"output_noise_rms","analysis":"noise","observation":{"kind":"port","id":"primary_out"},"max":0.002,"unit":"V_rms","operating_cases":["midrange"]}
+    ],
+    "constraints": {"max_components":24,"max_width_mm":70,"max_height_mm":50}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}
