@@ -36,3 +36,22 @@ linters:
         text: Error return value of `.*\.Close` is not checked
         linters:
           - errcheck
+      # These findings are in checksum-frozen V9/V10 evidence-chain files.
+      # Mutating their bytes would invalidate published corpus and baseline
+      # commitments. Keep the exclusions exact; successor versions must fix
+      # the cleanup paths before their manifests are frozen.
+      - path: (^|.*/)(cmd/kicadai-baseline-publish-v10/main\.go|internal/capabilityadvancementv10/advance\.go|internal/capabilitybaselinepublicationv(9|10)/verify\.go|internal/capabilityexecutorv10/runner\.go|internal/capabilityselectionv10/select\.go)$
+        text: Error return value of `(file|directory|temporary|temp)\.Close` is not checked
+        linters:
+          - errcheck
+      - path: (^|.*/)(internal/capabilityexecutorv10/runner\.go|internal/capabilityselectionv10/select\.go)$
+        text: Error return value of `os\.Remove` is not checked
+        linters:
+          - errcheck
+      # These negative-zero tests are likewise validator-manifest inputs.
+      # Replace the literals with math.Copysign when the validators are next
+      # copied and frozen; do not rewrite the committed V9/V10 evidence chain.
+      - path: (^|.*/)internal/corpusfreezev(9|10)/validator_test\.go$
+        text: "SA4026:"
+        linters:
+          - staticcheck
