@@ -46,10 +46,11 @@ jobs:
 
       # Coverage executes the bounded suite, so keep one instrumented pass here.
       # Makefile maps GO_TEST_TIMEOUT to go test -timeout; frozen end-to-end
-      # promotion corpora run in independent jobs below.
+      # promotion corpora run in independent jobs below. Serialize packages so
+      # the simulation-heavy suites do not starve each other on two-core runners.
       - name: Run bounded test suite and enforce coverage floor
-        timeout-minutes: 45
-        run: make GO_TEST_TIMEOUT=30m COVER_TEST_FLAGS=-short coverage-check
+        timeout-minutes: 60
+        run: make GO_TEST_TIMEOUT=30m COVER_TEST_FLAGS='-short -p=1' coverage-check
 
   offline-promotion:
     name: Offline promotion corpus (${{ matrix.name }})
