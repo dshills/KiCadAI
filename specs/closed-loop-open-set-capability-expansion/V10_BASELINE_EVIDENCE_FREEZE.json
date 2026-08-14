@@ -3,7 +3,7 @@
   "version": 10,
   "freeze_commit_parent": "da0e8c41c5cbdf4fa4b62c5e8c9609e63ca88610",
   "evidence_manifest": "V10_BASELINE_EVIDENCE.sha256",
-  "evidence_manifest_sha256": "781a44a4c35c0f51e12a99f349a131d88df25d2e67250c55bc62e34e7efa30ff",
+  "evidence_manifest_sha256": "28743cfb00432ecf441cdf4bd0c58dd387a1640a3bf557e49ef07d67947c9d2d",
   "discovery_count": 24,
   "mandatory_gate_count": 14,
   "pass_promotion_count": 2,

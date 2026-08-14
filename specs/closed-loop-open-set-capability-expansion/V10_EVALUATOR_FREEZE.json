@@ -3,7 +3,7 @@
   "version": 10,
   "freeze_parent_commit": "cb887a8146d26922a1ebe7e4f3d2cb9ea51faf2c",
   "evaluator_manifest": "V10_EVALUATOR.sha256",
-  "evaluator_manifest_sha256": "34016f92258b5ce583c4961e282a6189ef87df360392313ee7e6c6d476ce5b03",
+  "evaluator_manifest_sha256": "964aac59060a8fffaed1a98a05c1431154d2eaa022c8d743463de2f89994c029",
   "discovery_case_count": 24,
   "replays_per_case": 2,
   "maximum_parallel_cases": 4,

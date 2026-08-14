@@ -120,6 +120,75 @@ func TestRunExecutesFixedParallelCaseBatches(t *testing.T) {
 	}
 }
 
+func TestRunResumesOnlyAuthenticatedCompletedCases(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "resumable")
+	request := testRequest(t, root)
+	first, err := testExecutor(capabilityfeedback.OutcomeUnsupported).Run(
+		context.Background(),
+		request,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var calls atomic.Int64
+	resumeExecutor := testExecutor(capabilityfeedback.OutcomeUnsupported)
+	synthesize := resumeExecutor.synthesize
+	resumeExecutor.synthesize = func(
+		ctx context.Context,
+		requirement opentopologysynthesis.Requirement,
+		inventory opentopologysynthesis.PrimitiveInventory,
+		environment opentopologysynthesis.SimulationEnvironment,
+		policy opentopologysynthesis.Policy,
+	) opentopologysynthesis.SynthesisRun {
+		calls.Add(1)
+		return synthesize(ctx, requirement, inventory, environment, policy)
+	}
+	request.Resume = true
+	resumed, err := resumeExecutor.Run(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 0 || resumed.Hash != first.Hash {
+		t.Fatalf("full resume calls=%d hashes=%s/%s", calls.Load(), resumed.Hash, first.Hash)
+	}
+
+	missingID := "v10_case_007"
+	if err := os.Remove(caseCheckpointPath(root, missingID)); err != nil {
+		t.Fatal(err)
+	}
+	calls.Store(0)
+	partial, err := resumeExecutor.Run(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 2 || partial.Hash != first.Hash {
+		t.Fatalf("partial resume calls=%d hashes=%s/%s", calls.Load(), partial.Hash, first.Hash)
+	}
+
+	checkpoint := caseCheckpointPath(root, "v10_case_001")
+	data, err := os.ReadFile(checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), "v10_case_001", "v10_case_999", 1))
+	if err := os.Chmod(checkpoint, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(checkpoint, data, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(checkpoint, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	calls.Store(0)
+	if _, err := resumeExecutor.Run(context.Background(), request); err == nil ||
+		!strings.Contains(err.Error(), "checkpoint binding or evidence is invalid") ||
+		calls.Load() != 0 {
+		t.Fatalf("tampered resume error=%v calls=%d", err, calls.Load())
+	}
+}
+
 func TestRunRejectsUndiagnosedPhysicalFailure(t *testing.T) {
 	executor := testExecutor(capabilityfeedback.OutcomePass)
 	executor.promote = func(_ context.Context, _ opentopologysynthesis.SynthesisRun, _ opentopologysynthesis.SimulationEnvironment, _ opentopologysynthesis.PhysicalPromotionOptions) opentopologysynthesis.PhysicalPromotionResult {

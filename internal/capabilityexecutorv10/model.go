@@ -15,6 +15,9 @@ import (
 )
 
 const cleanRootSchema = "kicadai.closed-loop-open-set-clean-root.v10"
+const evaluationRootSchema = "kicadai.closed-loop-open-set-evaluation-root.v10"
+const evaluationRootMarkerName = "V10_EVALUATION_ROOT.json"
+const checkpointDirectoryName = "checkpoints"
 const ParallelCaseLimit = 4
 
 type CaseInput struct {
@@ -39,6 +42,7 @@ type Environment struct {
 type Request struct {
 	CorpusManifestSHA256 string
 	OutputRoot           string
+	Resume               bool
 	Cases                []CaseInput
 	Environment          Environment
 }
@@ -78,6 +82,17 @@ type cleanRootMarker struct {
 	RequirementSHA256       string `json:"requirement_sha256"`
 	EnvironmentSHA256       string `json:"environment_sha256"`
 	EvaluatorManifestSHA256 string `json:"evaluator_manifest_sha256"`
+}
+
+type evaluationRootMarker struct {
+	Schema                  string `json:"schema"`
+	Version                 int    `json:"version"`
+	CorpusManifestSHA256    string `json:"corpus_manifest_sha256"`
+	EnvironmentSHA256       string `json:"environment_sha256"`
+	EvaluatorManifestSHA256 string `json:"evaluator_manifest_sha256"`
+	CaseCount               int    `json:"case_count"`
+	ReplaysPerCase          int    `json:"replays_per_case"`
+	ParallelCaseLimit       int    `json:"parallel_case_limit"`
 }
 
 type caseResult struct {

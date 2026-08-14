@@ -76,6 +76,23 @@ func MarshalJSONStable(report Report) ([]byte, error) {
 	return json.MarshalIndent(report, "", "  ")
 }
 
+// ValidateCase verifies and canonicalizes one independently persisted case
+// envelope. It exists so long-running evaluators can checkpoint completed
+// cases without weakening the aggregate Build validation boundary.
+func ValidateCase(record CaseEvidence) (CaseEvidence, error) {
+	return validateCase(record)
+}
+
+// MarshalCaseJSONStable emits one validated case checkpoint using the same
+// canonical evidence hash as the final aggregate report.
+func MarshalCaseJSONStable(record CaseEvidence) ([]byte, error) {
+	validated, err := validateCase(record)
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(validated, "", "  ")
+}
+
 func validateCase(record CaseEvidence) (CaseEvidence, error) {
 	policy := capabilityroundsv10.FrozenPolicy()
 	if record.Schema != CaseEvidenceSchema || record.Version != Version || record.Case.Role != "discovery" ||

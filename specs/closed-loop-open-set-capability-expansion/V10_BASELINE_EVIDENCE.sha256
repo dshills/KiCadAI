@@ -1,5 +1,5 @@
 886ccbd7b63146f64fe6b11400b1e8314297f433d067c60e5230940b8d56728c  ../../internal/capabilitybaselinev10/model.go
-774ace097ecc3c6ebeae26f01c147fa93c411087490889da384eec1b3d99f7cc  ../../internal/capabilitybaselinev10/validate.go
+7ec2c4189a9f14b7f7a3316af16b719fd43253d1d4b14dc4fa38af5a355456c4  ../../internal/capabilitybaselinev10/validate.go
 f716b6ef5b8a77ba9dbab0e5f517bdd07a24abc1b92edd11b81a0dfe07fffef8  ../../internal/capabilitybaselinev10/validate_test.go
 f8144d205e2f733720c6d59012251e6038548ea43160843a1e6f953f77ebc3e8  ../../internal/capabilityroundsv10/rounds.go
 f19a03af2b9d02e93f33bec7b9225004ce22dba235d8f46e8699636dbadb9bff  ../../internal/capabilityroundsv10/rounds_test.go
@@ -12,4 +12,4 @@ b33c230cd66f864d37bcf09d105f22684c182dd930ef59ad2926a44b2d45f08e  ../../internal
 3058631d78e2f2567234d4411d20e2a2d0d95cfbe9ef56d7298dcecdd4a7513a  ../../internal/capabilityroundsv9/select.go
 a1c27c04bca9a82547cf6b71df5f63f6818b42135b3cf9e28014b2ab389072a6  ../../internal/capabilityroundsv9/select_test.go
 4c5ac0dc84b4f1cba04f2ab5de47c969112e6fcd841a43a52425c94af93144ec  V10_BASELINE_EVIDENCE_ENVELOPE.md
-702151f33e6ac6dac5a5313caa6028565fc542ef881dc2dd01054483e790929e  V10_BASELINE_EVIDENCE_REFREEZE.md
+70d9ff579846af989169cfe5afe4d593e6cd2b5fa2e3cd5afd06cfb7afdb88b0  V10_BASELINE_EVIDENCE_REFREEZE.md

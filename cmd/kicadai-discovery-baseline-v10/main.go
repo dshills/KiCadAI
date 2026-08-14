@@ -34,6 +34,7 @@ type options struct {
 	toolchainLock     string
 	timeout           time.Duration
 	keepArtifacts     bool
+	resume            bool
 }
 
 type summary struct {
@@ -65,6 +66,7 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	flags.StringVar(&opts.toolchainLock, "toolchain-lock", "", "locked KiCad promotion toolchain document")
 	flags.DurationVar(&opts.timeout, "timeout", 4*time.Hour, "whole-cohort execution timeout")
 	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", true, "retain installed-KiCad promotion evidence")
+	flags.BoolVar(&opts.resume, "resume", false, "resume authenticated completed-case checkpoints from the working root")
 	if err := flags.Parse(arguments); err != nil {
 		return fmt.Errorf("parse V10 discovery evaluator arguments: %s", strings.TrimSpace(flagDiagnostics.String()))
 	}
@@ -122,7 +124,8 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	}, libraryresolver.LoadOptions{})
 	index.Diagnostics = libraryIssues
 	report, err := capabilityexecutorv10.New().Run(ctx, capabilityexecutorv10.Request{
-		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot, Cases: corpus.Cases,
+		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot,
+		Resume: opts.resume, Cases: corpus.Cases,
 		Environment: capabilityexecutorv10.Environment{
 			Inventory:  inventory,
 			Simulation: opentopologysynthesis.SimulationEnvironment{Catalog: catalog, CatalogHash: catalogHash, ModelRegistry: models},

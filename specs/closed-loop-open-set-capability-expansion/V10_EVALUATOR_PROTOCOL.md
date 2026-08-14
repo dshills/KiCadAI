@@ -1,8 +1,9 @@
 # V10 Production Discovery Evaluator Protocol
 
 Status: production evaluator implemented and corpus-independent tests passing.
-No real V10 requirement has been synthesized and no held-out key or plaintext
-has been opened by this implementation phase.
+Public V10 execution has begun; no incomplete attempt has been accepted as a
+baseline, and no held-out key or plaintext has been opened by the public
+evaluator.
 
 `kicadai-discovery-baseline-v10` is the sole generation-zero public evaluator.
 It requires a clean committed repository, an independently authenticated V10
@@ -39,6 +40,20 @@ requirement, case, replay slot, environment, and evaluator. Full synthesis
 evidence must be byte-identical. Invalid, canceled, timed-out, or drifting
 execution aborts the cohort without publishing a baseline.
 
+Long-running public evaluation may be resumed explicitly with `--resume` from
+the same working root. The initial invocation creates a read-only root
+commitment binding the corpus, environment, evaluator, case count, replay
+count, and parallelism. A case checkpoint is installed atomically and without
+replacement only after both synthesis replays, any required physical
+promotions, observation, gates, and canonical case validation complete.
+Resume strictly authenticates the root commitment, every checkpoint's
+canonical evidence hash and bindings, and both read-only replay-root
+commitments. Completed cases are never rerun; a case directory without a valid
+checkpoint is treated as interrupted scratch state, removed, and rerun from
+two clean roots. Unknown files, malformed or changed evidence, binding drift,
+or checkpoint tampering fail closed. Only a complete 24-case rebuild may
+produce the aggregate report.
+
 Every synthesis pass executes physical promotion once from each outer replay
 root. Each promotion itself performs the production two-run clean-root KiCad
 workflow. The two outer promotion hashes, statuses, and project hashes must
@@ -67,3 +82,7 @@ go run ./cmd/kicadai-discovery-baseline-v10 \
   --working-root /private/tmp/kicadai-v10-generation-zero \
   --report /private/tmp/kicadai-v10-generation-zero-report.json
 ```
+
+After an intentional bounded invocation ends before completion, repeat the
+same command with `--resume`; all corpus, evaluator, environment, working-root,
+and report-path bindings must remain identical.

@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -34,15 +36,31 @@ func (executor Executor) Run(ctx context.Context, request Request) (capabilityba
 	if !digestPattern.MatchString(request.CorpusManifestSHA256) || len(request.Cases) != 24 {
 		return capabilitybaselinev10.Report{}, fmt.Errorf("V10 corpus binding or discovery cohort is invalid")
 	}
-	if err := prepareOutputRoot(request.OutputRoot); err != nil {
-		return capabilitybaselinev10.Report{}, err
-	}
-	records := make([]capabilitybaselinev10.CaseEvidence, len(request.Cases))
 	for index, input := range request.Cases {
 		wantID := fmt.Sprintf("v10_case_%03d", index+1)
 		if input.Entry.ID != wantID {
 			return capabilitybaselinev10.Report{}, fmt.Errorf("V10 case order differs at %d", index)
 		}
+	}
+	rootMarker := evaluationRootMarker{
+		Schema: evaluationRootSchema, Version: 10,
+		CorpusManifestSHA256:    request.CorpusManifestSHA256,
+		EnvironmentSHA256:       environmentSHA256,
+		EvaluatorManifestSHA256: request.Environment.EvaluatorManifestSHA256,
+		CaseCount:               len(request.Cases), ReplaysPerCase: 2,
+		ParallelCaseLimit: ParallelCaseLimit,
+	}
+	if err := prepareOutputRoot(request.OutputRoot, request.Resume, rootMarker); err != nil {
+		return capabilitybaselinev10.Report{}, err
+	}
+	records, completed, err := loadCaseCheckpoints(
+		request.OutputRoot,
+		request.Cases,
+		rootMarker,
+		request.Resume,
+	)
+	if err != nil {
+		return capabilitybaselinev10.Report{}, err
 	}
 	errorsByIndex := make([]error, len(request.Cases))
 	jobs := make(chan int, ParallelCaseLimit)
@@ -57,11 +75,18 @@ func (executor Executor) Run(ctx context.Context, request Request) (capabilityba
 					errorsByIndex[index] = runErr
 					continue
 				}
+				if runErr = persistCaseCheckpoint(request.OutputRoot, result.evidence); runErr != nil {
+					errorsByIndex[index] = runErr
+					continue
+				}
 				records[index] = result.evidence
 			}
 		}()
 	}
 	for index := range request.Cases {
+		if completed[index] {
+			continue
+		}
 		jobs <- index
 	}
 	close(jobs)
@@ -244,18 +269,278 @@ func validateEntry(input CaseInput) error {
 	return nil
 }
 
-func prepareOutputRoot(root string) error {
+func prepareOutputRoot(
+	root string,
+	resume bool,
+	marker evaluationRootMarker,
+) error {
 	if strings.TrimSpace(root) == "" {
 		return fmt.Errorf("V10 evaluator output root is required")
 	}
 	clean := filepath.Clean(root)
+	if resume {
+		info, err := os.Lstat(clean)
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("resume V10 evaluator output root: not a real directory")
+		}
+		checkpointInfo, err := os.Lstat(filepath.Join(clean, checkpointDirectoryName))
+		if err != nil || !checkpointInfo.IsDir() || checkpointInfo.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("resume V10 evaluator checkpoint root: not a real directory")
+		}
+		data, err := readBoundedRegularFile(
+			filepath.Join(clean, evaluationRootMarkerName),
+			64*1024,
+		)
+		if err != nil {
+			return fmt.Errorf("resume V10 evaluator root commitment: %w", err)
+		}
+		var actual evaluationRootMarker
+		if err := decodeStrictJSON(data, &actual); err != nil || !reflect.DeepEqual(actual, marker) {
+			return fmt.Errorf("resume V10 evaluator root commitment differs")
+		}
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(clean), 0o755); err != nil {
 		return err
 	}
 	if err := os.Mkdir(clean, 0o755); err != nil {
 		return fmt.Errorf("create fresh V10 evaluator output root: %w", err)
 	}
+	if err := os.Mkdir(filepath.Join(clean, checkpointDirectoryName), 0o755); err != nil {
+		return fmt.Errorf("create V10 evaluator checkpoint root: %w", err)
+	}
+	data, err := json.Marshal(marker)
+	if err != nil {
+		return err
+	}
+	return writeNewReadOnlyFile(filepath.Join(clean, evaluationRootMarkerName), data)
+}
+
+func loadCaseCheckpoints(
+	root string,
+	cases []CaseInput,
+	marker evaluationRootMarker,
+	resume bool,
+) ([]capabilitybaselinev10.CaseEvidence, []bool, error) {
+	records := make([]capabilitybaselinev10.CaseEvidence, len(cases))
+	completed := make([]bool, len(cases))
+	if !resume {
+		return records, completed, nil
+	}
+	checkpointRoot := filepath.Join(root, checkpointDirectoryName)
+	entries, err := os.ReadDir(checkpointRoot)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read V10 evaluator checkpoints: %w", err)
+	}
+	allowed := make(map[string]bool, len(cases))
+	for _, input := range cases {
+		allowed[input.Entry.ID+".json"] = true
+	}
+	for _, entry := range entries {
+		if allowed[entry.Name()] {
+			continue
+		}
+		path := filepath.Join(checkpointRoot, entry.Name())
+		if strings.HasPrefix(entry.Name(), ".v10-checkpoint-") &&
+			entry.Type().IsRegular() {
+			if err := os.Remove(path); err != nil {
+				return nil, nil, fmt.Errorf("remove incomplete V10 checkpoint: %w", err)
+			}
+			continue
+		}
+		return nil, nil, fmt.Errorf("unexpected V10 evaluator checkpoint entry %q", entry.Name())
+	}
+	for index, input := range cases {
+		path := caseCheckpointPath(root, input.Entry.ID)
+		data, err := readBoundedRegularFile(path, 16*1024*1024)
+		if errors.Is(err, os.ErrNotExist) {
+			if err := os.RemoveAll(filepath.Join(root, input.Entry.ID)); err != nil {
+				return nil, nil, fmt.Errorf("remove incomplete V10 case root: %w", err)
+			}
+			continue
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("read %s checkpoint: %w", input.Entry.ID, err)
+		}
+		var record capabilitybaselinev10.CaseEvidence
+		if err := decodeStrictJSON(data, &record); err != nil {
+			return nil, nil, fmt.Errorf("decode %s checkpoint: %w", input.Entry.ID, err)
+		}
+		validated, err := capabilitybaselinev10.ValidateCase(record)
+		if err != nil || !reflect.DeepEqual(record, validated) ||
+			record.Case.ID != input.Entry.ID ||
+			record.RequirementSHA256 != input.Entry.RequirementSHA256 ||
+			record.EnvironmentSHA256 != marker.EnvironmentSHA256 ||
+			record.EvaluatorManifestSHA256 != marker.EvaluatorManifestSHA256 {
+			return nil, nil, fmt.Errorf("%s checkpoint binding or evidence is invalid", input.Entry.ID)
+		}
+		if err := validateCheckpointRoots(root, input, marker, record); err != nil {
+			return nil, nil, err
+		}
+		records[index] = validated
+		completed[index] = true
+	}
+	return records, completed, nil
+}
+
+func validateCheckpointRoots(
+	root string,
+	input CaseInput,
+	marker evaluationRootMarker,
+	record capabilitybaselinev10.CaseEvidence,
+) error {
+	for replay := 1; replay <= 2; replay++ {
+		path := filepath.Join(
+			root,
+			input.Entry.ID,
+			fmt.Sprintf("replay-%d", replay),
+			"CLEAN_ROOT.json",
+		)
+		data, err := readBoundedRegularFile(path, 64*1024)
+		if err != nil || hashBytes(data) != record.ReplayRootSHA256[replay-1] {
+			return fmt.Errorf("%s replay %d checkpoint root is invalid", input.Entry.ID, replay)
+		}
+		var actual cleanRootMarker
+		if err := decodeStrictJSON(data, &actual); err != nil {
+			return fmt.Errorf("%s replay %d checkpoint root is malformed", input.Entry.ID, replay)
+		}
+		expected := cleanRootMarker{
+			Schema: cleanRootSchema, Version: 10,
+			CaseID: input.Entry.ID, Replay: replay,
+			CorpusManifestSHA256:    marker.CorpusManifestSHA256,
+			RequirementSHA256:       input.Entry.RequirementSHA256,
+			EnvironmentSHA256:       marker.EnvironmentSHA256,
+			EvaluatorManifestSHA256: marker.EvaluatorManifestSHA256,
+		}
+		if !reflect.DeepEqual(actual, expected) {
+			return fmt.Errorf("%s replay %d checkpoint root binding differs", input.Entry.ID, replay)
+		}
+	}
 	return nil
+}
+
+func persistCaseCheckpoint(
+	root string,
+	record capabilitybaselinev10.CaseEvidence,
+) error {
+	data, err := capabilitybaselinev10.MarshalCaseJSONStable(record)
+	if err != nil {
+		return fmt.Errorf("validate %s checkpoint: %w", record.Case.ID, err)
+	}
+	data = append(data, '\n')
+	if err := writeAtomicReadOnlyNoReplace(caseCheckpointPath(root, record.Case.ID), data); err != nil {
+		return fmt.Errorf("persist %s checkpoint: %w", record.Case.ID, err)
+	}
+	return nil
+}
+
+func caseCheckpointPath(root string, caseID string) string {
+	return filepath.Join(root, checkpointDirectoryName, caseID+".json")
+}
+
+func writeNewReadOnlyFile(path string, data []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o444)
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write(data)
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if syncErr != nil {
+		return syncErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	directory, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
+}
+
+func writeAtomicReadOnlyNoReplace(path string, data []byte) error {
+	if _, err := os.Lstat(path); err == nil {
+		return fmt.Errorf("checkpoint already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	parent := filepath.Dir(path)
+	temporary, err := os.CreateTemp(parent, ".v10-checkpoint-")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if _, err := temporary.Write(data); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return err
+	}
+	writtenInfo, err := temporary.Stat()
+	if err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(temporaryPath, 0o444); err != nil {
+		return err
+	}
+	sealedInfo, err := os.Lstat(temporaryPath)
+	if err != nil || !sealedInfo.Mode().IsRegular() ||
+		sealedInfo.Mode().Perm() != 0o444 || !os.SameFile(writtenInfo, sealedInfo) {
+		return fmt.Errorf("checkpoint temporary file changed before installation")
+	}
+	if err := os.Link(temporaryPath, path); err != nil {
+		return err
+	}
+	installedInfo, err := os.Lstat(path)
+	if err != nil || !installedInfo.Mode().IsRegular() ||
+		installedInfo.Mode().Perm() != 0o444 || !os.SameFile(sealedInfo, installedInfo) {
+		return fmt.Errorf("checkpoint changed during installation")
+	}
+	directory, err := os.Open(parent)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
+}
+
+func readBoundedRegularFile(path string, limit int64) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o444 || info.Size() > limit {
+		return nil, fmt.Errorf("not a bounded regular file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+		return nil, fmt.Errorf("file changed while opening")
+	}
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("file exceeds size bound")
+	}
+	return data, nil
 }
 
 func prepareCleanRoot(root string, marker cleanRootMarker) (string, error) {
