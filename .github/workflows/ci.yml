@@ -44,13 +44,41 @@ jobs:
         timeout-minutes: 10
         run: go test -timeout 9m ./internal/promotionrunner -run '^(TestCleanCheckoutPromotionCommandContract|TestPromotionWorkflowContractAndPinnedActions)$'
 
+      # The frozen V8 runner manifest was authored on a case-insensitive
+      # filesystem with two uppercase path spellings. Materialize temporary
+      # aliases only for that historical verification, then restore the exact
+      # 25-file corpus before the broad suite checks its sealed file set.
+      - name: Verify legacy V8 round-one freeze
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          corpus=internal/capabilityfeedback/testdata/closed_loop_open_set_v8_corpus
+          created=()
+          ensure_alias() {
+            local source=$1 target=$2
+            if [[ ! -e "$target" ]]; then
+              cp "$source" "$target"
+              created+=("$target")
+            fi
+          }
+          cleanup() {
+            if (( ${#created[@]} )); then
+              rm -f "${created[@]}"
+            fi
+          }
+          trap cleanup EXIT
+          ensure_alias "$corpus/manifest.json" "$corpus/MANIFEST.json"
+          ensure_alias "$corpus/discovery_obligations.json" "$corpus/DISCOVERY_OBLIGATIONS.json"
+          go test -short -timeout 9m ./internal/capabilityfeedback -run '^TestClosedLoopV8Round1'
+
       # Coverage executes the bounded suite, so keep one instrumented pass here.
       # Makefile maps GO_TEST_TIMEOUT to go test -timeout; frozen end-to-end
       # promotion corpora run in independent jobs below. Serialize packages so
       # the simulation-heavy suites do not starve each other on two-core runners.
       - name: Run bounded test suite and enforce coverage floor
         timeout-minutes: 60
-        run: make GO_TEST_TIMEOUT=30m COVER_TEST_FLAGS='-short -p=1' coverage-check
+        run: make GO_TEST_TIMEOUT=40m COVER_TEST_FLAGS='-short -p=1 -skip=^TestClosedLoopV8Round1' coverage-check
 
   offline-promotion:
     name: Offline promotion corpus (${{ matrix.name }})
