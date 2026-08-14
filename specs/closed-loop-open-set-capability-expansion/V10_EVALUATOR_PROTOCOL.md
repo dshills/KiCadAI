@@ -24,6 +24,13 @@ content-addressed toolchain/library environment without host-specific paths.
 Policy drift, registry drift, missing libraries, or an inconsistent catalog is
 an evaluator error rather than a circuit capability outcome.
 
+Installed-library diagnostics are scoped deterministically to each synthesized
+design's resolved closure before physical promotion. Diagnostics for selected
+symbols, inherited bases, footprints, pins, or pads remain blocking and produce
+a stable physical nonpass. Diagnostics for unrelated installed-library records
+remain available to explicit library audits, but do not invalidate every case
+in the cohort.
+
 Cases execute through a fixed four-worker queue, with at most four cases
 running concurrently and evidence retained in manifest order. Every case executes
 exactly twice sequentially within its worker. Each replay receives a new

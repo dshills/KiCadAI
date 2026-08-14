@@ -120,9 +120,7 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	index, libraryIssues := libraryresolver.Load(ctx, libraryresolver.LibraryRoots{
 		SymbolsRoot: toolEvidence.SymbolsRoot, FootprintsRoot: toolEvidence.FootprintsRoot,
 	}, libraryresolver.LoadOptions{})
-	if reports.HasBlockingIssue(libraryIssues) {
-		return fmt.Errorf("load locked KiCad libraries: blocking library evidence")
-	}
+	index.Diagnostics = libraryIssues
 	report, err := capabilityexecutorv10.New().Run(ctx, capabilityexecutorv10.Request{
 		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot, Cases: corpus.Cases,
 		Environment: capabilityexecutorv10.Environment{

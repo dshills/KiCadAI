@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
@@ -36,6 +38,80 @@ func TestPhysicalPromotionRejectsUnprovenSynthesis(t *testing.T) {
 		first.Hash != second.Hash {
 		t.Fatalf("unproven physical promotion = %#v", first)
 	}
+}
+
+func TestPhysicalPromotionScopesInstalledLibraryDiagnosticsToSelectedDesign(t *testing.T) {
+	selectedSymbolPath := "/symbols/Device.kicad_sym"
+	index := libraryresolver.LibraryIndex{
+		Symbols: map[string]libraryresolver.SymbolRecord{
+			"Device:R": {
+				LibraryID: "Device:R", Path: selectedSymbolPath,
+			},
+			"Converter_DCDC:Broken": {
+				LibraryID: "Converter_DCDC:Broken",
+				Path:      "/symbols/Converter_DCDC.kicad_sym",
+			},
+		},
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Resistor_SMD:R_0603_1608Metric": {
+				FootprintID: "Resistor_SMD:R_0603_1608Metric",
+				Path:        "/footprints/Resistor_SMD.pretty/R_0603_1608Metric.kicad_mod",
+			},
+		},
+		Diagnostics: []reports.Issue{{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+			Path: "library.symbol.Converter_DCDC:Broken", Message: "unrelated symbol defect",
+		}},
+	}
+	run := physicalPromotionLibraryClosureTestRun()
+	scoped, issues := physicalPromotionLibraryIndex(run, index)
+	if len(issues) != 0 || len(scoped.Diagnostics) != 0 {
+		t.Fatalf("unrelated diagnostics blocked selected design: %#v", issues)
+	}
+
+	index.Diagnostics = append(index.Diagnostics, reports.Issue{
+		Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning,
+		Path: selectedSymbolPath, Message: "selected symbol defect",
+	})
+	scoped, issues = physicalPromotionLibraryIndex(run, index)
+	if len(issues) != 1 || !issues[0].Blocking() || len(scoped.Diagnostics) != 1 {
+		t.Fatalf("selected diagnostics did not fail closed: %#v", issues)
+	}
+
+	catalog := &components.Catalog{}
+	run.Report = Report{
+		Status: StatusPassed, Selected: &SelectedResult{}, RequirementHash: "requirement",
+		PrimitiveInventoryHash: "inventory", CatalogHash: "catalog",
+	}
+	run.SelectedGraph = &CandidateGraph{}
+	run.Hash = "synthesis"
+	promotion := PromoteSynthesisRun(
+		context.Background(),
+		run,
+		SimulationEnvironment{Catalog: catalog, CatalogHash: "catalog"},
+		PhysicalPromotionOptions{
+			OutputRoot: t.TempDir(), KiCadCLI: "unused", LibraryIndex: &index,
+		},
+	)
+	if promotion.Status != PhysicalPromotionFailed || len(promotion.Issues) != 1 ||
+		!promotion.Issues[0].Blocking() || len(promotion.Runs) != 0 {
+		t.Fatalf("selected library defect promotion = %#v", promotion)
+	}
+}
+
+func physicalPromotionLibraryClosureTestRun() SynthesisRun {
+	return SynthesisRun{Physical: &PhysicalLoweringResult{
+		Status: PhysicalLoweringReady, Hash: "physical",
+		Resolved: circuitgraph.ResolvedDocument{Components: []circuitgraph.ResolvedComponent{{
+			ComponentID: "resistor", VariantID: "0603", SymbolID: "Device:R",
+			FootprintID: "Resistor_SMD:R_0603_1608Metric",
+			Units:       []circuitgraph.ResolvedUnit{{Unit: 1, SymbolID: "Device:R"}},
+			Functions: []circuitgraph.ResolvedFunction{
+				{SymbolID: "Device:R", Unit: 1, SymbolPin: "1", Pad: "1"},
+				{SymbolID: "Device:R", Unit: 1, SymbolPin: "2", Pad: "2"},
+			},
+		}}},
+	}}
 }
 
 func TestPhysicalPromotionWorkflowIssuesIgnoreInformationalChecks(t *testing.T) {

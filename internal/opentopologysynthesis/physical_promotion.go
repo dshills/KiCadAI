@@ -88,6 +88,15 @@ func PromoteSynthesisRun(
 		)}
 		return finalizePhysicalPromotion(result)
 	}
+	scopedLibraryIndex, libraryIssues := physicalPromotionLibraryIndex(
+		run,
+		*opts.LibraryIndex,
+	)
+	if reports.HasBlockingIssue(libraryIssues) {
+		result.Status = PhysicalPromotionFailed
+		result.Issues = libraryIssues
+		return finalizePhysicalPromotion(result)
+	}
 	if err := preparePhysicalPromotionRoot(opts.OutputRoot); err != nil {
 		result.Issues = []reports.Issue{physicalPromotionIssue(
 			"options.output_root",
@@ -127,7 +136,7 @@ func PromoteSynthesisRun(
 				run.Report.RequirementHash,
 				opts.KiCadCLI,
 				environment,
-				*opts.LibraryIndex,
+				scopedLibraryIndex,
 				timeout,
 				opts.KeepArtifacts,
 				opts.Overwrite,
@@ -177,6 +186,48 @@ func PromoteSynthesisRun(
 	result.ProjectHash = result.Runs[0].ProjectHash
 	result.Status = PhysicalPromotionPassed
 	return finalizePhysicalPromotion(result)
+}
+
+// physicalPromotionLibraryIndex limits installed-library diagnostics to the
+// exact symbols, inherited bases, footprints, pins, and pads selected by the
+// simulation-proven physical design. Unrelated library records remain part of
+// explicit library audits, but cannot decide whether this design is promotable.
+func physicalPromotionLibraryIndex(
+	run SynthesisRun,
+	index libraryresolver.LibraryIndex,
+) (libraryresolver.LibraryIndex, []reports.Issue) {
+	request := libraryresolver.ClosureRequest{}
+	for _, component := range run.Physical.Resolved.Components {
+		symbol := libraryresolver.SymbolReference{LibraryID: component.SymbolID}
+		for _, unit := range component.Units {
+			symbol.Units = append(symbol.Units, unit.Unit)
+		}
+		footprint := libraryresolver.FootprintReference{
+			LibraryID: component.FootprintID,
+		}
+		for _, function := range component.Functions {
+			symbol.Pins = append(symbol.Pins, function.SymbolPin)
+			footprint.Pads = append(footprint.Pads, function.Pad)
+		}
+		request.Symbols = append(request.Symbols, symbol)
+		request.Footprints = append(request.Footprints, footprint)
+		request.Variants = append(
+			request.Variants,
+			libraryresolver.VariantReference{
+				ComponentID: component.ComponentID,
+				VariantID:   component.VariantID,
+				FootprintID: component.FootprintID,
+			},
+		)
+	}
+	closure, issues := libraryresolver.ResolveDesignClosure(index, request)
+	issues = append(
+		issues,
+		libraryresolver.DesignClosureIssuesFrom(index.Diagnostics, closure)...,
+	)
+	issues = reports.SortedIssues(issues)
+	index.Diagnostics = issues
+	return index, issues
 }
 
 func preparePhysicalPromotionRoot(root string) error {
