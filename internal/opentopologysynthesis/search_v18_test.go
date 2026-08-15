@@ -251,6 +251,30 @@ func TestSynthesizeV18DelegatesNoneligibleRequirementByteForByte(t *testing.T) {
 	}
 }
 
+func TestSynthesizeV18WithLegacyIsolatesExtensionForNoneligibleRequirement(t *testing.T) {
+	requirement := testV18Case005(t)
+	requirement.Requirements.BehavioralRequirements = requirement.Requirements.BehavioralRequirements[:1]
+	requirement.Version = 0
+	extensionInventory, extensionEnvironment := testV18SynthesisEnvironment(t)
+	legacyInventory, legacyEnvironment := testLegacySynthesisEnvironmentV18(t)
+	if extensionInventory.Hash == legacyInventory.Hash {
+		t.Fatal("V18 extension inventory unexpectedly matches the immutable legacy inventory")
+	}
+	want := SynthesizeV17(context.Background(), requirement, legacyInventory, legacyEnvironment, DefaultPolicy())
+	got := SynthesizeV18WithLegacy(
+		context.Background(),
+		requirement,
+		extensionInventory,
+		extensionEnvironment,
+		legacyInventory,
+		legacyEnvironment,
+		DefaultPolicy(),
+	)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("V18 legacy-isolated delegation differs: got=%#v want=%#v", got, want)
+	}
+}
+
 func testV18Case005(t *testing.T) Requirement {
 	t.Helper()
 	data := mustRead(t, filepath.Join("..", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus", "discovery", "v10_case_005.json"))
@@ -275,6 +299,24 @@ func testV18SynthesisEnvironment(t *testing.T) (PrimitiveInventory, SimulationEn
 	inventory, issues := BuildPrimitiveInventory(catalog, catalogHash, registry)
 	if len(issues) != 0 {
 		t.Fatalf("V18 primitive inventory issues: %#v", issues)
+	}
+	return inventory, SimulationEnvironment{Catalog: catalog, CatalogHash: catalogHash, ModelRegistry: registry}
+}
+
+func testLegacySynthesisEnvironmentV18(t *testing.T) (PrimitiveInventory, SimulationEnvironment) {
+	t.Helper()
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		t.Fatalf("legacy model provenance diagnostics: %#v", diagnostics)
+	}
+	catalogHash := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog}).CatalogHash()
+	inventory, issues := BuildPrimitiveInventory(catalog, catalogHash, registry)
+	if len(issues) != 0 {
+		t.Fatalf("legacy primitive inventory issues: %#v", issues)
 	}
 	return inventory, SimulationEnvironment{Catalog: catalog, CatalogHash: catalogHash, ModelRegistry: registry}
 }

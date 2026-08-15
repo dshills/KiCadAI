@@ -13,9 +13,34 @@ func SynthesizeV18(
 	environment SimulationEnvironment,
 	policy Policy,
 ) SynthesisRun {
+	return SynthesizeV18WithLegacy(
+		ctx,
+		requirement,
+		inventory,
+		environment,
+		inventory,
+		environment,
+		policy,
+	)
+}
+
+// SynthesizeV18WithLegacy keeps the extension inputs separate from the exact
+// historical inputs used by V17. Requirements outside the bounded extension
+// therefore preserve the historical result even when the V18 catalog contains
+// additional reviewed primitives. Eligible requirements use the extension and
+// fall back only to the same historical V17 environment.
+func SynthesizeV18WithLegacy(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	environment SimulationEnvironment,
+	legacyInventory PrimitiveInventory,
+	legacySimulation SimulationEnvironment,
+	policy Policy,
+) SynthesisRun {
 	requirement = Normalize(requirement)
 	if !v18RequiresThresholdExtension(requirement) {
-		return SynthesizeV17(ctx, requirement, inventory, environment, policy)
+		return SynthesizeV17(ctx, requirement, legacyInventory, legacySimulation, policy)
 	}
 	run := synthesizeThresholdExtensionV18(ctx, requirement, inventory, environment, policy)
 	if run.Report.Status == StatusPassed || ctx.Err() != nil {
@@ -23,7 +48,7 @@ func SynthesizeV18(
 	}
 	// An eligible requirement may still be covered by a legacy architecture.
 	// Preserve that result rather than turning a V17 pass into a V18 regression.
-	legacy := SynthesizeV17(ctx, requirement, inventory, environment, policy)
+	legacy := SynthesizeV17(ctx, requirement, legacyInventory, legacySimulation, policy)
 	if legacy.Report.Status == StatusPassed {
 		return legacy
 	}

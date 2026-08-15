@@ -1,10 +1,10 @@
 45ed79bb04be93a19aa7d71a0ddf158bc58f60b480c6b8c0806de7a9c23ea3a9  ../../catalog_assets.go
-8e5cb8658dfc6dccf752b6a31a23bba804d99b9ce17c093a07a395f89f3c8a5e  ../../cmd/kicadai-discovery-baseline-v18/main.go
+509923da6e54bea3abd8a10794f302fe1f9e49518968744baab4355101865b18  ../../cmd/kicadai-discovery-baseline-v18/main.go
 baac07c76fdcf11fb6bb67b2466b89aadfe169eaee70d9addade50ed21a5690b  ../../cmd/kicadai-discovery-baseline-v18/main_test.go
 83e61778d01075e99bd74b8bb773fb2da703bcda68c6c7d9f881e96de4edcbea  ../../data/components-v18/low_voltage_analog.json
 aa6a132db0293cb640d8c817d230e3f5dc4cb32571913d3faac7a9419b825eb2  ../../data/model-provenance/v18-extension.json
-3ebfe79bd95ffc9443ec9ebfe93659ce87eb3622343c427b7e5f24a559d9688a  ../../internal/capabilityexecutorv10/v18_executor.go
-275bb760b354b3791e717d73d65571c9332cb8dd9c6c69096f39b2b032ac0d7a  ../../internal/capabilityexecutorv10/v18_executor_test.go
+85170463609c24f253f3222c2b2c24cb94a6d85a1b3ededbebcafe078c6070d0  ../../internal/capabilityexecutorv10/v18_executor.go
+4b763683aa7f400f2941f2bd02898a4afc17dce765c8111c308e1483f4925faf  ../../internal/capabilityexecutorv10/v18_executor_test.go
 b897f04063df22383eae3d55dd86820fa5a2d9d770887ceb26a2a38cb8b6a134  ../../internal/capabilityexecutorv10/v18_runner.go
 c7b9eb52c5fffb6fecfd17c1f03466b23f109ce1691a3e1e6bffb42f3fd774e2  ../../internal/capabilityexecutorv10/v18_runner_test.go
 24541ffe0f4ee372e0f1db5508eb22b102343f4eca2f376cacbca51cf275dcdf  ../../internal/capabilityfeedback/testdata/closed_loop_open_set_v10_corpus/CHECKSUMS.sha256
@@ -14,10 +14,10 @@ ed54e04dd4c6b47ef9d108947c303335ea3dda43039aa560752c5dbd80c64b48  ../../internal
 e03ddd8d2b3b0f34fefa448d71a9b273f2bd7606f52ee25f68b4cb4465917b10  ../../internal/modelprovenance/registry_v18.go
 7373d8bb9b809017a595e9558f54466e355d721a67ad6221cd89e832909a38d6  ../../internal/modelprovenance/registry_v18_test.go
 377af0e6703cfa23846e5883122ea847b308cdf0efbe24c6fd21ffff8b85001c  ../../internal/opentopologysynthesis/search_v18.go
-2817275bed7ab990cbb9fc9623d10cbf9ab4cc8163911a87c6d0171ca91ac39c  ../../internal/opentopologysynthesis/search_v18_test.go
+d980882d9e3397c5507d56125a6a939af148c47f00707f5112ed58258c034b38  ../../internal/opentopologysynthesis/search_v18_test.go
 87170fbae71d1739ed1ed3a42103d8d416ed5b074c0ed921e6124c3cc182e808  ../../internal/opentopologysynthesis/simulation_v18.go
 3c2fe846a425bfa879244bb266d5da372d9d0b85fb296cefffe2f5f01c8e8cad  ../../internal/opentopologysynthesis/simulation_v18_test.go
-e41dd881a5cdaefbaab3a1b86e7f83e17f520b4d6d988afb19d7105fd8f832a1  ../../internal/opentopologysynthesis/synthesis_v18.go
+d970442f4f4f930d620de9b59eaa44d6d941fcd54942dd89e68ea8f4dff3c2bb  ../../internal/opentopologysynthesis/synthesis_v18.go
 b458848642f34b591c5ce4a523ad61ec4d8f95b91b992c6665a3f6e5f3345512  ../../internal/opentopologysynthesis/value_v18.go
 c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f  V17_EVALUATOR.sha256
 58dbad896c755c723e6f242a95ed9b80786508167d51f3ca5a0cb2668beacc98  V18_EVALUATOR_PROTOCOL.md

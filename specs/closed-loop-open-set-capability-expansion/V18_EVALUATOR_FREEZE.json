@@ -3,7 +3,7 @@
   "version": 18,
   "freeze_parent_commit": "e3f18fbdc99db5e30d6819f8d0e2d9a95a27bb46",
   "evaluator_manifest": "V18_EVALUATOR.sha256",
-  "evaluator_manifest_sha256": "5b5e107139ce3ecb3b8054b2733159d168cdaae9e48524c7579a29dc06eedfbe",
+  "evaluator_manifest_sha256": "beefc3f2b38352a4eb4fb2074c52a0eda1a22df7385fdf9b1e01569350ceb1f3",
   "inherited_v17_evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
   "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
   "corpus_checksums_sha256": "24541ffe0f4ee372e0f1db5508eb22b102343f4eca2f376cacbca51cf275dcdf",

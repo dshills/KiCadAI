@@ -90,6 +90,27 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("hash V18 evaluator manifest: %w", err)
 	}
+	legacyCatalog, err := components.LoadCatalog(ctx, components.LoadOptions{})
+	if err != nil {
+		return fmt.Errorf("load immutable legacy component catalog: %w", err)
+	}
+	legacyModels, legacyModelDiagnostics := modelprovenance.LoadDefault()
+	if len(legacyModelDiagnostics) != 0 {
+		messages := make([]string, 0, len(legacyModelDiagnostics))
+		for _, diagnostic := range legacyModelDiagnostics {
+			messages = append(messages, diagnostic.Message)
+		}
+		return fmt.Errorf("load immutable legacy model provenance: %s", strings.Join(messages, "; "))
+	}
+	legacyCatalogHash := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: legacyCatalog}).CatalogHash()
+	legacyInventory, legacyInventoryIssues := opentopologysynthesis.BuildPrimitiveInventory(legacyCatalog, legacyCatalogHash, legacyModels)
+	if reports.HasBlockingIssue(legacyInventoryIssues) {
+		return fmt.Errorf("build immutable legacy primitive inventory: blocking inventory evidence")
+	}
+	legacySimulation := opentopologysynthesis.SimulationEnvironment{
+		Catalog: legacyCatalog, CatalogHash: legacyCatalogHash, ModelRegistry: legacyModels,
+	}
+
 	catalog, err := components.LoadCatalogV18(ctx)
 	if err != nil {
 		return fmt.Errorf("load embedded component catalog: %w", err)
@@ -127,7 +148,7 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 		SymbolsRoot: toolEvidence.SymbolsRoot, FootprintsRoot: toolEvidence.FootprintsRoot,
 	}, libraryresolver.LoadOptions{})
 	index.Diagnostics = libraryIssues
-	report, err := capabilityexecutorv10.NewV18().RunV18(ctx, capabilityexecutorv10.Request{
+	report, err := capabilityexecutorv10.NewV18WithLegacy(legacyInventory, legacySimulation).RunV18(ctx, capabilityexecutorv10.Request{
 		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot,
 		Resume: opts.resume, Cases: corpus.Cases,
 		Environment: capabilityexecutorv10.Environment{
