@@ -15,7 +15,7 @@ import (
 
 const replaySpoolNameV11 = "SYNTHESIS_RUN.json"
 
-func writeReplaySpoolV11(path string, run *opentopologysynthesis.SynthesisRun) (string, error) {
+func writeReplaySpoolV11(path string, run *opentopologysynthesis.SynthesisRun) (_ string, returnErr error) {
 	if _, err := os.Lstat(path); err == nil {
 		return "", fmt.Errorf("replay spool already exists")
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -27,21 +27,27 @@ func writeReplaySpoolV11(path string, run *opentopologysynthesis.SynthesisRun) (
 		return "", err
 	}
 	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
+	temporaryClosed := false
+	defer func() {
+		if !temporaryClosed {
+			returnErr = errors.Join(returnErr, temporary.Close())
+		}
+		if err := os.Remove(temporaryPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			returnErr = errors.Join(returnErr, fmt.Errorf("remove temporary replay spool: %w", err))
+		}
+	}()
 	digest := sha256.New()
 	if err := canonicaljsonstream.Encode(io.MultiWriter(temporary, digest), run); err != nil {
-		temporary.Close()
 		return "", err
 	}
 	if err := temporary.Sync(); err != nil {
-		temporary.Close()
 		return "", err
 	}
 	writtenInfo, err := temporary.Stat()
 	if err != nil {
-		temporary.Close()
 		return "", err
 	}
+	temporaryClosed = true
 	if err := temporary.Close(); err != nil {
 		return "", err
 	}
@@ -63,8 +69,7 @@ func writeReplaySpoolV11(path string, run *opentopologysynthesis.SynthesisRun) (
 	if err != nil {
 		return "", err
 	}
-	defer directory.Close()
-	if err := directory.Sync(); err != nil {
+	if err := errors.Join(directory.Sync(), directory.Close()); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(digest.Sum(nil)), nil
