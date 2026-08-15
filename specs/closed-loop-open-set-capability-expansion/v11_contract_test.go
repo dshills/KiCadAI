@@ -74,7 +74,7 @@ func TestVersionTenGenerationZeroRetirementIsAuthenticatedAndFailClosed(t *testi
 		t.Fatal("V10 evaluation-root commitment does not reproduce")
 	}
 	corpusDirectory := filepath.Clean(filepath.Join(directory, "..", "..", "internal", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus"))
-	if retirement.CorpusManifestSHA256 != v9BaselinePublisherFileSHA256(t, filepath.Join(corpusDirectory, "MANIFEST.json")) ||
+	if retirement.CorpusManifestSHA256 != v9BaselinePublisherFileSHA256(t, filepath.Join(corpusDirectory, "manifest.json")) ||
 		retirement.CorpusChecksumsSHA256 != v9BaselinePublisherFileSHA256(t, filepath.Join(corpusDirectory, "CHECKSUMS.sha256")) {
 		t.Fatal("V10 retirement corpus bindings do not reproduce")
 	}

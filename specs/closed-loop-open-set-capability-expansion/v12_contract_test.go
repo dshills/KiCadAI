@@ -69,7 +69,7 @@ func TestVersionElevenGenerationZeroRetirementIsAuthenticatedAndFailClosed(t *te
 		t.Fatal("V11 evaluation-root commitment does not reproduce")
 	}
 	corpus := filepath.Clean(filepath.Join(directory, "..", "..", "internal", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus"))
-	if retirement.CorpusManifestSHA256 != v7FileSHA256(t, filepath.Join(corpus, "MANIFEST.json")) ||
+	if retirement.CorpusManifestSHA256 != v7FileSHA256(t, filepath.Join(corpus, "manifest.json")) ||
 		retirement.CorpusChecksumsSHA256 != v7FileSHA256(t, filepath.Join(corpus, "CHECKSUMS.sha256")) {
 		t.Fatal("V11 retirement corpus bindings do not reproduce")
 	}
@@ -152,7 +152,7 @@ func TestVersionTwelveEvaluatorIsFrozenPublicOnlyAndAggregateMemoryBounded(t *te
 		t.Fatalf("invalid V12 evaluator freeze: %+v", freeze)
 	}
 	corpus := filepath.Clean(filepath.Join(directory, "..", "..", "internal", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus"))
-	if freeze.CorpusManifestSHA256 != v7FileSHA256(t, filepath.Join(corpus, "MANIFEST.json")) ||
+	if freeze.CorpusManifestSHA256 != v7FileSHA256(t, filepath.Join(corpus, "manifest.json")) ||
 		freeze.CorpusChecksumsSHA256 != v7FileSHA256(t, filepath.Join(corpus, "CHECKSUMS.sha256")) {
 		t.Fatal("V12 immutable corpus bindings do not reproduce")
 	}
