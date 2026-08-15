@@ -122,9 +122,6 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	index, libraryIssues := libraryresolver.Load(ctx, libraryresolver.LibraryRoots{
 		SymbolsRoot: toolEvidence.SymbolsRoot, FootprintsRoot: toolEvidence.FootprintsRoot,
 	}, libraryresolver.LoadOptions{})
-	if reports.HasBlockingIssue(libraryIssues) {
-		return fmt.Errorf("load library index: blocking library evidence")
-	}
 	index.Diagnostics = libraryIssues
 	report, err := capabilityexecutorv10.New().RunV11(ctx, capabilityexecutorv10.Request{
 		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot,

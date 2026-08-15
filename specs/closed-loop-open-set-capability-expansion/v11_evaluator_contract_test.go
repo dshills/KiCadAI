@@ -117,6 +117,7 @@ func assertV11EvaluatorManifestIsCompleteAndPublicOnly(t *testing.T, directory, 
 	runner := string(v7ReadFile(t, filepath.Join(directory, "../../internal/capabilityexecutorv10/v11_runner.go")))
 	store := string(v7ReadFile(t, filepath.Join(directory, "../../internal/capabilityexecutorv10/v11_replay_store.go")))
 	if !strings.Contains(command, ".RunV11(") || strings.Contains(command, ".Run(ctx") ||
+		!strings.Contains(command, "index.Diagnostics = libraryIssues") || strings.Contains(command, "load library index: blocking") ||
 		!strings.Contains(runner, "run = opentopologysynthesis.SynthesisRun{}") || strings.Contains(runner, "runs :=") ||
 		!strings.Contains(store, "canonicaljsonstream.Encode") {
 		t.Fatal("V11 command does not bind the memory-bounded production path")
