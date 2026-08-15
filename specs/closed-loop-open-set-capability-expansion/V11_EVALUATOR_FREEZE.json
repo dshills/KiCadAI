@@ -1,0 +1,21 @@
+{
+  "schema": "kicadai.closed-loop-open-set-evaluator-freeze.v11",
+  "version": 11,
+  "freeze_parent_commit": "08212cec107b857ae5f24db8e99a86dab0bc81f4",
+  "evaluator_manifest": "V11_EVALUATOR.sha256",
+  "evaluator_manifest_sha256": "9518986bf8bfab0c15d697b24f4d1d076c73630593ebf6d1b0003b54c2c30877",
+  "v10_retirement_sha256": "b0c9bd4b4041b25e0b48640a74442d07316ad4f39c5cc3ab38e659e5fb0aee12",
+  "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
+  "corpus_checksums_sha256": "24541ffe0f4ee372e0f1db5508eb22b102343f4eca2f376cacbca51cf275dcdf",
+  "discovery_case_count": 24,
+  "replays_per_case": 2,
+  "maximum_parallel_cases": 4,
+  "maximum_live_replays_per_worker": 1,
+  "complete_replay_buffer_retained": false,
+  "immutable_v10_corpus_reused": true,
+  "v10_checkpoints_reused": false,
+  "production_path": true,
+  "held_out_access_surface": false,
+  "real_corpus_evaluated": false,
+  "external_key_opened": false
+}

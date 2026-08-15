@@ -149,6 +149,11 @@ func TestVersionElevenCorrectiveContractPreservesCorpusAndRestartsEvaluation(t *
 	}
 }
 
+func TestVersionElevenContractManifestReproduces(t *testing.T) {
+	directory := v9BaselinePublisherContractDirectory(t)
+	v8VerifyManifest(t, directory, "V11_CONTRACT.sha256")
+}
+
 func decodeV11Strict(t *testing.T, data []byte, destination any) {
 	t.Helper()
 	decoder := json.NewDecoder(bytes.NewReader(data))
