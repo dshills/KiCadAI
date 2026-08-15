@@ -3,7 +3,7 @@
   "version": 10,
   "freeze_parent_commit": "592ce44b630a1fcd9375c9604b0e1d24f4f6c4a4",
   "cli_manifest": "V10_BASELINE_PUBLISHER_CLI.sha256",
-  "cli_manifest_sha256": "f81f965d5d718b0c1c1746d8c1496239ffc8d8a47a6e63a474dfcab2544e39c1",
+  "cli_manifest_sha256": "b3586917266d90da899cfde0dd4355a5748e4d6ccb1d13afc89f3724d3a523ab",
   "publisher_manifest_sha256": "ac59be26ba83f8f8e8e3268ca732a3646c73d761446d0bd5c39bbba96029eab9",
   "discovery_case_count": 24,
   "production_path": true,

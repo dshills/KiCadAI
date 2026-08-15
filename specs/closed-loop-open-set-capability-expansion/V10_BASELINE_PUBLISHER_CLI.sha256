@@ -1,5 +1,5 @@
-90c945098cc0f328f74986cb8a6614e57d8beab7a6f5e676acee9fd64b7a70d3  ../../cmd/kicadai-baseline-publish-v10/main.go
-0406a5f6966f517787ed0bb03d0fd9dcc3008e2a5641527d1061c58c08f6c144  ../../cmd/kicadai-baseline-publish-v10/main_test.go
+5c9306d28168f74a58a8c64608b513747da79124d9c5786c7f317a52da5f1208  ../../cmd/kicadai-baseline-publish-v10/main.go
+0cfb961ee506e7124b39c7fdcb9e42a9a6e3dfa1842f4b6e21156c5ca26d15d1  ../../cmd/kicadai-baseline-publish-v10/main_test.go
 a5a21e337278bd0c2f0b8f299d2eb561507ad3e2e7794b295b07a8e2c5290939  ../../go.mod
 6eee5c8722b41ef5d1a156f9814ac865807af4486a9a46268635d1991cc6c3a6  ../../go.sum
 ac59be26ba83f8f8e8e3268ca732a3646c73d761446d0bd5c39bbba96029eab9  V10_BASELINE_PUBLISHER.sha256
