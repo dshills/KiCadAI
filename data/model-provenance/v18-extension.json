@@ -1,0 +1,29 @@
+{
+  "schema": "kicadai.model-provenance-registry.v1",
+  "version": 1,
+  "records": [
+    {
+      "catalog_id": "opamp.ti.tlv9061idbvr.sot23_5",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/tlv9061.pdf",
+        "revision": "TI SBOS839N, revised July 2026, reviewed 2026-08-15",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    }
+  ]
+}

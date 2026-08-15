@@ -6,7 +6,7 @@ import "embed"
 // Callers that need local or private records can still select a filesystem
 // catalog explicitly through components.LoadOptions.CatalogDir.
 //
-//go:embed data/components/*.json
+//go:embed data/components/*.json data/components-v18/*.json
 var DefaultComponentCatalog embed.FS
 
 // DefaultModelProvenance contains the reviewed catalog-to-model trust registry

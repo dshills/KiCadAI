@@ -1,7 +1,7 @@
 # Project Status
 
-Last full verification: 2026-08-08 by the complete bounded local suite, focused
-scheduler/race/preservation suites, and installed-KiCad lanes. Closed-loop
+Last full verification: 2026-08-15 by the complete bounded local suite, focused
+V18 preservation and deterministic-replay suites, and installed-KiCad lanes. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -17,8 +17,14 @@ four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
 
-Focused V2 frozen-baseline, sealed-held-out-commitment, and specification
-contract checks were reproduced locally on 2026-08-09.
+The V18 versioned extension now produces a complete public pass for a
+low-voltage, high-input-impedance, multi-output analog threshold requirement.
+The selected graph uses reviewed low-voltage catalog/provenance evidence,
+closed-loop endpoint access, coupled threshold-value selection, and a
+contention-free diode-wired comparator conjunction. It passes deterministic
+replay, physical lowering, and two clean installed-KiCad promotions. The V6–V17
+evaluator inputs and replay seals remain byte-identical. See the
+[V18 specification](../specs/closed-loop-open-set-capability-expansion/V18_SPEC_ADDENDUM.md).
 
 The behavioral-contract feasibility and realizability prerequisite is now
 implemented behind a versioned capability-feedback policy. It conservatively
@@ -39,17 +45,13 @@ and [completion audit](../specs/multi-stage-out-of-distribution-synthesis/AUDIT.
 
 The active capability-expansion program is
 [closed-loop open-set capability expansion](../specs/closed-loop-open-set-capability-expansion/SPEC.md).
-V1 produced two discovery passes but no held-out uplift. The independently
-authored V2 corpus and baseline then selected complete-topology search, but the
-generic candidate produced zero discovery passes and was removed before any
-held-out evidence was decrypted. V2 is closed fail-closed and its sealed
-held-out set is retired. The next prerequisite is a generic
-behavioral-contract feasibility and realizability gate that separates
-impossible or energy-domain-creating requirements from single-topology and
-multi-obligation composition gaps before a fresh V3 corpus is authored. That
-gate is now complete; the next action is the independently isolated V3 corpus
-and baseline. See
-the [V2 validation audit](../specs/closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
+V1–V17 remain authenticated historical evidence, including fail-closed
+retirements where a generation could not complete. V18 is the current public-
+only extension and deliberately reuses the immutable 24-case V10 discovery
+corpus and frozen V17 serial replay transport. Only the explicit V18 constructor
+can load the added catalog/provenance records and search/evaluation adapters;
+all noneligible requirements delegate byte-for-byte to V17. Held-out keys and
+blind outcomes are outside the V18 protocol.
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

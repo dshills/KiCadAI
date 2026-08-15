@@ -85,6 +85,14 @@ behavior → capability gate → topology/value search → trusted simulation
 | **Experimental** | Broader AI-proposed graphs and capability expansion may generate inspectable artifacts only with explicit opt-in; they cannot be promoted as fabrication-ready. | [Capability gating](docs/capability-gating.md), [AI generation](docs/ai-generation.md) |
 | **Unsupported** | Arbitrary circuits and parts, mains/high-energy safety, RF power, unrestricted dense boards, unreviewed models, and automatic fabrication approval remain outside the proven envelope. | [AI readiness](docs/ai-readiness.md), [roadmap](specs/ROADMAP.md) |
 
+The current V18 capability extension adds a version-isolated, catalog-backed
+path for low-voltage, high-input-impedance, multi-output analog threshold
+requirements. Its public replay case passes deterministic search, coupled value
+selection, simulation, physical lowering, and two clean installed-KiCad
+promotions without changing the frozen V6–V17 evaluator paths. This remains a
+bounded capability, not arbitrary analog synthesis. See the
+[V18 specification](specs/closed-loop-open-set-capability-expansion/V18_SPEC_ADDENDUM.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.
