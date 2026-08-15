@@ -1,0 +1,134 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_004",
+    "role": "discovery",
+    "reporting_domain": "mixed_signal_data_conversion",
+    "circuit_role": "sensing_measurement",
+    "safety_impact": "safety_critical",
+    "outcome": "unsupported",
+    "frontier": [
+      {
+        "obligation_anchor": "4f5022e11bc80089f52560d6017a01017fa9789a086b3e44ff50c70972325e02",
+        "path": [
+          {
+            "stage": "component",
+            "category": "component",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:4c7706d6da5d6f2459f1836427c8fcfbfb5ead535e5aadd56a059fecbc0bf5f9"
+        ]
+      },
+      {
+        "obligation_anchor": "cb05e64d16a0288cd54739e28aab70ef0c14834bd3c9cc183a184c2a9d2814a3",
+        "path": [
+          {
+            "stage": "component",
+            "category": "component",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:4c7706d6da5d6f2459f1836427c8fcfbfb5ead535e5aadd56a059fecbc0bf5f9"
+        ]
+      },
+      {
+        "obligation_anchor": "8d1a9643468199746719400ca4ab429ae84db5732132151af7090d2c6fb9b913",
+        "path": [
+          {
+            "stage": "component",
+            "category": "component",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:4c7706d6da5d6f2459f1836427c8fcfbfb5ead535e5aadd56a059fecbc0bf5f9"
+        ]
+      },
+      {
+        "obligation_anchor": "435a3ea136996f5456eec4c2fa3d0c70d428a1d55d9f7aa1cf68527197451555",
+        "path": [
+          {
+            "stage": "component",
+            "category": "component",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:4c7706d6da5d6f2459f1836427c8fcfbfb5ead535e5aadd56a059fecbc0bf5f9"
+        ]
+      },
+      {
+        "obligation_anchor": "dfba6b1863dee7c7a9033a7865c3f3697006c3bfbec38c0c343c633b1dce36f9",
+        "path": [
+          {
+            "stage": "component",
+            "category": "component",
+            "scope": "component",
+            "capability": "catalog_value_domain",
+            "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+            "required_evidence": [
+              "catalog_value_domain: catalog-backed component, rating, value, symbol, pin, footprint, and pad evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:4c7706d6da5d6f2459f1836427c8fcfbfb5ead535e5aadd56a059fecbc0bf5f9"
+        ]
+      }
+    ],
+    "satisfied_obligations": []
+  },
+  "requirement_sha256": "51320e976468e8d752770b3149978b15e4779035670acddeae2333823f4dbe00",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "061a2fc5f1d60a3cd5be23ff1ac5526c8f3054519c50929e1cc825b5ce37c9fa",
+    "061a2fc5f1d60a3cd5be23ff1ac5526c8f3054519c50929e1cc825b5ce37c9fa"
+  ],
+  "replay_root_sha256": [
+    "f698a8c8ab9b05b6e17ada6242f0592558aa92d7197e7f8a86599cf27a675e69",
+    "5d43044ad096e73660a5917c1278bffbd618b9907bd4f97e612de04e3090972d"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "44fddaa03ca503319edbb1f6e2277aaf89d60578a70b7dd3017be18f91c23b04"
+}

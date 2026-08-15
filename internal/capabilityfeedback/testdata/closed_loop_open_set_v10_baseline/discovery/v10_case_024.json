@@ -1,0 +1,75 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_024",
+    "role": "discovery",
+    "reporting_domain": "protection_power_integrity",
+    "circuit_role": "conversion_regulation",
+    "safety_impact": "non_safety",
+    "outcome": "exhausted",
+    "frontier": [
+      {
+        "obligation_anchor": "7925763e6c61246dd904baae76caaf2b57a5dff7c6ee899c6aef956433196d7a",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "output_voltage_evidence",
+            "code": "NONCONVERGENT",
+            "required_evidence": [
+              "output_voltage_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:013adb8f4e915c59f1abe2afc8c88e6ca31df7f4c25a9b7c33ab0d8424d76a7b",
+          "evidence_sha256:1c2672ce98811a22a4bb437e152d931559e853ceaa8459138918a009843eb5fb",
+          "evidence_sha256:2ebb591955277fef4afebca786f02eec32cd0b7ed5b0767724ada2a7f040320f",
+          "evidence_sha256:7db998ba8034230aa2fd9fb11be1204278fc4079c40b3006b64362d76751a655",
+          "evidence_sha256:ec409eec882e5d557ab0b559c6e5ce00b8f998e2db8108d7a4afb5f515a5205e"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "1141ed2cae70d59ab34a2d8d0ed29b59f615dede3c64512336b771357f3cf12a",
+      "22fb397b9e4195a27d20aeb96144383269fc0dfc904f7eb0bb3356b1a14527ee",
+      "5d19d91f6aa9c111681359e503cdaf1e7bf776ab39417fe61bd687c6561c145d",
+      "631124305710356ce5650f2e45c363ccaf733cd40556708aa128256274f400d2",
+      "a1888d9ab2c6a8025bd8eb1f2be10b7ada41b29b89918c721ba95e96e12f0523",
+      "b055e6124d9ef11b96172db4ec01b821d06acde3a2fc9ae95f6b9fe7fdab243a",
+      "d0339b6fae340607c37f6e188bb7e6d90e85ebe129f7ee94a6cdec91c061fca2"
+    ]
+  },
+  "requirement_sha256": "9d6e7e1d2d8e673473693c38c960aa819fa72f8f80d0892f2fe5e5c1bdde3b29",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "4b6e935472b11d512d738778714b030412e343a8af93e94e993ffe669de18112",
+    "4b6e935472b11d512d738778714b030412e343a8af93e94e993ffe669de18112"
+  ],
+  "replay_root_sha256": [
+    "6eb968655f5acbda3535367c2f22f04ace30c453027c6a1acd3e2e355e214ab1",
+    "03e30dc7ef26b1b7739afb12bffcf30ed57308b9508f0582c0e0a69b5460fd88"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "fd53dcc6dcce59025ee01c8b0bbc027c405ed9b9cc9ea9401de7ef4ff2b32672"
+}

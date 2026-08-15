@@ -1,0 +1,116 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_021",
+    "role": "discovery",
+    "reporting_domain": "digital_control",
+    "circuit_role": "protection_supervision",
+    "safety_impact": "review_required",
+    "outcome": "exhausted",
+    "frontier": [
+      {
+        "obligation_anchor": "faa34b687e592a99bd376270d255da3f36416e03b7c801651c59939838e8d346",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:25c02f8b97b0e3bad07b7b4a12a1a32e96f154045f43f14c72a56114f701f52d"
+        ]
+      },
+      {
+        "obligation_anchor": "8d1c1225bf1db232dcd385a6a6656394688ab25ead6f1f070bc5ada1dd947067",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:25c02f8b97b0e3bad07b7b4a12a1a32e96f154045f43f14c72a56114f701f52d"
+        ]
+      },
+      {
+        "obligation_anchor": "59768afcda9a95d5fd0e195478c378ae5544a8270ba554f67fbd2a5a56ebcdc1",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:25c02f8b97b0e3bad07b7b4a12a1a32e96f154045f43f14c72a56114f701f52d"
+        ]
+      },
+      {
+        "obligation_anchor": "c2c3d6d57a7c0605712a78821f7407ee71fb29a5de55f0fb99308810bb23b99c",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:25c02f8b97b0e3bad07b7b4a12a1a32e96f154045f43f14c72a56114f701f52d"
+        ]
+      }
+    ],
+    "satisfied_obligations": []
+  },
+  "requirement_sha256": "37d77403b6712a22d930a249e2271b1fbfe01994196fd4ca61e006a98f015aa8",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "9cbb6f2802929403b95a2a8fab089df725472d034a1f30085f6a907f2a2a12cf",
+    "9cbb6f2802929403b95a2a8fab089df725472d034a1f30085f6a907f2a2a12cf"
+  ],
+  "replay_root_sha256": [
+    "6e6073205adb10bd586b675a153c01ccf1853f9cf4eb11ac5010d95a2f700049",
+    "ea495ff35471ee9bde334c6dbee9adbff707de5ea41d85cba869462275bfb1ba"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "2867a7079612a2b3a5e4e3fabf20906ae32fbe68edcc48355ac9171f7ac2aae2"
+}

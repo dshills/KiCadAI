@@ -1,0 +1,130 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_022",
+    "role": "discovery",
+    "reporting_domain": "mixed_signal_data_conversion",
+    "circuit_role": "source_bias",
+    "safety_impact": "safety_relevant",
+    "outcome": "exhausted",
+    "frontier": [
+      {
+        "obligation_anchor": "14149b6846bca7d679b23c6c99cfa0791edb76feea685687438ee543845ad859",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "peak_current_evidence",
+            "code": "ASSERTION_ABOVE_MAXIMUM",
+            "required_evidence": [
+              "peak_current_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:42e81118781e7a0c239f3a20b56fba2675cf565843ad82927f9d958b5e93b2c3",
+          "evidence_sha256:c1b0a3f453e79ab5f016b705bb96b8d42d7d951f675cf23e492771c5865b61ef",
+          "evidence_sha256:cf30be776a495c6bd45c06a6c846526b65e345c7582c2d6a7001d41b592b56b0"
+        ]
+      },
+      {
+        "obligation_anchor": "3ce81dbed1b0e2e57913e2a4b59fbe1ac12022d72bb4ce037f746437c9c10cb4",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "transconductance_evidence",
+            "code": "ASSERTION_BELOW_MINIMUM",
+            "required_evidence": [
+              "transconductance_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:425c45b53d2adc866692254faabc3ecb3b8955419426799718c13380dea66610",
+          "evidence_sha256:a7ea945c8f4b8ac00b61d5f2c0645c2175a8658faa2852c004ed86fadeadeaa8",
+          "evidence_sha256:c1b0a3f453e79ab5f016b705bb96b8d42d7d951f675cf23e492771c5865b61ef"
+        ]
+      },
+      {
+        "obligation_anchor": "3ce81dbed1b0e2e57913e2a4b59fbe1ac12022d72bb4ce037f746437c9c10cb4",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "transconductance_evidence",
+            "code": "ASSERTION_ABOVE_MAXIMUM",
+            "required_evidence": [
+              "transconductance_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:5a67276813d67052abbb393da38160b9eb28c81ce3f0d89df1df185bd5de5317",
+          "evidence_sha256:a27de28f59f3460bf65fa27eaa71fb97e2af6333317a8c2bd6d78a3d0b1c9747",
+          "evidence_sha256:c1b0a3f453e79ab5f016b705bb96b8d42d7d951f675cf23e492771c5865b61ef"
+        ]
+      },
+      {
+        "obligation_anchor": "4696e362dbfe69835825c8f6a3efb6e0af772a5664264a0ef2ae8e8f21f7b071",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "settling_time_evidence",
+            "code": "ASSERTION_ABOVE_MAXIMUM",
+            "required_evidence": [
+              "settling_time_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:6b7e5c29f779004a1ef43b528248b2d55e81c6c61562b55ac568478681e2beff",
+          "evidence_sha256:77e5b4f8428eee54bc49813ed333899f16aea0485047d99a1a62f192d316e362",
+          "evidence_sha256:c1b0a3f453e79ab5f016b705bb96b8d42d7d951f675cf23e492771c5865b61ef"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "93439908e0e68eaf9a200f92593470b93a3a1b9a425000e8d32a4bc7aef943dc"
+    ]
+  },
+  "requirement_sha256": "8dfd213e2e78f43fcc09274b1da40767ac0554579b8fb9a8949de9065b8e943a",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "217b02c7d9af8667368c9f2148b58d73fcdc26f112671bdb8905b0ced4598c32",
+    "217b02c7d9af8667368c9f2148b58d73fcdc26f112671bdb8905b0ced4598c32"
+  ],
+  "replay_root_sha256": [
+    "c56c7dc6a4153c61a59a017b59266e04d8d11d1906113f40d6491be0b252c362",
+    "e31415589e935073ab4c2b9721dc2224d89b03b4d2777763f9258bb18440b5eb"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "325a72371efefc33e9791075f36cc7a70ce8cf72ce6295dd294e08b20c189638"
+}

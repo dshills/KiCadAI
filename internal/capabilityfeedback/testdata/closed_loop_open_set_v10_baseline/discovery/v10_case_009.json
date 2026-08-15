@@ -1,0 +1,188 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_009",
+    "role": "discovery",
+    "reporting_domain": "digital_control",
+    "circuit_role": "sensing_measurement",
+    "safety_impact": "safety_relevant",
+    "outcome": "exhausted",
+    "frontier": [
+      {
+        "obligation_anchor": "f145c08f67a1651b1eb921e7bd0399ea2ed0298f69da927ed307e3c3d66bb270",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "656f2d265395a1c87177da7083685eb0f31df98c10517ca6115b572c1bc2cb00",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "8663f5f269e73117fa4aae81ea069209742542f374b329f3c843398a9153b959",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "5f9e3165584984f3e729255943602b40c93a24f3036c8b67f40edb77d604996d",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "c63706c4a42e64bb6f026b0728520c77023fcd16148085af4daaafbdef11a9a8",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "1e3878b4d22cbcf9c29114cfa2128d1744510e13319c1a4676e8fa3571b5c67e",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "f8a82f98e69c38d2e1be9d5fbc3aeff3e0eddea97d2d989d6b6a2e833b82fc69",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      },
+      {
+        "obligation_anchor": "cd759a94d21b895e9d7aa0f1d6b8c0ae43c567cc531ea5bde59b997690581465",
+        "path": [
+          {
+            "stage": "topology",
+            "category": "topology",
+            "scope": "topology",
+            "capability": "causal_topology_repair",
+            "code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+            "required_evidence": [
+              "causal_topology_repair: reviewed reusable topology construction and complete-graph evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "evidence_sha256:89fb1cd2c7809ccd8b597bde1a60ae3d22e4405051a765d09839546fdd3ef4c7"
+        ]
+      }
+    ],
+    "satisfied_obligations": []
+  },
+  "requirement_sha256": "04fec91fc4561e4af8ad44ff0cf74e0c05b36ddb5425f6ccb8b0acdc6642b84e",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "5b6b6fd86709f0d803c4a2954f9349afa98b9f4a51a027850238af00e72b8d6f",
+    "5b6b6fd86709f0d803c4a2954f9349afa98b9f4a51a027850238af00e72b8d6f"
+  ],
+  "replay_root_sha256": [
+    "25c350c2a42b151d935bd86feabcefe4d44d883b188763159daf536f45495478",
+    "9462b5a11a69273c79f0a0e4b965937cc9d6f240007ca79a6a30859b96e908c8"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "daa29c6c433e91bfc19b9816c27b24509fb81df7ebed3853774745e33bfc0274"
+}

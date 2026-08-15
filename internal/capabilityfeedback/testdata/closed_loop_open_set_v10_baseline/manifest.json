@@ -1,0 +1,166 @@
+{
+  "schema": "kicadai.closed-loop-open-set-baseline-publication.v10",
+  "version": 10,
+  "binding": {
+    "starting_commit": "370f001daf0d912c8092af307e615b06b02060d0",
+    "contract_freeze_commit": "2bc33a1857feb88011d53a0f5f405569468ae2d1",
+    "corpus_freeze_commit": "c1099385f987951bd91efc5d349cc4f2428de42d",
+    "evaluator_freeze_commit": "8ec362d86b4d26dd3dbbe4657f960242910e2f2f",
+    "publisher_parent_commit": "da0e8c41c5cbdf4fa4b62c5e8c9609e63ca88610",
+    "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
+    "contract_manifest_sha256": "9a04332c0483b4b42285932d3761fbf2356854994fcf2177a835cedd4af6cedf",
+    "author_packet_manifest_sha256": "faee0e8393cb6f8e171030fddf6dee1cded65224bff4a27c80f61efe2991aeb4",
+    "validator_manifest_sha256": "c8b51e0dde6814efed026efe1302e177d49bec7d80094df5d3c22ef53fb67de5",
+    "corpus_publisher_manifest_sha256": "34d64b627eaf0ddf43e3a0cfea0b54a280e3769e24c766b5febd3fae91c51c25",
+    "baseline_evidence_manifest_sha256": "28743cfb00432ecf441cdf4bd0c58dd387a1640a3bf557e49ef07d67947c9d2d",
+    "baseline_publisher_sha256": "ac59be26ba83f8f8e8e3268ca732a3646c73d761446d0bd5c39bbba96029eab9",
+    "validation_report_sha256": "fe6917c0fc9fd3e39db023e3cdd6eede3c3f5ab7f1e654472bb9268a0a4b947d",
+    "historical_commitments_sha256": "eea2e5aba73be6469052ec3a73da5bb1994f11251708c89d31d5268d6359fb2e",
+    "discovery_obligations_sha256": "2eb9500ecb36adcdce9ea8838e6cba75da5a03781f915e78328eb07055a957b0",
+    "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+    "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f"
+  },
+  "report_sha256": "5837a8780cd405383e9e2b833ce7ce41bf92273c49c9a9aa0158c5d9add2c350",
+  "case_count": 24,
+  "outcome_counts": [
+    {
+      "outcome": "pass",
+      "count": 0
+    },
+    {
+      "outcome": "unsupported",
+      "count": 7
+    },
+    {
+      "outcome": "unsafe",
+      "count": 1
+    },
+    {
+      "outcome": "exhausted",
+      "count": 16
+    }
+  ],
+  "cases": [
+    {
+      "id": "v10_case_001",
+      "path": "discovery/v10_case_001.json",
+      "sha256": "7bbff9b44c87acd33e99cedf78c1b0160ad0b0d66e97a3ea48c46de7f6dc30dd"
+    },
+    {
+      "id": "v10_case_002",
+      "path": "discovery/v10_case_002.json",
+      "sha256": "c0fc6b8eb22769e9615fe3e3bb0eae56236e731c59140efd2f876c717ad0918c"
+    },
+    {
+      "id": "v10_case_003",
+      "path": "discovery/v10_case_003.json",
+      "sha256": "61e767d63a1e0488178c647d8e25711b04d726c87c67a21ab0fc19320f6e711b"
+    },
+    {
+      "id": "v10_case_004",
+      "path": "discovery/v10_case_004.json",
+      "sha256": "405ea42f671c12fd35b5664503fde5fcc1f9373b5f788a9ad1cdf3d9ed872c82"
+    },
+    {
+      "id": "v10_case_005",
+      "path": "discovery/v10_case_005.json",
+      "sha256": "7789fbd3fa5b5b9b5350824faa6acc4d0be777fb424af1e4df8948a0375d2f42"
+    },
+    {
+      "id": "v10_case_006",
+      "path": "discovery/v10_case_006.json",
+      "sha256": "dae58d9ed602cc6af77e6e17fb848c08bad9dd3bfec61e0b79d7942f08528fd0"
+    },
+    {
+      "id": "v10_case_007",
+      "path": "discovery/v10_case_007.json",
+      "sha256": "bf51b74279398e4192bac41a95470d1155895fe910684978d592cf02c22e84ea"
+    },
+    {
+      "id": "v10_case_008",
+      "path": "discovery/v10_case_008.json",
+      "sha256": "a68bc0d98c5b60a04b51fb37b18c1cd5492e59c36d56f0c9b5027932d39a8fe0"
+    },
+    {
+      "id": "v10_case_009",
+      "path": "discovery/v10_case_009.json",
+      "sha256": "a465f1a9332ed458c51c7dd00f2236cc1738476aab60bb8490d790bbff842468"
+    },
+    {
+      "id": "v10_case_010",
+      "path": "discovery/v10_case_010.json",
+      "sha256": "7a55edabf8ae02f562df5ecf188b409e68789cc21a71578c125691dad92149e3"
+    },
+    {
+      "id": "v10_case_011",
+      "path": "discovery/v10_case_011.json",
+      "sha256": "450c0d5338418e2f2535772580e53662e87be3740ec67a7dd8d032db2301e915"
+    },
+    {
+      "id": "v10_case_012",
+      "path": "discovery/v10_case_012.json",
+      "sha256": "1b009b971f7c5f53bcdedf9c7585fa9154e347988dfb59be67158dafc5ff0fde"
+    },
+    {
+      "id": "v10_case_013",
+      "path": "discovery/v10_case_013.json",
+      "sha256": "8a39207b59224b6d5396dbf81f7abcd1f7100e5fa2a14e271b1ade988c54ea7d"
+    },
+    {
+      "id": "v10_case_014",
+      "path": "discovery/v10_case_014.json",
+      "sha256": "9f49ff252fedc8a589ea7dfb418f2d46a1b82d567e058d8b2bb5b9c703c71fff"
+    },
+    {
+      "id": "v10_case_015",
+      "path": "discovery/v10_case_015.json",
+      "sha256": "625cde1ec89c39e47ddb4232b4b3f7d569390e870e79962cf86ff28cd041c20f"
+    },
+    {
+      "id": "v10_case_016",
+      "path": "discovery/v10_case_016.json",
+      "sha256": "b135b0b6ff9410f865ec7de2227b9be687f722dfe8b320e06adf86e8ae0293a6"
+    },
+    {
+      "id": "v10_case_017",
+      "path": "discovery/v10_case_017.json",
+      "sha256": "ea93fb17302419f4e66237d45145bb1f5860887008708b15876da2d6237821c7"
+    },
+    {
+      "id": "v10_case_018",
+      "path": "discovery/v10_case_018.json",
+      "sha256": "35334ef24868dfb1390ff5fd5ca60405dec699d183ade334157c508376bb90b3"
+    },
+    {
+      "id": "v10_case_019",
+      "path": "discovery/v10_case_019.json",
+      "sha256": "66a04c030cce45758376ef993f9911c3c0f84a0b8f47dbfef6a60bfa25b4471f"
+    },
+    {
+      "id": "v10_case_020",
+      "path": "discovery/v10_case_020.json",
+      "sha256": "1bc990b13fd460422549c85f831906cf2a7a65929db6e1f9e6c8686d73458306"
+    },
+    {
+      "id": "v10_case_021",
+      "path": "discovery/v10_case_021.json",
+      "sha256": "5f8ba646e210de467ed04360cd69468149e7a38c72ef2a719c0e6ccacf57aa0d"
+    },
+    {
+      "id": "v10_case_022",
+      "path": "discovery/v10_case_022.json",
+      "sha256": "314fdd266d1c80df5b2488e36d7cd9fedec52400383e48e3ac172ada8b812564"
+    },
+    {
+      "id": "v10_case_023",
+      "path": "discovery/v10_case_023.json",
+      "sha256": "5d1ecf3879775f77abec173d7fa34de7a34144a8d44825e1607202c4e1ca4c18"
+    },
+    {
+      "id": "v10_case_024",
+      "path": "discovery/v10_case_024.json",
+      "sha256": "d8d0b601af5f6ded9dc105270580e0c9312b30b9416f614613dd7e20e0ec07e6"
+    }
+  ],
+  "hash": "8696f5346406f4e6e75740a1e0f397d9c2a791423e8057deaf25f317477cd796"
+}

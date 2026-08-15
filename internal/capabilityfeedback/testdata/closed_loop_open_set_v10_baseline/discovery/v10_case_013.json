@@ -1,0 +1,155 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_013",
+    "role": "discovery",
+    "reporting_domain": "analog_signal_path",
+    "circuit_role": "conversion_regulation",
+    "safety_impact": "safety_critical",
+    "outcome": "exhausted",
+    "frontier": [
+      {
+        "obligation_anchor": "ebb867b4c87e4ea2547551d7166bae0fd5df724a6bb3d867c19fd96a532827d5",
+        "path": [
+          {
+            "stage": "model",
+            "category": "model",
+            "scope": "model",
+            "capability": "electrothermal_model",
+            "code": "THERMAL_MODEL_UNAVAILABLE",
+            "required_evidence": [
+              "electrothermal_model: reviewed model provenance and applicability bounds"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:0f6d27b78409be465ef1255d4d8a159ff2c17bd8713240a1083d87ed06441bea",
+          "evidence_sha256:88999f5f8159ce70ed1f3599a362d71265fab522cbb4bac571144d5831ffd2a3"
+        ]
+      },
+      {
+        "obligation_anchor": "993a586563b7cc4189136a04b3fa2dc790a186dfef14b9bb14c68fc72b29b0bb",
+        "path": [
+          {
+            "stage": "model",
+            "category": "model",
+            "scope": "model",
+            "capability": "electrothermal_model",
+            "code": "THERMAL_MODEL_UNAVAILABLE",
+            "required_evidence": [
+              "electrothermal_model: reviewed model provenance and applicability bounds"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:0f6d27b78409be465ef1255d4d8a159ff2c17bd8713240a1083d87ed06441bea",
+          "evidence_sha256:88999f5f8159ce70ed1f3599a362d71265fab522cbb4bac571144d5831ffd2a3"
+        ]
+      },
+      {
+        "obligation_anchor": "a3d97845d90da6b126356a86400b4e924a80b77232cb0b738fc1b81ad278b226",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "electrothermal_solver",
+            "code": "SIMULATION_INVALID",
+            "required_evidence": [
+              "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:0f6d27b78409be465ef1255d4d8a159ff2c17bd8713240a1083d87ed06441bea",
+          "evidence_sha256:1986e37adb1499b5e98f7b1ea0a12c5bc0e8fc47e823a165218f97079dd7f573",
+          "evidence_sha256:a7e06d181c8263f69c1a12916205c969304dc07bda23abe469764376d1089d5f"
+        ]
+      },
+      {
+        "obligation_anchor": "a3d97845d90da6b126356a86400b4e924a80b77232cb0b738fc1b81ad278b226",
+        "path": [
+          {
+            "stage": "model",
+            "category": "model",
+            "scope": "model",
+            "capability": "electrothermal_model",
+            "code": "THERMAL_MODEL_UNAVAILABLE",
+            "required_evidence": [
+              "electrothermal_model: reviewed model provenance and applicability bounds"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:0f6d27b78409be465ef1255d4d8a159ff2c17bd8713240a1083d87ed06441bea",
+          "evidence_sha256:88999f5f8159ce70ed1f3599a362d71265fab522cbb4bac571144d5831ffd2a3"
+        ]
+      },
+      {
+        "obligation_anchor": "993a586563b7cc4189136a04b3fa2dc790a186dfef14b9bb14c68fc72b29b0bb",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "electrothermal_solver",
+            "code": "SIMULATION_INVALID",
+            "required_evidence": [
+              "electrothermal_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:0f6d27b78409be465ef1255d4d8a159ff2c17bd8713240a1083d87ed06441bea",
+          "evidence_sha256:1986e37adb1499b5e98f7b1ea0a12c5bc0e8fc47e823a165218f97079dd7f573",
+          "evidence_sha256:a7e06d181c8263f69c1a12916205c969304dc07bda23abe469764376d1089d5f"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "133aa828c5e2654c88921de73048eda653ca57e5b33a29e2bca8f08af7d808df",
+      "23c0c3e5a1f4956d9d62d21b70bbbf23942d0a0dd13e333a0fd4bb682e4511a1",
+      "353e9c777da83da1254849f48a226a3ab43064a547e82d8e00b1498a58b5ac49",
+      "435d2901e19e1df2529a57b797ff315b37b6c16bd97ad9306408441694b9ecb4",
+      "5dad2f23c5a5fe40b7a5c323d435d8edb2e532f8d35311e919493ee1130aecb9",
+      "8b03e76dec84eca9371dfb455587fbdc500382ea94e9d08ee457cfdd64f90db3",
+      "d72a0f9f2815c82c52154d421ebd9ae153c5eadb6cb44f39750d451f617f1482",
+      "e63f504fda39b084a6b6a0c4fb7c8af268901565815984efb0e39c6feea9b993"
+    ]
+  },
+  "requirement_sha256": "a67a2c65e4b13d419a90a55311bd24f148b7d699e7e652f2ea28fad43782adae",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "1269ee5dfb55ce20d4f8a8e8571ef77d50377dbf74558d2b9950c4814630d693",
+    "1269ee5dfb55ce20d4f8a8e8571ef77d50377dbf74558d2b9950c4814630d693"
+  ],
+  "replay_root_sha256": [
+    "8fe3d1760558eed79f3702b4d67a1a0852f9032176035ef5ffb9c691515f3f55",
+    "233b2f89cfa6c86847a21dfd5278bee0d9fbb3ce00c1d73aaa94100a9196d01e"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "c047b447a3eef048d8052bb1a431a21c3e8cefcb17fe973b3c2aedf26f7506c7"
+}

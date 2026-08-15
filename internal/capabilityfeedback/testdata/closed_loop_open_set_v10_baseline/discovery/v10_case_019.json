@@ -1,0 +1,91 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_019",
+    "role": "discovery",
+    "reporting_domain": "analog_signal_path",
+    "circuit_role": "sensing_measurement",
+    "safety_impact": "safety_relevant",
+    "outcome": "unsupported",
+    "frontier": [
+      {
+        "obligation_anchor": "98ff3b2bc4e5acfebcaa9cf16000882eb0f27dd9c2401fcb8c8227cf16a965bc",
+        "path": [
+          {
+            "stage": "model",
+            "category": "model",
+            "scope": "model",
+            "capability": "thermal_model",
+            "code": "THERMAL_MODEL_UNAVAILABLE",
+            "required_evidence": [
+              "thermal_model: reviewed model provenance and applicability bounds"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:57d73b95c2309c049a6fab6cf74788828d6a12ff87243d5b3901c60bfa610c53",
+          "evidence_sha256:fa0baa3592411a9772040721111e4dcccb4cdb353b187044f89d582e8f2152c0"
+        ]
+      },
+      {
+        "obligation_anchor": "11a823f01c429f79f02e10e91dbf190e69ee06c579e2310c525ead955bcab110",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "transimpedance_evidence",
+            "code": "ASSERTION_BELOW_MINIMUM",
+            "required_evidence": [
+              "transimpedance_evidence: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:2e8cfff1751d5bfd47092186da0569243aaf7976279e82eaf5a332407b2c46bf",
+          "evidence_sha256:6ffadaa03e3a366bd315f8313fb80d8bc730b38a7cc31d06ba1d641fdb062ac6",
+          "evidence_sha256:c5e6458170a9a7de544106d0a9d60b814d567c70749ad581fbffa3690a922114",
+          "evidence_sha256:fa0baa3592411a9772040721111e4dcccb4cdb353b187044f89d582e8f2152c0",
+          "evidence_sha256:fc3f374c588774d9982f440690fea0f324b15cf69a98152e4477868a0e5fd828"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "588099600d2f234dace137ed77120cefe4122f95a0e23b63b0ebc25148967e80",
+      "5dfaea008be337eaca4ab5613086d5923d841dd1d01d905ab7476fd515aaf729",
+      "e0f821928894cd3145f02e28e128e36981fc2df7c46ac4a4f9fe7052e96fac46"
+    ]
+  },
+  "requirement_sha256": "4bf0d07ade6eab8b9d06e535a7eae3bd49d1483d340484c852276c3617d7c747",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "c389a659ce499fb81122846485fb21d6831736baa6780751754cd5bf7b30ca66",
+    "c389a659ce499fb81122846485fb21d6831736baa6780751754cd5bf7b30ca66"
+  ],
+  "replay_root_sha256": [
+    "ff36df75de241b90be1bfe3c43d803cb81327bf1ff68af87b7b825bc4bd7675c",
+    "198de6dac742e84895b082eb7461c4e431875b46543eb582ec7cedf794dacdba"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "b1a0a1b1f0cb115488b51220f000a7b1937d89c11364d7438f9b75c3acb63056"
+}

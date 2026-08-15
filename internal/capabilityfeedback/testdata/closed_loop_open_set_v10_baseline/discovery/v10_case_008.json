@@ -1,0 +1,72 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_008",
+    "role": "discovery",
+    "reporting_domain": "power_energy_conversion",
+    "circuit_role": "conversion_regulation",
+    "safety_impact": "non_safety",
+    "outcome": "unsupported",
+    "frontier": [
+      {
+        "obligation_anchor": "2ad62e0c4a01a99eed08029df599fc60daca977b60d2fa2ba3a832ec3539a0fe",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "dc_operating_point_solver",
+            "code": "SIMULATION_INVALID",
+            "required_evidence": [
+              "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:14fe43b69936520749c7a773711af756a21c90ac078b38e174e56adfea778137",
+          "evidence_sha256:644c0041a6dc4370625d17c32b002a0a1eabbd6fd75961b189552d0d9eadded5"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "3cc610a70dadcf4c1f5a32a63a98c80576d56f940b76c4be46ad5a7b61b02bef",
+      "445d325b4f705efab1f2e06912f80059536c15de17ca75a2f00a4b9132cba630",
+      "5dfbe7f2fd9d45dadd4a46dd23c541c82346da76384cf5550aa991e752d50042",
+      "7c6f2522c707fe1318d45f527b3786e8714eeef15d7c6d546c1ec97b52a6de54",
+      "8398ce55b6a7b44fd3d5b7b027d4b8473f5526435521e85d4118e9c7b58f05fa",
+      "9a654ac84ff1d6ed6f715a27d8d2d850306399ae154db6b94b696c119e4b0d14",
+      "a79a82e484755741f96f8a5f6d32ccc23181895df22b986eae7bf218f7613b69"
+    ]
+  },
+  "requirement_sha256": "3e1a646ea55e053f39af86d83c5bee2f4a4006326686f8d9582df7ba62fe37c7",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "a1550532dba1ef6441a38389bb9b27098750985a2f88f0c4162a6b46cf9b6d76",
+    "a1550532dba1ef6441a38389bb9b27098750985a2f88f0c4162a6b46cf9b6d76"
+  ],
+  "replay_root_sha256": [
+    "3a8868fe86e4bdb50892e2cec9f288f28d51405c646b678a84590644544bd299",
+    "9035dcfa47ef509386098de88f922ba8abd28716fd93405b0f9b336a09cb9fbc"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "30f911aa4e21c022f1d70d197d817736c473b26b18752b108850854b9abd23fb"
+}

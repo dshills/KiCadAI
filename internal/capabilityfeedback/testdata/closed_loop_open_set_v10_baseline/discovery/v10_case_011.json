@@ -1,0 +1,70 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_011",
+    "role": "discovery",
+    "reporting_domain": "sensing_instrumentation",
+    "circuit_role": "protection_supervision",
+    "safety_impact": "non_safety",
+    "outcome": "unsupported",
+    "frontier": [
+      {
+        "obligation_anchor": "f82ab14acb7e673674f424f12811cdf85514ac59c29e93f5737c8906fd9545d0",
+        "path": [
+          {
+            "stage": "simulation",
+            "category": "simulation",
+            "scope": "simulation",
+            "capability": "dc_operating_point_solver",
+            "code": "SIMULATION_INVALID",
+            "required_evidence": [
+              "dc_operating_point_solver: trusted deterministic analysis, convergence, corner, and assertion evidence"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+          "evidence_sha256:08b645afd72bdb6ca25529b39435c3d8b791e846241acc5901ac477f62f432a1",
+          "evidence_sha256:2c891cc77cf8db906449b8c277aded0601a89f91daa797dd2b9488dd5ace5357"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "3023fb8a28dfa10a2cc9e8ac3405f6aefa5c816e6a564d1af6b9c51f58381d88",
+      "6e09d9c9e7dabaca90ab93cf4aebbd37c5122c396a52f2fd7ce66710952d5bf5",
+      "a14ff4fc588f8ca121084ba6c703d5596473086fd060c14c516f20291d336891",
+      "ebb6defedd5fb095212e7c182ef7e9840e284b09bad998b84dd0b2191030baa5",
+      "fd63fa4c86d200f17debd8e20ce3978088f7bacbe16faebb9fd71a28c831e85e"
+    ]
+  },
+  "requirement_sha256": "74b1a16c3e52906653dd3c9b38270550ff675ac617bee5de3f3a30627f4ee79d",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "688dccabe87accf65975fd20717a9eb8255f6c70e65409ab93713ab3db6188f5",
+    "688dccabe87accf65975fd20717a9eb8255f6c70e65409ab93713ab3db6188f5"
+  ],
+  "replay_root_sha256": [
+    "4e776d7e32e05f2751d9e512a5e6932006286bee9bf476e5eb5243040ced9c76",
+    "a5f7bd0d2585dfb3ef9a20bf8e8959072569bc0369b1e5be9ca6ae91f513341b"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "50fbcebdb19b8e2ce135e5f2b109d7af739045851ab660c031c1f3d04581dfeb"
+}

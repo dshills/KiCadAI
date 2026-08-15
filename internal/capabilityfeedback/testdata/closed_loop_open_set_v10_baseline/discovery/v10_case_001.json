@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.closed-loop-open-set-case-evidence.v10",
+  "version": 10,
+  "case": {
+    "id": "v10_case_001",
+    "role": "discovery",
+    "reporting_domain": "analog_signal_path",
+    "circuit_role": "source_bias",
+    "safety_impact": "non_safety",
+    "outcome": "unsupported",
+    "frontier": [
+      {
+        "obligation_anchor": "714cfc90d9c57dec9fa79fccf78d911174cf1092d0949071f38d0d77479d7aef",
+        "path": [
+          {
+            "stage": "model",
+            "category": "model",
+            "scope": "model",
+            "capability": "dc_operating_point_model",
+            "code": "METRIC_UNSUPPORTED",
+            "required_evidence": [
+              "dc_operating_point_model: reviewed model provenance and applicability bounds"
+            ]
+          }
+        ],
+        "diagnostics": [
+          "downstream:OPEN_TOPOLOGY_NO_PASSING_GRAPH",
+          "evidence_sha256:e64a0bb51bf4d710511582d9d7c7d9197d7d9aa39f647776836eef6b0039a71e"
+        ]
+      }
+    ],
+    "satisfied_obligations": [
+      "157209f00009fa767e04c5803568d61121bce88b615a7857409c81e8ba05c436",
+      "386aaf9e876cacaba72609110a856456f2bc9e9521f491568cc5c38ff7828b45",
+      "76c9757aa1df704857516c10de4ff749e0b2ba912f7ea455cf30f6d68acd33dd",
+      "b7d24e2712efa77cb702529d3d164861758706086a16847822f8d4c5d768d118",
+      "bacbb585f42028bcf307b694c3ad050208e4a462c0f40724eb8151caaceb0841"
+    ]
+  },
+  "requirement_sha256": "5cc2252f4f9005e36c9d47a733803973c649b502b08b64cd4e536bfaa9825418",
+  "environment_sha256": "1d0b547f308a6c51541a7c6af84170333f9660eafb1c2b45a7b60c9234ba170e",
+  "evaluator_manifest_sha256": "c6a7ed4eded6a508c4d726466f19186915b56dd6076ccba3a8e099ec69ec1b3f",
+  "replay_sha256": [
+    "4a34994217716a1a554a5d1b4ae8b0e885ee8ff6c1a1f13a7bfe8c191bcb4aff",
+    "4a34994217716a1a554a5d1b4ae8b0e885ee8ff6c1a1f13a7bfe8c191bcb4aff"
+  ],
+  "replay_root_sha256": [
+    "d09c45dfc4b6a911694421c5108864393cd8aaf0182b903eb30360aa529b3374",
+    "b5c655cf039cc043f7acc20c5194fed60bb96a8f8255720e86d2b5847b36d170"
+  ],
+  "gates": {
+    "primitive_only": true,
+    "topology_search": true,
+    "simulation": true,
+    "all_corners": false,
+    "model_provenance": true,
+    "closed_loop_evidence": true,
+    "complete_routing": false,
+    "connectivity": false,
+    "writer_correctness": false,
+    "round_trip_zero_diff": false,
+    "erc": false,
+    "strict_drc": false,
+    "deterministic_replay": true,
+    "fail_closed": true
+  },
+  "promotions": [],
+  "hash": "d5a36bcb7a096c670688b9a67d17eb50f814372895a6311419f083a5693ce9a6"
+}
