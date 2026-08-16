@@ -160,11 +160,7 @@ component-onboarding-promotion-bundle:
 	./scripts/component-onboarding-promotion.sh
 
 lint:
-	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
-	if [ -n "$$unformatted" ]; then \
-		printf "gofmt required:\n%s\n" "$$unformatted" >&2; \
-		exit 1; \
-	fi
+	./scripts/check-go-format.sh
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go vet ./...
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOLANGCI_LINT_CACHE="$(GOLANGCI_LINT_CACHE)" golangci-lint run ./cmd/... ./internal/...; \

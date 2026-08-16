@@ -1,7 +1,8 @@
 # Project Status
 
-Last full verification: 2026-08-15 by the complete bounded local suite, focused
-V18 preservation and deterministic-replay suites, and installed-KiCad lanes. Closed-loop
+Last full local verification: 2026-08-16 by the complete bounded Go suite,
+focused V19 preservation, compositional-beam, and deterministic-replay suites.
+The latest installed-KiCad lanes remain the verified 2026-08-15 evidence. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -26,6 +27,18 @@ replay, physical lowering, and two clean installed-KiCad promotions. The V6–V1
 evaluator inputs and replay seals remain byte-identical. See the
 [V18 specification](../specs/closed-loop-open-set-capability-expansion/V18_SPEC_ADDENDUM.md).
 
+V19 Phases 1–5 are implemented behind a separate versioned constructor. V19
+derives directed causal-graph invariants, applies reusable role-complete stage,
+observation-cone, terminal-redirection, and typed-feedback operations, and
+composes them with existing repairs in a deterministic depth-four, width-eight
+beam capped at 48 evaluated causal candidates. The exact V18 and V17
+environments remain separately bound, and every V19-ineligible result delegates
+byte-for-byte through V18. The evaluator and contract manifests are frozen and
+authenticated before public observation. No V19 public evaluation has run;
+V18 remains the latest admitted public capability, and V19 Phase 6 is a
+separate bounded evaluation goal. See the
+[V19 evaluator protocol](../specs/closed-loop-open-set-capability-expansion/V19_EVALUATOR_PROTOCOL.md).
+
 The behavioral-contract feasibility and realizability prerequisite is now
 implemented behind a versioned capability-feedback policy. It conservatively
 separates direct-domain topology failures from energy-domain creation,
@@ -46,12 +59,13 @@ and [completion audit](../specs/multi-stage-out-of-distribution-synthesis/AUDIT.
 The active capability-expansion program is
 [closed-loop open-set capability expansion](../specs/closed-loop-open-set-capability-expansion/SPEC.md).
 V1–V17 remain authenticated historical evidence, including fail-closed
-retirements where a generation could not complete. V18 is the current public-
-only extension and deliberately reuses the immutable 24-case V10 discovery
-corpus and frozen V17 serial replay transport. Only the explicit V18 constructor
-can load the added catalog/provenance records and search/evaluation adapters;
-all noneligible requirements delegate byte-for-byte to V17. Held-out keys and
-blind outcomes are outside the V18 protocol.
+retirements where a generation could not complete. V18 is the current admitted
+public-only extension. The locally frozen V19 extension deliberately reuses the
+immutable 24-case V10 discovery corpus and frozen V17 serial replay transport,
+binds exact V18 and V17 environments independently, and adds no component
+catalog or model-provenance records. Only the explicit V19 constructor can use
+the bounded compositional causal repair. Public outcomes, held-out keys, and
+blind outcomes are outside the completed V19 Phase 5 protocol.
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

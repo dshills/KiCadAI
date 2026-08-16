@@ -93,6 +93,14 @@ promotions without changing the frozen V6–V17 evaluator paths. This remains a
 bounded capability, not arbitrary analog synthesis. See the
 [V18 specification](specs/closed-loop-open-set-capability-expansion/V18_SPEC_ADDENDUM.md).
 
+V19 Phases 1–5 add version-isolated causal-graph invariants, reusable topology
+operations, and a deterministic depth-four compositional repair beam while
+delegating every ineligible request byte-for-byte through the exact V18 path.
+The V19 evaluator is frozen and locally verified, but it has not observed the
+public corpus; V18 therefore remains the latest publicly admitted capability.
+The one bounded V19 public evaluation is a separate Phase 6 goal. See the
+[V19 evaluator protocol](specs/closed-loop-open-set-capability-expansion/V19_EVALUATOR_PROTOCOL.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.
