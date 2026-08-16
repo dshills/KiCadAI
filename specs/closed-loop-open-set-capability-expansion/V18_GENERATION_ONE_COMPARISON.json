@@ -1,0 +1,44 @@
+{
+  "schema": "kicadai.closed-loop-open-set-generation-one-comparison.v18",
+  "version": 18,
+  "source_commit": "e7d5e96c9cd6f5ee573b4cbdbe7ac0b042cbd111",
+  "baseline_report": "internal/capabilityfeedback/testdata/closed_loop_open_set_v10_baseline/report.json",
+  "baseline_report_sha256": "5837a8780cd405383e9e2b833ce7ce41bf92273c49c9a9aa0158c5d9add2c350",
+  "baseline_hash": "daf7143f04abd7b8a7b739979d695667b9e10344af1f69f14a261ff10f52715c",
+  "generation_report": "internal/capabilityfeedback/testdata/closed_loop_open_set_v18_generation_one/report.json",
+  "generation_report_sha256": "332983874f65d84099f5f7a8740b9dd815aa6e892358f784be24a6c043f8edad",
+  "generation_hash": "82cb1847bd6b90511aea06b4034dfe1d60c5968f8c33fa9a2e3258e3e9ff5794",
+  "case_count": 24,
+  "replays_per_case": 2,
+  "baseline_outcome_counts": {
+    "pass": 0,
+    "unsupported": 7,
+    "unsafe": 1,
+    "exhausted": 16
+  },
+  "generation_outcome_counts": {
+    "pass": 1,
+    "unsupported": 7,
+    "unsafe": 1,
+    "exhausted": 15
+  },
+  "newly_passing": [
+    {
+      "case_id": "v10_case_005",
+      "before": "exhausted",
+      "after": "pass",
+      "replay_sha256": "27568f2c04a4848379c54c3bab81bd7e6e87f2dbc1ab761706b45e14d92ce963",
+      "promotion_run_sha256": "f49c161bbd3c22cbc7cdb391a0528a0f92d6718bda1f86f74ae8ef9762dac4c2",
+      "promotion_project_sha256": "83ddd5c8cc8c88c30ee6454f6ac6e177692d062cd5c3785c119512363e9482d5"
+    }
+  ],
+  "other_outcome_transitions": [],
+  "lost_satisfied_obligations": 0,
+  "no_baseline_pass_regression": true,
+  "unsafe_evidence_preserved": true,
+  "typed_obligation_non_regression": true,
+  "deterministic_replay_complete": true,
+  "installed_kicad_promotion_complete": true,
+  "all_physical_gates_passed": true,
+  "accepted": true
+}
