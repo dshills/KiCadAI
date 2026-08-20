@@ -69,6 +69,10 @@ Mains and other high-energy safety systems, RF power, unrestricted high-speed
 or dense boards, arbitrary parts and models, automatic compliance claims, and
 automatic fabrication approval are unsupported.
 
+The V19 causal-topology experiment is also explicitly unsupported in v1. Its
+bounded public evaluation failed the frozen advancement and preservation gates
+and was permanently retired. V18 is the latest admitted public capability.
+
 ## Compatibility changes
 
 Breaking changes to a stable v1 CLI or schema require a new major version or a

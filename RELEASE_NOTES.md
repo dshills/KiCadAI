@@ -24,6 +24,11 @@ an arbitrary-circuit generator or a fabrication approval system. Human
 electrical, thermal, mechanical, regulatory, and manufacturing review remains
 required.
 
+The bounded V19 capability evaluation completed all 24 public cases twice but
+did not meet its frozen advancement or preservation gates. It is published as
+a fail-closed retirement and is not part of this release's supported surface;
+V18 remains the latest admitted public capability.
+
 Pre-v1 compatibility note: `kicadai version` now reports the KiCadAI build.
 Use `kicadai kicad-version` for the live connected-KiCad version probe that the
 old command provided.

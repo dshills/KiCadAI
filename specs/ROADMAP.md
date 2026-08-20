@@ -87,11 +87,11 @@ approval are not v1 claims.
   weakening existing gates. See the
   [specification](closed-loop-open-set-capability-expansion/SPEC.md). V1–V17
   preserve authenticated advancement and fail-closed retirement history. V18
-  is the latest publicly admitted capability. V19 Phases 1–5 implement a
-  version-isolated compositional causal-repair beam behind the exact V18 path;
-  its evaluator is frozen and awaits the one bounded Phase 6 public decision.
-  See the [V19 evaluator
-  protocol](closed-loop-open-set-capability-expansion/V19_EVALUATOR_PROTOCOL.md).
+  is the latest publicly admitted capability. V19's one bounded Phase 6 run
+  completed all 24 public cases twice but produced zero passes and regressed
+  the V18 admitted pass, so V19 is permanently retired and excluded from v1.
+  See the [V19 retirement
+  audit](closed-loop-open-set-capability-expansion/V19_GENERATION_ZERO_RETIREMENT_AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic

@@ -35,3 +35,7 @@ versioning for its documented CLI and versioned input contracts.
 - v1 remains bounded and fail-closed. It does not claim arbitrary-circuit
   generation, unrestricted routing, fabrication approval, or suitability for
   mains/high-energy designs.
+- The bounded V19 public evaluation completed deterministically but failed its
+  advancement and preservation gates. V19 is permanently retired and excluded
+  from the v1 supported surface; V18 remains the latest admitted public
+  capability.
