@@ -451,6 +451,40 @@ func TestRelativeGroupPreviewLeavesEdgeAndJointSearchToAtomicPlanner(t *testing.
 	}
 }
 
+func TestJointGroupPreviewReservesUngroupedWithoutPinningAnchors(t *testing.T) {
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 24, HeightMM: 20},
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 4, YMM: 4, Layer: "F.Cu"}},
+			{Ref: "U2", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 16, YMM: 4, Layer: "F.Cu"}},
+			{Ref: "J1", FootprintID: "Test:J", Bounds: Bounds{WidthMM: 3, HeightMM: 3, Source: BoundsExplicit}, Position: &Placement{XMM: 10, YMM: 14, Layer: "F.Cu"}},
+		},
+		Groups: []Group{
+			{ID: "left", Components: []string{"U1"}, Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true},
+			{ID: "right", Components: []string{"U2"}, Anchor: GroupAnchor{Ref: "U2"}, TranslateAsUnit: true},
+		},
+	}
+	request = NormalizeRequest(request)
+	components := map[string]Component{"U1": request.Components[0], "U2": request.Components[1], "J1": request.Components[2]}
+	groupOrder := relativeGroupOrder(request.Groups, components)
+	grouped := relativeGroupIndexesByMember(request.Groups)
+	if shouldPreviewRelativeGroupSearch(request.Groups, groupOrder, components) {
+		t.Fatal("joint group search unexpectedly enabled preview anchor targets")
+	}
+	if !shouldReserveUngroupedForRelativeGroupSearch(groupOrder, grouped, components) {
+		t.Fatal("joint group search did not request an ungrouped reservation preview")
+	}
+	preview := previewRelativeGroupSearch(context.Background(), request, groupOrder, grouped, false)
+	if len(preview.reservations) != 1 || preview.reservations[0].Ref != "J1" {
+		t.Fatalf("joint preview reservations = %#v, want only J1; raw preview=%#v", preview.reservations, placeContext(context.Background(), request, false))
+	}
+	for _, group := range preview.request.Groups {
+		if group.Anchor.At != nil {
+			t.Fatalf("joint preview pinned group %q anchor to %#v", group.ID, group.Anchor.At)
+		}
+	}
+}
+
 func TestRigidGroupPlanningPreservesPreviewedUngroupedPlacements(t *testing.T) {
 	rules := DefaultRules()
 	rules.GridMM = 1
@@ -507,7 +541,7 @@ func TestRigidGroupPreviewFailsOpenWhenAnyProvisionalPlacementFails(t *testing.T
 	}
 	components := map[string]Component{"U1": request.Components[0], "X1": request.Components[1]}
 	groupOrder := relativeGroupOrder(request.Groups, components)
-	preview := previewRelativeGroupSearch(context.Background(), request, groupOrder, relativeGroupIndexesByMember(request.Groups))
+	preview := previewRelativeGroupSearch(context.Background(), request, groupOrder, relativeGroupIndexesByMember(request.Groups), true)
 
 	if len(preview.reservations) != 0 || len(preview.reservationsByRef) != 0 {
 		t.Fatalf("incomplete preview leaked reservations: %#v", preview)

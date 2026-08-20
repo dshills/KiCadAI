@@ -80,8 +80,10 @@ func placeNormalizedContext(ctx context.Context, request Request, planRigidGroup
 	rigidGroupByMember := relativeGroupIndexesByMember(request.Groups)
 	rigidGroupOrder := relativeGroupOrder(request.Groups, componentsByRef)
 	rigidPreview := relativeGroupSearchPreview{request: request}
-	if planRigidGroups && shouldPreviewRelativeGroupSearch(request.Groups, rigidGroupOrder, componentsByRef) {
-		rigidPreview = previewRelativeGroupSearch(ctx, request, rigidGroupOrder, rigidGroupByMember)
+	pinPreviewAnchors := shouldPreviewRelativeGroupSearch(request.Groups, rigidGroupOrder, componentsByRef)
+	if planRigidGroups && (pinPreviewAnchors ||
+		shouldReserveUngroupedForRelativeGroupSearch(rigidGroupOrder, rigidGroupByMember, componentsByRef)) {
+		rigidPreview = previewRelativeGroupSearch(ctx, request, rigidGroupOrder, rigidGroupByMember, pinPreviewAnchors)
 	}
 	if !planRigidGroups {
 		rigidGroupByMember = nil
@@ -318,6 +320,13 @@ func shouldPreviewRelativeGroupSearch(groups []Group, groupOrder []int, componen
 	return !relativeGroupHasEdgeConstraint(groups[groupOrder[0]], components)
 }
 
+func shouldReserveUngroupedForRelativeGroupSearch(groupOrder []int, rigidGroupByMember map[string]int, components map[string]Component) bool {
+	if len(groupOrder) < 2 {
+		return false
+	}
+	return len(components) > len(rigidGroupByMember)
+}
+
 // previewRelativeGroupSearch obtains a deterministic whole-board forecast
 // without committing rigid-group transforms. Its successful ungrouped
 // placements are reused directly by the final pass, not recomputed. They also
@@ -325,7 +334,7 @@ func shouldPreviewRelativeGroupSearch(groups []Group, groupOrder []int, componen
 // consume space that the remaining circuit needs. If the reservation-backed
 // search is infeasible, the caller falls back to the ordinary bounded group
 // search.
-func previewRelativeGroupSearch(ctx context.Context, request Request, groupOrder []int, rigidGroupByMember map[string]int) relativeGroupSearchPreview {
+func previewRelativeGroupSearch(ctx context.Context, request Request, groupOrder []int, rigidGroupByMember map[string]int, pinAnchors bool) relativeGroupSearchPreview {
 	if len(groupOrder) == 0 {
 		return relativeGroupSearchPreview{request: request}
 	}
@@ -343,18 +352,24 @@ func previewRelativeGroupSearch(ctx context.Context, request Request, groupOrder
 	if len(previewByRef) != len(request.Components) {
 		return relativeGroupSearchPreview{request: request}
 	}
-	searchRequest := CloneRequest(request)
-	for _, groupIndex := range groupOrder {
-		if request.Groups[groupIndex].Anchor.At != nil {
-			continue
+	searchRequest := request
+	// A single unconstrained interior group can safely reuse its previewed
+	// anchor. Multiple groups still require their joint atomic search; in that
+	// case the preview contributes only ungrouped space reservations.
+	if pinAnchors {
+		searchRequest = CloneRequest(request)
+		for _, groupIndex := range groupOrder {
+			if request.Groups[groupIndex].Anchor.At != nil {
+				continue
+			}
+			placed, ok := previewByRef[normalizeRef(request.Groups[groupIndex].Anchor.Ref)]
+			if !ok {
+				continue
+			}
+			group := &searchRequest.Groups[groupIndex]
+			target := Point{XMM: placed.Position.XMM, YMM: placed.Position.YMM}
+			group.Anchor.At = &target
 		}
-		placed, ok := previewByRef[normalizeRef(request.Groups[groupIndex].Anchor.Ref)]
-		if !ok {
-			continue
-		}
-		group := &searchRequest.Groups[groupIndex]
-		target := Point{XMM: placed.Position.XMM, YMM: placed.Position.YMM}
-		group.Anchor.At = &target
 	}
 	reservations := make([]PlacementResult, 0, len(preview.Placements))
 	reservationsByRef := make(map[string]PlacementResult, len(preview.Placements))
