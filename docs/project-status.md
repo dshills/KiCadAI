@@ -2,8 +2,14 @@
 
 Last full bounded Go verification: 2026-08-20, including focused V19
 preservation, compositional-beam, deterministic-replay, contract, and
-retirement-evidence suites.
-The latest installed-KiCad lanes remain the verified 2026-08-15 evidence. Closed-loop
+retirement-evidence suites. The release coverage gate reports 80.5% after
+excluding generated protobuf bindings, above the required 75% threshold.
+The latest installed-KiCad lanes were reproduced on 2026-08-20 with KiCad
+10.0.3. The six-scenario clean-checkout promotion bundle passed twice with
+identical normalized inventories, and the complete 13-case design-example tier
+passed clean ERC, strict DRC, connectivity, route completion, writer
+correctness, and zero round-trip differences. The five educational schematics
+also remain deterministic and readable. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -18,6 +24,15 @@ power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
+
+The `v1.0.0-rc.1` release surface is frozen. Application version reporting is
+separate from connected-KiCad reporting; macOS and Linux AMD64/ARM64 builds are
+byte-reproducible and checksummed; clean-install smoke tests cover help,
+version, capability reporting, a supported example, and fail-closed refusal.
+The supported and excluded boundaries are recorded in
+[`SUPPORT.md`](../SUPPORT.md). Historical experimental promotion matrices do
+not enter the v1 surface implicitly: without explicit experimental opt-in they
+continue to refuse at the capability gate.
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
