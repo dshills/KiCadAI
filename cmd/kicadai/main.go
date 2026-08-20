@@ -2690,37 +2690,28 @@ func runValidateCommand(ctx context.Context, opts cliOptions, stdout io.Writer) 
 
 func runWriterCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer",
 			Message:  "writer requires a subcommand",
-		}); err != nil {
-			return err
-		}
-		return errors.New("writer requires a subcommand")
+		})
 	}
 	if opts.commandArgs[0] != "check" {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer." + opts.commandArgs[0],
 			Message:  "unsupported writer subcommand " + opts.commandArgs[0],
-		}); err != nil {
-			return err
-		}
-		return errors.New("unsupported writer subcommand " + opts.commandArgs[0])
+		})
 	}
 	if len(opts.commandArgs) != 2 {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer.check",
 			Message:  "writer check requires 1 argument",
-		}); err != nil {
-			return err
-		}
-		return errors.New("writer check requires 1 argument")
+		})
 	}
 	wcOpts := writerCorrectnessOptions(opts)
 	var libraryIssues []reports.Issue
@@ -3672,10 +3663,7 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	if strings.TrimSpace(opts.output) == "" {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "--output is required"}
-		if err := writeReportFailure(stdout, "intent", issue); err != nil {
-			return err
-		}
-		return errors.New(issue.Message)
+		return writeReportFailure(stdout, "intent", issue)
 	}
 	plan, issues, draft, sourceText, err := loadIntentPlanForCreate(opts)
 	if err != nil {
@@ -3983,10 +3971,7 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 }
 
 func writeDesignFailure(stdout io.Writer, issue reports.Issue) error {
-	if err := writeReportFailure(stdout, "design", issue); err != nil {
-		return err
-	}
-	return errors.New(issue.Message)
+	return writeReportFailure(stdout, "design", issue)
 }
 
 func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []reports.Issue, extraArtifacts []reports.Artifact) reports.Result {
