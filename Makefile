@@ -1,9 +1,15 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one race-short public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install release release-smoke release-reproducibility test test-one race-short public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
+INSTALL_DIR ?= $(HOME)/.local/bin
+DIST_DIR ?= $(CURDIR)/dist
+VERSION ?= v$(shell tr -d '[:space:]' < VERSION)
+COMMIT ?= $(shell git rev-parse HEAD)
+BUILD_DATE ?= $(shell git show -s --format=%cI $(COMMIT))
+RELEASE_BINARY ?= $(DIST_DIR)/kicadai_$(VERSION)_$(shell go env GOOS)_$(shell go env GOARCH)
 GO_CACHE_ROOT ?= $(CURDIR)/.cache/go
 GOCACHE_DIR := $(GO_CACHE_ROOT)/build
 GOMODCACHE_DIR := $(GO_CACHE_ROOT)/mod
@@ -39,7 +45,10 @@ COMPONENT_ONBOARDING_PROMOTION_ROOT ?= $(CURDIR)/.tmp/component-onboarding-promo
 help:
 	@printf "KiCadAI targets:\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
-	@printf "  make install         Install CLI binary to ./bin using go install\n"
+	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
+	@printf "  make release         Build versioned macOS/Linux release artifacts\n"
+	@printf "  make release-smoke   Smoke-test one host-compatible release binary\n"
+	@printf "  make release-reproducibility Verify two release builds are byte-identical\n"
 	@printf "  make test            Run Go tests\n"
 	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make race-short      Run the local bounded concurrency race suite\n"
@@ -60,12 +69,27 @@ help:
 	@printf "  make proto           Regenerate vendored KiCad protobuf bindings\n"
 	@printf "  make proto-check     Regenerate protobuf bindings and check for diffs\n"
 
+# Ordinary source builds intentionally retain the "dev" application version
+# and Go-embedded VCS/dirty metadata. Only build-release.sh may stamp an
+# official VERSION identity into a binary.
 build:
 	mkdir -p "$(BIN_DIR)"
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
 
-install:
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go install ./cmd/kicadai
+install: build
+	mkdir -p "$(INSTALL_DIR)"
+	install -m 0755 "$(BIN)" "$(INSTALL_DIR)/kicadai"
+
+release:
+	VERSION="$(VERSION)" COMMIT="$(COMMIT)" BUILD_DATE="$(BUILD_DATE)" OUTPUT_DIR="$(DIST_DIR)" \
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" ./scripts/build-release.sh
+
+release-smoke:
+	./scripts/release-smoke-test.sh "$(RELEASE_BINARY)"
+
+release-reproducibility:
+	VERSION="$(VERSION)" COMMIT="$(COMMIT)" BUILD_DATE="$(BUILD_DATE)" \
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" ./scripts/verify-release-reproducibility.sh
 
 test:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...

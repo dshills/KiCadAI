@@ -122,9 +122,11 @@ that arbitrary dense boards are supported.
 
 ## Run It In Under Ten Minutes
 
-You need Go 1.23 or newer and KiCad 9 or newer. KiCad 10.0.3 is the recorded
-reference version. `protoc` is needed only when regenerating vendored protobuf
-bindings.
+Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
+reference for installed-KiCad validation and promotion claims. KiCad 9 remains
+experimental for those claims. Source builds require Go 1.23 or newer;
+`protoc` is needed only when regenerating vendored protobuf bindings. See the
+[v1 support contract](SUPPORT.md).
 
 ```sh
 git clone https://github.com/dshills/KiCadAI.git
@@ -145,7 +147,15 @@ the direct writers or checked-in educational examples:
 ```sh
 make build
 ./bin/kicadai --help
+./bin/kicadai version
 ```
+
+Release downloads contain one platform binary, `RELEASE_MANIFEST.json`, and
+`SHA256SUMS`. Verify the checksum before installing, then place the binary on
+your `PATH`. A source checkout can install to `~/.local/bin` with `make
+install`; set `INSTALL_DIR` to choose another location. The project publishes a
+CLI rather than a supported Go library, so versioned `go install` is not the v1
+installation contract.
 
 See [educational circuits](examples/educational/README.md), the
 [CLI reference](docs/cli-reference.md), and the preserved
@@ -264,6 +274,8 @@ Start with the [documentation index](docs/README.md).
 |---|---|
 | Featured end-to-end proof | [Protected Programmable Current Output](examples/public-demo/protected-programmable-current-output/README.md) |
 | Current capabilities and limits | [Project Status](docs/project-status.md) |
+| v1 platforms, compatibility, and support boundary | [Support Contract](SUPPORT.md) |
+| Release history and safety reporting | [Changelog](CHANGELOG.md), [Security](SECURITY.md) |
 | Detailed implementation record | [Capability Record](docs/capability-record.md) |
 | Educational generated schematics | [Educational Examples](examples/educational/README.md) |
 | Commands and live IPC | [CLI Reference](docs/cli-reference.md) |
@@ -286,6 +298,7 @@ Start with the [documentation index](docs/README.md).
 make test
 make lint
 make build
+make release-reproducibility
 ```
 
 See [Development Reference](docs/development.md) for focused tests, coverage,

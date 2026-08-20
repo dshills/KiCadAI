@@ -10,7 +10,7 @@ project/editor you want to inspect, then run:
 ```sh
 kicadai config
 kicadai ping
-kicadai version
+kicadai kicad-version
 kicadai documents
 kicadai capabilities
 kicadai capability generation --json
@@ -67,6 +67,7 @@ artifact.
 kicadai config
 kicadai ping
 kicadai version
+kicadai kicad-version
 kicadai documents
 kicadai capabilities
 kicadai inspect project ./examples/07_generated_pcb
@@ -476,9 +477,11 @@ the resolved profile ID, version, source, and hash.
 
 ### Live IPC Commands
 
+- `version` or `--version`: print the KiCadAI application version, source
+  commit, build date, Go version, and platform without connecting to KiCad.
 - `config`: print resolved connection configuration.
 - `ping`: check whether KiCad responds.
-- `version`: print KiCad version information.
+- `kicad-version`: print connected KiCad version information.
 - `documents`: list open KiCad documents.
 - `capabilities`: report detected API command support.
 - `plan-led-demo`: print a deterministic LED schematic action plan.

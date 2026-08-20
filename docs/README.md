@@ -6,6 +6,10 @@ This directory holds the detailed reference material that used to live in the pr
 
 - [Featured Public Demo](../examples/public-demo/protected-programmable-current-output/README.md): behavior-only protected current-output synthesis, native KiCad artifacts, compact evidence, refusal replay, and video storyboard.
 - [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
+- [v1 Support Contract](../SUPPORT.md): release platforms, KiCad compatibility,
+  stable interfaces, and explicit unsupported boundaries.
+- [Changelog](../CHANGELOG.md) and [Security](../SECURITY.md): release changes,
+  vulnerability reporting, and electrical-safety boundaries.
 - [Educational Schematic Examples](../examples/educational/README.md): five
   generated teaching circuits with conventional topology-aware layout and
   reproducible KiCad projects.
