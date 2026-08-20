@@ -632,20 +632,86 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 
 func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex, allowGridFallback bool) ([]kicadfiles.Point, bool) {
 	routeStart, routeEnd := start, end
-	if direction, ok := endpointLabelDirection(from, result.Components, rules.Grid); ok {
-		routeStart = kicadfiles.Point{X: start.X + direction.X, Y: start.Y + direction.Y}
-	}
-	if direction, ok := endpointLabelDirection(to, result.Components, rules.Grid); ok {
-		routeEnd = kicadfiles.Point{X: end.X + direction.X, Y: end.Y + direction.Y}
-	}
-	withAccess := func(points []kicadfiles.Point) []kicadfiles.Point {
-		if routeStart != start {
-			points = append([]kicadfiles.Point{start}, points...)
+	var sharedComponent *PlacedComponent
+	if from.Ref == to.Ref {
+		for index := range result.Components {
+			if result.Components[index].Ref == from.Ref {
+				sharedComponent = &result.Components[index]
+				break
+			}
 		}
+	}
+	routeAccessPoint := func(endpoint Endpoint, anchor kicadfiles.Point) (kicadfiles.Point, bool) {
+		if direction, ok := endpointLabelDirection(endpoint, result.Components, rules.Grid); ok {
+			return kicadfiles.Point{X: anchor.X + direction.X, Y: anchor.Y + direction.Y}, true
+		}
+		// Cross-component routes already score every candidate against symbol
+		// bodies, and an inferred side is ambiguous when library pin direction is
+		// absent. The body-derived fallback is reserved for two pins on the same
+		// body: without an outward access point, their shortest route necessarily
+		// cuts through that body.
+		if sharedComponent == nil {
+			return kicadfiles.Point{}, false
+		}
+		body := componentBody(*sharedComponent)
+		direction := labelDirectionFromBody(anchor, body, rules.Grid)
+		access := anchor
+		switch {
+		case direction.X < 0:
+			access.X = SnapIU(body.MinX-rules.Grid, rules.Grid)
+		case direction.X > 0:
+			access.X = SnapIU(body.MaxX+rules.Grid, rules.Grid)
+		case direction.Y < 0:
+			access.Y = SnapIU(body.MinY-rules.Grid, rules.Grid)
+		case direction.Y > 0:
+			access.Y = SnapIU(body.MaxY+rules.Grid, rules.Grid)
+		}
+		return access, true
+	}
+	if access, ok := routeAccessPoint(from, start); ok {
+		routeStart = access
+	}
+	if access, ok := routeAccessPoint(to, end); ok {
+		routeEnd = access
+	}
+	followsOutwardAccess := func(anchor, next, access kicadfiles.Point) bool {
+		direction := kicadfiles.Point{X: access.X - anchor.X, Y: access.Y - anchor.Y}
+		delta := kicadfiles.Point{X: next.X - anchor.X, Y: next.Y - anchor.Y}
+		switch {
+		case direction.X < 0:
+			return delta.Y == 0 && next.X <= access.X
+		case direction.X > 0:
+			return delta.Y == 0 && next.X >= access.X
+		case direction.Y < 0:
+			return delta.X == 0 && next.Y <= access.Y
+		case direction.Y > 0:
+			return delta.X == 0 && next.Y >= access.Y
+		default:
+			return true
+		}
+	}
+	withAccess := func(inner []kicadfiles.Point) ([]kicadfiles.Point, bool) {
+		points := make([]kicadfiles.Point, 0, len(inner)+2)
+		if routeStart != start {
+			points = append(points, start)
+		}
+		points = append(points, inner...)
 		if routeEnd != end {
 			points = append(points, end)
 		}
-		return compactPointPath(points)
+		points = compactPointPath(points)
+		// Pin-access points are mandatory routing constraints. A candidate that
+		// approaches an access point from the pin side immediately reverses over
+		// the same segment; compacting that reversal would silently restore a
+		// route through the symbol body. A straight continuation may compact the
+		// access point, so validate the direction of the retained endpoint segment
+		// instead of requiring the intermediate point to remain present.
+		if len(points) < 2 ||
+			routeStart != start && !followsOutwardAccess(start, points[1], routeStart) ||
+			routeEnd != end && !followsOutwardAccess(end, points[len(points)-2], routeEnd) {
+			return nil, false
+		}
+		return points, true
 	}
 	candidates := routeCandidates(routeStart, routeEnd, result.Components, rules, anchorIndex)
 	type scoredRoute struct {
@@ -655,7 +721,11 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	scored := make([]scoredRoute, 0, len(candidates))
 	for _, candidate := range candidates {
-		candidate = withAccess(candidate)
+		var valid bool
+		candidate, valid = withAccess(candidate)
+		if !valid {
+			continue
+		}
 		score, clean := scoreRouteIndexed(candidate, netName, from, to, result, request, anchorIndex)
 		scored = append(scored, scoredRoute{points: candidate, score: score, clean: clean})
 	}
@@ -668,9 +738,10 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	if !hasClean && allowGridFallback {
 		if points, ok := orthogonalGridRoute(netName, from, to, routeStart, routeEnd, result, request, rules, anchorIndex); ok {
-			points = withAccess(points)
-			score, clean := scoreRouteIndexed(points, netName, from, to, result, request, anchorIndex)
-			scored = append(scored, scoredRoute{points: points, score: score, clean: clean})
+			if points, valid := withAccess(points); valid {
+				score, clean := scoreRouteIndexed(points, netName, from, to, result, request, anchorIndex)
+				scored = append(scored, scoredRoute{points: points, score: score, clean: clean})
+			}
 		}
 	}
 	sort.SliceStable(scored, func(i, j int) bool {
@@ -680,7 +751,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 		return comparePointPaths(scored[i].points, scored[j].points) < 0
 	})
 	if len(scored) == 0 {
-		return withAccess([]kicadfiles.Point{routeStart, routeEnd}), false
+		return []kicadfiles.Point{start, end}, false
 	}
 	return scored[0].points, scored[0].clean
 }

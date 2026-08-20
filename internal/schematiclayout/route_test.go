@@ -282,6 +282,29 @@ func TestLabelDirectionUsesPlacedBodyEdge(t *testing.T) {
 	}
 }
 
+func TestRouteUsesBodyEdgeAccessForPinsWithoutDirection(t *testing.T) {
+	component := PlacedComponent{
+		Component: Component{
+			Ref: "U1",
+			Pins: []Pin{
+				{Number: "1", At: kicadfiles.Point{X: -kicadfiles.MM(2.54), Y: -kicadfiles.MM(2.54)}},
+				{Number: "2", At: kicadfiles.Point{X: -kicadfiles.MM(2.54)}},
+			},
+		},
+		PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+	}
+	result := Route(Request{
+		Sheet: testSheet(),
+		Nets:  []Net{{Name: "ENABLE", Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}}}},
+	}, Result{Components: []PlacedComponent{component}})
+	if hasDiagnostic(result.Diagnostics, DiagnosticWireSymbolOverlap, SeverityError) {
+		t.Fatalf("same-symbol route crossed the body: connections=%#v diagnostics=%#v", result.Connections, result.Diagnostics)
+	}
+	if len(result.Connections) != 1 || len(result.Connections[0].Points) < 4 {
+		t.Fatalf("same-symbol route lacks outward pin access: %#v", result.Connections)
+	}
+}
+
 func TestRoutePrefersCalibratedPinDirectionForLabelStub(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

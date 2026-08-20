@@ -1,8 +1,15 @@
 # Project Status
 
-Last full local verification: 2026-08-16 by the complete bounded Go suite,
-focused V19 preservation, compositional-beam, and deterministic-replay suites.
-The latest installed-KiCad lanes remain the verified 2026-08-15 evidence. Closed-loop
+Last full bounded Go verification: 2026-08-20, including focused V19
+preservation, compositional-beam, deterministic-replay, contract, and
+retirement-evidence suites. The release coverage gate reports 80.5% after
+excluding generated protobuf bindings, above the required 75% threshold.
+The latest installed-KiCad lanes were reproduced on 2026-08-20 with KiCad
+10.0.3. The six-scenario clean-checkout promotion bundle passed twice with
+identical normalized inventories, and the complete 13-case design-example tier
+passed clean ERC, strict DRC, connectivity, route completion, writer
+correctness, and zero round-trip differences. The five educational schematics
+also remain deterministic and readable. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -18,6 +25,15 @@ four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
 
+The `v1.0.0-rc.1` release surface is frozen. Application version reporting is
+separate from connected-KiCad reporting; macOS and Linux AMD64/ARM64 builds are
+byte-reproducible and checksummed; clean-install smoke tests cover help,
+version, capability reporting, a supported example, and fail-closed refusal.
+The supported and excluded boundaries are recorded in
+[`SUPPORT.md`](../SUPPORT.md). Historical experimental promotion matrices do
+not enter the v1 surface implicitly: without explicit experimental opt-in they
+continue to refuse at the capability gate.
+
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
 The selected graph uses reviewed low-voltage catalog/provenance evidence,
@@ -27,17 +43,20 @@ replay, physical lowering, and two clean installed-KiCad promotions. The V6–V1
 evaluator inputs and replay seals remain byte-identical. See the
 [V18 specification](../specs/closed-loop-open-set-capability-expansion/V18_SPEC_ADDENDUM.md).
 
-V19 Phases 1–5 are implemented behind a separate versioned constructor. V19
+V19 Phases 1–5 were implemented behind a separate versioned constructor. V19
 derives directed causal-graph invariants, applies reusable role-complete stage,
 observation-cone, terminal-redirection, and typed-feedback operations, and
 composes them with existing repairs in a deterministic depth-four, width-eight
 beam capped at 48 evaluated causal candidates. The exact V18 and V17
 environments remain separately bound, and every V19-ineligible result delegates
-byte-for-byte through V18. The evaluator and contract manifests are frozen and
-authenticated before public observation. No V19 public evaluation has run;
-V18 remains the latest admitted public capability, and V19 Phase 6 is a
-separate bounded evaluation goal. See the
-[V19 evaluator protocol](../specs/closed-loop-open-set-capability-expansion/V19_EVALUATOR_PROTOCOL.md).
+byte-for-byte through V18. The bounded Phase 6 evaluation authenticated the
+frozen evaluator and contract, ran all 24 public cases exactly twice, and
+completed deterministic replay. Its aggregate outcome was 0 pass, 12
+unsupported, 1 unsafe, and 11 exhausted; it also failed to preserve V18's one
+admitted pass. V19 is permanently retired, is not part of the v1 supported
+surface, and authorizes no capability claim. V18 remains the latest admitted
+public capability. See the
+[V19 retirement audit](../specs/closed-loop-open-set-capability-expansion/V19_GENERATION_ZERO_RETIREMENT_AUDIT.md).
 
 The behavioral-contract feasibility and realizability prerequisite is now
 implemented behind a versioned capability-feedback policy. It conservatively
@@ -60,12 +79,11 @@ The active capability-expansion program is
 [closed-loop open-set capability expansion](../specs/closed-loop-open-set-capability-expansion/SPEC.md).
 V1–V17 remain authenticated historical evidence, including fail-closed
 retirements where a generation could not complete. V18 is the current admitted
-public-only extension. The locally frozen V19 extension deliberately reuses the
-immutable 24-case V10 discovery corpus and frozen V17 serial replay transport,
-binds exact V18 and V17 environments independently, and adds no component
-catalog or model-provenance records. Only the explicit V19 constructor can use
-the bounded compositional causal repair. Public outcomes, held-out keys, and
-blind outcomes are outside the completed V19 Phase 5 protocol.
+public-only extension. V19 reused the immutable 24-case V10 discovery corpus
+and frozen V17 serial replay transport without opening held-out keys, but its
+completed public evaluation failed both advancement and preservation gates.
+The V19 constructor is retained only as versioned historical regression
+evidence and is excluded from the v1 supported contract.
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

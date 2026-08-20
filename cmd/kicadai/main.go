@@ -21,6 +21,7 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/blocks/verification"
 	"kicadai/internal/boardvalidation"
+	"kicadai/internal/buildinfo"
 	"kicadai/internal/components"
 	"kicadai/internal/config"
 	"kicadai/internal/creationevidence"
@@ -72,7 +73,7 @@ Commands:
   block         List, inspect, and validate built-in circuit blocks
   fabrication   List, show, and validate fabrication profiles
   component     List, select, onboard, promote, and validate component catalog records
-	  circuit       Preflight or create projects from strict generic circuit graphs
+  circuit       Preflight or create projects from strict generic circuit graphs
   requirement   Create projects from strict behavior-only requirements
   open-topology Discover and promote primitive circuits from behavior-only requirements
   check         Run KiCad CLI ERC/DRC checks
@@ -93,7 +94,8 @@ Commands:
   ping          Check whether KiCad responds to the API
   roundtrip     Run KiCad CLI round-trip checks
   transaction   Build, validate, plan, or apply structured edit transactions
-  version       Print KiCad version information
+  version       Print KiCadAI application version information
+  kicad-version Print connected KiCad version information
   help          Print this help text
 
 Global flags:
@@ -309,6 +311,7 @@ type cliOptions struct {
 	skipPlacementFeedback       bool
 	feedbackOutput              bool
 	prettyOutput                bool
+	applicationVersion          bool
 	commandArgs                 []string
 	flagHelp                    map[string]cliFlagHelp
 }
@@ -428,6 +431,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "ping":
 		return a.runPing(ctx, opts, stdout)
 	case "version":
+		return runApplicationVersion(opts, stdout)
+	case "kicad-version":
 		return a.runVersion(ctx, opts, stdout)
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", command, usage)
@@ -533,6 +538,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.skipPlacementFeedback, "skip-placement-feedback", false, "skip placement feedback in block project generation output")
 	flags.BoolVar(&opts.feedbackOutput, "feedback", false, "include grouped operation feedback for transaction commands")
 	flags.BoolVar(&opts.prettyOutput, "pretty", false, "pretty-print JSON output")
+	flags.BoolVar(&opts.applicationVersion, "version", false, "print KiCadAI application version information")
 
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -584,6 +590,9 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	}
 	if err := validatePlacementFeedbackOptions(opts); err != nil {
 		return opts, "", err
+	}
+	if opts.applicationVersion {
+		return opts, "version", nil
 	}
 	if flags.NArg() == 0 {
 		return opts, "help", nil
@@ -2681,37 +2690,28 @@ func runValidateCommand(ctx context.Context, opts cliOptions, stdout io.Writer) 
 
 func runWriterCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer",
 			Message:  "writer requires a subcommand",
-		}); err != nil {
-			return err
-		}
-		return errors.New("writer requires a subcommand")
+		})
 	}
 	if opts.commandArgs[0] != "check" {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer." + opts.commandArgs[0],
 			Message:  "unsupported writer subcommand " + opts.commandArgs[0],
-		}); err != nil {
-			return err
-		}
-		return errors.New("unsupported writer subcommand " + opts.commandArgs[0])
+		})
 	}
 	if len(opts.commandArgs) != 2 {
-		if err := writeReportFailure(stdout, "writer", reports.Issue{
+		return writeReportFailure(stdout, "writer", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "writer.check",
 			Message:  "writer check requires 1 argument",
-		}); err != nil {
-			return err
-		}
-		return errors.New("writer check requires 1 argument")
+		})
 	}
 	wcOpts := writerCorrectnessOptions(opts)
 	var libraryIssues []reports.Issue
@@ -3663,10 +3663,7 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	if strings.TrimSpace(opts.output) == "" {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "--output is required"}
-		if err := writeReportFailure(stdout, "intent", issue); err != nil {
-			return err
-		}
-		return errors.New(issue.Message)
+		return writeReportFailure(stdout, "intent", issue)
 	}
 	plan, issues, draft, sourceText, err := loadIntentPlanForCreate(opts)
 	if err != nil {
@@ -3974,10 +3971,7 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 }
 
 func writeDesignFailure(stdout io.Writer, issue reports.Issue) error {
-	if err := writeReportFailure(stdout, "design", issue); err != nil {
-		return err
-	}
-	return errors.New(issue.Message)
+	return writeReportFailure(stdout, "design", issue)
 }
 
 func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []reports.Issue, extraArtifacts []reports.Artifact) reports.Result {
@@ -5615,6 +5609,19 @@ func (a app) runVersion(parent context.Context, opts cliOptions, stdout io.Write
 		return err
 	}
 	return nil
+}
+
+func runApplicationVersion(opts cliOptions, stdout io.Writer) error {
+	info := buildinfo.Current()
+	if opts.jsonOutput {
+		return writeJSON(stdout, info)
+	}
+	modified := ""
+	if info.Modified {
+		modified = ", modified"
+	}
+	_, err := fmt.Fprintf(stdout, "%s %s (commit %s, built %s, %s, %s%s)\n", info.Name, info.Version, info.Commit, info.BuildDate, info.GoVersion, info.Platform, modified)
+	return err
 }
 
 func (a app) runDocuments(parent context.Context, opts cliOptions, stdout io.Writer) error {

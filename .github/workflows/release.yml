@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-rc.*'
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Reproducible release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up frozen release Go toolchain
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          # Final Go 1.23 patch, released 2025-08-06 with security fixes:
+          # https://go.dev/doc/devel/release#go1.23.12
+          go-version: '1.23.12'
+          cache: true
+
+      - name: Validate and export release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="v$(tr -d '[:space:]' < VERSION)"
+          test "$GITHUB_REF_NAME" = "$expected"
+          {
+            printf 'KICADAI_RELEASE_VERSION=%s\n' "$GITHUB_REF_NAME"
+            printf 'KICADAI_RELEASE_COMMIT=%s\n' "$GITHUB_SHA"
+            printf 'KICADAI_RELEASE_BUILD_DATE=%s\n' "$(git show -s --format=%cI "$GITHUB_SHA")"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$KICADAI_RELEASE_VERSION" \
+          COMMIT="$KICADAI_RELEASE_COMMIT" \
+          BUILD_DATE="$KICADAI_RELEASE_BUILD_DATE" \
+            make release
+
+      - name: Verify byte reproducibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$KICADAI_RELEASE_VERSION" \
+          COMMIT="$KICADAI_RELEASE_COMMIT" \
+          BUILD_DATE="$KICADAI_RELEASE_BUILD_DATE" \
+            make release-reproducibility
+
+      - name: Run first-use release smoke test
+        run: make RELEASE_BINARY="dist/kicadai_${GITHUB_REF_NAME}_linux_amd64" release-smoke
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "${prerelease[@]}" \
+            --verify-tag \
+            --title "KiCadAI $GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            dist/*

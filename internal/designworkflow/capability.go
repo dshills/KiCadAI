@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"kicadai/internal/blocks"
@@ -304,9 +305,10 @@ func capabilityGateIssues(assessment capabilitygate.Assessment) []reports.Issue 
 func applyWorkflowCapability(result WorkflowResult, initial capabilitygate.Assessment) WorkflowResult {
 	assessment := initial
 	assessmentInvalid := false
+	projectRoot := stableCapabilityProjectRoot(result.Project.OutputDir)
 	for index, stage := range result.Stages {
 		digest, err := capabilitygate.Digest(capabilityStageDigest{
-			Name: stage.Name, Status: stage.Status, Issues: capabilityIssueDigests(stage.Issues),
+			Name: stage.Name, Status: stage.Status, Issues: capabilityIssueDigests(stage.Issues, projectRoot),
 		})
 		if err != nil {
 			continue
@@ -406,12 +408,43 @@ type capabilityIssueDigest struct {
 	Path     string           `json:"path,omitempty"`
 }
 
-func capabilityIssueDigests(issues []reports.Issue) []capabilityIssueDigest {
+func stableCapabilityProjectRoot(outputDir string) string {
+	if outputDir == "" {
+		return ""
+	}
+	projectRoot := filepath.Clean(outputDir)
+	if absolute, err := filepath.Abs(projectRoot); err == nil {
+		projectRoot = absolute
+	}
+	return projectRoot
+}
+
+func capabilityIssueDigests(issues []reports.Issue, projectRoot string) []capabilityIssueDigest {
 	result := make([]capabilityIssueDigest, 0, len(issues))
 	for _, issue := range issues {
-		result = append(result, capabilityIssueDigest{Code: issue.Code, Severity: issue.Severity, Path: issue.Path})
+		result = append(result, capabilityIssueDigest{
+			Code: issue.Code, Severity: issue.Severity, Path: stableCapabilityIssuePath(issue.Path, projectRoot),
+		})
 	}
 	return result
+}
+
+func stableCapabilityIssuePath(issuePath, projectRoot string) string {
+	if issuePath == "" {
+		return ""
+	}
+	issuePath = filepath.Clean(issuePath)
+	if projectRoot == "" || !filepath.IsAbs(issuePath) {
+		return filepath.ToSlash(issuePath)
+	}
+	relative, err := filepath.Rel(projectRoot, issuePath)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return filepath.ToSlash(issuePath)
+	}
+	if relative == "." {
+		return "."
+	}
+	return filepath.ToSlash(relative)
 }
 
 func stableCapabilityIdentity(parts ...string) string {

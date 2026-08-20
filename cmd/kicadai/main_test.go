@@ -4803,7 +4803,7 @@ func TestRunPingTextConnectFailureDoesNotWriteJSON(t *testing.T) {
 	}
 }
 
-func TestRunVersionJSON(t *testing.T) {
+func TestRunKiCadVersionLegacyJSON(t *testing.T) {
 	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
 		return &fakeAPIClient{
 			version: &commontypes.KiCadVersion{Major: 9, Minor: 1, Patch: 0, FullVersion: "9.1.0"},
@@ -4817,7 +4817,7 @@ func TestRunVersionJSON(t *testing.T) {
 		"--socket", "ipc:///tmp/kicad/api.sock",
 		"--client-name", "test-client",
 		"--json",
-		"version",
+		"kicad-version",
 	}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
@@ -4835,7 +4835,53 @@ func TestRunVersionJSON(t *testing.T) {
 	}
 }
 
-func TestRunVersionJSONFailureReturnsStructuredResult(t *testing.T) {
+func TestRunApplicationVersionJSONDoesNotConnectToKiCad(t *testing.T) {
+	app := appWithClientFactory(func(context.Context, config.Config) (apiClient, error) {
+		t.Fatal("application version attempted to connect to KiCad")
+		return nil, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := app.run([]string{"--json", "version"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	for _, want := range []string{`"name": "kicadai"`, `"version":`, `"commit":`, `"build_date":`, `"go_version":`, `"platform":`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected application version output to contain %q, got %s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunApplicationVersionFlagText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--format", "text", "--version"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.HasPrefix(stdout.String(), "kicadai ") {
+		t.Fatalf("application version output = %q", stdout.String())
+	}
+}
+
+func TestRunKiCadVersionJSON(t *testing.T) {
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{
+			version: &commontypes.KiCadVersion{Major: 10, Minor: 0, Patch: 3, FullVersion: "10.0.3"},
+		}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := app.run([]string{"--socket", "ipc:///tmp/kicad/api.sock", "kicad-version"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), `"full_version": "10.0.3"`) {
+		t.Fatalf("KiCad version output = %s", stdout.String())
+	}
+}
+
+func TestRunKiCadVersionJSONFailureReturnsStructuredResult(t *testing.T) {
 	want := errors.New("version failed")
 	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
 		return &fakeAPIClient{versionErr: want}, nil
@@ -4847,7 +4893,7 @@ func TestRunVersionJSONFailureReturnsStructuredResult(t *testing.T) {
 	err := app.run([]string{
 		"--socket", "ipc:///tmp/kicad/api.sock",
 		"--json",
-		"version",
+		"kicad-version",
 	}, &stdout, &stderr)
 	if !errors.Is(err, want) {
 		t.Fatalf("run error = %v, want %v", err, want)

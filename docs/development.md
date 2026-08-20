@@ -2,6 +2,31 @@
 
 Examples, package map, testing, protobuf maintenance, current limits, troubleshooting, and design direction.
 
+## Release Builds
+
+`VERSION` contains the release-candidate identity. Release binaries are the
+supported distribution surface; packages below `internal/` and the local Go
+module name are not a public library API.
+
+```sh
+make release
+make release-smoke
+make release-reproducibility
+```
+
+`make release` writes four CGO-free macOS/Linux AMD64/ARM64 binaries plus
+`RELEASE_MANIFEST.json` and `SHA256SUMS` to ignored `dist/`. The release
+workflow pins Go 1.23.12, derives the build date from the tagged commit, verifies
+two byte-identical builds, smoke-tests the host binary, and publishes only a
+tag whose name exactly matches `VERSION`.
+
+The release builder refuses a dirty repository. Maintainers may set
+`ALLOW_DIRTY_RELEASE=1` only to exercise packaging before a commit; artifacts
+built with that override are not publishable release evidence.
+
+`make install` builds the current source and installs `kicadai` to
+`~/.local/bin`; set `INSTALL_DIR` to override the destination.
+
 ## Examples
 
 Checked-in examples live under `examples/`:

@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-08-03
+Date: 2026-08-20
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -31,6 +31,13 @@ hardening correctness, expanding verified design knowledge, and closing the loop
 from validation feedback to safe automatic repair.
 
 ## Current State
+
+The project is in a v1.0.0-rc.1 release freeze. No new capability generation
+is admitted until the bounded public contract, release artifacts, V19 Phase 6
+decision, clean-checkout verification, and release review are complete. v1 is
+the deterministic evidence-backed pass-or-refuse CLI described in
+[`SUPPORT.md`](../SUPPORT.md); arbitrary-circuit generation and fabrication
+approval are not v1 claims.
 
 ### Implemented Foundations
 
@@ -72,22 +79,19 @@ from validation feedback to safe automatic repair.
   connectivity, writer/round-trip checks, and replay; one contradictory input
   and four adversarial inputs fail closed. See the [completion
   audit](multi-stage-out-of-distribution-synthesis/AUDIT.md).
-- Active program: closed-loop open-set capability expansion connects current
+- Closed-loop open-set capability expansion connects current
   topology, component, model, simulation, physical, routing, writer, and KiCad
   evidence to deterministic identity-neutral gap clustering and impact ranking.
   A separately frozen discovery/held-out corpus must select the rank-1 reusable
   capability before implementation, then prove strict held-out uplift without
   weakening existing gates. See the
-  [specification](closed-loop-open-set-capability-expansion/SPEC.md). The V1
-  blind run improved discovery from zero to two passes but produced no held-out
-  pass. V2 selected complete-topology search but its generic candidate produced
-  zero discovery uplift, so the candidate was removed before held-out
-  decryption and the sealed V2 held-out set was retired. Completion is not
-  claimed. Behavioral-contract feasibility and realizability classification is
-  now complete under a versioned policy; the next step is a fresh independently
-  authored V3 experiment. See the V1
-  [validation audit](closed-loop-open-set-capability-expansion/V1_VALIDATION_AUDIT.md)
-  and [V2 validation audit](closed-loop-open-set-capability-expansion/V2_VALIDATION_AUDIT.md).
+  [specification](closed-loop-open-set-capability-expansion/SPEC.md). V1–V17
+  preserve authenticated advancement and fail-closed retirement history. V18
+  is the latest publicly admitted capability. V19's one bounded Phase 6 run
+  completed all 24 public cases twice but produced zero passes and regressed
+  the V18 admitted pass, so V19 is permanently retired and excluded from v1.
+  See the [V19 retirement
+  audit](closed-loop-open-set-capability-expansion/V19_GENERATION_ZERO_RETIREMENT_AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic
@@ -1278,6 +1282,12 @@ intent:
 - The workflow can stop safely with partial artifacts and precise blockers.
 
 ## Near-Term Recommended Sequence
+
+The immediate sequence is the v1 release freeze, not another capability
+expansion: complete the bounded V19 Phase 6 decision, reproduce all release and
+installed-KiCad gates from clean roots, publish checksummed binaries, and cut
+v1.0.0-rc.1. New capability work resumes only after the release candidate is
+complete.
 
 The first generic promotions are complete: RC filter, protected USB-C LED,
 protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage

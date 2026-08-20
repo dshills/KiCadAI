@@ -260,10 +260,7 @@ func loadRequirementArchitectureRegistry(catalog *components.Catalog, supportedR
 }
 
 func writeRequirementFailure(stdout io.Writer, issue reports.Issue) error {
-	if err := writeReportFailure(stdout, "requirement.create", issue); err != nil {
-		return err
-	}
-	return errors.New(issue.Message)
+	return writeReportFailure(stdout, "requirement.create", issue)
 }
 
 func writeRequirementIssues(stdout io.Writer, issues []reports.Issue) error {
