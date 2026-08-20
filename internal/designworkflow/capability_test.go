@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/capabilitygate"
+	"kicadai/internal/reports"
 )
 
 func TestCapabilityAssessmentClassifiesPromotedBlockSupported(t *testing.T) {
@@ -140,5 +141,39 @@ func TestWorkflowCapabilityOnlyDecreasesAcrossCheckpoints(t *testing.T) {
 	}
 	if result.Acceptance.FabricationReady {
 		t.Fatalf("downgraded workflow retained fabrication-ready status: %#v", result.Acceptance)
+	}
+}
+
+func TestCapabilityIssueDigestPathsAreIndependentOfProjectRoot(t *testing.T) {
+	leftRoot := filepath.Join(t.TempDir(), "run-1", "project")
+	rightRoot := filepath.Join(t.TempDir(), "run-2", "project")
+	left := capabilityIssueDigests([]reports.Issue{{
+		Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityInfo,
+		Path: filepath.Join(leftRoot, "board.kicad_pcb"),
+	}}, stableCapabilityProjectRoot(leftRoot))
+	right := capabilityIssueDigests([]reports.Issue{{
+		Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityInfo,
+		Path: filepath.Join(rightRoot, "board.kicad_pcb"),
+	}}, stableCapabilityProjectRoot(rightRoot))
+	if len(left) != 1 || len(right) != 1 || left[0] != right[0] {
+		t.Fatalf("capability issue digests differ by project root: left=%#v right=%#v", left, right)
+	}
+	if left[0].Path != "board.kicad_pcb" {
+		t.Fatalf("stable capability path = %q", left[0].Path)
+	}
+}
+
+func TestCapabilityIssueDigestRelativizesAgainstRelativeProjectRoot(t *testing.T) {
+	projectRoot := filepath.Join("relative", "project")
+	absoluteRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := capabilityIssueDigests([]reports.Issue{{
+		Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityInfo,
+		Path: filepath.Join(absoluteRoot, "board.kicad_pcb"),
+	}}, stableCapabilityProjectRoot(projectRoot))
+	if len(digest) != 1 || digest[0].Path != "board.kicad_pcb" {
+		t.Fatalf("stable capability path = %#v", digest)
 	}
 }
