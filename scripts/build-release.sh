@@ -7,6 +7,7 @@ version=${version#v}
 commit=${COMMIT:-$(git -C "$root" rev-parse HEAD)}
 build_date=${BUILD_DATE:-$(git -C "$root" show -s --format=%cI "$commit")}
 output_dir=${OUTPUT_DIR:-"$root/dist"}
+max_concurrent_builds=${RELEASE_MAX_CONCURRENT_BUILDS:-2}
 
 if [ "${ALLOW_DIRTY_RELEASE:-0}" != 1 ] && [ -n "$(git -C "$root" status --porcelain --untracked-files=normal)" ]; then
 	printf 'release builds require a clean repository; ALLOW_DIRTY_RELEASE=1 is for pre-commit verification only\n' >&2
@@ -30,6 +31,10 @@ if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
 	printf 'release commit must be a full lowercase Git SHA-1: %s\n' "$commit" >&2
 	exit 2
 fi
+if ! printf '%s\n' "$max_concurrent_builds" | grep -Eq '^[1-9][0-9]*$'; then
+	printf 'RELEASE_MAX_CONCURRENT_BUILDS must be a positive integer: %s\n' "$max_concurrent_builds" >&2
+	exit 2
+fi
 if [ -e "$output_dir" ]; then
 	if [ ! -d "$output_dir" ] || ! directory_is_empty "$output_dir"; then
 		printf 'release output directory must be absent or empty: %s\n' "$output_dir" >&2
@@ -43,15 +48,47 @@ mkdir -p "$output_dir"
 
 ldflags="-s -w -X kicadai/internal/buildinfo.Version=$version -X kicadai/internal/buildinfo.Commit=$commit -X kicadai/internal/buildinfo.BuildDate=$build_date"
 targets='darwin/amd64 darwin/arm64 linux/amd64 linux/arm64'
+build_logs="$output_dir/.build-logs"
+mkdir -p "$build_logs"
+pids=()
+labels=()
+
+wait_build_batch() {
+	local failed=0 index
+	for index in "${!pids[@]}"; do
+		if ! wait "${pids[$index]}"; then
+			failed=1
+		fi
+		cat "$build_logs/${labels[$index]}.log"
+	done
+	pids=()
+	labels=()
+	if [ "$failed" -ne 0 ]; then
+		return 1
+	fi
+}
+
 for target in $targets; do
 	goos=${target%/*}
 	goarch=${target#*/}
 	artifact="$output_dir/kicadai_v${version}_${goos}_${goarch}"
-	printf 'building %s/%s\n' "$goos" "$goarch"
-	CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-		go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$artifact" ./cmd/kicadai
-	chmod 0755 "$artifact"
+	label="${goos}_${goarch}"
+	(
+		printf 'building %s/%s\n' "$goos" "$goarch"
+		CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+			go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$artifact" ./cmd/kicadai
+		chmod 0755 "$artifact"
+	) >"$build_logs/$label.log" 2>&1 &
+	pids+=("$!")
+	labels+=("$label")
+	if [ "${#pids[@]}" -ge "$max_concurrent_builds" ]; then
+		wait_build_batch
+	fi
 done
+if [ "${#pids[@]}" -gt 0 ]; then
+	wait_build_batch
+fi
+rm -rf "$build_logs"
 
 go_version=$(go version | awk '{ print $3 }')
 {

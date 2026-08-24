@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/canonicaljsonstream"
 	"kicadai/internal/simmodel"
 )
 
@@ -794,12 +795,11 @@ func normalizeState(state *CandidateState) {
 func stateHash(state CandidateState) string { return hashJSON(state) }
 
 func hashJSON(value any) string {
-	data, err := json.Marshal(value)
+	digest, err := canonicaljsonstream.SHA256(value)
 	if err != nil {
 		return ""
 	}
-	digest := sha256.Sum256(data)
-	return hex.EncodeToString(digest[:])
+	return digest
 }
 
 func MarshalReport(report Report) ([]byte, error) {

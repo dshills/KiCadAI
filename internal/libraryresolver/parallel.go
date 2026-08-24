@@ -2,8 +2,9 @@ package libraryresolver
 
 import (
 	"context"
-	"runtime"
 	"sync"
+
+	"kicadai/internal/runtimebudget"
 )
 
 func parallelMap[T any](ctx context.Context, count int, fn func(index int) T) []T {
@@ -14,10 +15,7 @@ func parallelMap[T any](ctx context.Context, count int, fn func(index int) T) []
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	workerCount := runtime.GOMAXPROCS(0)
-	if workerCount > count {
-		workerCount = count
-	}
+	workerCount := runtimebudget.Limit(count, count)
 	jobs := make(chan int)
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(workerCount)

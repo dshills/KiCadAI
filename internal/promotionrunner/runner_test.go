@@ -121,6 +121,14 @@ func TestRunReturnsCompletedPairWhenComparisonFails(t *testing.T) {
 		results[3].Comparison == nil || results[3].Comparison.Status != "failed" {
 		t.Fatalf("missing completed failing pairs: %#v", results)
 	}
+	for index, want := range []struct {
+		scenario string
+		run      int
+	}{{"case", 1}, {"case", 2}, {"second", 1}, {"second", 2}} {
+		if results[index].Scenario != want.scenario || results[index].Run != want.run {
+			t.Fatalf("parallel result %d = %s/%d, want %s/%d", index, results[index].Scenario, results[index].Run, want.scenario, want.run)
+		}
+	}
 	if _, statErr := os.Stat(filepath.Join(output, "scenarios", "case", "comparison.json")); statErr != nil {
 		t.Fatalf("comparison artifact: %v", statErr)
 	}

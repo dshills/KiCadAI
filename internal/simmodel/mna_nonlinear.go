@@ -1472,6 +1472,20 @@ func opAmpSupplyForOutput(plan Plan, output string) string {
 // ordinary base stopper, current-sense string, and feedback divider of a
 // regulator without classifying unrelated active stages that merely share a
 // supply or reference domain.
+type resistorPathState struct {
+	net  string
+	hops int
+}
+
+type resistorPathScratch struct {
+	queue   []resistorPathState
+	visited map[string]int
+}
+
+var resistorPathScratchPool = sync.Pool{New: func() any {
+	return &resistorPathScratch{visited: make(map[string]int, 32)}
+}}
+
 func resistorPathWithin(plan Plan, start, target string, maximumHops int) bool {
 	if start == "" || target == "" || maximumHops < 0 {
 		return false
@@ -1479,8 +1493,50 @@ func resistorPathWithin(plan Plan, start, target string, maximumHops int) bool {
 	if start == target {
 		return true
 	}
+	adjacency := resistorAdjacencyForPlan(plan)
+	scratch := resistorPathScratchPool.Get().(*resistorPathScratch)
+	scratch.queue = append(scratch.queue[:0], resistorPathState{net: start})
+	clear(scratch.visited)
+	scratch.visited[start] = 0
+	found := false
+	for head := 0; head < len(scratch.queue); head++ {
+		current := scratch.queue[head]
+		if current.hops >= maximumHops {
+			continue
+		}
+		for _, next := range adjacency[current.net] {
+			hops := current.hops + 1
+			if next == target {
+				found = true
+				break
+			}
+			if previous, visited := scratch.visited[next]; visited && previous <= hops {
+				continue
+			}
+			scratch.visited[next] = hops
+			scratch.queue = append(scratch.queue, resistorPathState{net: next, hops: hops})
+		}
+		if found {
+			break
+		}
+	}
+	if len(scratch.visited) > 512 {
+		scratch.visited = make(map[string]int, 32)
+	} else {
+		clear(scratch.visited)
+	}
+	if cap(scratch.queue) > 512 {
+		scratch.queue = nil
+	} else {
+		scratch.queue = scratch.queue[:0]
+	}
+	resistorPathScratchPool.Put(scratch)
+	return found
+}
+
+func buildResistorAdjacency(devices []ResolvedDevice) map[string][]string {
 	adjacency := map[string][]string{}
-	for _, device := range plan.Devices {
+	for _, device := range devices {
 		if device.PrimitiveModel != PrimitiveResistorV1 {
 			continue
 		}
@@ -1492,31 +1548,7 @@ func resistorPathWithin(plan Plan, start, target string, maximumHops int) bool {
 		adjacency[left] = append(adjacency[left], right)
 		adjacency[right] = append(adjacency[right], left)
 	}
-	type pathState struct {
-		net  string
-		hops int
-	}
-	queue := []pathState{{net: start}}
-	visited := map[string]int{start: 0}
-	for len(queue) != 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current.hops >= maximumHops {
-			continue
-		}
-		for _, next := range adjacency[current.net] {
-			hops := current.hops + 1
-			if next == target {
-				return true
-			}
-			if previous, found := visited[next]; found && previous <= hops {
-				continue
-			}
-			visited[next] = hops
-			queue = append(queue, pathState{net: next, hops: hops})
-		}
-	}
-	return false
+	return adjacency
 }
 
 func nonlinearIterationConverged(maxVoltageUpdateV, maxCurrentUpdateA, maxResidual float64) bool {

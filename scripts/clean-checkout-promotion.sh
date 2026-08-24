@@ -6,6 +6,7 @@ work_root=${PROMOTION_ROOT:-"$repo_root/.tmp/clean-checkout-promotion"}
 cache_root=${PROMOTION_CACHE_DIR:-"$repo_root/.cache/kicadai-promotion-toolchain"}
 matrix_path=${PROMOTION_MATRIX:-"$repo_root/testdata/external-review-mitigation/matrix.json"}
 scenario_timeout=${PROMOTION_SCENARIO_TIMEOUT:-20m}
+max_concurrent_scenarios=${PROMOTION_MAX_CONCURRENT_SCENARIOS:-2}
 
 case "$work_root" in
 	/*) ;;
@@ -58,6 +59,7 @@ mkdir -p "$bin_root" "$bundle_root"
 	--bootstrap \
 	--cache-dir "$cache_root" \
 	--scenario-timeout "$scenario_timeout" \
+	--max-concurrent-scenarios "$max_concurrent_scenarios" \
 	>"$work_root/promotion.json"
 
 if [ "$(git -C "$repo_root" rev-parse --verify HEAD)" != "$revision" ] ||

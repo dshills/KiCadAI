@@ -3,10 +3,11 @@ package simmodel
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
+
+	"kicadai/internal/runtimebudget"
 )
 
 const (
@@ -146,7 +147,7 @@ func evaluateWorstCaseCorners(base Plan, corners [][]NamedValue) []worstCaseCorn
 	}
 	uniqueCorners, resultIndex := uniqueCornerEvaluationPlan(corners)
 	uniqueResults := make([]worstCaseCornerEvaluation, len(uniqueCorners))
-	workerCount := worstCaseCornerWorkerCount(len(uniqueCorners), len(base.Analyses), runtime.GOMAXPROCS(0))
+	workerCount := worstCaseCornerWorkerCount(len(uniqueCorners), len(base.Analyses), runtimebudget.Capacity())
 	jobs := make(chan int)
 	var workers sync.WaitGroup
 	workers.Add(workerCount)

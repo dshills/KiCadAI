@@ -163,20 +163,35 @@ AI generation coverage gaps are tracked in `data/ai-readiness/`; see
 
 ## Testing
 
-The bounded local suite does not require KiCad. An unqualified invocation
+The bounded local suite does not require KiCad. Use the explicit cost tiers:
+
+```sh
+make test-fast
+make test-bounded  # `make test` is the same bounded gate
+make test-exhaustive
+```
+
+`test-fast` omits individually classified multi-minute synthesis proofs.
+`test-bounded` retains those proofs but uses legacy `-short` behavior for
+separately promoted corpora and installed-tool checks. `test-exhaustive`
+removes `-short`; external-tool and frozen-campaign opt-ins remain explicit.
+See [Performance and Test Tiers](performance.md) for benchmark commands,
+measured costs, and concurrency controls.
+
+An unqualified Go invocation
 skips frozen end-to-end promotion campaigns unless
 `KICADAI_RUN_PROMOTION_CORPORA=1` is set; a focused `-run` expression is also
 treated as an explicit campaign request:
 
 ```sh
-make GO_TEST_FLAGS=-short test
+make test
 go test ./... -timeout 20m
 ```
 
 Equivalent direct command:
 
 ```sh
-go test -short ./... -timeout 20m
+go test -short -p=1 ./... -timeout 20m
 ```
 
 The Makefile keeps Go build, module, and lint caches under one ignored root,
