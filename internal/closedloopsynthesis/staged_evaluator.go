@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"kicadai/internal/runtimebudget"
 	"kicadai/internal/simmodel"
 )
 
@@ -256,7 +257,11 @@ func (evaluator SimModelEvaluator) evaluateScheduledStage(
 		}
 	}
 
-	workerCount := min(max(1, limits.MaxConcurrentPlans), len(jobs))
+	maximumAnalysisFanout := 1
+	for _, resultIndex := range jobs {
+		maximumAnalysisFanout = max(maximumAnalysisFanout, min(4, len(results[resultIndex].plan.analyses)))
+	}
+	workerCount := runtimebudget.NestedLimit(len(jobs), limits.MaxConcurrentPlans, maximumAnalysisFanout)
 	if workerCount == 1 {
 		for _, resultIndex := range jobs {
 			plan := results[resultIndex].plan

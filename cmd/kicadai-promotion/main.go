@@ -60,11 +60,12 @@ func runPromote(arguments []string) error {
 	bootstrap := flags.Bool("bootstrap", false, "bootstrap the locked toolchain when discovery fails")
 	cacheDir := flags.String("cache-dir", "", "caller-owned cache for a bootstrapped toolchain")
 	timeout := flags.Duration("scenario-timeout", 20*time.Minute, "maximum duration for each scenario run")
+	maxConcurrentScenarios := flags.Int("max-concurrent-scenarios", 2, "maximum independent scenario pairs to run concurrently")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
-	if *outputRoot == "" || *timeout <= 0 {
-		return errors.New("positive --scenario-timeout and --output are required")
+	if *outputRoot == "" || *timeout <= 0 || *maxConcurrentScenarios <= 0 {
+		return errors.New("positive --scenario-timeout, --max-concurrent-scenarios, and --output are required")
 	}
 	if (*bundleOutput == "") != (*revision == "") {
 		return errors.New("--bundle-output and --revision must be provided together")
@@ -113,7 +114,8 @@ func runPromote(arguments []string) error {
 		return err
 	}
 	results, runErr := promotionrunner.Run(ctx, matrix, toolchain, promotionrunner.Options{
-		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: promotionOutput, ScenarioTimeout: *timeout,
+		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: promotionOutput,
+		ScenarioTimeout: *timeout, MaxConcurrentScenarios: *maxConcurrentScenarios,
 	})
 	if results == nil {
 		results = []promotionrunner.RunResult{}

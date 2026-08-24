@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/runtimebudget"
 )
 
 const maxPlotCommandOutputBytes = 64 * 1024
@@ -505,10 +506,7 @@ func statPlotFiles(filePaths []string) map[string]plotFileState {
 	if len(filePaths) == 0 {
 		return out
 	}
-	workers := 4
-	if len(filePaths) < workers {
-		workers = len(filePaths)
-	}
+	workers := runtimebudget.Limit(len(filePaths), 4)
 	jobs := make(chan string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup

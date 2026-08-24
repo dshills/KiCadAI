@@ -49,19 +49,20 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 		dominantDensity := make(map[string]float64, len(plan.Nodes))
 		noiseSources := 0
 		for _, device := range plan.Devices {
-			system := cloneMNASystem(base)
+			scratch := acquireReusableMNASystemClone(&base)
+			system := &scratch.system
 			terminals := terminalMap(device)
 			switch device.PrimitiveModel {
 			case PrimitiveResistorV1:
 				// Norton current-noise density sqrt(4 k T / R), A/sqrt(Hz).
 				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / *device.ValueSI)
-				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
+				stampCurrentSource(system, terminals["A"], terminals["B"], complex(density, 0))
 			case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 				// A closed fuse is a physical cold resistance and contributes
 				// the same Johnson-Nyquist noise as any other passive resistance.
 				resistance := deviceParameterMap(device)["cold_resistance_ohm"]
 				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / resistance)
-				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
+				stampCurrentSource(system, terminals["A"], terminals["B"], complex(density, 0))
 			case PrimitiveOpAmpV1:
 				parameters := deviceParameterMap(device)
 				density := parameters["input_voltage_noise_density_v_sqrt_hz"]
@@ -72,11 +73,13 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				// noise gain.
 				system.rhs[system.branchIndex[device.Component]] += complex(density, 0)
 			default:
+				releaseReusableMNASystemClone(scratch)
 				continue
 			}
 			noiseSources++
-			solution, diagnostic := solveMNA(system)
+			solution, diagnostic := solveMNA(*system)
 			if diagnostic != nil {
+				releaseReusableMNASystemClone(scratch)
 				diagnostic.Path = "analyses." + analysis.ID + ".noise_sources." + device.Component + "." + diagnostic.Path
 				diagnostic.Message = "noise transfer solve failed: " + diagnostic.Message
 				return result, []Diagnostic{*diagnostic}
@@ -86,7 +89,7 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				// terms in their linearized system. Noise is the incremental
 				// response to one physical source, so remove the source-free
 				// baseline before accumulating spectral density.
-				incremental := solvedNodeVoltage(system, solution, node) - solvedNodeVoltage(base, baseSolution, node)
+				incremental := solvedNodeVoltage(*system, solution, node) - solvedNodeVoltage(base, baseSolution, node)
 				magnitude := cmplx.Abs(incremental)
 				powerSpectralDensity[node] += magnitude * magnitude
 				if magnitude > dominantDensity[node] {
@@ -94,6 +97,7 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 					dominantSource[node] = device.Component
 				}
 			}
+			releaseReusableMNASystemClone(scratch)
 		}
 		if noiseSources == 0 {
 			return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "noise analysis resolved no trusted physical noise sources", Suggestion: "include a reviewed resistive element or active-device noise model"}}

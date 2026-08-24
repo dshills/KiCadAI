@@ -36,6 +36,8 @@ This directory holds the detailed reference material that used to live in the pr
 - [Detailed Capability Record](capability-record.md): the preserved chronological implementation and evidence inventory formerly shown at the top of the root README.
 - [Libraries And Components](libraries-and-components.md): component intelligence, pinmaps, and library resolver details.
 - [Development Reference](development.md): examples, Go packages, testing, protobuf maintenance, limitations, troubleshooting, and design direction.
+- [Performance and Test Tiers](performance.md): reproducible benchmarks,
+  profiling findings, test-cost tiers, and deterministic concurrency controls.
 - [KiCad Direct File Writers](kicad-file-writers.md): lower-level writer behavior.
 - [Component Intelligence](component-intelligence.md): focused component catalog reference.
 - [AI Readiness Matrix](ai-readiness.md): machine-readable AI-agent guidance for component, block, layout, validation, and documentation gaps. This complements the human narrative in circuit block readiness docs.

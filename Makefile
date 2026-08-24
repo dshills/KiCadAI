@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install release release-smoke release-reproducibility test test-one race-short public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install release release-smoke release-reproducibility test test-fast test-bounded test-exhaustive test-one race-short performance-report performance-scaling public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -23,13 +23,19 @@ GEN_COVER_EXCLUDE := (^|\/)internal\/kiapi\/gen\/
 COVERAGE_THRESHOLD ?= 75.0
 GO_TEST_TIMEOUT ?= 20m
 GO_TEST_FLAGS ?=
+GO_TEST_PACKAGE_PARALLELISM ?= 1
+FAST_TEST_SKIP ?= ^(TestWindowedHeatingPowerPassesElectricalAndSafetyCorners|TestPowerTransferCompoundFollowerReachesBoundedAudioEnvelope|TestPowerTransferCandidatesReachTrustedSimulation|TestCurrentLimitedSwitchRelationshipIsRetainedByDefaultSearch|TestDefaultSearchCurrentLimitedFirstTrialIsPhysicallyReady|TestProtectedCurrentDriverRepairTraceReplaysAndFailsClosedPrecisely)$$
 GO_TEST_PACKAGE ?= ./...
 GO_TEST_NAME ?=
-RACE_PACKAGES := ./internal/ipc ./internal/atomicfile ./internal/aiprovider ./internal/transactions
-COVER_TEST_FLAGS ?=
+PERFORMANCE_BENCHTIME ?= 500ms
+PERFORMANCE_COUNT ?= 3
+RACE_PACKAGES := ./internal/ipc ./internal/atomicfile ./internal/aiprovider ./internal/transactions ./internal/runtimebudget ./internal/simmodel ./internal/closedloopsynthesis ./internal/libraryresolver ./internal/promotionrunner ./internal/fabrication
+COVER_TEST_FLAGS ?= -short -p=$(GO_TEST_PACKAGE_PARALLELISM)
 PROMOTION_ROOT ?= $(CURDIR)/.tmp/clean-checkout-promotion
 PROMOTION_CACHE_DIR ?= $(CURDIR)/.cache/kicadai-promotion-toolchain
 PROMOTION_SCENARIO_TIMEOUT ?= 20m
+PROMOTION_MAX_CONCURRENT_SCENARIOS ?= 2
+export PROMOTION_MAX_CONCURRENT_SCENARIOS
 HELD_OUT_PROMOTION_ROOT ?= $(CURDIR)/.tmp/held-out-capability-promotion
 HELD_OUT_PROMOTION_MATRIX ?= $(CURDIR)/specs/held-out-capability-expansion/PROMOTION_MATRIX.json
 HIERARCHICAL_PROMOTION_ROOT ?= $(CURDIR)/.tmp/hierarchical-multi-domain-promotion
@@ -50,8 +56,13 @@ help:
 	@printf "  make release-smoke   Smoke-test one host-compatible release binary\n"
 	@printf "  make release-reproducibility Verify two release builds are byte-identical\n"
 	@printf "  make test            Run Go tests\n"
+	@printf "  make test-fast       Run the short developer-feedback tier\n"
+	@printf "  make test-bounded    Run the bounded local/CI tier\n"
+	@printf "  make test-exhaustive Run the complete release-verification tier\n"
 	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make race-short      Run the local bounded concurrency race suite\n"
+	@printf "  make performance-report Run representative processing benchmarks\n"
+	@printf "  make performance-scaling Compare synthesis with 1/2/4/8/default workers\n"
 	@printf "  make public-demo     Reproduce the featured protected-current-output proof\n"
 	@printf "  make public-demo-refusal Verify fail-closed behavior outside the reviewed envelope\n"
 	@printf "  make review-matrix   Run the external-review mitigation ladder twice\n"
@@ -92,7 +103,16 @@ release-reproducibility:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" ./scripts/verify-release-reproducibility.sh
 
 test:
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -short -p="$(GO_TEST_PACKAGE_PARALLELISM)" $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
+
+test-fast:
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -short -p="$(GO_TEST_PACKAGE_PARALLELISM)" -skip="$(FAST_TEST_SKIP)" $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
+
+test-bounded:
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -short -p="$(GO_TEST_PACKAGE_PARALLELISM)" $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
+
+test-exhaustive:
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -p="$(GO_TEST_PACKAGE_PARALLELISM)" $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
 
 test-one:
 	@if [ -z "$(GO_TEST_NAME)" ]; then \
@@ -114,6 +134,19 @@ test-one:
 
 race-short:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -race -short -count=1 -timeout "$(GO_TEST_TIMEOUT)" $(RACE_PACKAGES)
+
+performance-report:
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -run '^$$' -bench '^(BenchmarkRouteRequestGoldenDetour|BenchmarkPlaceModerateBoard|BenchmarkWriteProjectDirectory|BenchmarkCompareProjects)$$' -benchmem -benchtime "$(PERFORMANCE_BENCHTIME)" -count "$(PERFORMANCE_COUNT)" ./internal/routing ./internal/placement ./internal/kicadfiles/design ./internal/promotionrunner
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -run '^$$' -bench '^(BenchmarkEvaluateTransientSwitch|BenchmarkResistorPathWithin|BenchmarkSynthesizePoweredLowpass)$$' -benchmem -benchtime 1x -count 1 ./internal/simmodel ./internal/opentopologysynthesis
+
+performance-scaling:
+	@set -e; \
+	for workers in 1 2 4 8; do \
+		printf '\nKICADAI_MAX_WORKERS=%s\n' "$$workers"; \
+		KICADAI_MAX_WORKERS="$$workers" GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -run '^$$' -bench '^BenchmarkSynthesizePoweredLowpass$$' -benchmem -benchtime 1x -count 1 ./internal/opentopologysynthesis; \
+	done; \
+	printf '\nKICADAI_MAX_WORKERS=default\n'; \
+	env -u KICADAI_MAX_WORKERS GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -run '^$$' -bench '^BenchmarkSynthesizePoweredLowpass$$' -benchmem -benchtime 1x -count 1 ./internal/opentopologysynthesis
 
 public-demo:
 	./examples/public-demo/protected-programmable-current-output/run.sh positive

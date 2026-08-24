@@ -12,10 +12,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"kicadai/internal/creationevidence"
 	"kicadai/internal/promotiontoolchain"
+	"kicadai/internal/runtimebudget"
 )
 
 type Options struct {
@@ -23,6 +25,9 @@ type Options struct {
 	KiCadAI         string
 	OutputRoot      string
 	ScenarioTimeout time.Duration
+	// MaxConcurrentScenarios bounds independent scenario pairs. Each pair's
+	// two deterministic-replay runs remain sequential.
+	MaxConcurrentScenarios int
 }
 
 type CommandRecord struct {
@@ -42,40 +47,79 @@ type RunResult struct {
 	Comparison *Comparison     `json:"comparison,omitempty"`
 }
 
+type scenarioOutcome struct {
+	pair  []RunResult
+	err   error
+	fatal bool
+}
+
 func Run(ctx context.Context, matrix MatrixDocument, toolchain promotiontoolchain.Evidence, options Options) ([]RunResult, error) {
 	if options.ScenarioTimeout <= 0 {
 		options.ScenarioTimeout = 20 * time.Minute
+	}
+	if options.MaxConcurrentScenarios <= 0 {
+		options.MaxConcurrentScenarios = 2
 	}
 	binary, err := regularExecutable(options.KiCadAI)
 	if err != nil {
 		return nil, err
 	}
-	var results []RunResult
 	if err := ensureEmptyOutputRoot(options.OutputRoot); err != nil {
 		return nil, err
 	}
-	var comparisonErrors []error
-	for _, scenario := range matrix.Matrix.Scenarios {
-		var pair []RunResult
-		for run := 1; run <= 2; run++ {
-			result, err := runScenario(ctx, scenario, run, toolchain, options, binary)
-			if err != nil {
-				return nil, fmt.Errorf("%s run %d: %w", scenario.ID, run, err)
+	outcomes := make([]scenarioOutcome, len(matrix.Matrix.Scenarios))
+	workerCount := runtimebudget.Limit(len(outcomes), options.MaxConcurrentScenarios, 4)
+	jobs := make(chan int)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				scenario := matrix.Matrix.Scenarios[index]
+				outcomes[index] = runScenarioPair(ctx, scenario, toolchain, options, binary)
 			}
-			pair = append(pair, result)
+		}()
+	}
+	for index := range matrix.Matrix.Scenarios {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
+
+	results := make([]RunResult, 0, len(outcomes)*2)
+	comparisonErrors := make([]error, 0)
+	for _, outcome := range outcomes {
+		if outcome.fatal {
+			return nil, outcome.err
 		}
-		comparison, comparisonErr := CompareProjects(scenario.ID, pair[0].Project, pair[1].Project, options.RepositoryRoot, toolchain)
-		comparisonPath := filepath.Join(options.OutputRoot, "scenarios", scenario.ID, "comparison.json")
-		if err := writeComparison(comparisonPath, comparison); err != nil {
-			return nil, fmt.Errorf("%s: write comparison: %w", scenario.ID, err)
-		}
-		pair[1].Comparison = &comparison
-		results = append(results, pair...)
-		if comparisonErr != nil {
-			comparisonErrors = append(comparisonErrors, fmt.Errorf("%s: %w", scenario.ID, comparisonErr))
+		results = append(results, outcome.pair...)
+		if outcome.err != nil {
+			comparisonErrors = append(comparisonErrors, outcome.err)
 		}
 	}
 	return results, errors.Join(comparisonErrors...)
+}
+
+func runScenarioPair(ctx context.Context, scenario Scenario, toolchain promotiontoolchain.Evidence, options Options, binary string) scenarioOutcome {
+	var pair []RunResult
+	for run := 1; run <= 2; run++ {
+		result, err := runScenario(ctx, scenario, run, toolchain, options, binary)
+		if err != nil {
+			return scenarioOutcome{pair: pair, err: fmt.Errorf("%s run %d: %w", scenario.ID, run, err), fatal: true}
+		}
+		pair = append(pair, result)
+	}
+	comparison, comparisonErr := CompareProjects(scenario.ID, pair[0].Project, pair[1].Project, options.RepositoryRoot, toolchain)
+	comparisonPath := filepath.Join(options.OutputRoot, "scenarios", scenario.ID, "comparison.json")
+	if err := writeComparison(comparisonPath, comparison); err != nil {
+		return scenarioOutcome{pair: pair, err: fmt.Errorf("%s: write comparison: %w", scenario.ID, err), fatal: true}
+	}
+	pair[1].Comparison = &comparison
+	if comparisonErr != nil {
+		return scenarioOutcome{pair: pair, err: fmt.Errorf("%s: %w", scenario.ID, comparisonErr)}
+	}
+	return scenarioOutcome{pair: pair}
 }
 
 func writeComparison(path string, comparison Comparison) error {
