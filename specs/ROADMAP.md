@@ -32,9 +32,10 @@ from validation feedback to safe automatic repair.
 
 ## Current State
 
-The project is in a v1.0.0-rc.1 release freeze. No new capability generation
-is admitted until the bounded public contract, release artifacts, V19 Phase 6
-decision, clean-checkout verification, and release review are complete. v1 is
+The project is in a v1.0.0-rc.2 stabilization freeze. RC2 retains the RC1
+capability surface and admits no new capability generation. The bounded public
+contract, V19 Phase 6 retirement, and fail-closed support boundary remain
+unchanged. v1 is
 the deterministic evidence-backed pass-or-refuse CLI described in
 [`SUPPORT.md`](../SUPPORT.md); arbitrary-circuit generation and fabrication
 approval are not v1 claims.
@@ -1283,10 +1284,10 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-The immediate sequence is the v1 release freeze, not another capability
-expansion: complete the bounded V19 Phase 6 decision, reproduce all release and
-installed-KiCad gates from clean roots, publish checksummed binaries, and cut
-v1.0.0-rc.1. New capability work resumes only after the release candidate is
+The immediate sequence is RC2 stabilization, not another capability
+expansion: reproduce all release and installed-KiCad gates from clean roots,
+publish checksummed binaries, cut v1.0.0-rc.2, and complete a short soak before
+the final v1.0.0 tag. New capability work resumes only after the release is
 complete.
 
 The first generic promotions are complete: RC filter, protected USB-C LED,

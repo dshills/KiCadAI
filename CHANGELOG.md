@@ -3,6 +3,27 @@
 All notable user-visible changes are recorded here. KiCadAI follows semantic
 versioning for its documented CLI and versioned input contracts.
 
+## 1.0.0-rc.2 - 2026-08-24
+
+### Added
+
+- Reproducible routing, placement, writer, comparison, simulation, synthesis,
+  and topology-cache benchmarks through `make performance-report`.
+- Explicit fast, bounded, and exhaustive local verification tiers.
+- A process-wide worker budget controlled by `KICADAI_MAX_WORKERS`.
+
+### Changed
+
+- Closed-loop evidence hashes stream canonical JSON directly into SHA-256
+  while retaining byte-identical digests.
+- Resistor-path discovery and noise-transfer solves reuse bounded topology and
+  scratch state to reduce nonlinear simulation allocation churn.
+- Independent promotion scenarios and release targets run with bounded
+  concurrency while results, diagnostics, manifests, and checksums retain
+  canonical order.
+- The RC1 circuit-generation capability and refusal boundaries remain frozen;
+  RC2 adds no circuit-generation capability.
+
 ## 1.0.0-rc.1 - 2026-08-20
 
 ### Breaking pre-v1 CLI transition
