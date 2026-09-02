@@ -2,6 +2,21 @@
 
 Project inspection, evaluation, writer correctness, transactions, round-trip validation, and KiCad ERC/DRC checks.
 
+### Simulation Admission Diagnostics
+
+Experimental post-v1 open-topology generation validates analysis definitions,
+trusted model coverage, parameters, solver availability, and model/solver
+compatibility before search or numerical execution. Admission artifacts are
+strict-decoded, bounded, canonically ordered, and content-addressed. The stable
+refusal codes are `MISSING_MODEL`, `INCOMPATIBLE_MODEL`,
+`MISSING_ANALYSIS_DEFINITION`, `UNSUPPORTED_ANALYSIS`, `SOLVER_UNAVAILABLE`,
+`SOLVER_MODEL_INCOMPATIBLE`, and `INVALID_MODEL_PARAMETERS`.
+
+An admission refusal is terminal for that synthesis or candidate attempt. It
+must not be converted into a different model, solver, looser analysis, or
+skipped assertion. Public examples for every result category are under
+[`examples/simulation-admission`](../examples/simulation-admission/README.md).
+
 ### Promotion Reports
 
 Generated design workflows emit `<output>/.kicadai/design-promotion.json` when

@@ -1,0 +1,86 @@
+{
+  "schema": "kicadai.simulation-admission.v1",
+  "version": 1,
+  "status": "refused",
+  "request_sha256": "1fe6058ca78256d6c263e0152b6fe222a87bd75c2af29f4a6533729225943738",
+  "environment_sha256": "ea75055f02cb48694e7e5eb38a9874b7b09243c62c548e5bab15792687d306ad",
+  "analyses": [
+    {
+      "id": "bias",
+      "authored_kind": "dc_operating_point",
+      "canonical_kind": "dc_operating_point",
+      "assertions": [
+        "output"
+      ],
+      "operating_cases": [
+        "nominal"
+      ],
+      "solver_id": "kicadai_dc_mna_v1",
+      "solver_sha256": "5fbdf4dad14a91fd9eb5ba1509f8e36cae7b1f09c8b5771f344daf28652f8dd0",
+      "status": "refused",
+      "reason": "one or more connected components lack an admissible model"
+    }
+  ],
+  "models": [
+    {
+      "analysis_id": "bias",
+      "component": "supply",
+      "catalog_id": "source.voltage.connector.1x02",
+      "family": "voltage_source",
+      "model_id": "mna_voltage_source_v1",
+      "parameters_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "model_claim": {
+        "model_id": "mna_voltage_source_v1"
+      },
+      "model_claim_sha256": "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      },
+      "registry_source_id": "embedded",
+      "registry_source_kind": "bundled",
+      "registry_source_sha256": "23d562a3902987bcda8fd966e1a47e8caded66c3f92f0addfdea00a839a38208",
+      "registry_record_sha256": "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+      "required_analyses": [
+        "dc_operating_point"
+      ],
+      "compatibility_status": "admitted",
+      "compatibility_reason": "exactly one authenticated reviewed primitive model satisfies the analysis dependencies"
+    }
+  ],
+  "rejected_models": [
+    {
+      "analysis_id": "bias",
+      "component": "load",
+      "catalog_id": "resistor.generic.0603",
+      "model_id": "mna_resistor_v1",
+      "code": "INVALID_MODEL_PARAMETERS",
+      "reason": "parameter is not defined by the trusted model"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "INVALID_MODEL_PARAMETERS",
+      "path": "components.load.models",
+      "analysis": "dc_operating_point",
+      "component": "load",
+      "message": "connected component model parameters are invalid",
+      "suggestion": "retain exactly one reviewed model applicable to this analysis"
+    }
+  ],
+  "hash": "dbaf1dfce5fe349f63c62592492efcb125437018c7eaee190e80c195996d4225"
+}

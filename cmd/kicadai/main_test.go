@@ -4248,7 +4248,6 @@ func fakeCheckCLI(t *testing.T, exitCode int, reportJSON string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kicad-cli")
 	if runtime.GOOS == "windows" {
-		path += ".bat"
 		t.Skip("fake check CLI helper is implemented for POSIX shells")
 	}
 	body := "#!/bin/sh\n" +
@@ -4273,7 +4272,6 @@ func fakeWorkflowKiCadCLI(t *testing.T, checkExitCode int, reportJSON string) st
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kicad-cli")
 	if runtime.GOOS == "windows" {
-		path += ".bat"
 		t.Skip("fake workflow KiCad CLI helper is implemented for POSIX shells")
 	}
 	body := "#!/bin/sh\n" +

@@ -7,6 +7,16 @@ versioning for its documented CLI and versioned input contracts.
 
 ### Changed
 
+- Add experimental, version-isolated analysis/model/solver admission for
+  open-topology generation. Required analyses, exact reviewed component and
+  harness models, normalized parameters, source records, and immutable solver
+  definitions are hash-bound before search or numerical evaluation.
+- Add stable fail-closed diagnostics for missing/incompatible models, missing
+  or unsupported analyses, unavailable solvers, solver/model incompatibility,
+  and invalid model parameters. No implicit model substitution is permitted.
+- Add strict admission-artifact decoding, tamper validation, deterministic
+  replay tests, and public admitted/refused evidence examples. V19 remains
+  immutable and retired; V20 evaluation is a separate post-v1 gate.
 - Deterministically shard and authenticate the bounded coverage suite, with
   exact test/package inventory checks and content-addressed proof reuse.
 - Upgrade official GitHub Actions pins to verified Node.js 24-compatible

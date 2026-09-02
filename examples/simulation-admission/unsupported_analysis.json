@@ -1,0 +1,20 @@
+{
+  "schema": "kicadai.simulation-admission.v1",
+  "version": 1,
+  "status": "refused",
+  "request_sha256": "d7de9198b18cdf14c566a2970c024692d2b12d5b6aa209961602ab40d8130331",
+  "environment_sha256": "ea75055f02cb48694e7e5eb38a9874b7b09243c62c548e5bab15792687d306ad",
+  "analyses": [],
+  "models": [],
+  "rejected_models": [],
+  "diagnostics": [
+    {
+      "code": "UNSUPPORTED_ANALYSIS",
+      "path": "analyses.bias.authored_kind",
+      "analysis": "provider_solver",
+      "message": "analysis is not registered by the trusted analysis planner",
+      "suggestion": "use a supported behavioral analysis or add a reviewed deterministic analysis implementation"
+    }
+  ],
+  "hash": "52d5c61022cde34a940f52308af7be49fa92e0b9da11b0d7c684889d96da5a56"
+}

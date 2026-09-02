@@ -63,6 +63,12 @@ Structured intent examples live under `examples/intent/`. Files prefixed with
 - `amplifier_low_voltage_power_blocked.json`: intentional blocked low-voltage
   power amplifier topology fixture.
 
+Strict simulation-admission evidence examples live under
+`examples/simulation-admission/`. They include one admitted decision and one
+artifact for each stable model, analysis, solver, compatibility, and parameter
+refusal category. These are production-schema evidence records rather than
+circuit templates.
+
 Generated design requests live under `examples/design/`. The amplifier seed is
 `examples/design/amplifier/opamp_headphone_buffer.json`; it is draft-only and
 uses supported op-amp/connector blocks plus an explicit

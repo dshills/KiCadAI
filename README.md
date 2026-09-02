@@ -101,6 +101,16 @@ retired and excluded from the v1 supported surface; V18 remains the latest
 publicly admitted capability. See the
 [V19 retirement audit](specs/closed-loop-open-set-capability-expansion/V19_GENERATION_ZERO_RETIREMENT_AUDIT.md).
 
+The next version-isolated successor adds deterministic analysis, simulation-
+model, and solver admission to the production open-topology lane. It derives
+analysis needs from behavior, resolves only authenticated bundled or reviewed
+overlay model records, records exact model/parameter/source/solver digests,
+and refuses before search or numerical evaluation when the combination is not
+reproducible. This is currently an experimental post-v1 capability pending its
+frozen V20 public evaluation; it does not change the v1 support claim. See the
+[specification](specs/generic-analysis-model-solver-admission/SPEC.md) and
+[public evidence examples](examples/simulation-admission/README.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.

@@ -558,6 +558,24 @@ incompatible, and numerically unbounded systems fail closed. This remains
 bounded functional evidence, not arbitrary SPICE compatibility, parasitic,
 thermal, tolerance, SOA, or fabrication signoff.
 
+The post-v1 open-topology path adds an explicit
+`kicadai.simulation-admission.v1` trust boundary. Before search it derives the
+required analysis set from behavioral assertions, verifies inventory coverage,
+and binds each canonical analysis to one enabled immutable solver. Before each
+numerical operating-case/corner evaluation it resolves every connected graph
+and harness component to exactly one reviewed primitive model. The decision
+records the selected claim, normalized parameters and value, provenance record,
+source kind and digest, solver digest, and compatibility reason. Bundled,
+reviewed project, and explicitly configured reviewed registries are supported
+source classes; collisions, source rewrites, ambiguity, and fallback
+substitution fail closed.
+
+Refusals use stable codes: `MISSING_MODEL`, `INCOMPATIBLE_MODEL`,
+`MISSING_ANALYSIS_DEFINITION`, `UNSUPPORTED_ANALYSIS`, `SOLVER_UNAVAILABLE`,
+`SOLVER_MODEL_INCOMPATIBLE`, and `INVALID_MODEL_PARAMETERS`. These additions
+are experimental pending V20 evaluation and do not imply arbitrary SPICE or
+external-solver support.
+
 ## Primitive Open-Topology Generation
 
 `open-topology create` is the provider-independent behavior-to-KiCad lane. The
@@ -589,7 +607,9 @@ kicadai --json --overwrite \
 
 The compact JSON result reports status, stop reason, policy and evidence hashes,
 budget consumption, selected topology, replay status, project hash, and
-artifact references. Full evidence is written to:
+artifact references. It also includes the request-level simulation-admission
+decision; each full simulation attempt includes its exact candidate-level
+decision. Full evidence is written to:
 
 ```text
 out/open-topology/.kicadai/open-topology-synthesis.json

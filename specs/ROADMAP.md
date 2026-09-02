@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-08-20
+Date: 2026-09-02
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -32,8 +32,8 @@ from validation feedback to safe automatic repair.
 
 ## Current State
 
-The project is in the v1.0.0 final release freeze. The final release retains
-the RC2 capability surface and admits no new capability generation. The
+The project has released v1.0.0 and integrated its first release-hardening
+performance work without changing the released capability surface. The
 bounded public contract, V19 Phase 6 retirement, and fail-closed support
 boundary remain unchanged. KiCadAI v1 is the deterministic pass-or-refuse CLI
 described in
@@ -1382,15 +1382,22 @@ twice with byte-identical evidence; a real feedback-branch split is selected,
 and both designs pass two clean installed-KiCad runs. See
 `specs/generic-multi-branch-analog-topology-synthesis/`.
 
-The v1.0.1 engineering-efficiency milestone is the immediate post-v1 work. It
-profiles and deterministically shards the bounded coverage gate, authenticates
-content-addressed proof reuse, and upgrades official Actions to Node.js 24
-without changing circuit behavior or the supported surface. After that
-release-hardening work is complete, the next capability milestone should close
-the highest-impact V19 analysis/model/solver-availability cluster using only
-generic support selected from independently frozen behavior failures. It must
+The v1.0.1 engineering-efficiency work is integrated: it profiles and
+deterministically shards the bounded coverage gate, authenticates content-
+addressed proof reuse, and upgrades official Actions to Node.js 24 without
+changing circuit behavior or the supported surface. The active capability
+milestone now addresses the highest-impact V19 analysis/model/solver-
+availability cluster using only generic support selected from independently
+frozen behavior failures. It must
 preserve the exact 8/8 benchmark, both neutral physical promotions, the three
 protected-current promotions, and the v1 refusal boundary.
+
+The implementation uses a new V20 boundary because V19 is permanently retired.
+Required analyses, trusted model sources, exact component/harness model claims,
+parameters, immutable solvers, and compatibility decisions are deterministic
+and hash-bound. Missing or unavailable combinations refuse before search or
+simulation with typed diagnostics. No broader capability milestone begins
+until the 24-case, two-replay public evaluation and preservation gates complete.
 
 The deterministic synthesis-evaluation scheduler is now complete. Candidate
 attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates
