@@ -1,10 +1,10 @@
 # Project Status
 
-Last full bounded Go verification: 2026-08-24, including focused V19
+Last full bounded Go verification: 2026-09-02, including focused V19
 preservation, compositional-beam, deterministic-replay, contract, and
 retirement-evidence suites. The release coverage gate reports 80.5% after
 excluding generated protobuf bindings, above the required 75% threshold.
-The latest installed-KiCad lanes were reproduced on 2026-08-24 with KiCad
+The latest installed-KiCad lanes were reproduced on 2026-09-02 with KiCad
 10.0.3. The six-scenario clean-checkout promotion bundle passed twice with
 identical normalized inventories, and the complete 13-case design-example tier
 passed clean ERC, strict DRC, connectivity, route completion, writer
@@ -25,7 +25,7 @@ four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
 
-The `v1.0.0-rc.2` release surface is frozen and retains the RC1 capability
+The `v1.0.0` release surface is frozen and is identical to the RC2 capability
 boundary. Application version reporting is
 separate from connected-KiCad reporting; macOS and Linux AMD64/ARM64 builds are
 byte-reproducible and checksummed; clean-install smoke tests cover help,
@@ -35,7 +35,8 @@ The supported and excluded boundaries are recorded in
 not enter the v1 surface implicitly: without explicit experimental opt-in they
 continue to refuse at the capability gate.
 
-RC2 adds no generation capability. It introduces explicit fast, bounded, and
+The final release incorporates RC2 without adding generation capability. RC2
+introduced explicit fast, bounded, and
 exhaustive test tiers, representative performance benchmarks, streaming
 closed-loop evidence hashing, bounded worker budgets, deterministic parallel
 promotion/release work, and lower nonlinear-solver allocation churn. The
