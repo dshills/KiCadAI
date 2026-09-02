@@ -98,3 +98,53 @@ Promotion scenario pairs run concurrently across scenarios, but run 1 and run
 2 of each scenario remain sequential. Results, errors, comparisons, manifests,
 and hashes are assembled in frozen matrix order. Release targets build in
 bounded parallel batches and the manifest/checksum order remains canonical.
+
+## Authenticated bounded-coverage sharding
+
+The v1.0.0 GitHub `Offline quality gates` job took 46 minutes 37 seconds. Its
+instrumented package time was dominated by
+`internal/opentopologysynthesis` (2,048 seconds), followed by
+`internal/compositionlowering` (209 seconds). Running more packages inside the
+same process did not address that serial critical path.
+
+`make coverage` now partitions the same bounded selection into four general
+package shards and six top-level open-topology test shards. A checked-in cost
+table feeds a deterministic longest-processing-time scheduler; it never
+controls whether a test runs. `COVERAGE_MAX_WORKERS` defaults to four for local
+execution. CI runs the ten shards independently and requires a separate merge
+job to authenticate and assemble them.
+
+Each shard records its exact tests, packages, set-mode profile, source and
+environment fingerprints, wall/CPU/RSS report, and payload hashes. The merger
+regenerates the expected `go test -list` inventory and `go list ./...` package
+set, then rejects missing or duplicated tests, unexpected packages, stale
+source, digest mismatches, and non-set coverage. Duplicate set-mode regions are
+merged with logical OR while retaining the v1 package-coverage semantics and
+generated-code exclusion policy.
+
+Exact successful proofs are cached under `.cache/coverage-proofs`. The key
+includes all tracked and relevant untracked repository bytes, tracked file
+modes, Go/platform identity, relevant `KICADAI_*` and `GOMAXPROCS` settings,
+timeout, skip expression, and shard identity. Cache payloads are authenticated
+before reuse and again before merge. Any changed input misses or fails closed;
+the cache is an immutable proof reuse mechanism, not Go's test-result cache.
+
+Useful controls are:
+
+```sh
+make coverage-check                         # cold or authenticated cached run
+make COVERAGE_MAX_WORKERS=2 coverage-check # lower local CPU/memory pressure
+make coverage-monolithic                    # diagnostic reference profile
+```
+
+The machine-readable resource summary is written to
+`.coverage/profile.tsv`. macOS sandboxed runs expose wall/user/system CPU but
+not reliable peak RSS; the Linux CI report includes peak RSS.
+
+The checked-in cost table is a deterministic scheduling hint, never a test
+selection source. Recalibrate it after a sustained material runtime shift by
+using package timings from the required Linux coverage jobs and top-level
+`go test -json` elapsed times for `internal/opentopologysynthesis`; preserve
+stable identifiers and review the resulting plan diff. Stale weights may make
+a shard slower but cannot omit, duplicate, or otherwise change a test because
+the merger derives its expected inventory independently.

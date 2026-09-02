@@ -95,7 +95,7 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 		"PROMOTION_SCENARIO_TIMEOUT: ${{ matrix.scenario_timeout }}",
 		"run: make '${{ matrix.target }}'",
 		"kicadai-promotion' verify --bundle \"$bundle_path\"",
-		"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+		"actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
 		"name: ${{ matrix.artifact }}-${{ github.sha }}",
 		"path: ${{ runner.temp }}/${{ matrix.root }}/bundles/sha256-*",
 		"if-no-files-found: error",
@@ -113,6 +113,19 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 
 	ci := readContractFile(t, filepath.Join(workflowRoot, "ci.yml"))
 	for _, required := range []string{
+		"name: Offline static and contract gates",
+		"name: Offline quality gates",
+		"name: Bounded coverage (${{ matrix.name }})",
+		"timeout-minutes: 15",
+		"name: open-topology-5-of-6",
+		"name: general-3-of-4",
+		"coverage-proof-v1-${{ runner.os }}-${{ matrix.name }}-${{ steps.source.outputs.fingerprint }}",
+		"actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+		"actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+		"actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+		"golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a",
+		"COVER_TEST_SKIP='^TestClosedLoopV8Round1$'",
+		"coverage-merge-check",
 		"timeout-minutes: 75",
 		"KICADAI_PROMOTION_SHARD: ${{ matrix.shard }}",
 		"shard: 0/3",
@@ -134,6 +147,27 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 	}
 	if got := strings.Count(ci, "go_timeout: 55m"); got != 9 {
 		t.Errorf("CI workflow has %d extended promotion shard budgets, want 9", got)
+	}
+	if got := strings.Count(ci, "name: open-topology-"); got != 6 {
+		t.Errorf("CI workflow has %d open-topology coverage shards, want 6", got)
+	}
+	if got := strings.Count(ci, "name: general-"); got != 4 {
+		t.Errorf("CI workflow has %d general coverage shards, want 4", got)
+	}
+	for _, obsolete := range []string{
+		"actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+		"actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+		"golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa",
+	} {
+		for _, entry := range entries {
+			if entry.IsDir() || (filepath.Ext(entry.Name()) != ".yml" && filepath.Ext(entry.Name()) != ".yaml") {
+				continue
+			}
+			workflow := readContractFile(t, filepath.Join(workflowRoot, entry.Name()))
+			if strings.Contains(workflow, obsolete) {
+				t.Errorf("%s contains obsolete Node.js 20 action pin %q", entry.Name(), obsolete)
+			}
+		}
 	}
 }
 
