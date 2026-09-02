@@ -124,7 +124,7 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 		"actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
 		"actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 		"golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a",
-		"COVER_TEST_SKIP='^TestClosedLoopV8Round1$'",
+		"COVER_TEST_SKIP='^TestClosedLoopV8Round1'",
 		"coverage-merge-check",
 		"timeout-minutes: 75",
 		"KICADAI_PROMOTION_SHARD: ${{ matrix.shard }}",

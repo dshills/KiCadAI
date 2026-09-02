@@ -144,11 +144,13 @@ jobs:
 
       - name: Run bounded coverage shard
         run: |
+          # Preserve the legacy prefix exclusion: the static lane above runs
+          # this complete freeze-test family while its temporary aliases exist.
           make \
             GOCACHE_DIR="$(go env GOCACHE)" \
             GOMODCACHE_DIR="$(go env GOMODCACHE)" \
             GO_TEST_TIMEOUT=12m \
-            COVER_TEST_SKIP='^TestClosedLoopV8Round1$' \
+            COVER_TEST_SKIP='^TestClosedLoopV8Round1' \
             COVERAGE_SHARD_GROUP='${{ matrix.group }}' \
             COVERAGE_SHARD_INDEX='${{ matrix.index }}' \
             COVERAGE_SHARD_TOTAL='${{ matrix.total }}' \
@@ -190,10 +192,12 @@ jobs:
 
       - name: Verify exact selection, merge coverage, and enforce floor
         run: |
+          # The merge must regenerate the same prefix-excluded inventory used
+          # by every shard; those legacy freeze tests ran in offline-static.
           make \
             GOCACHE_DIR="$(go env GOCACHE)" \
             GOMODCACHE_DIR="$(go env GOMODCACHE)" \
-            COVER_TEST_SKIP='^TestClosedLoopV8Round1$' \
+            COVER_TEST_SKIP='^TestClosedLoopV8Round1' \
             coverage-merge-check
 
       - name: Report bounded resource and cache profile
