@@ -32,11 +32,11 @@ from validation feedback to safe automatic repair.
 
 ## Current State
 
-The project is in a v1.0.0-rc.2 stabilization freeze. RC2 retains the RC1
-capability surface and admits no new capability generation. The bounded public
-contract, V19 Phase 6 retirement, and fail-closed support boundary remain
-unchanged. v1 is
-the deterministic evidence-backed pass-or-refuse CLI described in
+The project is in the v1.0.0 final release freeze. The final release retains
+the RC2 capability surface and admits no new capability generation. The
+bounded public contract, V19 Phase 6 retirement, and fail-closed support
+boundary remain unchanged. KiCadAI v1 is the deterministic pass-or-refuse CLI
+described in
 [`SUPPORT.md`](../SUPPORT.md); arbitrary-circuit generation and fabrication
 approval are not v1 claims.
 
@@ -1284,11 +1284,10 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-The immediate sequence is RC2 stabilization, not another capability
-expansion: reproduce all release and installed-KiCad gates from clean roots,
-publish checksummed binaries, cut v1.0.0-rc.2, and complete a short soak before
-the final v1.0.0 tag. New capability work resumes only after the release is
-complete.
+The immediate sequence is final v1.0.0 publication, not another capability
+expansion: reproduce all release and installed-KiCad gates from the exact
+merged commit, publish checksummed binaries, and verify the annotated release
+tag. New capability work resumes only after those release assets are verified.
 
 The first generic promotions are complete: RC filter, protected USB-C LED,
 protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage

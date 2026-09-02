@@ -3,6 +3,23 @@
 All notable user-visible changes are recorded here. KiCadAI follows semantic
 versioning for its documented CLI and versioned input contracts.
 
+## 1.0.0 - 2026-09-02
+
+### Changed
+
+- Promoted `v1.0.0-rc.2` to the first stable release after a nine-day
+  stabilization soak with successful pull-request, `main`, and release
+  workflows.
+- Finalization changes only release identity and documentation; production
+  code is unchanged and the supported capability surface remains functionally
+  identical to RC2.
+
+### Safety
+
+- The bounded pass-or-refuse contract remains unchanged. v1.0.0 does not claim
+  arbitrary-circuit generation, fabrication approval, unrestricted routing,
+  or suitability for mains/high-energy designs.
+
 ## 1.0.0-rc.2 - 2026-08-24
 
 ### Added
