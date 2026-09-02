@@ -10,20 +10,20 @@ permissions:
   contents: read
 
 jobs:
-  offline-quality:
-    name: Offline quality gates
+  offline-static:
+    name: Offline static and contract gates
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 20
     env:
       KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     steps:
       - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -34,7 +34,7 @@ jobs:
           KICADAI_FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa # v7
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.12.2
           args: --timeout=5m ./...
@@ -71,13 +71,137 @@ jobs:
           ensure_alias "$corpus/discovery_obligations.json" "$corpus/DISCOVERY_OBLIGATIONS.json"
           go test -short -timeout 9m ./internal/capabilityfeedback -run '^TestClosedLoopV8Round1'
 
-      # Coverage executes the bounded suite, so keep one instrumented pass here.
-      # Makefile maps GO_TEST_TIMEOUT to go test -timeout; frozen end-to-end
-      # promotion corpora run in independent jobs below. Serialize packages so
-      # the simulation-heavy suites do not starve each other on two-core runners.
-      - name: Run bounded test suite and enforce coverage floor
-        timeout-minutes: 60
-        run: make GO_TEST_TIMEOUT=40m COVER_TEST_FLAGS='-short -p=1 -skip=^TestClosedLoopV8Round1' coverage-check
+  coverage-shard:
+    name: Bounded coverage (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: general-0-of-4
+            group: general
+            index: 0
+            total: 4
+          - name: general-1-of-4
+            group: general
+            index: 1
+            total: 4
+          - name: general-2-of-4
+            group: general
+            index: 2
+            total: 4
+          - name: general-3-of-4
+            group: general
+            index: 3
+            total: 4
+          - name: open-topology-0-of-6
+            group: open-topology
+            index: 0
+            total: 6
+          - name: open-topology-1-of-6
+            group: open-topology
+            index: 1
+            total: 6
+          - name: open-topology-2-of-6
+            group: open-topology
+            index: 2
+            total: 6
+          - name: open-topology-3-of-6
+            group: open-topology
+            index: 3
+            total: 6
+          - name: open-topology-4-of-6
+            group: open-topology
+            index: 4
+            total: 6
+          - name: open-topology-5-of-6
+            group: open-topology
+            index: 5
+            total: 6
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fingerprint bounded proof inputs
+        id: source
+        shell: bash
+        run: echo "fingerprint=$(./scripts/coverage-source-fingerprint.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore immutable coverage proof
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/coverage-proofs
+          key: coverage-proof-v1-${{ runner.os }}-${{ matrix.name }}-${{ steps.source.outputs.fingerprint }}
+
+      - name: Run bounded coverage shard
+        run: |
+          # Preserve the legacy prefix exclusion: the static lane above runs
+          # this complete freeze-test family while its temporary aliases exist.
+          make \
+            GOCACHE_DIR="$(go env GOCACHE)" \
+            GOMODCACHE_DIR="$(go env GOMODCACHE)" \
+            GO_TEST_TIMEOUT=12m \
+            COVER_TEST_SKIP='^TestClosedLoopV8Round1' \
+            COVERAGE_SHARD_GROUP='${{ matrix.group }}' \
+            COVERAGE_SHARD_INDEX='${{ matrix.index }}' \
+            COVERAGE_SHARD_TOTAL='${{ matrix.total }}' \
+            COVERAGE_SHARD_OUTPUT='.coverage/shards/${{ matrix.name }}' \
+            coverage-shard
+
+      - name: Upload authenticated coverage shard
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-${{ matrix.name }}
+          path: .coverage/shards/${{ matrix.name }}
+          if-no-files-found: error
+          include-hidden-files: true
+
+  offline-quality:
+    name: Offline quality gates
+    needs:
+      - offline-static
+      - coverage-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download authenticated coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-*
+          path: .coverage/shards
+          merge-multiple: false
+          digest-mismatch: error
+
+      - name: Verify exact selection, merge coverage, and enforce floor
+        run: |
+          # The merge must regenerate the same prefix-excluded inventory used
+          # by every shard; those legacy freeze tests ran in offline-static.
+          make \
+            GOCACHE_DIR="$(go env GOCACHE)" \
+            GOMODCACHE_DIR="$(go env GOMODCACHE)" \
+            COVER_TEST_SKIP='^TestClosedLoopV8Round1' \
+            coverage-merge-check
+
+      - name: Report bounded resource and cache profile
+        run: cat .coverage/profile.tsv
 
   offline-promotion:
     name: Offline promotion corpus (${{ matrix.name }})
@@ -136,10 +260,10 @@ jobs:
             go_timeout: 55m
     steps:
       - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -155,10 +279,10 @@ jobs:
       KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     steps:
       - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true

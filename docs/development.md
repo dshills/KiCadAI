@@ -212,10 +212,19 @@ make coverage-check
 `make coverage` prints both raw coverage and coverage excluding generated
 protobuf code under `internal/kiapi/gen/**`. `make coverage-check` fails if the
 generated-excluded total drops below `COVERAGE_THRESHOLD`, defaulting to `75.0`.
+It executes the exact bounded test inventory in deterministic authenticated
+shards, using at most four local workers by default. Set
+`COVERAGE_MAX_WORKERS` to reduce local CPU/memory pressure. Completed exact
+proofs are content-addressed under `.cache/coverage-proofs`; changed source,
+toolchain, environment, selection, or shard configuration cannot reuse them.
+See [Performance and Test Tiers](performance.md) for the shard and merge
+contract.
 
 The required GitHub Actions workflow runs formatting and the declared
-golangci-lint policy, then uses `-short` for the bounded test and instrumented
-coverage tiers. The three long frozen promotion corpora—open-set,
+golangci-lint policy, then uses `-short` for ten bounded instrumented coverage
+shards. A required merge job re-creates the full test/package inventory,
+authenticates every shard, and enforces the coverage floor. The three long
+frozen promotion corpora—open-set,
 adversarial-multi-function, and simulation-grounded—run in separate matrix
 jobs through `make test-one`. This keeps the coverage job bounded while still
 requiring those three established end-to-end corpora on pull requests and

@@ -9,6 +9,13 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [v1.0.1 engineering-efficiency specification](v1.0.1-engineering-efficiency/SPEC.md),
+  [plan](v1.0.1-engineering-efficiency/PLAN.md), and
+  [audit](v1.0.1-engineering-efficiency/AUDIT.md) - profiles the v1 quality
+  gate, adds fail-closed authenticated coverage sharding and exact proof reuse,
+  and upgrades official Actions pins without changing the v1 capability
+  surface.
+
 - [Nonlinear and switching architecture synthesis specification](nonlinear-switching-architecture-synthesis/SPEC.md),
   [plan](nonlinear-switching-architecture-synthesis/PLAN.md), and
   [completion audit](nonlinear-switching-architecture-synthesis/AUDIT.md)

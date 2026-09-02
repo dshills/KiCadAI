@@ -44,6 +44,16 @@ reference fast open-topology test loop is approximately 60% shorter while the
 full bounded proofs and installed-KiCad promotion evidence remain required for
 release acceptance.
 
+The active v1.0.1 release-hardening milestone addresses the remaining feedback
+latency in the full bounded coverage gate. The v1.0.0 GitHub quality job took
+46 minutes 37 seconds, with open-topology synthesis accounting for most of the
+serial time. Deterministic cost-based shards now preserve an exact machine-
+checked test/package inventory, authenticate set-mode profiles and resource
+reports, and reuse only exact content-addressed proofs. This work changes no
+generation capability, schema, routing, writer, artifact, or support boundary.
+The next capability work remains paused until its preservation and installed-
+KiCad gates close.
+
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
 The selected graph uses reviewed low-voltage catalog/provenance evidence,

@@ -3,6 +3,17 @@
 All notable user-visible changes are recorded here. KiCadAI follows semantic
 versioning for its documented CLI and versioned input contracts.
 
+## Unreleased
+
+### Changed
+
+- Deterministically shard and authenticate the bounded coverage suite, with
+  exact test/package inventory checks and content-addressed proof reuse.
+- Upgrade official GitHub Actions pins to verified Node.js 24-compatible
+  revisions.
+- Preserve the v1 supported/refused surface; this release-hardening milestone
+  adds no circuit-generation capability.
+
 ## 1.0.0 - 2026-09-02
 
 ### Changed

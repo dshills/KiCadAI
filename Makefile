@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install release release-smoke release-reproducibility test test-fast test-bounded test-exhaustive test-one race-short performance-report performance-scaling public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install release release-smoke release-reproducibility test test-fast test-bounded test-exhaustive test-one race-short performance-report performance-scaling public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-monolithic coverage-shard coverage-merge coverage-report coverage-threshold coverage-check coverage-merge-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -19,6 +19,19 @@ COVER_DIR := $(CURDIR)/.coverage
 COVER_PROFILE := $(COVER_DIR)/kicadai.cover.out
 COVER_NOGEN_PROFILE := $(COVER_DIR)/kicadai.nogen.cover.out
 COVER_NOGEN_TOTAL := $(COVER_DIR)/kicadai.nogen.total
+COVER_SHARD_DIR ?= $(COVER_DIR)/shards
+COVER_PROFILE_SUMMARY ?= $(COVER_DIR)/profile.tsv
+COVERAGE_PROOF_CACHE ?= $(CURDIR)/.cache/coverage-proofs
+COVERAGE_GENERAL_SHARDS ?= 4
+COVERAGE_OPEN_TOPOLOGY_SHARDS ?= 6
+COVERAGE_MAX_WORKERS ?= 4
+COVERAGE_SHARD_GROUP ?=
+COVERAGE_SHARD_INDEX ?=
+COVERAGE_SHARD_TOTAL ?=
+COVERAGE_SHARD_OUTPUT ?=
+COVER_TEST_SKIP ?=
+COVERAGE_REFERENCE_PROFILE ?=
+COVER_MONOLITHIC_PROFILE ?= $(COVER_DIR)/kicadai.monolithic.cover.out
 GEN_COVER_EXCLUDE := (^|\/)internal\/kiapi\/gen\/
 COVERAGE_THRESHOLD ?= 75.0
 GO_TEST_TIMEOUT ?= 20m
@@ -30,7 +43,6 @@ GO_TEST_NAME ?=
 PERFORMANCE_BENCHTIME ?= 500ms
 PERFORMANCE_COUNT ?= 3
 RACE_PACKAGES := ./internal/ipc ./internal/atomicfile ./internal/aiprovider ./internal/transactions ./internal/runtimebudget ./internal/simmodel ./internal/closedloopsynthesis ./internal/libraryresolver ./internal/promotionrunner ./internal/fabrication
-COVER_TEST_FLAGS ?= -short -p=$(GO_TEST_PACKAGE_PARALLELISM)
 PROMOTION_ROOT ?= $(CURDIR)/.tmp/clean-checkout-promotion
 PROMOTION_CACHE_DIR ?= $(CURDIR)/.cache/kicadai-promotion-toolchain
 PROMOTION_SCENARIO_TIMEOUT ?= 20m
@@ -228,7 +240,42 @@ lint:
 coverage:
 	mkdir -p "$(COVER_DIR)"
 	rm -f "$(COVER_PROFILE)" "$(COVER_NOGEN_PROFILE)" "$(COVER_NOGEN_TOTAL)"
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(COVER_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" -coverprofile="$(COVER_PROFILE)" ./...
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" \
+		GO_TEST_TIMEOUT="$(GO_TEST_TIMEOUT)" COVER_TEST_SKIP="$(COVER_TEST_SKIP)" \
+		COVER_SHARD_DIR="$(COVER_SHARD_DIR)" COVER_PROFILE="$(COVER_PROFILE)" \
+		COVER_PROFILE_SUMMARY="$(COVER_PROFILE_SUMMARY)" COVERAGE_PROOF_CACHE="$(COVERAGE_PROOF_CACHE)" \
+		COVERAGE_GENERAL_SHARDS="$(COVERAGE_GENERAL_SHARDS)" \
+		COVERAGE_OPEN_TOPOLOGY_SHARDS="$(COVERAGE_OPEN_TOPOLOGY_SHARDS)" \
+		COVERAGE_MAX_WORKERS="$(COVERAGE_MAX_WORKERS)" ./scripts/run-coverage-suite.sh
+	@if [ -n "$(COVERAGE_REFERENCE_PROFILE)" ]; then \
+		./scripts/compare-coverprofiles.sh "$(COVERAGE_REFERENCE_PROFILE)" "$(COVER_PROFILE)"; \
+	fi
+
+coverage-monolithic:
+	mkdir -p "$(COVER_DIR)"
+	rm -f "$(COVER_MONOLITHIC_PROFILE)"
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -short -count=1 -p=1 \
+		$(if $(COVER_TEST_SKIP),-skip="$(COVER_TEST_SKIP)",) -timeout "$(GO_TEST_TIMEOUT)" \
+		-covermode=set -coverprofile="$(COVER_MONOLITHIC_PROFILE)" ./...
+
+coverage-shard:
+	@if [ -z "$(COVERAGE_SHARD_GROUP)" ] || [ -z "$(COVERAGE_SHARD_INDEX)" ] || [ -z "$(COVERAGE_SHARD_TOTAL)" ] || [ -z "$(COVERAGE_SHARD_OUTPUT)" ]; then \
+		printf 'COVERAGE_SHARD_GROUP, COVERAGE_SHARD_INDEX, COVERAGE_SHARD_TOTAL, and COVERAGE_SHARD_OUTPUT are required\n' >&2; \
+		exit 2; \
+	fi
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" \
+		GO_TEST_TIMEOUT="$(GO_TEST_TIMEOUT)" COVER_TEST_SKIP="$(COVER_TEST_SKIP)" \
+		COVERAGE_PROOF_CACHE="$(COVERAGE_PROOF_CACHE)" ./scripts/run-coverage-shard.sh \
+		"$(COVERAGE_SHARD_GROUP)" "$(COVERAGE_SHARD_INDEX)" "$(COVERAGE_SHARD_TOTAL)" "$(COVERAGE_SHARD_OUTPUT)"
+
+coverage-merge:
+	COVER_TEST_SKIP="$(COVER_TEST_SKIP)" \
+		COVERAGE_GENERAL_SHARDS="$(COVERAGE_GENERAL_SHARDS)" \
+		COVERAGE_OPEN_TOPOLOGY_SHARDS="$(COVERAGE_OPEN_TOPOLOGY_SHARDS)" \
+		./scripts/merge-coverage-shards.sh "$(COVER_SHARD_DIR)" "$(COVER_PROFILE)"
+	./scripts/summarize-coverage-profile.sh "$(COVER_SHARD_DIR)" "$(COVER_PROFILE_SUMMARY)"
+
+coverage-report:
 	awk 'NR == 1 || $$0 !~ /$(GEN_COVER_EXCLUDE)/' "$(COVER_PROFILE)" > "$(COVER_NOGEN_PROFILE)"
 	@printf "\nRaw coverage including generated protobuf code:\n"
 	@printf "Raw total: "
@@ -242,9 +289,9 @@ coverage:
 	fi; \
 	printf "Generated-excluded total: %s\n" "$$filtered"; \
 	printf "%s\n" "$$filtered" > "$(COVER_NOGEN_TOTAL)"
-	@printf "\nProfiles:\n  %s\n  %s\n" "$(COVER_PROFILE)" "$(COVER_NOGEN_PROFILE)"
+	@printf "\nProfiles:\n  %s\n  %s\n  %s\n" "$(COVER_PROFILE)" "$(COVER_NOGEN_PROFILE)" "$(COVER_PROFILE_SUMMARY)"
 
-coverage-check: coverage
+coverage-threshold:
 	@actual="$$(LC_ALL=C awk '{ sub(/%/, "", $$1); print $$1 }' "$(COVER_NOGEN_TOTAL)")"; \
 	if [ -z "$$actual" ]; then \
 		printf "failed to read generated-excluded coverage total\n" >&2; \
@@ -257,6 +304,10 @@ coverage-check: coverage
 		} \
 		printf("coverage %.2f%% meets threshold %.2f%%\n", actual, threshold); \
 	}'
+
+coverage-check: coverage coverage-report coverage-threshold
+
+coverage-merge-check: coverage-merge coverage-report coverage-threshold
 
 run-help:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go run ./cmd/kicadai --help

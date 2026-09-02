@@ -1382,11 +1382,15 @@ twice with byte-identical evidence; a real feedback-branch split is selected,
 and both designs pass two clean installed-KiCad runs. See
 `specs/generic-multi-branch-analog-topology-synthesis/`.
 
-The next milestone should expand graph, value, model, and stage-reentry repair
-only from new independently frozen behavior failures. It should prioritize
-reusable analog families outside the proven protected-current envelope, while
-preserving the exact 8/8 benchmark, both neutral physical promotions, and the
-three protected-current promotions.
+The v1.0.1 engineering-efficiency milestone is the immediate post-v1 work. It
+profiles and deterministically shards the bounded coverage gate, authenticates
+content-addressed proof reuse, and upgrades official Actions to Node.js 24
+without changing circuit behavior or the supported surface. After that
+release-hardening work is complete, the next capability milestone should close
+the highest-impact V19 analysis/model/solver-availability cluster using only
+generic support selected from independently frozen behavior failures. It must
+preserve the exact 8/8 benchmark, both neutral physical promotions, the three
+protected-current promotions, and the v1 refusal boundary.
 
 The deterministic synthesis-evaluation scheduler is now complete. Candidate
 attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates
