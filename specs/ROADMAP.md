@@ -1398,6 +1398,10 @@ parameters, immutable solvers, and compatibility decisions are deterministic
 and hash-bound. Missing or unavailable combinations refuse before search or
 simulation with typed diagnostics. No broader capability milestone begins
 until the 24-case, two-replay public evaluation and preservation gates complete.
+That evaluation is now complete: 1 pass, 5 unsupported, 1 unsafe, and 17
+exhausted. V18's pass and safety result were preserved, and the selected model-
+availability leaf advanced to a later topology blocker. V20 therefore meets
+its frozen material-improvement gate while remaining outside the v1 surface.
 
 The deterministic synthesis-evaluation scheduler is now complete. Candidate
 attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates

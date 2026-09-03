@@ -573,8 +573,9 @@ substitution fail closed.
 Refusals use stable codes: `MISSING_MODEL`, `INCOMPATIBLE_MODEL`,
 `MISSING_ANALYSIS_DEFINITION`, `UNSUPPORTED_ANALYSIS`, `SOLVER_UNAVAILABLE`,
 `SOLVER_MODEL_INCOMPATIBLE`, and `INVALID_MODEL_PARAMETERS`. These additions
-are experimental pending V20 evaluation and do not imply arbitrary SPICE or
-external-solver support.
+are experimental. V20's frozen public evaluation preserved the V18 pass and
+advanced the selected model-availability leaf, but does not imply arbitrary
+SPICE or external-solver support.
 
 ## Primitive Open-Topology Generation
 

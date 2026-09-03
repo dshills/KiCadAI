@@ -59,8 +59,13 @@ coverage is absent. Every opted-in numerical attempt is separately admitted
 against its exact graph and harness models before evaluation and records model,
 parameter, provenance-record, source, compatibility, and solver digests. Seven
 stable refusal categories replace implicit fallback. The frozen V20 public
-evaluation is not yet complete, so this is experimental and does not expand
-the v1 supported surface.
+evaluation completed all 24 cases twice: 1 pass, 5 unsupported, 1 unsafe, and
+17 exhausted. It preserved V18's admitted pass and safety result, and two
+cases that V18 reported as unsupported advanced to later bounded topology
+blockers; relative to V18, unsupported therefore fell from 7 to 5 while
+exhausted rose from 15 to 17. The selected
+model-availability leaf therefore passed the frozen advancement rule. This
+remains experimental and does not expand the v1 supported surface.
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.

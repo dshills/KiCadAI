@@ -16,7 +16,8 @@ versioning for its documented CLI and versioned input contracts.
   and invalid model parameters. No implicit model substitution is permitted.
 - Add strict admission-artifact decoding, tamper validation, deterministic
   replay tests, and public admitted/refused evidence examples. V19 remains
-  immutable and retired; V20 evaluation is a separate post-v1 gate.
+  immutable and retired. The frozen V20 evaluation preserved V18's admitted
+  pass and advanced the selected model-availability leaf to a later blocker.
 - Deterministically shard and authenticate the bounded coverage suite, with
   exact test/package inventory checks and content-addressed proof reuse.
 - Upgrade official GitHub Actions pins to verified Node.js 24-compatible

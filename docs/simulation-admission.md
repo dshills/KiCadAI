@@ -62,3 +62,6 @@ The V20 successor evaluates only the public analysis/model/solver frontier
 selected before implementation: DC operating point, DC sweep, AC sweep,
 transient, and stability. Electrothermal and unrelated capability families are
 outside that evaluation expansion. V19 remains immutable and retired.
+The completed V20 run produced 1 pass, 5 unsupported, 1 unsafe, and 17
+exhausted cases. It preserved V18's pass and safety result and advanced the
+selected DC operating-point model leaf to bounded topology repair.

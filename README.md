@@ -106,8 +106,10 @@ model, and solver admission to the production open-topology lane. It derives
 analysis needs from behavior, resolves only authenticated bundled or reviewed
 overlay model records, records exact model/parameter/source/solver digests,
 and refuses before search or numerical evaluation when the combination is not
-reproducible. This is currently an experimental post-v1 capability pending its
-frozen V20 public evaluation; it does not change the v1 support claim. See the
+reproducible. Its frozen V20 public evaluation preserved the V18 pass and
+advanced the selected model-availability leaf to a later topology blocker.
+It remains an experimental post-v1 capability and does not change the v1
+support claim. See the
 [specification](specs/generic-analysis-model-solver-admission/SPEC.md) and
 [public evidence examples](examples/simulation-admission/README.md).
 
