@@ -78,8 +78,11 @@ func synthesizeTopologyCompletionV21(
 	admission simulationadmission.PreparedEnvironment,
 	policy Policy,
 ) SynthesisRun {
+	if ctx.Err() != nil || !topologyCompletionStatusFrontierV21(v20) {
+		return v20
+	}
 	requirement = Normalize(requirement)
-	if !topologyCompletionFrontierV21(v20) || ctx.Err() != nil {
+	if allCandidateFailuresCriticalV19(requirement, v20) {
 		return v20
 	}
 	base, eligible := causalRepairBaseV19(requirement, v20, inventory)
@@ -160,7 +163,7 @@ func synthesizeTopologyCompletionV21(
 	return finalizeSynthesisRunV17(run)
 }
 
-func topologyCompletionFrontierV21(run SynthesisRun) bool {
+func topologyCompletionStatusFrontierV21(run SynthesisRun) bool {
 	if run.Report.Status == StatusPassed || run.Report.Status == StatusCanceled || run.Report.Status == StatusInvalid || run.Report.Status == StatusInfeasible {
 		return false
 	}

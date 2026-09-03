@@ -24,6 +24,25 @@ func TestV21PreservesIneligibleV20RunByteForByte(t *testing.T) {
 	}
 }
 
+func TestV21PreservesUnsafeV20RunByteForByte(t *testing.T) {
+	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
+	if len(requirement.Requirements.BehavioralRequirements) == 0 {
+		t.Fatal("causal V19 test requirement has no behavioral assertion")
+	}
+	requirement.Requirements.BehavioralRequirements[0].Critical = true
+	v20 := causalV19FrontierRun(requirement,
+		Diagnosis{Code: "assertion_above_maximum", RequirementID: "transfer_bound", Analysis: "dc_operating_point", Metric: "voltage_gain"},
+		Diagnosis{Code: "assertion_below_minimum", RequirementID: "transfer_bound", Analysis: "dc_operating_point", Metric: "voltage_gain"},
+	)
+	got := synthesizeTopologyCompletionV21(
+		context.Background(), requirement, v20, causalV19Inventory(t), SimulationEnvironment{},
+		simulationadmission.PrepareEnvironment(simulationadmission.Environment{}), DefaultPolicy(),
+	)
+	if !reflect.DeepEqual(got, v20) {
+		t.Fatalf("V21 changed an unsafe V20 run\nwant %#v\n got %#v", v20, got)
+	}
+}
+
 func TestV21TopologyInvariantsAcceptDirectionallyCompleteGraph(t *testing.T) {
 	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
 	inventory := causalV19Inventory(t)
