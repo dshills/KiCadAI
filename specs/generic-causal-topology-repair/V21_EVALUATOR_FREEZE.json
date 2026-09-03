@@ -1,9 +1,9 @@
 {
   "schema": "kicadai.closed-loop-open-set-evaluator-freeze.v21",
   "version": 21,
-  "freeze_parent_commit": "6aa63c6267e8d1128abeef7082423d23a85e0735",
+  "freeze_parent_commit": "0136c091a8aeb1dcd4ccab75dba5010f98507d4d",
   "evaluator_manifest": "V21_EVALUATOR.sha256",
-  "evaluator_manifest_sha256": "315b5ee5e47c6a0b2df7762f5cf7da80250c1382c590092d4bc44c9656411e32",
+  "evaluator_manifest_sha256": "7a1447a90ee55ee51d0a72c4dea44587241f4395c5be1188c6b043e5d042875f",
   "inherited_v20_evaluator_manifest_sha256": "1004d00da2e73f912bbb6b2422291c5c03ebddea75c173270f1b3be14f1bf2e5",
   "v20_generation_zero_report_sha256": "6ea9b697f8852cb8f4d752f75e5fa44aca93de7bbad9bb5e5fc6c063b10ff6aa",
   "selected_population_sha256": "5809ba88980d3745727f3c0a3324cc987105c94a2a2a816baf54382d25ab70d1",
