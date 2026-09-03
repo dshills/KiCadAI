@@ -1,0 +1,36 @@
+{
+  "schema": "kicadai.simulation-admission.v1",
+  "version": 1,
+  "status": "refused",
+  "request_sha256": "2492189b6cde0375d2027de9808f397393633996e5be6bdc9f11503398fb517b",
+  "environment_sha256": "0d1c8cc1eb19ff71ddf4f3e1a804a4c6490e4fd062476420c7f0cb048f4fe8dd",
+  "analyses": [
+    {
+      "id": "bias",
+      "authored_kind": "dc_operating_point",
+      "canonical_kind": "dc_operating_point",
+      "assertions": [
+        "output"
+      ],
+      "operating_cases": [
+        "nominal"
+      ],
+      "solver_id": "kicadai_dc_mna_v1",
+      "solver_sha256": "5fbdf4dad14a91fd9eb5ba1509f8e36cae7b1f09c8b5771f344daf28652f8dd0",
+      "status": "refused",
+      "reason": "registered deterministic solver is disabled in the executing environment"
+    }
+  ],
+  "models": [],
+  "rejected_models": [],
+  "diagnostics": [
+    {
+      "code": "SOLVER_UNAVAILABLE",
+      "path": "analyses.bias.solver",
+      "analysis": "dc_operating_point",
+      "message": "registered deterministic solver is disabled in the executing environment",
+      "suggestion": "enable the immutable solver or refuse the analysis"
+    }
+  ],
+  "hash": "6e1f2ac17626bb4106c383b1f78fe37e94e9b1404308464af3c022217d1faad2"
+}

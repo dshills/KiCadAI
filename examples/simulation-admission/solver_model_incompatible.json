@@ -1,0 +1,77 @@
+{
+  "schema": "kicadai.simulation-admission.v1",
+  "version": 1,
+  "status": "refused",
+  "request_sha256": "e820f78937098f4aa52d04bb97a4be02badf1c8c59d879e3ea26ad8929d8839e",
+  "environment_sha256": "ea75055f02cb48694e7e5eb38a9874b7b09243c62c548e5bab15792687d306ad",
+  "analyses": [
+    {
+      "id": "bias",
+      "authored_kind": "dc_operating_point",
+      "canonical_kind": "dc_operating_point",
+      "assertions": [
+        "output"
+      ],
+      "operating_cases": [
+        "nominal"
+      ],
+      "solver_id": "kicadai_dc_mna_v1",
+      "solver_sha256": "5fbdf4dad14a91fd9eb5ba1509f8e36cae7b1f09c8b5771f344daf28652f8dd0",
+      "status": "refused",
+      "reason": "selected primitive models are incompatible with the registered solver workflow: missing_trusted_source_or_device"
+    }
+  ],
+  "models": [
+    {
+      "analysis_id": "bias",
+      "component": "load",
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "value_si": 1000,
+      "parameters_sha256": "21e90a8dc91efbc21acc78d4555745a855e7ad8ce734cfe05477880b09078bc6",
+      "model_claim": {
+        "model_id": "mna_resistor_v1"
+      },
+      "model_claim_sha256": "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      },
+      "registry_source_id": "embedded",
+      "registry_source_kind": "bundled",
+      "registry_source_sha256": "23d562a3902987bcda8fd966e1a47e8caded66c3f92f0addfdea00a839a38208",
+      "registry_record_sha256": "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+      "required_analyses": [
+        "dc_operating_point"
+      ],
+      "compatibility_status": "admitted",
+      "compatibility_reason": "exactly one authenticated reviewed primitive model satisfies the analysis dependencies"
+    }
+  ],
+  "rejected_models": [],
+  "diagnostics": [
+    {
+      "code": "SOLVER_MODEL_INCOMPATIBLE",
+      "path": "analyses.bias.workflow_model",
+      "analysis": "dc_operating_point",
+      "message": "selected primitive models are incompatible with the registered solver workflow: missing_trusted_source_or_device",
+      "suggestion": "select a complete unambiguous reviewed primitive set compatible with the solver workflow"
+    }
+  ],
+  "hash": "932732a1350471d240594128c7f1ce66139c3555397a12ac62571aa294c2a98c"
+}

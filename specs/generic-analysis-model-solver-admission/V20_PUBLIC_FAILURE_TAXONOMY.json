@@ -1,0 +1,88 @@
+{
+  "schema": "kicadai.public-analysis-model-solver-failure-taxonomy.v20",
+  "version": 20,
+  "source_report": "internal/capabilityfeedback/testdata/closed_loop_open_set_v18_generation_one/report.json",
+  "source_report_sha256": "332983874f65d84099f5f7a8740b9dd815aa6e892358f784be24a6c043f8edad",
+  "population": {
+    "case_count": 24,
+    "pass": 1,
+    "nonpassing": 23
+  },
+  "family": "analysis_model_solver_availability",
+  "affected_case_count": 9,
+  "reporting_domain_count": 5,
+  "single_family_case_count": 7,
+  "typed_atoms": [
+    "ac_sweep_solver",
+    "dc_operating_point_model",
+    "dc_operating_point_solver",
+    "dc_sweep_solver",
+    "stability_solver",
+    "transient_solver"
+  ],
+  "cases": [
+    {
+      "id": "v10_case_001",
+      "reporting_domain": "analog_signal_path",
+      "circuit_role": "source_bias",
+      "single_family": true,
+      "atoms": ["dc_operating_point_model"]
+    },
+    {
+      "id": "v10_case_002",
+      "reporting_domain": "power_energy_conversion",
+      "circuit_role": "amplification_conditioning",
+      "single_family": true,
+      "atoms": ["ac_sweep_solver"]
+    },
+    {
+      "id": "v10_case_008",
+      "reporting_domain": "power_energy_conversion",
+      "circuit_role": "conversion_regulation",
+      "single_family": true,
+      "atoms": ["dc_operating_point_solver"]
+    },
+    {
+      "id": "v10_case_010",
+      "reporting_domain": "mixed_signal_data_conversion",
+      "circuit_role": "interface_control",
+      "single_family": true,
+      "atoms": ["stability_solver"]
+    },
+    {
+      "id": "v10_case_011",
+      "reporting_domain": "sensing_instrumentation",
+      "circuit_role": "protection_supervision",
+      "single_family": true,
+      "atoms": ["dc_operating_point_solver"]
+    },
+    {
+      "id": "v10_case_014",
+      "reporting_domain": "power_energy_conversion",
+      "circuit_role": "sensing_measurement",
+      "single_family": true,
+      "atoms": ["dc_sweep_solver"]
+    },
+    {
+      "id": "v10_case_015",
+      "reporting_domain": "digital_control",
+      "circuit_role": "interface_control",
+      "single_family": true,
+      "atoms": ["transient_solver"]
+    },
+    {
+      "id": "v10_case_020",
+      "reporting_domain": "power_energy_conversion",
+      "circuit_role": "interface_control",
+      "single_family": false,
+      "atoms": ["ac_sweep_solver", "dc_sweep_solver", "transient_solver"]
+    },
+    {
+      "id": "v10_case_023",
+      "reporting_domain": "sensing_instrumentation",
+      "circuit_role": "amplification_conditioning",
+      "single_family": false,
+      "atoms": ["dc_operating_point_solver"]
+    }
+  ]
+}

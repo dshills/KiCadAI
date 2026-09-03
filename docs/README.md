@@ -13,6 +13,8 @@ This directory holds the detailed reference material that used to live in the pr
 - [Educational Schematic Examples](../examples/educational/README.md): five
   generated teaching circuits with conventional topology-aware layout and
   reproducible KiCad projects.
+- [Simulation Admission Evidence](../examples/simulation-admission/README.md):
+  authenticated admitted and typed fail-closed model/solver decisions.
 - [KiCadAI Agent Skill](kicadai-agent-skill.md): prescriptive command and validation contract for AI agents using KiCadAI.
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
 - [AI Generation](ai-generation.md): behavioral, bounded, and generic provider
@@ -29,6 +31,9 @@ This directory holds the detailed reference material that used to live in the pr
 - [Validation And Analysis](validation-and-analysis.md): inspection, evaluation,
   writer correctness, transactions, round-trip validation, ERC/DRC checks, and
   independently verifiable clean-checkout promotion bundles.
+- [Simulation Admission](simulation-admission.md): deterministic analysis
+  planning, trusted model sources, solver availability, provenance, and typed
+  refusal behavior.
 - [Fabrication Export And Readiness](fabrication.md): readiness gates, BOM/CPL evidence, physical-rule fabrication profiles, provenance, and export commands.
 
 ## Libraries And Internals

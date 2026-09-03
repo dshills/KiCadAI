@@ -73,6 +73,13 @@ The V19 causal-topology experiment is also explicitly unsupported in v1. Its
 bounded public evaluation failed the frozen advancement and preservation gates
 and was permanently retired. V18 is the latest admitted public capability.
 
+Post-v1 analysis/model/solver admission work is experimental until its frozen
+successor evaluation and preservation gates pass. Its additive evidence fields
+and stricter early refusals do not expand the v1 supported electrical envelope.
+Only bundled model provenance and reviewed project/configured overlays are
+eligible; unreviewed SPICE files, provider-selected models or solvers, implicit
+substitution, and unavailable solver backends remain unsupported.
+
 ## Compatibility changes
 
 Breaking changes to a stable v1 CLI or schema require a new major version or a

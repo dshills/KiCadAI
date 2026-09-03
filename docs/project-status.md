@@ -44,15 +44,28 @@ reference fast open-topology test loop is approximately 60% shorter while the
 full bounded proofs and installed-KiCad promotion evidence remain required for
 release acceptance.
 
-The active v1.0.1 release-hardening milestone addresses the remaining feedback
+The v1.0.1 release-hardening changes are now integrated. They addressed the remaining feedback
 latency in the full bounded coverage gate. The v1.0.0 GitHub quality job took
 46 minutes 37 seconds, with open-topology synthesis accounting for most of the
 serial time. Deterministic cost-based shards now preserve an exact machine-
 checked test/package inventory, authenticate set-mode profiles and resource
 reports, and reuse only exact content-addressed proofs. This work changes no
 generation capability, schema, routing, writer, artifact, or support boundary.
-The next capability work remains paused until its preservation and installed-
-KiCad gates close.
+The active post-v1 milestone is generic analysis/model/solver admission. The
+production open-topology path now has a version-isolated preflight that derives
+required analyses, authenticates bundled and reviewed overlay model sources,
+selects an immutable enabled solver, and refuses before topology search when
+coverage is absent. Every opted-in numerical attempt is separately admitted
+against its exact graph and harness models before evaluation and records model,
+parameter, provenance-record, source, compatibility, and solver digests. Seven
+stable refusal categories replace implicit fallback. The frozen V20 public
+evaluation completed all 24 cases twice: 1 pass, 5 unsupported, 1 unsafe, and
+17 exhausted. It preserved V18's admitted pass and safety result, and two
+cases that V18 reported as unsupported advanced to later bounded topology
+blockers; relative to V18, unsupported therefore fell from 7 to 5 while
+exhausted rose from 15 to 17. The selected
+model-availability leaf therefore passed the frozen advancement rule. This
+remains experimental and does not expand the v1 supported surface.
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
@@ -104,6 +117,13 @@ and frozen V17 serial replay transport without opening held-out keys, but its
 completed public evaluation failed both advancement and preservation gates.
 The V19 constructor is retained only as versioned historical regression
 evidence and is excluded from the v1 supported contract.
+
+The successor work is specified separately under
+[`generic-analysis-model-solver-admission`](../specs/generic-analysis-model-solver-admission/SPEC.md).
+It reuses the authenticated public corpus but cannot mutate or relabel V19.
+Its evaluator remains serial and two-replay, and its public result must preserve
+the V18 admitted pass and historical safety outcomes before any capability can
+be claimed.
 
 The scheduler removes the immediate evaluation-scaling bottleneck without
 weakening the trust boundary. Failed candidates stop only at canonical stage

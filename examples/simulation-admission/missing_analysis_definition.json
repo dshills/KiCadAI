@@ -1,0 +1,20 @@
+{
+  "schema": "kicadai.simulation-admission.v1",
+  "version": 1,
+  "status": "refused",
+  "request_sha256": "33d342d2ef82100db1a3d574e1ddd2f3a497f3d22a79115afd198e8bfed30dc6",
+  "environment_sha256": "ea75055f02cb48694e7e5eb38a9874b7b09243c62c548e5bab15792687d306ad",
+  "analyses": [],
+  "models": [],
+  "rejected_models": [],
+  "diagnostics": [
+    {
+      "code": "MISSING_ANALYSIS_DEFINITION",
+      "path": "analyses.bias.canonical_kind",
+      "analysis": "dc_operating_point",
+      "message": "canonical analysis does not match the registered authored analysis",
+      "suggestion": "derive canonical analyses from the immutable analysis registry"
+    }
+  ],
+  "hash": "294f66938fcf955c18c51b0f22afa62dda2c9a80b44751ccba8d4580f3b92141"
+}

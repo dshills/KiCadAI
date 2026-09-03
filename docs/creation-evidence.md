@@ -37,6 +37,13 @@ Lane-specific provider responses, intent planning records, retry state,
 rationale, simulation, and KiCad reports remain additive. They do not replace
 the six core paths.
 
+Open-topology synthesis evidence may additionally contain a
+`kicadai.simulation-admission.v1` decision at report level and on each numerical
+attempt. These optional fields authenticate the required analyses, exact model
+claims and parameters, reviewed source records, solver definitions, and
+compatibility decisions. Older v1 evidence remains byte-compatible because
+historical constructors omit the additive fields.
+
 All core document bytes are prepared before the shared writer starts updating
 files. Individual files and the manifest are replaced atomically, and a
 failure before writing preserves the previous complete evidence. Project

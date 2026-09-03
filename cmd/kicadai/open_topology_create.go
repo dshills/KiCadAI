@@ -12,8 +12,10 @@ import (
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/modelprovenance"
 	"kicadai/internal/opentopologysynthesis"
 	"kicadai/internal/reports"
+	"kicadai/internal/simulationadmission"
 )
 
 type openTopologyCreateResult struct {
@@ -32,6 +34,7 @@ type openTopologySynthesisSummary struct {
 	PhysicalHash     string                            `json:"physical_hash,omitempty"`
 	EvidenceHash     string                            `json:"evidence_hash"`
 	EvidenceArtifact string                            `json:"evidence_artifact,omitempty"`
+	Admission        *simulationadmission.Decision     `json:"admission,omitempty"`
 }
 
 type openTopologyPromotionSummary struct {
@@ -128,15 +131,52 @@ func runOpenTopology(
 		CatalogHash:   catalogHash,
 		ModelRegistry: provenance,
 	}
-	synthesis := opentopologysynthesis.Synthesize(
+	baseProvenance, baseDiagnostics := modelprovenance.LoadDefault()
+	if len(baseDiagnostics) != 0 {
+		return writeOpenTopologyFailure(stdout, reports.Issue{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+			Path: "simulation_admission.model_source", Message: baseDiagnostics[0].Message,
+		})
+	}
+	var modelSources []simulationadmission.Source
+	if strings.TrimSpace(opts.componentOverlay) == "" {
+		modelSource, sourceErr := simulationadmission.NewSource(
+			"embedded-model-provenance", simulationadmission.SourceBundled, baseProvenance,
+		)
+		if sourceErr != nil {
+			return writeOpenTopologyFailure(stdout, reports.Issue{
+				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+				Path: "simulation_admission.model_source", Message: sourceErr.Error(),
+			})
+		}
+		modelSources = []simulationadmission.Source{modelSource}
+	} else {
+		modelSources, err = simulationadmission.SplitMergedSources(
+			"embedded-model-provenance", simulationadmission.SourceBundled, baseProvenance,
+			"configured-component-overlay", simulationadmission.SourceConfigured, provenance,
+		)
+		if err != nil {
+			return writeOpenTopologyFailure(stdout, reports.Issue{
+				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+				Path: "simulation_admission.model_source", Message: err.Error(),
+			})
+		}
+	}
+	admissionEnvironment := simulationadmission.Environment{
+		Sources:        modelSources,
+		EnabledSolvers: simulationadmission.EnabledBuiltinSolverIDs(),
+	}
+	admittedSynthesis := opentopologysynthesis.SynthesizeAdmittedV20(
 		ctx,
 		requirement,
 		inventory,
 		environment,
+		admissionEnvironment,
 		opentopologysynthesis.DefaultPolicy(),
 	)
+	synthesis := admittedSynthesis.Synthesis
 	data := openTopologyCreateResult{
-		Synthesis: summarizeOpenTopologySynthesis(synthesis),
+		Synthesis: summarizeOpenTopologySynthesis(synthesis, &admittedSynthesis.Admission),
 	}
 	if synthesis.Report.Status != opentopologysynthesis.StatusPassed {
 		issues := openTopologySynthesisIssues(synthesis)
@@ -320,6 +360,7 @@ func scopeOpenTopologyLibraryIssues(
 
 func summarizeOpenTopologySynthesis(
 	run opentopologysynthesis.SynthesisRun,
+	admission *simulationadmission.Decision,
 ) openTopologySynthesisSummary {
 	summary := openTopologySynthesisSummary{
 		Status:          run.Report.Status,
@@ -329,6 +370,7 @@ func summarizeOpenTopologySynthesis(
 		PolicyHash:      run.Report.PolicyHash,
 		Consumption:     run.Report.Consumption,
 		EvidenceHash:    run.Hash,
+		Admission:       admission,
 	}
 	if run.Report.Selected != nil {
 		summary.SelectedTopology = run.Report.Selected.TopologyHash
