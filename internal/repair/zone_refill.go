@@ -3,8 +3,10 @@ package repair
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -90,6 +92,12 @@ func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.
 	}
 	command := append([]string{cli.Path}, args...)
 	commandResult := execRunner.Run(ctx, filepath.Dir(pcbPath), cli.Path, args...)
+	if shouldRetryZoneRefillNoOutputCrash(commandResult, reportPath) && ctx.Err() == nil {
+		if err := os.Remove(reportPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return ZoneRefillRunResult{Command: command}, fmt.Errorf("zone refill command failed (%v); failed to clean up report for retry: %w", commandResult.Err, err)
+		}
+		commandResult = execRunner.Run(ctx, filepath.Dir(pcbPath), cli.Path, args...)
+	}
 	run := ZoneRefillRunResult{
 		Command: command,
 	}
@@ -108,6 +116,25 @@ func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.
 		return run, fmt.Errorf("zone refill command failed with exit code %d: %s", commandResult.ExitCode, detail)
 	}
 	return run, nil
+}
+
+// shouldRetryZoneRefillNoOutputCrash recognizes an intermittent KiCad CLI
+// process crash that occurs before the zone-refill DRC writes any evidence.
+// Callers may make one identical retry; substantive and ordinary exit failures
+// remain fail-closed.
+func shouldRetryZoneRefillNoOutputCrash(result checks.CommandResult, reportPath string) bool {
+	if result.Err == nil || strings.TrimSpace(result.Stdout) != "" || strings.TrimSpace(result.Stderr) != "" {
+		return false
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(result.Err, &exitErr) || result.ExitCode >= 0 {
+		return false
+	}
+	info, err := os.Stat(reportPath)
+	if err != nil {
+		return errors.Is(err, os.ErrNotExist)
+	}
+	return info.Mode().IsRegular() && info.Size() == 0
 }
 
 func zoneRefillOptionsFromPostValidation(opts PostValidationOptions) ZoneRefillOptions {
