@@ -74,7 +74,7 @@ func TestV21ContractAndEvaluatorManifests(t *testing.T) {
 	if err := json.Unmarshal(data, &freeze); err != nil {
 		t.Fatal(err)
 	}
-	if freeze.Schema != "kicadai.closed-loop-open-set-evaluator-freeze.v21" || freeze.Version != 21 || freeze.FreezeParentCommit != "5481c6d03cbf56c174a1ae6462cafd6d20bc63ec" {
+	if freeze.Schema != "kicadai.closed-loop-open-set-evaluator-freeze.v21" || freeze.Version != 21 || freeze.FreezeParentCommit != "c003765b5edf3301ed8fcb87b3dca256cf848332" {
 		t.Fatalf("invalid V21 identity freeze: %+v", freeze)
 	}
 	if freeze.EvaluatorManifest != "V21_EVALUATOR.sha256" || freeze.EvaluatorManifestSHA256 != v21FileSHA256(t, freeze.EvaluatorManifest) || freeze.InheritedV20ManifestSHA256 != "1004d00da2e73f912bbb6b2422291c5c03ebddea75c173270f1b3be14f1bf2e5" {
