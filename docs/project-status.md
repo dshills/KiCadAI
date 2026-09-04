@@ -4,12 +4,14 @@ Last full bounded Go verification: 2026-09-04, including focused V21
 topology-completion, deterministic-replay, contract, evaluator-seal, and
 preservation suites. The release coverage gate reports 80.8% after
 excluding generated protobuf bindings, above the required 75% threshold.
-The latest installed-KiCad lanes were reproduced on 2026-09-02 with KiCad
-10.0.3. The six-scenario clean-checkout promotion bundle passed twice with
-identical normalized inventories, and the complete 13-case design-example tier
-passed clean ERC, strict DRC, connectivity, route completion, writer
-correctness, and zero round-trip differences. The five educational schematics
-also remain deterministic and readable. Closed-loop
+The latest installed-KiCad lanes were reproduced on 2026-09-04 with KiCad
+10.0.3. The six-scenario clean-checkout promotion bundle
+`sha256-c78451a2cd1e507e159859cf9f03cf528593a9cb9fbc2b6619d1b32b828f7439`
+passed two full iterations (12 total runs) with identical normalized
+inventories, and the complete 13-case design-example tier passed clean ERC,
+strict DRC, connectivity, route completion, writer correctness, and zero
+round-trip differences. The five educational schematics also remain
+deterministic and readable. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative

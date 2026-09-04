@@ -61,3 +61,30 @@ the installed KiCad zone-refill process. The exact command passed outside the
 sandbox with zero violations. The unchanged frozen evaluator was therefore run
 outside that sandbox from a fresh root; no production retry or bypass was
 retained.
+
+## Final local validation
+
+Validation completed on 2026-09-04 against the immutable implementation and
+evaluation commit
+`890d5a00029b91183d970b00e3fe3a5440310d27` without manually triggering
+GitHub Actions:
+
+- `make lint` and the complete serial `make test-bounded` suite passed.
+- The ten-shard coverage run executed 6,350 tests and reported 80.8% coverage
+  after excluding generated protobuf bindings, above the 75% threshold.
+- Release artifacts for macOS and Linux on amd64 and arm64 were
+  byte-reproducible; the packaged macOS arm64 binary passed the release smoke
+  test.
+- The external-review regression matrix passed twice.
+- The supported public demo completed two installed-KiCad promotions with
+  identical project hashes. Its out-of-envelope companion failed closed with
+  `OPEN_TOPOLOGY_REPAIR_EXHAUSTED` and emitted no KiCad project.
+- The six-scenario clean-checkout promotion bundle passed two full iterations
+  (12 total runs) and authenticated as
+  `sha256-c78451a2cd1e507e159859cf9f03cf528593a9cb9fbc2b6619d1b32b828f7439`.
+- The complete 13-case installed-KiCad design-example tier passed, including
+  protected USB-C LED and I2C sensor boards, ESP32-WROOM-32E, Class-A and
+  Class-AB amplifiers, op-amp, sensor, routing, writer, and round-trip evidence.
+- All five educational schematics passed two replays for checked-in
+  reproducibility, graph-derived conventional layout without placement
+  recipes, and installed-library diagnostics.
