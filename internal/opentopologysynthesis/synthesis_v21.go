@@ -171,31 +171,12 @@ func topologyCompletionStatusFrontierV21(requirement Requirement, run SynthesisR
 	if allCandidateFailuresCriticalV19(requirement, run) || universalDiagnosisExistsV19(run) {
 		return false
 	}
+	// This is the generic production frontier. The version-isolated public
+	// evaluator separately binds V21 execution to its authenticated selected
+	// requirement population, so mixed or downstream-only ineligible evidence
+	// is delegated to V20 before this predicate is reached.
 	switch run.Report.StopReason {
-	case StopRepairExhausted, StopRepairUnsupported:
-		// A repair stop reason can be retained as a downstream diagnostic beneath
-		// a stronger simulation, model, solver, or safety frontier. An unqualified
-		// stop is direct topology evidence. Otherwise require at least one direct
-		// topology diagnostic; other direct blockers may coexist and are preserved
-		// as later evidence for a structurally complete graph.
-		if len(run.Report.Diagnostics) == 0 {
-			return true
-		}
-		for _, diagnostic := range run.Report.Diagnostics {
-			if diagnostic.Code == CodeRepairExhausted || diagnostic.Code == CodeRepairUnsupported {
-				return true
-			}
-		}
-		return false
-	case StopSearchExhausted, StopNoCompleteGraph:
-		if len(run.Report.Diagnostics) == 0 {
-			return true
-		}
-		for _, diagnostic := range run.Report.Diagnostics {
-			if diagnostic.Code != CodeSearchExhausted && diagnostic.Code != CodeNoCompleteGraph {
-				return false
-			}
-		}
+	case StopRepairExhausted, StopRepairUnsupported, StopSearchExhausted, StopNoCompleteGraph:
 		return true
 	default:
 		return false

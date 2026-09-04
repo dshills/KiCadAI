@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -26,17 +27,20 @@ import (
 )
 
 const evaluatorVersion = 21
+const selectedPopulationSHA256 = "5809ba88980d3745727f3c0a3324cc987105c94a2a2a816baf54382d25ab70d1"
+const selectedPopulationCaseCount = 8
 
 type options struct {
-	repositoryRoot    string
-	corpusRoot        string
-	workingRoot       string
-	reportPath        string
-	evaluatorManifest string
-	toolchainLock     string
-	timeout           time.Duration
-	keepArtifacts     bool
-	resume            bool
+	repositoryRoot     string
+	corpusRoot         string
+	workingRoot        string
+	reportPath         string
+	evaluatorManifest  string
+	selectedPopulation string
+	toolchainLock      string
+	timeout            time.Duration
+	keepArtifacts      bool
+	resume             bool
 }
 
 type summary struct {
@@ -65,6 +69,7 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	flags.StringVar(&opts.workingRoot, "working-root", "", "fresh V21 root for per-case replay and promotion evidence")
 	flags.StringVar(&opts.reportPath, "report", "", "fresh V21 generation-zero report path")
 	flags.StringVar(&opts.evaluatorManifest, "evaluator-manifest", "", "frozen V21 evaluator checksum manifest")
+	flags.StringVar(&opts.selectedPopulation, "selected-population", "", "frozen V21 selected public topology population")
 	flags.StringVar(&opts.toolchainLock, "toolchain-lock", "", "locked KiCad promotion toolchain document")
 	flags.DurationVar(&opts.timeout, "timeout", 6*time.Hour, "whole-cohort execution timeout")
 	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", true, "retain installed-KiCad promotion evidence")
@@ -85,6 +90,10 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 	defer cancel()
 
 	corpus, err := capabilityexecutorv10.LoadPublicDiscovery(opts.corpusRoot)
+	if err != nil {
+		return err
+	}
+	selectedCaseIDs, err := loadV21SelectedCaseIDs(opts.selectedPopulation)
 	if err != nil {
 		return err
 	}
@@ -149,7 +158,16 @@ func run(parent context.Context, arguments []string, stdout io.Writer) error {
 		SymbolsRoot: toolEvidence.SymbolsRoot, FootprintsRoot: toolEvidence.FootprintsRoot,
 	}, libraryresolver.LoadOptions{})
 	index.Diagnostics = libraryIssues
-	report, err := capabilityexecutorv10.NewV21WithLegacy(v18Inventory, v18Simulation, v18Inventory, v18Simulation, legacyInventory, legacySimulation).RunV21(ctx, capabilityexecutorv10.Request{
+	executor, err := capabilityexecutorv10.NewSelectedV21WithLegacy(
+		corpus.Cases, selectedCaseIDs,
+		v18Inventory, v18Simulation,
+		v18Inventory, v18Simulation,
+		legacyInventory, legacySimulation,
+	)
+	if err != nil {
+		return err
+	}
+	report, err := executor.RunV21(ctx, capabilityexecutorv10.Request{
 		CorpusManifestSHA256: corpus.ManifestSHA256, OutputRoot: opts.workingRoot,
 		Resume: opts.resume, Cases: corpus.Cases,
 		Environment: capabilityexecutorv10.Environment{
@@ -185,6 +203,53 @@ func modelDiagnosticMessages(diagnostics []modelprovenance.Diagnostic) string {
 	return strings.Join(messages, "; ")
 }
 
+func loadV21SelectedCaseIDs(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open V21 selected public topology population: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	pathInfo, pathErr := os.Lstat(path)
+	if err != nil || pathErr != nil || !info.Mode().IsRegular() || !pathInfo.Mode().IsRegular() || !os.SameFile(info, pathInfo) || info.Size() <= 0 || info.Size() > 1<<20 {
+		return nil, fmt.Errorf("V21 selected public topology population is not a bounded nonempty regular file")
+	}
+	data, err := io.ReadAll(io.LimitReader(file, 1<<20+1))
+	if err != nil {
+		return nil, fmt.Errorf("read V21 selected public topology population: %w", err)
+	}
+	if int64(len(data)) != info.Size() {
+		return nil, fmt.Errorf("V21 selected public topology population changed while reading")
+	}
+	digest := sha256.Sum256(data)
+	if fmt.Sprintf("%x", digest) != selectedPopulationSHA256 {
+		return nil, fmt.Errorf("V21 selected public topology population differs from its frozen commitment")
+	}
+	var population struct {
+		Schema        string `json:"schema"`
+		Version       int    `json:"version"`
+		SelectedCases []struct {
+			ID string `json:"id"`
+		} `json:"selected_cases"`
+	}
+	if err := json.Unmarshal(data, &population); err != nil {
+		return nil, fmt.Errorf("decode V21 selected public topology population: %w", err)
+	}
+	if population.Schema != "kicadai.public-causal-topology-population.v21" || population.Version != 21 || len(population.SelectedCases) != selectedPopulationCaseCount {
+		return nil, fmt.Errorf("V21 selected public topology population identity or size is invalid")
+	}
+	ids := make([]string, 0, len(population.SelectedCases))
+	seen := make(map[string]bool, len(population.SelectedCases))
+	for _, selected := range population.SelectedCases {
+		if strings.TrimSpace(selected.ID) == "" || seen[selected.ID] {
+			return nil, fmt.Errorf("V21 selected public topology population contains an empty or duplicate identity")
+		}
+		seen[selected.ID] = true
+		ids = append(ids, selected.ID)
+	}
+	return ids, nil
+}
+
 func normalizeOptions(opts *options) error {
 	if opts.timeout <= 0 {
 		return fmt.Errorf("timeout must be positive")
@@ -195,9 +260,10 @@ func normalizeOptions(opts *options) error {
 	}
 	opts.repositoryRoot = root
 	defaults := map[*string]string{
-		&opts.corpusRoot:        filepath.Join(root, "internal", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus"),
-		&opts.evaluatorManifest: filepath.Join(root, "specs", "generic-causal-topology-repair", "V21_EVALUATOR.sha256"),
-		&opts.toolchainLock:     filepath.Join(root, "toolchain", "kicad-promotion.lock.json"),
+		&opts.corpusRoot:         filepath.Join(root, "internal", "capabilityfeedback", "testdata", "closed_loop_open_set_v10_corpus"),
+		&opts.evaluatorManifest:  filepath.Join(root, "specs", "generic-causal-topology-repair", "V21_EVALUATOR.sha256"),
+		&opts.selectedPopulation: filepath.Join(root, "specs", "generic-causal-topology-repair", "V21_PUBLIC_TOPOLOGY_POPULATION.json"),
+		&opts.toolchainLock:      filepath.Join(root, "toolchain", "kicad-promotion.lock.json"),
 	}
 	for target, fallback := range defaults {
 		if strings.TrimSpace(*target) == "" {
@@ -207,7 +273,7 @@ func normalizeOptions(opts *options) error {
 	if strings.TrimSpace(opts.workingRoot) == "" || strings.TrimSpace(opts.reportPath) == "" {
 		return fmt.Errorf("--working-root and --report are required")
 	}
-	for _, target := range []*string{&opts.corpusRoot, &opts.workingRoot, &opts.reportPath, &opts.evaluatorManifest, &opts.toolchainLock} {
+	for _, target := range []*string{&opts.corpusRoot, &opts.workingRoot, &opts.reportPath, &opts.evaluatorManifest, &opts.selectedPopulation, &opts.toolchainLock} {
 		absolute, err := filepath.Abs(*target)
 		if err != nil {
 			return err
