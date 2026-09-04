@@ -174,9 +174,13 @@ func topologyCompletionStatusFrontierV21(requirement Requirement, run SynthesisR
 	switch run.Report.StopReason {
 	case StopRepairExhausted, StopRepairUnsupported:
 		// A repair stop reason can be retained as a downstream diagnostic beneath
-		// a stronger simulation, model, solver, or safety frontier. Require at
-		// least one direct topology diagnostic. Other direct blockers may coexist
-		// and are preserved as later evidence for a structurally complete graph.
+		// a stronger simulation, model, solver, or safety frontier. An unqualified
+		// stop is direct topology evidence. Otherwise require at least one direct
+		// topology diagnostic; other direct blockers may coexist and are preserved
+		// as later evidence for a structurally complete graph.
+		if len(run.Report.Diagnostics) == 0 {
+			return true
+		}
 		for _, diagnostic := range run.Report.Diagnostics {
 			if diagnostic.Code == CodeRepairExhausted || diagnostic.Code == CodeRepairUnsupported {
 				return true

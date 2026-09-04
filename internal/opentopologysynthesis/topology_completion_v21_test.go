@@ -91,8 +91,8 @@ func TestV21DirectRepairFrontierAllowsOtherDirectBlockers(t *testing.T) {
 		t.Fatal("V21 accepted a repair stop without a direct topology diagnostic")
 	}
 	direct.Report.Diagnostics = nil
-	if topologyCompletionStatusFrontierV21(requirement, direct) {
-		t.Fatal("V21 accepted an unsubstantiated repair stop")
+	if !topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 rejected an unqualified direct repair stop")
 	}
 }
 
