@@ -74,6 +74,28 @@ func TestV21DirectSearchFrontierRequiresTopologyDiagnostics(t *testing.T) {
 	}
 }
 
+func TestV21DirectRepairFrontierAllowsOtherDirectBlockers(t *testing.T) {
+	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
+	direct := SynthesisRun{Report: Report{
+		Status: StatusFailed, StopReason: StopRepairExhausted,
+		Diagnostics: []Diagnostic{
+			{Code: CodeRepairExhausted, Path: "repair"},
+			{Code: CodeValueExhausted, Path: "values"},
+		},
+	}}
+	if !topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 rejected a direct topology frontier with a coexisting later blocker")
+	}
+	direct.Report.Diagnostics = direct.Report.Diagnostics[1:]
+	if topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 accepted a repair stop without a direct topology diagnostic")
+	}
+	direct.Report.Diagnostics = nil
+	if topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 accepted an unsubstantiated repair stop")
+	}
+}
+
 func TestV21TopologyInvariantsAcceptDirectionallyCompleteGraph(t *testing.T) {
 	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
 	inventory := causalV19Inventory(t)
