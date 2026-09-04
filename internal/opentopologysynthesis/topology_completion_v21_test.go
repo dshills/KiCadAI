@@ -43,6 +43,37 @@ func TestV21PreservesUnsafeV20RunByteForByte(t *testing.T) {
 	}
 }
 
+func TestV21PreservesDownstreamTopologyDiagnosticByteForByte(t *testing.T) {
+	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
+	v20 := causalV19FrontierRun(requirement,
+		Diagnosis{Code: "assertion_above_maximum", RequirementID: "transfer_bound", Analysis: "dc_operating_point", Metric: "voltage_gain"},
+		Diagnosis{Code: "assertion_below_minimum", RequirementID: "transfer_bound", Analysis: "dc_operating_point", Metric: "voltage_gain"},
+	)
+	v20.Report.Diagnostics = []Diagnostic{{Code: "SIMULATION_INVALID", Path: "simulation"}}
+	got := synthesizeTopologyCompletionV21(
+		context.Background(), requirement, v20, causalV19Inventory(t), SimulationEnvironment{},
+		simulationadmission.PrepareEnvironment(simulationadmission.Environment{}), DefaultPolicy(),
+	)
+	if !reflect.DeepEqual(got, v20) {
+		t.Fatalf("V21 changed a non-topology root with a downstream topology stop\nwant %#v\n got %#v", v20, got)
+	}
+}
+
+func TestV21DirectSearchFrontierRequiresTopologyDiagnostics(t *testing.T) {
+	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
+	direct := SynthesisRun{Report: Report{
+		Status: StatusExhausted, StopReason: StopSearchExhausted,
+		Diagnostics: []Diagnostic{{Code: CodeSearchExhausted, Path: "search.policy"}},
+	}}
+	if !topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 rejected a direct topology-search frontier")
+	}
+	direct.Report.Diagnostics = append(direct.Report.Diagnostics, Diagnostic{Code: "SIMULATION_INVALID", Path: "simulation"})
+	if topologyCompletionStatusFrontierV21(requirement, direct) {
+		t.Fatal("V21 accepted a mixed search and non-topology frontier")
+	}
+}
+
 func TestV21TopologyInvariantsAcceptDirectionallyCompleteGraph(t *testing.T) {
 	requirement := causalV19Requirement("voltage_gain", "dc_operating_point")
 	inventory := causalV19Inventory(t)

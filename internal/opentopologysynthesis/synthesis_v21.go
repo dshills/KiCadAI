@@ -78,13 +78,14 @@ func synthesizeTopologyCompletionV21(
 	admission simulationadmission.PreparedEnvironment,
 	policy Policy,
 ) SynthesisRun {
-	if ctx.Err() != nil || !topologyCompletionStatusFrontierV21(v20) {
+	if ctx.Err() != nil {
 		return v20
 	}
-	requirement = Normalize(requirement)
-	if allCandidateFailuresCriticalV19(requirement, v20) {
+	normalized := Normalize(requirement)
+	if !topologyCompletionStatusFrontierV21(normalized, v20) {
 		return v20
 	}
+	requirement = normalized
 	base, eligible := causalRepairBaseV19(requirement, v20, inventory)
 	if !eligible {
 		return v20
@@ -163,12 +164,28 @@ func synthesizeTopologyCompletionV21(
 	return finalizeSynthesisRunV17(run)
 }
 
-func topologyCompletionStatusFrontierV21(run SynthesisRun) bool {
+func topologyCompletionStatusFrontierV21(requirement Requirement, run SynthesisRun) bool {
 	if run.Report.Status == StatusPassed || run.Report.Status == StatusCanceled || run.Report.Status == StatusInvalid || run.Report.Status == StatusInfeasible {
 		return false
 	}
+	if allCandidateFailuresCriticalV19(requirement, run) || universalDiagnosisExistsV19(run) {
+		return false
+	}
 	switch run.Report.StopReason {
-	case StopRepairExhausted, StopRepairUnsupported, StopSearchExhausted, StopNoCompleteGraph:
+	case StopRepairExhausted, StopRepairUnsupported:
+		// A repair stop reason can be retained as a downstream diagnostic beneath
+		// a stronger simulation, model, solver, or safety frontier. Only a direct,
+		// homogeneous V20 topology frontier is eligible for V21 completion.
+		return causalTopologyRepairFrontierV19(requirement, run)
+	case StopSearchExhausted, StopNoCompleteGraph:
+		if len(run.Report.Diagnostics) == 0 {
+			return true
+		}
+		for _, diagnostic := range run.Report.Diagnostics {
+			if diagnostic.Code != CodeSearchExhausted && diagnostic.Code != CodeNoCompleteGraph {
+				return false
+			}
+		}
 		return true
 	default:
 		return false
