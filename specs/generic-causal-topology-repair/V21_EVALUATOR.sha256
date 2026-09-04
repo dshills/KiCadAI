@@ -1,7 +1,7 @@
-dc413b406d99d5cd3883526bba7a7a6a09c4aa8324d50f67113d3722a866c05a  ../../cmd/kicadai-discovery-baseline-v21/main.go
-87242a2dc3285c6379ee7ddd2d0721c69002b9537dbf067d8ce7c306170fff54  ../../cmd/kicadai-discovery-baseline-v21/main_test.go
-c126555751d721c12f2fa1ac93e39f3b60eb303d24a1dfe9c0c84ae3b398e6f0  ../../internal/capabilityexecutorv10/v21_executor.go
-093007b8bdc77508bb2b18fa869ee0d075f48b67726f6e5c6dbd1a20daa401c3  ../../internal/capabilityexecutorv10/v21_executor_test.go
+74a7527a432577e7d43c88d2129a7ac52612c84aa7ed941903ce07e6945cbe92  ../../cmd/kicadai-discovery-baseline-v21/main.go
+f71b4ef3d0410dbad2a54256d8d853ed4251e57973d7d97ffa04540f9e4a0510  ../../cmd/kicadai-discovery-baseline-v21/main_test.go
+967b703cddc8848b814f10f25efe06cb387fe2d78e662f05c0e19e548ef81630  ../../internal/capabilityexecutorv10/v21_executor.go
+0c4837ef721e75351e304b97f70aca15f69a15a3c222c05f47911d1ed5a77445  ../../internal/capabilityexecutorv10/v21_executor_test.go
 86405403cfb5077d9623213aa831aa36aa615af65ab40b6c8042e6905d0feb3c  ../../internal/capabilityexecutorv10/v21_runner.go
 108fbea905054a0b736d07b52c99540dd0fad2a9ac5c12dbfa2ec80a88dfe6be  ../../internal/capabilityexecutorv10/v21_runner_test.go
 c7931cd0b05bf10b1a0dc5182bc3241ce350159f047daa6f09fafa5b9b164100  ../../internal/capabilityfeedback/observe_v21.go
@@ -12,10 +12,10 @@ c7931cd0b05bf10b1a0dc5182bc3241ce350159f047daa6f09fafa5b9b164100  ../../internal
 02ba245d16b2a25ce729dc3a0a6ed39fc8bfdced00b29707865ebcf305d6fead  ../../internal/capabilityfeedback/testdata/closed_loop_open_set_v20_generation_zero/report.sha256
 96fffcb24fe6c1a8f041977ef70c93393b8de78c9aa348788d4249a60eb55add  ../../internal/opentopologysynthesis/repair_model.go
 05b46cc12315f30d50b98be58d5711edf731b95fb4fa5dce45733e61eb56a56d  ../../internal/opentopologysynthesis/repair_v21.go
-0992652f5c1c962ab0db1db661858ddb4835c29c7cbf55aa2940052b69b8e415  ../../internal/opentopologysynthesis/synthesis_v21.go
+e708d12bfd03380e5966beaa0f7037a4ef707f16608edb1e82c191663300b066  ../../internal/opentopologysynthesis/synthesis_v21.go
 6903e33546c86bb0b08109fa8ad784fca864e2a38e3e66f3f527ba4d6ac9eb6e  ../../internal/opentopologysynthesis/topology_completion_model_v21.go
 6735224da2b0a5599dab84fa97b7535ac4827ba0e20bb5f21744c89a13675e46  ../../internal/opentopologysynthesis/topology_completion_v21.go
-3ae623754bd7d89ff49bb5ed3036f7cc310de88d8a850dbfe381783c86c31ba6  ../../internal/opentopologysynthesis/topology_completion_v21_test.go
+980673041828b7a87281feb4cec2bfae553c752812eb2600ec5f168e728e9167  ../../internal/opentopologysynthesis/topology_completion_v21_test.go
 00a5e3d5176e41da962c94366806fc07f17f218bf2bebec32d25aa6d5cea0609  ../../internal/opentopologysynthesis/topology_invariants_v21.go
 1004d00da2e73f912bbb6b2422291c5c03ebddea75c173270f1b3be14f1bf2e5  ../generic-analysis-model-solver-admission/V20_EVALUATOR.sha256
 a1d6843da3a8d4e50a74fcf37e09163de64f5d68e7438d2c66de0c0f4a330706  V21_EVALUATOR_PROTOCOL.md
