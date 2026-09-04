@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
@@ -45,55 +42,6 @@ func (runner fakeCheckRunner) Run(_ context.Context, workingDir string, path str
 }
 
 func (fakeCheckRunner) Version(context.Context, string) (string, error) {
-	return "fake", nil
-}
-
-type sequenceCheckRunner struct {
-	results                []checks.CommandResult
-	calls                  int
-	writeReportOnCall      int
-	writeEmptyReportOnCall int
-}
-
-func (runner *sequenceCheckRunner) Run(_ context.Context, workingDir string, path string, args ...string) checks.CommandResult {
-	runner.calls++
-	if len(runner.results) == 0 {
-		return checks.CommandResult{
-			WorkingDir: workingDir,
-			Path:       path,
-			Args:       append([]string(nil), args...),
-			ExitCode:   -1,
-			Err:        errors.New("sequence check runner has no results"),
-		}
-	}
-	if runner.calls == runner.writeReportOnCall {
-		for index, arg := range args {
-			if arg == "--output" && index+1 < len(args) {
-				_ = os.WriteFile(args[index+1], []byte("{}\n"), 0o644)
-				break
-			}
-		}
-	}
-	if runner.calls == runner.writeEmptyReportOnCall {
-		for index, arg := range args {
-			if arg == "--output" && index+1 < len(args) {
-				_ = os.WriteFile(args[index+1], nil, 0o644)
-				break
-			}
-		}
-	}
-	resultIndex := runner.calls - 1
-	if resultIndex >= len(runner.results) {
-		resultIndex = len(runner.results) - 1
-	}
-	result := runner.results[resultIndex]
-	result.WorkingDir = workingDir
-	result.Path = path
-	result.Args = append([]string(nil), args...)
-	return result
-}
-
-func (*sequenceCheckRunner) Version(context.Context, string) (string, error) {
 	return "fake", nil
 }
 
@@ -202,141 +150,20 @@ func TestKiCadZoneRefillRunnerAllowsDRCViolationExitCode(t *testing.T) {
 	}
 }
 
-func TestKiCadZoneRefillRunnerReportsRepeatedNoOutputCrash(t *testing.T) {
+func TestKiCadZoneRefillRunnerReportsLaunchFailureWithoutStderr(t *testing.T) {
 	project := t.TempDir()
 	pcb := filepath.Join(project, "demo.kicad_pcb")
 	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
 		t.Fatalf("write pcb: %v", err)
 	}
-	checkRunner := &sequenceCheckRunner{results: []checks.CommandResult{{
+	runner := KiCadZoneRefillRunner{Runner: fakeCheckRunner{result: checks.CommandResult{
 		ExitCode: -1,
-		Err:      signaledProcessError(t),
+		Err:      errors.New("signal: abort trap"),
 	}}}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
 	_, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{})
 	if err == nil || !strings.Contains(err.Error(), "signal: abort trap") {
 		t.Fatalf("RefillZones() error = %v", err)
 	}
-	if checkRunner.calls != zoneRefillCrashMaxAttempts {
-		t.Fatalf("runner calls = %d, want %d", checkRunner.calls, zoneRefillCrashMaxAttempts)
-	}
-}
-
-func TestKiCadZoneRefillRunnerRetriesNoOutputCrashAfterCooldown(t *testing.T) {
-	project := t.TempDir()
-	pcb := filepath.Join(project, "demo.kicad_pcb")
-	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
-		t.Fatalf("write pcb: %v", err)
-	}
-	checkRunner := &sequenceCheckRunner{results: []checks.CommandResult{{
-		ExitCode: -1,
-		Err:      signaledProcessError(t),
-	}, {ExitCode: 0}}}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
-	if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err != nil {
-		t.Fatalf("RefillZones() error = %v", err)
-	}
-	if checkRunner.calls != 2 {
-		t.Fatalf("runner calls = %d, want 2", checkRunner.calls)
-	}
-}
-
-func TestKiCadZoneRefillRunnerRetriesCrashWithEmptyReport(t *testing.T) {
-	project := t.TempDir()
-	pcb := filepath.Join(project, "demo.kicad_pcb")
-	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
-		t.Fatalf("write pcb: %v", err)
-	}
-	checkRunner := &sequenceCheckRunner{
-		results: []checks.CommandResult{{
-			ExitCode: -1,
-			Err:      signaledProcessError(t),
-		}, {ExitCode: 0}},
-		writeEmptyReportOnCall: 1,
-	}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
-	if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err != nil {
-		t.Fatalf("RefillZones() error = %v", err)
-	}
-	if checkRunner.calls != 2 {
-		t.Fatalf("runner calls = %d, want 2", checkRunner.calls)
-	}
-}
-
-func TestKiCadZoneRefillRunnerDoesNotRetrySubstantiveFailure(t *testing.T) {
-	tests := []struct {
-		name              string
-		result            checks.CommandResult
-		writeReportOnCall int
-	}{
-		{
-			name: "stderr",
-			result: checks.CommandResult{
-				ExitCode: -1,
-				Stderr:   "fatal error",
-				Err:      signaledProcessError(t),
-			},
-		},
-		{
-			name: "report",
-			result: checks.CommandResult{
-				ExitCode: -1,
-				Err:      signaledProcessError(t),
-			},
-			writeReportOnCall: 1,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			project := t.TempDir()
-			pcb := filepath.Join(project, "demo.kicad_pcb")
-			if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
-				t.Fatalf("write pcb: %v", err)
-			}
-			checkRunner := &sequenceCheckRunner{
-				results:           []checks.CommandResult{test.result},
-				writeReportOnCall: test.writeReportOnCall,
-			}
-			runner := KiCadZoneRefillRunner{Runner: checkRunner}
-			if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err == nil {
-				t.Fatal("RefillZones() error = nil")
-			}
-			if checkRunner.calls != 1 {
-				t.Fatalf("runner calls = %d, want 1", checkRunner.calls)
-			}
-		})
-	}
-}
-
-func TestKiCadZoneRefillRunnerDoesNotRetryLaunchFailure(t *testing.T) {
-	project := t.TempDir()
-	pcb := filepath.Join(project, "demo.kicad_pcb")
-	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
-		t.Fatalf("write pcb: %v", err)
-	}
-	checkRunner := &sequenceCheckRunner{results: []checks.CommandResult{{
-		ExitCode: -1,
-		Err:      errors.New("executable file not found"),
-	}}}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner}
-	if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err == nil {
-		t.Fatal("RefillZones() error = nil")
-	}
-	if checkRunner.calls != 1 {
-		t.Fatalf("runner calls = %d, want 1", checkRunner.calls)
-	}
-}
-
-func signaledProcessError(t *testing.T) error {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("signal-based process termination is not portable to Windows")
-	}
-	err := exec.Command("/bin/sh", "-c", "kill -ABRT $$").Run()
-	if err == nil {
-		t.Fatal("signaled process returned no error")
-	}
-	return err
 }
 
 func TestDiscoverZoneRefillPCBRejectsAmbiguousDirectory(t *testing.T) {

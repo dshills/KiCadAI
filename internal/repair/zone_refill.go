@@ -3,14 +3,11 @@ package repair
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
@@ -20,8 +17,6 @@ const (
 	postValidatorZoneRefill                 = "zone_refill"
 	postValidatorZoneRefillBeforeValidation = "zone_refill_before_validation"
 	postValidatorZoneRefillAfterRepair      = "zone_refill_after_repair_before_validation"
-	zoneRefillCrashMaxAttempts              = 3
-	zoneRefillCrashRetryDelay               = time.Second
 )
 
 type ZoneRefillPolicy string
@@ -60,8 +55,7 @@ type ZoneRefillRunner interface {
 }
 
 type KiCadZoneRefillRunner struct {
-	Runner          checks.Runner
-	CrashRetryDelay time.Duration
+	Runner checks.Runner
 }
 
 func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.KiCadCLI, target string, opts ZoneRefillOptions) (ZoneRefillRunResult, error) {
@@ -95,47 +89,7 @@ func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.
 		execRunner = checks.ExecRunner{}
 	}
 	command := append([]string{cli.Path}, args...)
-	if err := ctx.Err(); err != nil {
-		return ZoneRefillRunResult{Command: command}, fmt.Errorf("zone refill canceled before first attempt: %w", err)
-	}
-	if err := os.Remove(reportPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return ZoneRefillRunResult{Command: command}, fmt.Errorf("prepare zone refill report path: %w", err)
-	}
-	retryDelay := runner.CrashRetryDelay
-	if retryDelay <= 0 {
-		retryDelay = zoneRefillCrashRetryDelay
-	}
-	var commandResult checks.CommandResult
-	attempts := 0
-	for attempts < zoneRefillCrashMaxAttempts {
-		if attempts > 0 {
-			// A signal-only crash can leave an empty report even though it did
-			// not produce usable evidence; clear that file before retrying.
-			if err := os.Remove(reportPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return ZoneRefillRunResult{Command: command}, fmt.Errorf("previous zone refill attempt failed (%v); additionally failed to clean up report for retry: %w", commandResult.Err, err)
-			}
-			timer := time.NewTimer(retryDelay)
-			select {
-			case <-ctx.Done():
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				return ZoneRefillRunResult{Command: command}, fmt.Errorf("zone refill canceled after %d attempt(s): %w", attempts, ctx.Err())
-			case <-timer.C:
-			}
-		}
-		commandResult = execRunner.Run(ctx, filepath.Dir(pcbPath), cli.Path, args...)
-		attempts++
-		if err := ctx.Err(); err != nil {
-			return ZoneRefillRunResult{Command: command}, fmt.Errorf("zone refill canceled after %d attempt(s): %w", attempts, err)
-		}
-		if !shouldRetryZoneRefillNoOutputCrash(commandResult, reportPath) {
-			break
-		}
-	}
+	commandResult := execRunner.Run(ctx, filepath.Dir(pcbPath), cli.Path, args...)
 	run := ZoneRefillRunResult{
 		Command: command,
 	}
@@ -151,28 +105,9 @@ func (runner KiCadZoneRefillRunner) RefillZones(ctx context.Context, cli checks.
 		if detail == "" {
 			detail = commandResult.Err.Error()
 		}
-		return run, fmt.Errorf("zone refill command failed after %d attempt(s) with exit code %d: %s", attempts, commandResult.ExitCode, detail)
+		return run, fmt.Errorf("zone refill command failed with exit code %d: %s", commandResult.ExitCode, detail)
 	}
 	return run, nil
-}
-
-// shouldRetryZoneRefillNoOutputCrash recognizes an intermittent KiCad CLI
-// process crash that occurs before the zone-refill DRC writes any evidence.
-// Callers may make only the fixed number of identical, delayed attempts above;
-// substantive and ordinary exit failures remain fail-closed.
-func shouldRetryZoneRefillNoOutputCrash(result checks.CommandResult, reportPath string) bool {
-	if result.Err == nil || strings.TrimSpace(result.Stdout) != "" || strings.TrimSpace(result.Stderr) != "" {
-		return false
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(result.Err, &exitErr) || result.ExitCode >= 0 {
-		return false
-	}
-	info, err := os.Stat(reportPath)
-	if err != nil {
-		return errors.Is(err, os.ErrNotExist)
-	}
-	return info.Mode().IsRegular() && info.Size() == 0
 }
 
 func zoneRefillOptionsFromPostValidation(opts PostValidationOptions) ZoneRefillOptions {
