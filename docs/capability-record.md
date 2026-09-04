@@ -9,6 +9,12 @@ supported, experimental, and unsupported boundaries, start with
 
 - Direct project, schematic, and PCB writers are functional and extensively
   tested.
+- The V21 experimental open-topology successor now derives generic causal
+  obligations and applies canonical bounded graph completion only after exact
+  V20 analysis/model/solver admission. Its frozen 24-case evaluation preserves
+  the V18 pass and safety result, keeps all unselected cases byte-identical to
+  V20, and advances six selected cases across four domains to a later blocker.
+  See the [V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
 - Every normalized creation request is deterministically classified as
