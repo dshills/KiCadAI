@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
@@ -211,17 +212,17 @@ func TestKiCadZoneRefillRunnerReportsRepeatedNoOutputCrash(t *testing.T) {
 		ExitCode: -1,
 		Err:      signaledProcessError(t),
 	}}}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner}
+	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
 	_, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{})
 	if err == nil || !strings.Contains(err.Error(), "signal: abort trap") {
 		t.Fatalf("RefillZones() error = %v", err)
 	}
-	if checkRunner.calls != 2 {
-		t.Fatalf("runner calls = %d, want 2", checkRunner.calls)
+	if checkRunner.calls != zoneRefillCrashMaxAttempts {
+		t.Fatalf("runner calls = %d, want %d", checkRunner.calls, zoneRefillCrashMaxAttempts)
 	}
 }
 
-func TestKiCadZoneRefillRunnerRetriesNoOutputCrashOnce(t *testing.T) {
+func TestKiCadZoneRefillRunnerRetriesNoOutputCrashAfterCooldown(t *testing.T) {
 	project := t.TempDir()
 	pcb := filepath.Join(project, "demo.kicad_pcb")
 	if err := os.WriteFile(pcb, []byte("(kicad_pcb)\n"), 0o644); err != nil {
@@ -231,7 +232,7 @@ func TestKiCadZoneRefillRunnerRetriesNoOutputCrashOnce(t *testing.T) {
 		ExitCode: -1,
 		Err:      signaledProcessError(t),
 	}, {ExitCode: 0}}}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner}
+	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
 	if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err != nil {
 		t.Fatalf("RefillZones() error = %v", err)
 	}
@@ -253,7 +254,7 @@ func TestKiCadZoneRefillRunnerRetriesCrashWithEmptyReport(t *testing.T) {
 		}, {ExitCode: 0}},
 		writeEmptyReportOnCall: 1,
 	}
-	runner := KiCadZoneRefillRunner{Runner: checkRunner}
+	runner := KiCadZoneRefillRunner{Runner: checkRunner, CrashRetryDelay: time.Nanosecond}
 	if _, err := runner.RefillZones(context.Background(), checks.KiCadCLI{Path: "/bin/kicad-cli"}, project, ZoneRefillOptions{}); err != nil {
 		t.Fatalf("RefillZones() error = %v", err)
 	}
