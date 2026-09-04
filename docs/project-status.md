@@ -1,8 +1,8 @@
 # Project Status
 
-Last full bounded Go verification: 2026-09-02, including focused V19
-preservation, compositional-beam, deterministic-replay, contract, and
-retirement-evidence suites. The release coverage gate reports 80.5% after
+Last full bounded Go verification: 2026-09-04, including focused V21
+topology-completion, deterministic-replay, contract, evaluator-seal, and
+preservation suites. The release coverage gate reports 80.8% after
 excluding generated protobuf bindings, above the required 75% threshold.
 The latest installed-KiCad lanes were reproduced on 2026-09-02 with KiCad
 10.0.3. The six-scenario clean-checkout promotion bundle passed twice with
@@ -66,6 +66,17 @@ blockers; relative to V18, unsupported therefore fell from 7 to 5 while
 exhausted rose from 15 to 17. The selected
 model-availability leaf therefore passed the frozen advancement rule. This
 remains experimental and does not expand the v1 supported surface.
+
+The V21 successor is complete. Generic causal-topology obligations and
+canonical bounded repair run only after exact V20 analysis/model/solver
+admission. Its frozen public evaluation completed all 24 cases exactly twice:
+1 pass, 5 unsupported, 1 unsafe, and 17 exhausted. All 16 unselected case
+objects remain byte-identical to V20, all replay hashes match, and the V18 pass
+again clears two installed-KiCad promotions with every physical and replay gate
+true. Six selected cases across four reporting domains advance to the later
+`OPEN_TOPOLOGY_NO_PASSING_GRAPH` blocker, exceeding the frozen material gate.
+V21 remains experimental and does not change the v1 supported surface. See the
+[V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.

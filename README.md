@@ -113,6 +113,17 @@ support claim. See the
 [specification](specs/generic-analysis-model-solver-admission/SPEC.md) and
 [public evidence examples](examples/simulation-admission/README.md).
 
+V21 builds on that admitted V20 boundary with generic causal-topology
+completion and bounded repair. It derives structural obligations from behavior,
+terminal contracts, and the current graph; applies only canonical generic graph
+operations; and preserves exact V20 analysis/model/solver admission before any
+new topology work. Its frozen 24-case, two-replay public evaluation preserved
+the V18 pass and unsafe result, kept all 16 unselected cases byte-identical to
+V20, and advanced six selected cases across four domains to a later behavioral-
+evidence blocker. V21 remains experimental and does not change the v1 support
+claim. See the
+[V21 audit](specs/generic-causal-topology-repair/AUDIT.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.
