@@ -4,7 +4,7 @@ Examples, package map, testing, protobuf maintenance, current limits, troublesho
 
 ## Release Builds
 
-`VERSION` contains the release-candidate identity. Release binaries are the
+`VERSION` contains the application release identity. Release binaries are the
 supported distribution surface; packages below `internal/` and the local Go
 module name are not a public library API.
 
@@ -16,13 +16,20 @@ make release-reproducibility
 
 `make release` writes four CGO-free macOS/Linux AMD64/ARM64 binaries plus
 `RELEASE_MANIFEST.json` and `SHA256SUMS` to ignored `dist/`. The release
-workflow pins Go 1.23.12, derives the build date from the tagged commit, verifies
+workflow uses the Go 1.26.8 pin in `go.mod`, derives the build date from the tagged commit, verifies
 two byte-identical builds, smoke-tests the host binary, and publishes only a
 tag whose name exactly matches `VERSION`.
 
-The release builder refuses a dirty repository. Maintainers may set
+The release builder refuses a dirty repository, mismatched commit metadata,
+and malformed version or timestamp overrides. It always compiles its own
+repository root, including when invoked from another directory. Maintainers may set
 `ALLOW_DIRTY_RELEASE=1` only to exercise packaging before a commit; artifacts
 built with that override are not publishable release evidence.
+
+Make targets use the exact Go patch recorded in `go.mod` by default. An explicit
+`GOTOOLCHAIN` override is for compatibility experiments, not canonical release
+evidence. `make security-check` queries the public vulnerability database with
+a pinned scanner; it is intentionally separate from offline test gates.
 
 `make install` builds the current source and installs `kicadai` to
 `~/.local/bin`; set `INSTALL_DIR` to override the destination.

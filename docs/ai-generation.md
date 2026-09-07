@@ -577,6 +577,17 @@ are experimental. V20's frozen public evaluation preserved the V18 pass and
 advanced the selected model-availability leaf, but does not imply arbitrary
 SPICE or external-solver support.
 
+The V21 successor adds generic causal-topology completion after the exact V20
+admission boundary. Typed reachability, reference-closure, observation-cone,
+causal-path, terminal, and driver-conflict obligations drive canonical bounded
+graph operations with stable-hash deduplication, cycle rejection, strict
+improvement, and repair provenance. The frozen public evaluation completed all
+24 cases twice, preserved every V20-ineligible case byte-for-byte, and advanced
+six selected cases across four domains to a later behavioral-evidence blocker.
+This remains experimental and does not authorize arbitrary topology, parts,
+models, solvers, or fabrication release. See the
+[V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
+
 ## Primitive Open-Topology Generation
 
 `open-topology create` is the provider-independent behavior-to-KiCad lane. The

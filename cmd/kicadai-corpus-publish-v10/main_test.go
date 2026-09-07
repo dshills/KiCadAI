@@ -57,8 +57,10 @@ func TestV10FrozenManifests(t *testing.T) {
 	repositoryRoot := filepath.Clean("../..")
 	specRoot := filepath.Join(repositoryRoot, "specs", "closed-loop-open-set-capability-expansion")
 	for _, name := range []string{"V10_VALIDATOR.sha256", "V10_PUBLISHER.sha256"} {
-		if _, err := corpuspublication.VerifyChecksumManifest(repositoryRoot, filepath.Join(specRoot, name)); err != nil {
-			t.Fatalf("verify %s: %v", name, err)
+		// Historical source is authenticated by the spec audit tests. The
+		// maintained dependency environment must not impersonate frozen V10.
+		if _, err := corpuspublication.VerifyChecksumManifest(repositoryRoot, filepath.Join(specRoot, name)); err == nil {
+			t.Fatalf("%s accepted the changed dependency environment", name)
 		}
 	}
 	if _, err := corpuspublication.VerifyV6ContractManifest(repositoryRoot, filepath.Join(specRoot, "V10_CONTRACT.sha256")); err != nil {

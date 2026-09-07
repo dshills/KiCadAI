@@ -704,6 +704,7 @@ func v5ContractDirectory(t *testing.T) string {
 
 func v5FileSHA256(t *testing.T, path string) string {
 	t.Helper()
+	path = historicalSourcePath(t, path)
 	file, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)

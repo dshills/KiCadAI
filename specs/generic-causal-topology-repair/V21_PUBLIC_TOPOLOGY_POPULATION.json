@@ -1,0 +1,43 @@
+{
+  "schema": "kicadai.public-causal-topology-population.v21",
+  "version": 21,
+  "freeze_parent_commit": "6baf59ad9c4881bbf2969149279281a2ff999c0f",
+  "source_report": "internal/capabilityfeedback/testdata/closed_loop_open_set_v20_generation_zero/report.json",
+  "source_report_sha256": "6ea9b697f8852cb8f4d752f75e5fa44aca93de7bbad9bb5e5fc6c063b10ff6aa",
+  "source_report_hash": "6e4b732925aa158d811e4d15041d6b9ce3d138c7a273409b41efde72fba76d24",
+  "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
+  "corpus_checksums_sha256": "24541ffe0f4ee372e0f1db5508eb22b102343f4eca2f376cacbca51cf275dcdf",
+  "v20_evaluator_manifest_sha256": "1004d00da2e73f912bbb6b2422291c5c03ebddea75c173270f1b3be14f1bf2e5",
+  "historical_git_trees": {
+    "v10_corpus": "f8806cfa758d65e6b3aa26988c10a77036165de7",
+    "v18_generation_one": "71d205038f6274c814e2c4ee08e14ea2ffb4e3bf",
+    "v19_generation_zero": "b543631e8dfde548949cbabb24ef4aa08fea56aa",
+    "v20_generation_zero": "cf102df4d7b6b9c6d22815beac67df714ae6d71b",
+    "v20_specification": "14f7ca0ce5b7e9fa1b66ac31ebc440e8594ffb9f"
+  },
+  "population": {
+    "discovery_case_count": 24,
+    "selected_case_count": 8,
+    "reporting_domain_count": 5,
+    "causal_topology_repair_occurrences": 47,
+    "complete_topology_occurrences": 9,
+    "total_topology_occurrences": 56
+  },
+  "typed_advancement": {
+    "minimum_cases": 3,
+    "minimum_reporting_domains": 2,
+    "requires_pass_or_strictly_later_specific_blocker": true,
+    "renaming_only_forbidden": true,
+    "regression_forbidden": true
+  },
+  "selected_cases": [
+    {"id":"v10_case_001","reporting_domain":"analog_signal_path","circuit_role":"source_bias","causal_topology_repair":6,"complete_topology":0,"structural_classes":["missing_observation_cone","required_branch_divergence","missing_source_to_load_path"]},
+    {"id":"v10_case_004","reporting_domain":"mixed_signal_data_conversion","circuit_role":"sensing_measurement","causal_topology_repair":5,"complete_topology":0,"structural_classes":["missing_control_to_output_path","missing_observation_cone","unreachable_external_port"]},
+    {"id":"v10_case_009","reporting_domain":"digital_control","circuit_role":"sensing_measurement","causal_topology_repair":8,"complete_topology":0,"structural_classes":["required_branch_divergence","missing_observation_cone","disconnected_required_subgraph"]},
+    {"id":"v10_case_012","reporting_domain":"protection_power_integrity","circuit_role":"source_bias","causal_topology_repair":0,"complete_topology":9,"structural_classes":["incomplete_causal_path","domain_reference_completeness","missing_source_to_load_path"]},
+    {"id":"v10_case_016","reporting_domain":"mixed_signal_data_conversion","circuit_role":"protection_supervision","causal_topology_repair":8,"complete_topology":0,"structural_classes":["missing_control_to_output_path","invalid_directionality_or_terminal_role","repair_cycle_or_duplicate"]},
+    {"id":"v10_case_017","reporting_domain":"sensing_instrumentation","circuit_role":"source_bias","causal_topology_repair":8,"complete_topology":0,"structural_classes":["required_branch_divergence","missing_observation_cone","missing_source_to_load_path"]},
+    {"id":"v10_case_018","reporting_domain":"protection_power_integrity","circuit_role":"amplification_conditioning","causal_topology_repair":8,"complete_topology":0,"structural_classes":["incomplete_causal_path","missing_observation_cone","unreachable_external_port"]},
+    {"id":"v10_case_021","reporting_domain":"digital_control","circuit_role":"protection_supervision","causal_topology_repair":4,"complete_topology":0,"structural_classes":["required_branch_divergence","missing_control_to_output_path","bounded_search_exhaustion"]}
+  ]
+}

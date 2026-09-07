@@ -21,22 +21,23 @@ const (
 )
 
 type RepairSearchResult struct {
-	Schema                string                 `json:"schema"`
-	Version               int                    `json:"version"`
-	PolicyVersion         string                 `json:"policy_version"`
-	RequirementHash       string                 `json:"requirement_hash"`
-	InventoryHash         string                 `json:"inventory_hash"`
-	InitialGraphHash      string                 `json:"initial_graph_hash"`
-	InitialEvaluationHash string                 `json:"initial_evaluation_hash"`
-	Status                RepairSearchStatus     `json:"status"`
-	Policy                Policy                 `json:"policy"`
-	Consumption           Consumption            `json:"consumption"`
-	CausalAnalyses        []CausalRepairAnalysis `json:"causal_analyses"`
-	Attempts              []RepairAttempt        `json:"attempts"`
-	Selected              *RepairedCandidate     `json:"selected,omitempty"`
-	Issues                []reports.Issue        `json:"issues"`
-	Trace                 repairloop.Trace       `json:"trace"`
-	Hash                  string                 `json:"hash"`
+	Schema                string                     `json:"schema"`
+	Version               int                        `json:"version"`
+	PolicyVersion         string                     `json:"policy_version"`
+	RequirementHash       string                     `json:"requirement_hash"`
+	InventoryHash         string                     `json:"inventory_hash"`
+	InitialGraphHash      string                     `json:"initial_graph_hash"`
+	InitialEvaluationHash string                     `json:"initial_evaluation_hash"`
+	Status                RepairSearchStatus         `json:"status"`
+	Policy                Policy                     `json:"policy"`
+	Consumption           Consumption                `json:"consumption"`
+	CausalAnalyses        []CausalRepairAnalysis     `json:"causal_analyses"`
+	TopologyCompletionV21 *TopologyCompletionPlanV21 `json:"topology_completion_v21,omitempty"`
+	Attempts              []RepairAttempt            `json:"attempts"`
+	Selected              *RepairedCandidate         `json:"selected,omitempty"`
+	Issues                []reports.Issue            `json:"issues"`
+	Trace                 repairloop.Trace           `json:"trace"`
+	Hash                  string                     `json:"hash"`
 	traceDiagnoses        []Diagnosis
 }
 

@@ -14,6 +14,13 @@ versions, and coordinate a fix and disclosure.
 
 ## Protected boundaries
 
+Run `make security-check` before a maintenance release. This networked gate
+uses a pinned `govulncheck` version and the current official Go vulnerability
+database; unlike frozen circuit evaluations, its findings can change over time.
+CI runs it separately from offline gates. Keep the exact Go patch in `go.mod`
+on a supported security-maintained release and update affected dependencies.
+Local Make targets and release CI share that toolchain pin.
+
 Security-sensitive defects include:
 
 - path traversal or unintended mutation outside an authorized output root;

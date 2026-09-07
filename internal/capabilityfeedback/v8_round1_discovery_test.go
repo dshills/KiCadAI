@@ -79,7 +79,7 @@ type closedLoopV8RoundInputs struct {
 func TestClosedLoopV8Round1RunnerIsFrozen(t *testing.T) {
 	repositoryRoot := closedLoopModuleRoot(t)
 	manifestPath := filepath.Join(closedLoopSpecDirectory(t), closedLoopV8Round1RunnerManifest)
-	if _, err := corpuspublication.VerifyChecksumManifest(repositoryRoot, manifestPath); err != nil {
+	if _, err := verifyHistoricalAuditManifest(repositoryRoot, manifestPath); err != nil {
 		t.Fatalf("verify V8 round-one runner manifest: %v", err)
 	}
 }
@@ -122,7 +122,7 @@ func TestUpdateClosedLoopV8Round1Discovery(t *testing.T) {
 	}
 	repositoryRoot := closedLoopModuleRoot(t)
 	infrastructureCommit := closedLoopV5CleanPublisherCommit(t, repositoryRoot)
-	inputs := loadClosedLoopV8RoundInputs(t)
+	inputs := loadClosedLoopV8RoundInputs(t, false)
 	manifestSource := mustCorpusRead(t, filepath.Join(closedLoopV8CorpusRoot, corpuspublication.ManifestFileV8))
 	obligationSource := mustCorpusRead(t, filepath.Join(closedLoopV8CorpusRoot, corpuspublication.DiscoveryObligationsFileV8))
 	var manifest corpuspublication.ManifestV8
@@ -210,16 +210,20 @@ func TestUpdateClosedLoopV8Round1Discovery(t *testing.T) {
 	t.Logf("V8 round one status=%s passes=%d->%d new_cohort_passes=%d", evaluation.Status, evaluation.DiscoveryPassBefore, evaluation.DiscoveryPassAfter, evaluation.NewActiveCohortPasses)
 }
 
-func loadClosedLoopV8RoundInputs(t *testing.T) closedLoopV8RoundInputs {
+func loadClosedLoopV8RoundInputs(t *testing.T, historicalAudit bool) closedLoopV8RoundInputs {
 	t.Helper()
 	repositoryRoot := closedLoopModuleRoot(t)
+	verifySource := corpuspublication.VerifyChecksumManifest
+	if historicalAudit {
+		verifySource = verifyHistoricalAuditManifest
+	}
 	// The generation-zero selection records the hash of its pre-implementation
 	// runner, while the selected implementation intentionally changes one of
 	// that runner's files. verifyClosedLoopV8SelectionInputs validates the raw
 	// runner commitment; only manifests whose current source closure must remain
 	// byte-identical are replayed here.
 	for _, name := range []string{"V8_EVALUATOR.sha256", closedLoopV8Round1RunnerManifest} {
-		if _, err := corpuspublication.VerifyChecksumManifest(repositoryRoot, filepath.Join(closedLoopSpecDirectory(t), name)); err != nil {
+		if _, err := verifySource(repositoryRoot, filepath.Join(closedLoopSpecDirectory(t), name)); err != nil {
 			t.Fatalf("verify frozen V8 manifest %s: %v", name, err)
 		}
 	}
@@ -258,7 +262,7 @@ func loadClosedLoopV8RoundInputs(t *testing.T) closedLoopV8RoundInputs {
 		t.Fatal("V8 reviewed implementation seal is invalid")
 	}
 	verifyClosedLoopV8ImplementationSeal(t, result.ImplementationRaw, result.Implementation, result.Selection)
-	if _, err := corpuspublication.VerifyChecksumManifest(closedLoopModuleRoot(t), filepath.Join(closedLoopSpecDirectory(t), closedLoopV8Round1RunnerManifest)); err != nil {
+	if _, err := verifySource(closedLoopModuleRoot(t), filepath.Join(closedLoopSpecDirectory(t), closedLoopV8Round1RunnerManifest)); err != nil {
 		t.Fatal(err)
 	}
 	return result
@@ -453,7 +457,7 @@ func verifyClosedLoopV8Round1Result(t *testing.T) {
 	}
 	var result closedLoopV8RoundResult
 	decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV8Round1Root, "round.json")), &result)
-	inputs := loadClosedLoopV8RoundInputs(t)
+	inputs := loadClosedLoopV8RoundInputs(t, true)
 	if want, err := hashClosedLoopV8RoundResult(result); err != nil || want != result.Hash || result.Schema != closedLoopV8Round1Schema || result.Version != 8 || result.Generation != 1 ||
 		result.RunnerManifestSHA256 != corpusHash(inputs.RunnerManifest) || result.ImplementationCommit != inputs.Implementation.ImplementationCommit ||
 		result.ImplementationSealSHA256 != inputs.Implementation.Hash || result.ImplementationSealFileSHA256 != corpusHash(inputs.ImplementationRaw) ||
@@ -505,7 +509,7 @@ func verifyClosedLoopV8Round1Retirement(t *testing.T) {
 	}
 	var retirement closedLoopV8RoundRetirement
 	decodeCorpusStrict(t, mustCorpusRead(t, filepath.Join(closedLoopV8Round1RetirementRoot, "retirement.json")), &retirement)
-	inputs := loadClosedLoopV8RoundInputs(t)
+	inputs := loadClosedLoopV8RoundInputs(t, true)
 	if want, err := hashClosedLoopV8RoundRetirement(retirement); err != nil || want != retirement.Hash || retirement.Schema != closedLoopV8Round1RetireSchema || retirement.Version != 8 || retirement.Generation != 1 ||
 		retirement.RunnerManifestSHA256 != corpusHash(inputs.RunnerManifest) || retirement.ImplementationCommit != inputs.Implementation.ImplementationCommit ||
 		retirement.ImplementationSealSHA256 != inputs.Implementation.Hash || retirement.ImplementationSealFileSHA256 != corpusHash(inputs.ImplementationRaw) ||

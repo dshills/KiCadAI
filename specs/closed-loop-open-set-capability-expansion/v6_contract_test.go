@@ -188,6 +188,7 @@ func v6ReadFile(t *testing.T, path string) []byte {
 
 func v6FileSHA256(t *testing.T, path string) string {
 	t.Helper()
+	path = historicalSourcePath(t, path)
 	sum := sha256.Sum256(v6ReadFile(t, path))
 	return hex.EncodeToString(sum[:])
 }

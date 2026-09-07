@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 version=${VERSION:-$(tr -d '[:space:]' < "$root/VERSION")}
 version=${version#v}
 commit=${COMMIT:-$(git -C "$root" rev-parse HEAD)}
 build_date=${BUILD_DATE:-$(git -C "$root" show -s --format=%cI "$commit")}
 output_dir=${OUTPUT_DIR:-"$root/dist"}
 max_concurrent_builds=${RELEASE_MAX_CONCURRENT_BUILDS:-2}
+case "$output_dir" in
+	/*) ;;
+	*) output_dir="$PWD/$output_dir" ;;
+esac
 
 if [ "${ALLOW_DIRTY_RELEASE:-0}" != 1 ] && [ -n "$(git -C "$root" status --porcelain --untracked-files=normal)" ]; then
 	printf 'release builds require a clean repository; ALLOW_DIRTY_RELEASE=1 is for pre-commit verification only\n' >&2
@@ -23,7 +27,7 @@ directory_is_empty() {
 	return 0
 }
 
-if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
+if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$ ]]; then
 	printf 'invalid release version: %s\n' "$version" >&2
 	exit 2
 fi
@@ -31,9 +35,24 @@ if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
 	printf 'release commit must be a full lowercase Git SHA-1: %s\n' "$commit" >&2
 	exit 2
 fi
-if ! printf '%s\n' "$max_concurrent_builds" | grep -Eq '^[1-9][0-9]*$'; then
+if [ "$commit" != "$(git -C "$root" rev-parse HEAD)" ]; then
+	printf 'release commit must match the checkout being compiled: %s\n' "$commit" >&2
+	exit 2
+fi
+# Keep linker arguments and JSON metadata unambiguous. The normal value comes
+# from Git's ISO-8601 commit timestamp; overrides must use the same format.
+if [[ ! "$build_date" =~ ^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$ ]]; then
+	printf 'release build date must be an ISO-8601 timestamp: %s\n' "$build_date" >&2
+	exit 2
+fi
+if [[ ! "$max_concurrent_builds" =~ ^[1-9][0-9]*$ ]]; then
 	printf 'RELEASE_MAX_CONCURRENT_BUILDS must be a positive integer: %s\n' "$max_concurrent_builds" >&2
 	exit 2
+fi
+# There are exactly four targets. Clamp oversized positive values without
+# passing arbitrary-width integers to shell arithmetic.
+if [ "${#max_concurrent_builds}" -gt 1 ] || [ "$max_concurrent_builds" -gt 4 ]; then
+	max_concurrent_builds=4
 fi
 if [ -e "$output_dir" ]; then
 	if [ ! -d "$output_dir" ] || ! directory_is_empty "$output_dir"; then
@@ -45,6 +64,7 @@ fi
 # The guard above makes stale artifacts impossible; never clean a caller-owned
 # directory implicitly.
 mkdir -p "$output_dir"
+cd "$root"
 
 ldflags="-s -w -X kicadai/internal/buildinfo.Version=$version -X kicadai/internal/buildinfo.Commit=$commit -X kicadai/internal/buildinfo.BuildDate=$build_date"
 targets='darwin/amd64 darwin/arm64 linux/amd64 linux/arm64'
