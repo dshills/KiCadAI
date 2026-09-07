@@ -49,7 +49,9 @@ func verifyHistoricalAuditManifest(root, manifestPath string) ([]byte, error) {
 	return data, nil
 }
 
-func TestHistoricalAuditDoesNotAdmitCurrentBuildAsFrozenV8(t *testing.T) {
+// Keep this in the existing V8 round-one CI lane, which materializes the
+// frozen manifest's historical uppercase aliases on case-sensitive systems.
+func TestClosedLoopV8Round1HistoricalAuditDoesNotAdmitCurrentBuild(t *testing.T) {
 	root := closedLoopModuleRoot(t)
 	for _, name := range []string{"V8_EVALUATOR.sha256", closedLoopV8Round1RunnerManifest} {
 		path := filepath.Join(closedLoopSpecDirectory(t), name)

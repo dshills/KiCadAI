@@ -16,11 +16,15 @@ Official v1 binaries are built with CGO disabled for:
 - macOS 64-bit Intel and Apple silicon;
 - Linux 64-bit x86 and ARM.
 
-The current release workflow uses the Go 1.26.8 pin in `go.mod` and publishes a
+The v1.0.1 release workflow uses the Go 1.26.8 pin in `go.mod` and publishes a
 manifest and SHA-256 checksums. Current source builds require Go 1.26.8 or newer.
 The original v1.0.0 tag used Go 1.23.12; this maintenance security update does
 not rewrite that tag or its artifacts. Windows and other platforms
 may build from source but are not release-supported in v1.
+
+Upgrade existing v1.0.0 installations to v1.0.1 to receive the security-patched
+toolchain and dependencies; updating a separately installed Go toolchain does
+not patch an existing KiCadAI binary. See the [installation guide](docs/installation.md).
 
 ## KiCad compatibility
 
@@ -81,6 +85,13 @@ and stricter early refusals do not expand the v1 supported electrical envelope.
 Only bundled model provenance and reviewed project/configured overlays are
 eligible; unreviewed SPICE files, provider-selected models or solvers, implicit
 substitution, and unavailable solver backends remain unsupported.
+
+V21 causal-topology completion and repair is also experimental. Maintenance
+revision 1 corrects structural, evidence-integrity, and bound-enforcement
+defects, but has not completed a new frozen public evaluation. The original
+V21 advancement report is historical evidence only, not validation of the
+corrected evaluator. Neither V20 nor V21 enters the v1 supported surface
+implicitly.
 
 ## Compatibility changes
 
