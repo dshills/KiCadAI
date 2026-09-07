@@ -1403,15 +1403,19 @@ exhausted. V18's pass and safety result were preserved, and the selected model-
 availability leaf advanced to a later topology blocker. V20 therefore meets
 its frozen material-improvement gate while remaining outside the v1 surface.
 
-The V21 generic causal-topology milestone is now complete. It derives reusable
+The V21 generic causal-topology milestone now requires revalidation. It derives reusable
 structural obligations, applies canonical bounded graph operations, and retains
 the exact V20 admission boundary and provenance. Its frozen 24-case public
 evaluation ran every case twice, preserved the V18 pass and safety result, kept
 all 16 unselected cases byte-identical to V20, and advanced six selected cases
 across four reporting domains to a later behavioral-evidence blocker. This
-passes the frozen material and preservation gates while remaining experimental
-and outside the v1 supported surface. See
-`specs/generic-causal-topology-repair/AUDIT.md`.
+was the original advancement claim. The September 6 review found unsound
+structural certificates, evidence-hash defects, and late resource-bound checks.
+Maintenance revision 1 fixes them without rewriting historical source or
+reports. Its public evaluation has not run; do not count the prior advancement
+as validation of the corrected evaluator. V21 remains experimental and outside
+the v1 supported surface. See [the review](../docs/project-review-2026-09-06.md)
+and `specs/generic-causal-topology-repair/AUDIT.md`.
 
 The deterministic synthesis-evaluation scheduler is now complete. Candidate
 attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates

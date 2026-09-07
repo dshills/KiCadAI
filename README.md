@@ -117,12 +117,14 @@ V21 builds on that admitted V20 boundary with generic causal-topology
 completion and bounded repair. It derives structural obligations from behavior,
 terminal contracts, and the current graph; applies only canonical generic graph
 operations; and preserves exact V20 analysis/model/solver admission before any
-new topology work. Its frozen 24-case, two-replay public evaluation preserved
-the V18 pass and unsafe result, kept all 16 unselected cases byte-identical to
-V20, and advanced six selected cases across four domains to a later behavioral-
-evidence blocker. V21 remains experimental and does not change the v1 support
-claim. See the
-[V21 audit](specs/generic-causal-topology-repair/AUDIT.md).
+new topology work. The September 6 review found unsound structural certificates,
+evidence-hash errors, and bound-enforcement defects in its original evaluator.
+These are corrected in maintenance revision 1. The original 24-case evaluation
+is retained as historical evidence, not validation of the repaired code or
+proof of its previously claimed six-case advancement. A new frozen evaluation
+is pending. V21 remains experimental and does not change the v1 support claim.
+See the [review and corrections](docs/project-review-2026-09-06.md) and
+[historical V21 audit](specs/generic-causal-topology-repair/AUDIT.md).
 
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
@@ -147,7 +149,7 @@ that arbitrary dense boards are supported.
 
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
-experimental for those claims. Source builds require Go 1.23 or newer;
+experimental for those claims. Source builds require Go 1.26.8 or newer;
 `protoc` is needed only when regenerating vendored protobuf bindings. See the
 [v1 support contract](SUPPORT.md).
 

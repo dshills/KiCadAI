@@ -69,16 +69,21 @@ exhausted rose from 15 to 17. The selected
 model-availability leaf therefore passed the frozen advancement rule. This
 remains experimental and does not expand the v1 supported surface.
 
-The V21 successor is complete. Generic causal-topology obligations and
+The V21 successor requires revalidation after the September 6 review. Generic causal-topology obligations and
 canonical bounded repair run only after exact V20 analysis/model/solver
 admission. Its frozen public evaluation completed all 24 cases exactly twice:
 1 pass, 5 unsupported, 1 unsafe, and 17 exhausted. All 16 unselected case
 objects remain byte-identical to V20, all replay hashes match, and the V18 pass
 again clears two installed-KiCad promotions with every physical and replay gate
 true. Six selected cases across four reporting domains advance to the later
-`OPEN_TOPOLOGY_NO_PASSING_GRAPH` blocker, exceeding the frozen material gate.
-V21 remains experimental and does not change the v1 supported surface. See the
-[V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
+`OPEN_TOPOLOGY_NO_PASSING_GRAPH` blocker in the original evaluator. However,
+the review reproduced unsound structural certificates, stale state hashes,
+tampered-evaluation acceptance, and late bound checks. Maintenance revision 1
+corrects these defects. The historical advancement is not evidence for the
+corrected evaluator, whose public corpus evaluation has not run. V21 remains
+experimental and does not change the v1 supported surface. See the
+[review](project-review-2026-09-06.md) and
+[historical V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.

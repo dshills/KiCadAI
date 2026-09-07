@@ -1,5 +1,13 @@
 .DEFAULT_GOAL := help
 
+# Use the same exact security-patched toolchain as CI and release builds.
+GOTOOLCHAIN ?= go$(shell awk '$$1 == "go" { print $$2 }' go.mod)
+export GOTOOLCHAIN
+
+.PHONY: security-check
+security-check:
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
 .PHONY: help build install release release-smoke release-reproducibility test test-fast test-bounded test-exhaustive test-one race-short performance-report performance-scaling public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-monolithic coverage-shard coverage-merge coverage-report coverage-threshold coverage-check coverage-merge-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
@@ -62,6 +70,7 @@ COMPONENT_ONBOARDING_PROMOTION_ROOT ?= $(CURDIR)/.tmp/component-onboarding-promo
 
 help:
 	@printf "KiCadAI targets:\n"
+	@printf "  make security-check  Check reachable vulnerabilities (requires network)\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
 	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
 	@printf "  make release         Build versioned macOS/Linux release artifacts\n"

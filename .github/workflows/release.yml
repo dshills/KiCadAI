@@ -23,9 +23,8 @@ jobs:
       - name: Set up frozen release Go toolchain
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          # Final Go 1.23 patch, released 2025-08-06 with security fixes:
-          # https://go.dev/doc/devel/release#go1.23.12
-          go-version: '1.23.12'
+          # Share the security-patched toolchain pin with local and CI gates.
+          go-version-file: go.mod
           cache: true
 
       - name: Validate and export release identity

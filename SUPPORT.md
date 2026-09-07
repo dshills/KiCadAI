@@ -16,8 +16,10 @@ Official v1 binaries are built with CGO disabled for:
 - macOS 64-bit Intel and Apple silicon;
 - Linux 64-bit x86 and ARM.
 
-The release workflow uses Go 1.23.12 and publishes a manifest and SHA-256
-checksums. Source builds require Go 1.23 or newer. Windows and other platforms
+The current release workflow uses the Go 1.26.8 pin in `go.mod` and publishes a
+manifest and SHA-256 checksums. Current source builds require Go 1.26.8 or newer.
+The original v1.0.0 tag used Go 1.23.12; this maintenance security update does
+not rewrite that tag or its artifacts. Windows and other platforms
 may build from source but are not release-supported in v1.
 
 ## KiCad compatibility

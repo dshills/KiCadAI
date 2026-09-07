@@ -1,6 +1,9 @@
 # Generic Causal Topology Completion and Bounded Repair Audit
 
-Status: complete; frozen public material-improvement and preservation gates passed
+Status: historical generation-zero audit; advancement claim superseded by the
+[September 6 correctness review](../../docs/project-review-2026-09-06.md).
+The results below describe the original evaluator only. They do not validate
+maintenance revision 1, whose public corpus evaluation has not run.
 
 Starting commit: `6baf59ad9`
 

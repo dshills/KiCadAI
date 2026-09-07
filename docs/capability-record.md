@@ -11,10 +11,12 @@ supported, experimental, and unsupported boundaries, start with
   tested.
 - The V21 experimental open-topology successor now derives generic causal
   obligations and applies canonical bounded graph completion only after exact
-  V20 analysis/model/solver admission. Its frozen 24-case evaluation preserves
-  the V18 pass and safety result, keeps all unselected cases byte-identical to
-  V20, and advances six selected cases across four domains to a later blocker.
-  See the [V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
+  V20 analysis/model/solver admission. The September 6 review corrected unsound
+  certificates, evidence hashes, and resource limits. Its original evaluation
+  is historical; the repaired evaluator has not been publicly reevaluated and
+  cannot inherit the previous six-case advancement claim. See the
+  [review](project-review-2026-09-06.md) and
+  [historical V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
 - Every normalized creation request is deterministically classified as

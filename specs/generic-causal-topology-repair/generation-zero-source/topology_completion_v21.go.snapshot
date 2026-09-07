@@ -40,12 +40,6 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 	if ctx.Err() != nil {
 		return canceledTopologyCompletionPlanV21(result)
 	}
-	if !topologyGraphWithinMemoryV21(graph, limits.MaximumGraphBytes) {
-		result.Status = "exhausted"
-		result.Consumption.BudgetExhausted = true
-		result.Issues = append(result.Issues, graphIssue(CodeTopologyBoundV21, "topology.v21.initial_graph", "initial graph exceeds the topology memory bound", "supply a graph within the declared memory limit"))
-		return finalizeTopologyCompletionPlanV21(result)
-	}
 	var err error
 	result.RequirementHash, err = CanonicalHash(requirement)
 	if err != nil {
@@ -77,7 +71,6 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 	}
 	base := topologyStateV21{graph: graph, graphHash: result.InitialGraphHash, depth: 0, report: result.Initial, ancestors: map[string]bool{result.InitialGraphHash: true}}
 	base.stateHash = topologyStateHashV21(base)
-	result.Consumption.MaximumRetained = 1
 	if result.Initial.Complete {
 		selected := topologyCandidateEvidenceV21(base, "selected", "structurally_complete")
 		result.Selected = &selected
@@ -87,6 +80,7 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 
 	frontier := []topologyStateV21{base}
 	seen := map[string]topologyStateV21{base.graphHash: base}
+	result.Consumption.MaximumRetained = 1
 	for depth := 1; depth <= limits.MaximumDepth && len(frontier) != 0; depth++ {
 		if ctx.Err() != nil {
 			return canceledTopologyCompletionPlanV21(result)
@@ -139,6 +133,7 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 					operations: append(slices.Clone(parent.operations), proposal.operation), report: proposal.report,
 					ancestors: topologyCloneSetV21(parent.ancestors),
 				}
+				state.stateHash = topologyStateHashV21(state)
 				disposition, reason := "retained", "strict_structural_improvement"
 				switch {
 				case hashErr != nil || candidateHash == "" || candidateHash != proposal.operation.AfterGraphHash:
@@ -159,22 +154,17 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 				case !topologyStrictlyImprovesV21(parent, state):
 					disposition, reason = "rejected", TopologyRejectionDominatedV21
 					result.Consumption.DominatedCandidates++
-				case len(seen) >= limits.MaximumRetained:
-					disposition, reason = "rejected", TopologyRejectionMemoryV21
-					result.Consumption.BudgetExhausted = true
 				}
 				proposal.operation.Accepted = disposition == "retained"
 				proposal.operation.Reason = reason
 				proposal.operation = finalizeTopologyOperationV21(proposal.operation)
 				state.operations[len(state.operations)-1] = proposal.operation
-				state.stateHash = topologyStateHashV21(state)
 				evidence := topologyCandidateEvidenceV21(state, disposition, reason)
 				result.Candidates = append(result.Candidates, evidence)
 				if disposition != "retained" {
 					continue
 				}
 				seen[candidateHash] = state
-				result.Consumption.MaximumRetained = max(result.Consumption.MaximumRetained, len(seen))
 				state.ancestors[candidateHash] = true
 				if state.report.Complete {
 					selected := evidence
@@ -193,7 +183,7 @@ func PlanTopologyCompletionV21(ctx context.Context, requirement Requirement, gra
 			next = next[:limits.MaximumWidth]
 			result.Consumption.BudgetExhausted = true
 		}
-		if len(seen) >= limits.MaximumRetained && len(next) != 0 {
+		if len(seen) > limits.MaximumRetained {
 			result.Consumption.BudgetExhausted = true
 			break
 		}
@@ -564,20 +554,13 @@ func topologyPrimitiveSupportsAnalysisV21(primitive PrimitiveCandidate, analysis
 
 func topologyStrictlyImprovesV21(parent, child topologyStateV21) bool {
 	parentCritical, childCritical := 0, 0
-	unresolvedCritical := make(map[string]bool)
 	for _, obligation := range parent.report.Obligations {
 		if obligation.Critical {
 			parentCritical++
-			unresolvedCritical[obligation.ID] = true
 		}
 	}
 	for _, obligation := range child.report.Obligations {
 		if obligation.Critical {
-			// A lower count cannot compensate for breaking an obligation that
-			// was satisfied in the parent state.
-			if !unresolvedCritical[obligation.ID] {
-				return false
-			}
 			childCritical++
 		}
 	}

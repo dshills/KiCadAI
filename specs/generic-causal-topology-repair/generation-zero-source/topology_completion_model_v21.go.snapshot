@@ -87,7 +87,6 @@ type TopologyInvariantReportV21 struct {
 	InventoryHash   string                  `json:"inventory_sha256"`
 	GraphHash       string                  `json:"graph_sha256"`
 	Obligations     []TopologyObligationV21 `json:"obligations"`
-	Issues          []reports.Issue         `json:"issues,omitempty"`
 	Complete        bool                    `json:"complete"`
 	Contradictory   bool                    `json:"contradictory"`
 	Hash            string                  `json:"hash"`

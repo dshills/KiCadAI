@@ -2,9 +2,6 @@ package opentopologysynthesis
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"slices"
 
 	"kicadai/internal/reports"
@@ -40,11 +37,6 @@ func repairCandidatePreparedV21(
 		InventoryHash: inventory.Hash, InitialEvaluationHash: initial.Hash, Status: RepairSearchFailed,
 		Policy: policy, CausalAnalyses: []CausalRepairAnalysis{}, Attempts: []RepairAttempt{}, Issues: []reports.Issue{},
 	}
-	if ctx.Err() != nil {
-		result.Status = RepairSearchCanceled
-		result.Issues = []reports.Issue{graphIssue(CodeCanceled, "repair.v21", "V21 topology completion canceled", "retry with an active context")}
-		return finalizeRepairSearchV17(result)
-	}
 	requirement = Normalize(requirement)
 	var err error
 	result.RequirementHash, err = CanonicalHash(requirement)
@@ -65,12 +57,8 @@ func repairCandidatePreparedV21(
 		result.Issues = []reports.Issue{graphIssue(CodeTopologyInvalidRepairV21, "repair.v21.graph_hash", err.Error(), "supply a canonical candidate graph")}
 		return finalizeRepairSearchV17(result)
 	}
-	unsignedInitial := initial
-	unsignedInitial.Hash = ""
-	initialData, initialErr := json.Marshal(unsignedInitial)
-	initialDigest := sha256.Sum256(initialData)
 	if initial.GraphHash != result.InitialGraphHash || initial.RequirementHash != result.RequirementHash ||
-		initial.InventoryHash != inventory.Hash || initial.Hash == "" || initialErr != nil || initial.Hash != hex.EncodeToString(initialDigest[:]) {
+		initial.InventoryHash != inventory.Hash || initial.Hash == "" {
 		result.Status = RepairSearchUnsupported
 		result.Issues = []reports.Issue{graphIssue(CodeRepairUnsupported, "repair.v21.initial_evaluation", "V21 repair requires a hash-bound evaluation of the exact graph, requirement, and inventory", "evaluate the exact selected graph before topology completion")}
 		return finalizeRepairSearchV17(result)

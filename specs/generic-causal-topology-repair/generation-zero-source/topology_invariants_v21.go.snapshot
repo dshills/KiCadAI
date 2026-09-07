@@ -178,26 +178,6 @@ func AnalyzeTopologyV21(requirement Requirement, graph CandidateGraph, inventory
 			report.Obligations = append(report.Obligations, topologyObligationV21(TopologyObligationIrrelevantFragmentV21, "", "", "", "", "", instance.ID, false))
 		}
 	}
-	if len(report.Obligations) == 0 {
-		// Reachability alone cannot certify electrical structure. Reuse the
-		// established structural checks without the V19 model/analysis gate:
-		// exact model and solver admission remains V20's responsibility.
-		validator := newCausalInvariantValidatorV19(requirement, graph, inventory, CausalInvariantContextV19{})
-		validator.validateRequirementBindings()
-		validator.validateTerminalDomainsAndRatings()
-		validator.validateActiveOutputContention()
-		validator.validateReferenceClosure()
-		// This API carries no typed feedback evidence. Unproven active cycles
-		// must therefore fail closed, even when every port is reachable.
-		validator.validateCausalCycles()
-		issues := ValidateCompleteGraph(graph, inventory, limits)
-		issues = append(issues, validator.issues...)
-		if len(issues) != 0 {
-			report.Contradictory = true
-			report.Issues = issues
-			report.Obligations = append(report.Obligations, topologyObligationV21(TopologyObligationDirectionV21, "", "", "", "", "", "", true))
-		}
-	}
 	return finalizeTopologyInvariantV21(report)
 }
 
