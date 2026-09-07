@@ -33,6 +33,16 @@ a pinned scanner; it is intentionally separate from offline test gates.
 
 `make install` builds the current source and installs `kicadai` to
 `~/.local/bin`; set `INSTALL_DIR` to override the destination.
+This is a development-identity build, not the version-stamped release artifact.
+See the [installation guide](installation.md) for verified release installation.
+
+For v1.0.1 maintenance publication, verify a clean checkout of the exact merged
+commit before tagging: build all four targets twice, compare every artifact,
+check embedded metadata, run first-run smoke tests, verify module checksums,
+and scan both source and all four binaries. Only then push a new annotated tag.
+Let the normal tag-triggered workflow publish assets, download them, and compare
+them byte-for-byte with the verified source build. Never overwrite a tag or
+published artifact. V21 corpus reevaluation is not part of this security release.
 
 ## Examples
 

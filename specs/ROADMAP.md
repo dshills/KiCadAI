@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-09-02
+Date: 2026-09-07
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -32,8 +32,10 @@ from validation feedback to safe automatic repair.
 
 ## Current State
 
-The project has released v1.0.0 and integrated its first release-hardening
-performance work without changing the released capability surface. The
+The project has released v1.0.0 and is publishing v1.0.1 security maintenance:
+patched Go/dependencies, release provenance and input-validation corrections,
+and experimental V21 correctness repairs. The integrated performance work and
+this maintenance release do not expand the supported capability surface. The
 bounded public contract, V19 Phase 6 retirement, and fail-closed support
 boundary remain unchanged. KiCadAI v1 is the deterministic pass-or-refuse CLI
 described in
@@ -1284,10 +1286,12 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-The immediate sequence is final v1.0.0 publication, not another capability
+The immediate sequence is v1.0.1 security maintenance publication, not another capability
 expansion: reproduce all release and installed-KiCad gates from the exact
 merged commit, publish checksummed binaries, and verify the annotated release
-tag. New capability work resumes only after those release assets are verified.
+tag. Corrected V21 has not completed a new frozen public evaluation; that is a
+separate subsequent milestone, not a blocker for the security release. New
+capability work resumes only after the maintenance release assets are verified.
 
 The first generic promotions are complete: RC filter, protected USB-C LED,
 protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage
@@ -1385,12 +1389,12 @@ and both designs pass two clean installed-KiCad runs. See
 The v1.0.1 engineering-efficiency work is integrated: it profiles and
 deterministically shards the bounded coverage gate, authenticates content-
 addressed proof reuse, and upgrades official Actions to Node.js 24 without
-changing circuit behavior or the supported surface. The active capability
-milestone now addresses the highest-impact V19 analysis/model/solver-
+changing circuit behavior or the supported surface. The completed experimental
+V20 implementation addresses the highest-impact V19 analysis/model/solver-
 availability cluster using only generic support selected from independently
-frozen behavior failures. It must
-preserve the exact 8/8 benchmark, both neutral physical promotions, the three
-protected-current promotions, and the v1 refusal boundary.
+frozen behavior failures. The exact 8/8 benchmark, both neutral physical
+promotions, the three protected-current promotions, and the v1 refusal boundary
+remain preservation requirements.
 
 The implementation uses a new V20 boundary because V19 is permanently retired.
 Required analyses, trusted model sources, exact component/harness model claims,

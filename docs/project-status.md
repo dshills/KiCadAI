@@ -1,16 +1,17 @@
 # Project Status
 
-Last full bounded Go verification: 2026-09-04, including focused V21
+Last full bounded Go verification: 2026-09-06, including focused V21
 topology-completion, deterministic-replay, contract, evaluator-seal, and
-preservation suites. The release coverage gate reports 80.8% after
+preservation suites. The review coverage gate reports 80.2% after
 excluding generated protobuf bindings, above the required 75% threshold.
-The latest installed-KiCad lanes were reproduced on 2026-09-04 with KiCad
-10.0.3. The six-scenario clean-checkout promotion bundle
+The 13-case installed-KiCad design-example tier was reproduced on 2026-09-06
+with KiCad 10.0.3, satisfying every declared success or fail-closed expectation.
+Successful cases passed clean ERC, strict DRC, connectivity, route completion,
+writer correctness, and zero round-trip differences. The earlier September 4
+six-scenario clean-checkout promotion bundle
 `sha256-c78451a2cd1e507e159859cf9f03cf528593a9cb9fbc2b6619d1b32b828f7439`
 passed two full iterations (12 total runs) with identical normalized
-inventories, and the complete 13-case design-example tier passed clean ERC,
-strict DRC, connectivity, route completion, writer correctness, and zero
-round-trip differences. The five educational schematics also remain
+inventories. The five educational schematics were replayed on September 6 and remain
 deterministic and readable. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
@@ -46,14 +47,21 @@ reference fast open-topology test loop is approximately 60% shorter while the
 full bounded proofs and installed-KiCad promotion evidence remain required for
 release acceptance.
 
-The v1.0.1 release-hardening changes are now integrated. They addressed the remaining feedback
+The v1.0.1 security maintenance release packages the merged Go 1.26.8 and
+dependency updates, release provenance/input-validation fixes, and V21
+maintenance corrections without changing the supported v1 envelope. Source
+builds now require Go 1.26.8 or newer. Corrected V21 has not completed a new
+frozen public evaluation; that separate milestone must not delay this release.
+See the [release notes](../RELEASE_NOTES.md).
+
+The integrated release-hardening changes also addressed the remaining feedback
 latency in the full bounded coverage gate. The v1.0.0 GitHub quality job took
 46 minutes 37 seconds, with open-topology synthesis accounting for most of the
 serial time. Deterministic cost-based shards now preserve an exact machine-
 checked test/package inventory, authenticate set-mode profiles and resource
 reports, and reuse only exact content-addressed proofs. This work changes no
 generation capability, schema, routing, writer, artifact, or support boundary.
-The active post-v1 milestone is generic analysis/model/solver admission. The
+The experimental post-v1 analysis/model/solver admission implementation is complete. The
 production open-topology path now has a version-isolated preflight that derives
 required analyses, authenticates bundled and reviewed overlay model sources,
 selects an immutable enabled solver, and refuses before topology search when

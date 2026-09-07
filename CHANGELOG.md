@@ -3,7 +3,32 @@
 All notable user-visible changes are recorded here. KiCadAI follows semantic
 versioning for its documented CLI and versioned input contracts.
 
-## Unreleased
+## 1.0.1 - 2026-09-07
+
+### Security
+
+- Build release binaries with Go 1.26.8 instead of 1.23.12 and update
+  `golang.org/x/text` to 0.39.0 and `golang.org/x/sys` to 0.44.0 to address
+  known vulnerability findings. Source builds now require Go 1.26.8 or newer;
+  released binaries do not require a Go installation.
+- Pin source, local verification, and release CI to the same Go patch by
+  default. Add a separate vulnerability gate using pinned `govulncheck` and
+  the current official vulnerability database.
+
+### Fixed
+
+- Authenticate release commit metadata against the checked-out source, compile
+  the intended repository even when invoked from another directory, and
+  reject malformed version, timestamp, and worker-count inputs.
+- Correct experimental V21 structural certification, finalized evidence hashes,
+  critical-obligation preservation, initial-evaluation authentication, and
+  resource/cancellation checks. Previously accepted invalid inputs may now
+  fail closed. Maintenance revision 1 preserves historical evidence separately.
+- Corrected V21 has not completed a new frozen public evaluation. Its original
+  advancement report does not validate the repaired evaluator; V21 remains
+  experimental and excluded from the v1 supported surface.
+- Run the historical V8 negative-admission regression in the existing dedicated
+  case-sensitive-filesystem audit lane, preserving frozen filenames and bytes.
 
 ### Changed
 
@@ -22,8 +47,8 @@ versioning for its documented CLI and versioned input contracts.
   exact test/package inventory checks and content-addressed proof reuse.
 - Upgrade official GitHub Actions pins to verified Node.js 24-compatible
   revisions.
-- Preserve the v1 supported/refused surface; this release-hardening milestone
-  adds no circuit-generation capability.
+- Preserve the stable v1 CLI, schema, artifact, and supported-circuit boundaries.
+  Experimental V20/V21 work does not add an admitted v1 generation capability.
 
 ## 1.0.0 - 2026-09-02
 

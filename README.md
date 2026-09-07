@@ -151,10 +151,12 @@ Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
 experimental for those claims. Source builds require Go 1.26.8 or newer;
 `protoc` is needed only when regenerating vendored protobuf bindings. See the
-[v1 support contract](SUPPORT.md).
+[v1 support contract](SUPPORT.md) and [v1.0.1 installation guide](docs/installation.md).
+v1.0.1 is a security maintenance release; existing v1.0.0 users should replace
+their binary, not merely update system Go.
 
 ```sh
-git clone https://github.com/dshills/KiCadAI.git
+git clone --branch v1.0.1 https://github.com/dshills/KiCadAI.git
 cd KiCadAI
 make public-demo
 ```
@@ -175,8 +177,8 @@ make build
 ./bin/kicadai version
 ```
 
-Release downloads contain one platform binary, `RELEASE_MANIFEST.json`, and
-`SHA256SUMS`. Verify the checksum before installing, then place the binary on
+Release assets contain four platform binaries, `RELEASE_MANIFEST.json`, and
+`SHA256SUMS`. Download the matching binary and verify its checksum before installing it on
 your `PATH`. A source checkout can install to `~/.local/bin` with `make
 install`; set `INSTALL_DIR` to choose another location. The project publishes a
 CLI rather than a supported Go library, so versioned `go install` is not the v1

@@ -12,6 +12,18 @@ behavior, and the smallest non-sensitive artifact needed to reproduce the
 problem. Maintainers will acknowledge a complete report, assess affected
 versions, and coordinate a fix and disclosure.
 
+## Maintenance release baseline
+
+v1.0.1 is the security maintenance baseline for the v1 release line. Users of
+v1.0.0 should upgrade to its replacement binaries; old tags and assets remain
+immutable. v1.0.1 uses Go 1.26.8, `golang.org/x/text` 0.39.0, and
+`golang.org/x/sys` 0.44.0. Source builds require Go 1.26.8 or newer. Updating
+system Go alone does not update a previously compiled KiCadAI binary.
+
+Vulnerability scans describe the database and artifacts checked at release
+time, not a permanent absence of vulnerabilities. New findings require a new
+maintenance release, never replacement of an existing tag's assets.
+
 ## Protected boundaries
 
 Run `make security-check` before a maintenance release. This networked gate
