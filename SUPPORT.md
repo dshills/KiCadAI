@@ -79,8 +79,8 @@ The V19 causal-topology experiment is also explicitly unsupported in v1. Its
 bounded public evaluation failed the frozen advancement and preservation gates
 and was permanently retired. V18 is the latest admitted public capability.
 
-Post-v1 analysis/model/solver admission work is experimental until its frozen
-successor evaluation and preservation gates pass. Its additive evidence fields
+Post-v1 analysis/model/solver admission remains experimental despite passing its
+frozen successor evaluation and preservation gates. Its additive evidence fields
 and stricter early refusals do not expand the v1 supported electrical envelope.
 Only bundled model provenance and reviewed project/configured overlays are
 eligible; unreviewed SPICE files, provider-selected models or solvers, implicit
@@ -88,10 +88,13 @@ substitution, and unavailable solver backends remain unsupported.
 
 V21 causal-topology completion and repair is also experimental. Maintenance
 revision 1 corrects structural, evidence-integrity, and bound-enforcement
-defects, but has not completed a new frozen public evaluation. The original
-V21 advancement report is historical evidence only, not validation of the
-corrected evaluator. Neither V20 nor V21 enters the v1 supported surface
-implicitly.
+defects. Its separate 24-case, two-replay public evaluation passed the frozen
+advancement and preservation gates: four selected cases across four domains
+advance structurally, but none becomes an additional complete circuit pass.
+The original V21 report remains historical evidence only. Neither V20 nor V21
+enters the v1 supported surface implicitly. See the
+[maintenance audit](specs/generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md)
+for outcomes, remaining blockers, and KiCad check-configuration limitations.
 
 ## Compatibility changes
 

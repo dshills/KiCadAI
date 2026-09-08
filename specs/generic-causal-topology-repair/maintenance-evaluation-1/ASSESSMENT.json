@@ -1,0 +1,68 @@
+{
+  "schema": "kicadai.v21-maintenance-assessment.v1",
+  "report_hash": "7269d4df5c8b2129dd1f451dbb457fe5e3a51bfcd22de48c4d6f5f3c6ce6ff9e",
+  "case_count": 24,
+  "replay_count": 48,
+  "outcome_counts": [
+    {
+      "outcome": "pass",
+      "count": 1
+    },
+    {
+      "outcome": "unsupported",
+      "count": 6
+    },
+    {
+      "outcome": "unsafe",
+      "count": 1
+    },
+    {
+      "outcome": "exhausted",
+      "count": 16
+    }
+  ],
+  "ineligible_byte_identical": 16,
+  "passes": 1,
+  "installed_kicad_promotions": 2,
+  "qualifying_cases": [
+    "v10_case_004",
+    "v10_case_017",
+    "v10_case_018",
+    "v10_case_021"
+  ],
+  "qualifying_domains": [
+    "digital_control",
+    "mixed_signal_data_conversion",
+    "protection_power_integrity",
+    "sensing_instrumentation"
+  ],
+  "regressions": [],
+  "terminal_frontier_occurrences": {
+    "ac_sweep_solver/SIMULATION_INVALID": 2,
+    "bandwidth_evidence/ASSERTION_BELOW_MINIMUM": 1,
+    "bounded_topology_completion/OPEN_TOPOLOGY_V21_BOUND_EXHAUSTED": 14,
+    "causal_path_consistency/OPEN_TOPOLOGY_V21_CONTRADICTORY_PATH": 8,
+    "complete_topology/OPEN_TOPOLOGY_SEARCH_EXHAUSTED": 9,
+    "dc_operating_point_solver/SIMULATION_INVALID": 3,
+    "dc_sweep_solver/SIMULATION_INVALID": 2,
+    "electrothermal_model/THERMAL_MODEL_UNAVAILABLE": 6,
+    "electrothermal_solver/SIMULATION_INVALID": 2,
+    "junction_temperature_evidence/NONCONVERGENT": 1,
+    "output_voltage_evidence/NONCONVERGENT": 2,
+    "passing_behavioral_evidence/OPEN_TOPOLOGY_NO_PASSING_GRAPH": 25,
+    "peak_current_evidence/ASSERTION_ABOVE_MAXIMUM": 1,
+    "peak_current_evidence/NONCONVERGENT": 1,
+    "settling_time_evidence/ASSERTION_ABOVE_MAXIMUM": 2,
+    "stability_solver/SIMULATION_INVALID": 1,
+    "startup_output_voltage_evidence/ASSERTION_ABOVE_MAXIMUM": 1,
+    "thermal_model/THERMAL_MODEL_UNAVAILABLE": 2,
+    "transconductance_evidence/ASSERTION_ABOVE_MAXIMUM": 1,
+    "transconductance_evidence/ASSERTION_BELOW_MINIMUM": 1,
+    "transient_solver/SIMULATION_INVALID": 2,
+    "transimpedance_evidence/ASSERTION_BELOW_MINIMUM": 1
+  },
+  "material_threshold_met": true,
+  "preservation_passed": true,
+  "evaluation_passed": true,
+  "experimental": true
+}

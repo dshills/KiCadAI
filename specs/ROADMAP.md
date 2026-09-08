@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-09-07
+Date: 2026-09-08
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -32,7 +32,7 @@ from validation feedback to safe automatic repair.
 
 ## Current State
 
-The project has released v1.0.0 and is publishing v1.0.1 security maintenance:
+The project has released v1.0.0 and v1.0.1 security maintenance:
 patched Go/dependencies, release provenance and input-validation corrections,
 and experimental V21 correctness repairs. The integrated performance work and
 this maintenance release do not expand the supported capability surface. The
@@ -1286,12 +1286,15 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-The immediate sequence is v1.0.1 security maintenance publication, not another capability
-expansion: reproduce all release and installed-KiCad gates from the exact
-merged commit, publish checksummed binaries, and verify the annotated release
-tag. Corrected V21 has not completed a new frozen public evaluation; that is a
-separate subsequent milestone, not a blocker for the security release. New
-capability work resumes only after the maintenance release assets are verified.
+The v1.0.1 security maintenance release and its checksummed assets are verified.
+The separate corrected V21 public maintenance evaluation has now completed and
+passed its frozen advancement and preservation gates, with four structural
+advances but no additional complete circuit passes. Finish review and integration
+of that evaluation-only evidence before selecting further capability work.
+The next decision should use its remaining behavioral, bounded-topology, and
+causal-consistency blockers; do not infer a numerical root cause from a generic
+nonpassing-evidence label. See the
+[maintenance audit](generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md).
 
 The first generic promotions are complete: RC filter, protected USB-C LED,
 protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage
@@ -1407,19 +1410,21 @@ exhausted. V18's pass and safety result were preserved, and the selected model-
 availability leaf advanced to a later topology blocker. V20 therefore meets
 its frozen material-improvement gate while remaining outside the v1 surface.
 
-The V21 generic causal-topology milestone now requires revalidation. It derives reusable
-structural obligations, applies canonical bounded graph operations, and retains
-the exact V20 admission boundary and provenance. Its frozen 24-case public
-evaluation ran every case twice, preserved the V18 pass and safety result, kept
-all 16 unselected cases byte-identical to V20, and advanced six selected cases
-across four reporting domains to a later behavioral-evidence blocker. This
-was the original advancement claim. The September 6 review found unsound
-structural certificates, evidence-hash defects, and late resource-bound checks.
-Maintenance revision 1 fixes them without rewriting historical source or
-reports. Its public evaluation has not run; do not count the prior advancement
-as validation of the corrected evaluator. V21 remains experimental and outside
-the v1 supported surface. See [the review](../docs/project-review-2026-09-06.md)
-and `specs/generic-causal-topology-repair/AUDIT.md`.
+The V21 generic causal-topology milestone has completed corrected maintenance
+revalidation. It derives reusable structural obligations, applies canonical
+bounded graph operations, and retains the exact V20 admission boundary and
+provenance. The September 6 review found unsound structural certificates,
+evidence-hash defects, and late resource-bound checks; maintenance revision 1
+fixed them without rewriting historical source or reports. Its separate frozen
+24-case, two-replay run preserved the V18 pass and safety result and all 16
+unselected V20 raw case objects. Four selected cases across four domains advance
+to a later behavioral-evidence blocker, meeting the unchanged material threshold.
+Outcomes are 1 pass, 6 unsupported, 1 unsafe, and 16 exhausted. The additional
+unsupported result is a contradictory-path refusal, not a qualifying advance.
+There are no new complete circuit passes. V21 remains experimental and outside
+the v1 surface. See [the review](../docs/project-review-2026-09-06.md) and
+[corrected maintenance audit](generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md);
+the original audit remains historical evidence only.
 
 The deterministic synthesis-evaluation scheduler is now complete. Candidate
 attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates
