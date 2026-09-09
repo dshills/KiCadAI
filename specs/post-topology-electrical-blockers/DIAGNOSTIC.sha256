@@ -1,0 +1,10 @@
+fd002200f1fe9ebb350d1d92fb0ebd8500a73860e16e96fa975508376661490b  PLAN.md
+ff56165b1ee67f42a25d0edfd54f8c8be293cda0eaf4ae1c98ac3ea1b647b5c8  DIAGNOSTIC_RUN.json
+e429468c0361ccc8f06ab1b7b594b1c482889827c4bec324737ae6163fdbbd10  run-diagnostics.sh
+f66827710d9e86073b1b6a850fda0a0b70e44efe5551f3e33d0d58f91d064154  contract_test.go
+1781af551b7f290c042b2b3f836d8f08419a1ac7d1c7a73083322bbe2ef1cfc5  ../../cmd/kicadai-electrical-diagnostics/main.go
+bd0b88caca1d83100c2d805e04108c16216fe5fffcb51c38580165b5e6513494  ../../cmd/kicadai-electrical-diagnostics/main_test.go
+53f8b2f4e83f3ff2ea18e101411448340169e04c24d0267b9fab00ea7794a1f9  ../../internal/electricaldiagnostics/evaluation.go
+f647787cc4088950949b639ba008a2418fe39de4603e0a423b9f3d20de522a01  ../../internal/electricaldiagnostics/evaluation_test.go
+d053d08a68a8b82207c33c5e3f6709337565d355e9e4ed0681711576b992cf33  ../../internal/electricaldiagnostics/synthesis.go
+8c802c0c48a5073fd27a44d98f27d0b56274c8f0502ef3fc8ca93a55517a109d  ../../internal/electricaldiagnostics/synthesis_test.go
