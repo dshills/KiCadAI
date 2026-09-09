@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.public-electrical-population.v22",
+  "version": 22,
+  "selection_basis": "The four public cases diagnosed before implementation in ROOT_CAUSE.md; no selection by V22 outcome.",
+  "predecessor_report": "internal/capabilityfeedback/testdata/closed_loop_open_set_v21_maintenance_1/report.json",
+  "selected_cases": [
+    {"id": "v10_case_004"},
+    {"id": "v10_case_017"},
+    {"id": "v10_case_018"},
+    {"id": "v10_case_021"}
+  ],
+  "public_case_count": 24,
+  "replays_per_case": 2,
+  "maximum_parallel_cases": 1,
+  "held_out_access": false,
+  "automatic_v1_admission": false
+}
