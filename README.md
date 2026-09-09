@@ -121,10 +121,16 @@ new topology work. The September 6 review found unsound structural certificates,
 evidence-hash errors, and bound-enforcement defects in its original evaluator.
 These are corrected in maintenance revision 1. The original 24-case evaluation
 is retained as historical evidence, not validation of the repaired code or
-proof of its previously claimed six-case advancement. A new frozen evaluation
-is pending. V21 remains experimental and does not change the v1 support claim.
+proof of its previously claimed six-case advancement. A separate frozen
+maintenance run completed all 24 public cases twice and passed its advancement
+and preservation gates: four selected cases across four domains advance to a
+later behavioral-evidence blocker, all 16 unselected raw case objects remain
+byte-identical to V20, and the V18 pass and safety result are preserved. Outcomes
+are 1 pass, 6 unsupported, 1 unsafe, and 16 exhausted; there are no additional
+complete circuit passes. V21 remains experimental and does not change the v1
+support claim.
 See the [review and corrections](docs/project-review-2026-09-06.md) and
-[historical V21 audit](specs/generic-causal-topology-repair/AUDIT.md).
+[corrected V21 maintenance audit](specs/generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md).
 
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases

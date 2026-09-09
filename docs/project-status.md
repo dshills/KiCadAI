@@ -1,18 +1,19 @@
 # Project Status
 
-Last full bounded Go verification: 2026-09-06, including focused V21
+Last full bounded Go verification: 2026-09-08, including focused V21
 topology-completion, deterministic-replay, contract, evaluator-seal, and
-preservation suites. The review coverage gate reports 80.2% after
-excluding generated protobuf bindings, above the required 75% threshold.
-The 13-case installed-KiCad design-example tier was reproduced on 2026-09-06
+preservation suites. The latest release coverage baseline is 80.2% after
+excluding generated protobuf bindings; the required threshold remains 75%.
+The maintenance PR records the final source-bound coverage proof.
+The 13-case installed-KiCad design-example tier was reproduced on 2026-09-08
 with KiCad 10.0.3, satisfying every declared success or fail-closed expectation.
 Successful cases passed clean ERC, strict DRC, connectivity, route completion,
-writer correctness, and zero round-trip differences. The earlier September 4
+writer correctness, and zero round-trip differences. The September 8
 six-scenario clean-checkout promotion bundle
-`sha256-c78451a2cd1e507e159859cf9f03cf528593a9cb9fbc2b6619d1b32b828f7439`
+`sha256-414ba1137410bf295156d794e8853b88ee8717769af48940147a751f9aceefe0`
 passed two full iterations (12 total runs) with identical normalized
-inventories. The five educational schematics were replayed on September 6 and remain
-deterministic and readable. Closed-loop
+inventories and 286 independently authenticated files. The five educational
+schematic layout/library checks passed twice on September 8. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -47,11 +48,12 @@ reference fast open-topology test loop is approximately 60% shorter while the
 full bounded proofs and installed-KiCad promotion evidence remain required for
 release acceptance.
 
-The v1.0.1 security maintenance release packages the merged Go 1.26.8 and
+The published v1.0.1 security maintenance release packages the merged Go 1.26.8 and
 dependency updates, release provenance/input-validation fixes, and V21
 maintenance corrections without changing the supported v1 envelope. Source
-builds now require Go 1.26.8 or newer. Corrected V21 has not completed a new
-frozen public evaluation; that separate milestone must not delay this release.
+builds now require Go 1.26.8 or newer. The annotated release tag and published
+checksummed artifacts were verified before the separate V21 maintenance
+evaluation began; that evaluation does not replace or rewrite release assets.
 See the [release notes](../RELEASE_NOTES.md).
 
 The integrated release-hardening changes also addressed the remaining feedback
@@ -77,21 +79,26 @@ exhausted rose from 15 to 17. The selected
 model-availability leaf therefore passed the frozen advancement rule. This
 remains experimental and does not expand the v1 supported surface.
 
-The V21 successor requires revalidation after the September 6 review. Generic causal-topology obligations and
-canonical bounded repair run only after exact V20 analysis/model/solver
-admission. Its frozen public evaluation completed all 24 cases exactly twice:
-1 pass, 5 unsupported, 1 unsafe, and 17 exhausted. All 16 unselected case
-objects remain byte-identical to V20, all replay hashes match, and the V18 pass
-again clears two installed-KiCad promotions with every physical and replay gate
-true. Six selected cases across four reporting domains advance to the later
-`OPEN_TOPOLOGY_NO_PASSING_GRAPH` blocker in the original evaluator. However,
-the review reproduced unsound structural certificates, stale state hashes,
-tampered-evaluation acceptance, and late bound checks. Maintenance revision 1
-corrects these defects. The historical advancement is not evidence for the
-corrected evaluator, whose public corpus evaluation has not run. V21 remains
-experimental and does not change the v1 supported surface. See the
+The corrected V21 successor passed its separate frozen maintenance evaluation
+on September 8. All 24 public cases completed exactly two replays: 1 pass,
+6 unsupported, 1 unsafe, and 16 exhausted. All 16 unselected raw case objects
+remain byte-identical to V20, replay hashes match, and the V18 pass again clears
+two installed-KiCad promotions with all fourteen required gates true. Four
+selected cases across four reporting domains advance beyond topology to the
+later `OPEN_TOPOLOGY_NO_PASSING_GRAPH` blocker, exceeding the three-case/two-domain
+threshold without a frozen preservation regression. No additional complete
+circuit passes were produced. One selected case now refuses with a contradictory
+causal-path diagnostic; that change is not counted as advancement.
+
+The September 6 review found unsound structural certificates, stale state
+hashes, tampered-evaluation acceptance, and late bound checks. Maintenance
+revision 1 corrected them; its authenticated result above supersedes the old
+evaluator's six-case advancement claim without rewriting historical evidence.
+V21 remains experimental and does not change the v1 supported surface. See the
 [review](project-review-2026-09-06.md) and
-[historical V21 audit](../specs/generic-causal-topology-repair/AUDIT.md).
+[maintenance audit](../specs/generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md)
+for remaining behavioral/topology blockers, retention limits, and disabled
+KiCad check categories in the frozen configuration.
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
