@@ -3,6 +3,26 @@
 Status: diagnostic implementation in progress; no successor evaluation frozen or run.
 Base: merged V21 maintenance evaluation, `abe617d182369352df8fe0e16f9071a539881b21`.
 
+### Instrumentation recovery 1
+
+The initial diagnostic execution at `676e3f18da98864d8900e42047e4b685b129e66b`
+completed 004 and 017 with exact historical replay matches, then failed while
+projecting 018; 021 did not start. This is an incomplete diagnostic run, not a
+new frozen evaluation result. Its source and original `DIAGNOSTIC.sha256` remain
+available at that commit. `DIAGNOSTIC_RECOVERY_1.json` records its evidence hashes
+and the sole recovery population: repeat 018 once to recover the lost trace, then
+execute 021 for the first time. Do not repeat 004 or 017. Effective diagnostic
+execution counts will be 1, 1, 2, 1 respectively, not four cases exactly once.
+
+The corrected projector permits inherited run-level inventory provenance to differ
+from a successor certificate, while still authenticating the certificate and its
+exact evaluation inventory. It also recognizes an assertion failure whose original
+typed code was normalized away, using an exact report-bound structured diagnosis.
+Neither correction changes synthesis, numerical evaluation, selection, or budgets.
+The current checksum manifest seals this recovery revision; it does not replace
+the historical source seal at `676e3f18`. Recovery still requires full historical
+synthesis replay matches. Preserve original traces and logs unchanged.
+
 ## Objective and boundary
 
 Explain the actual electrical failures of the four publicly advanced V21 cases,

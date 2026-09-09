@@ -111,3 +111,27 @@ func TestTraceBoundRefusesWithoutTruncation(t *testing.T) {
 		t.Fatal("oversized trace accepted")
 	}
 }
+
+func TestInheritedRunInventoryCanDifferFromSuccessorCertificate(t *testing.T) {
+	run := certifiedRun(t, false)
+	run.Report.PrimitiveInventoryHash = strings.Repeat("8", 64)
+	sealRun(t, &run)
+	projection, err := ProjectSynthesis(run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projection.InventoryHash == projection.CertifiedCandidates[0].Certificate.InventoryHash {
+		t.Fatal("mixed-version provenance was flattened")
+	}
+	certificate := &run.Candidates[0].Repair.TopologyCompletionV21.Selected.Invariant
+	certificate.InventoryHash = strings.Repeat("7", 64)
+	certificate.Hash = ""
+	certificate.Hash, err = hash(*certificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealRun(t, &run)
+	if _, err := ProjectSynthesis(run); err == nil {
+		t.Fatal("certificate/evaluation mismatch accepted")
+	}
+}

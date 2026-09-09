@@ -150,3 +150,39 @@ func TestProjectionOmitsWaveforms(t *testing.T) {
 		t.Fatal("compact projection retained waveform points")
 	}
 }
+
+func TestHistoricalAssertionDiagnosisRequiresExactEvidence(t *testing.T) {
+	actual, minimum := 2.0, 2.45
+	source := signedEvaluation(t, ot.SimulationAttempt{Status: ot.SimulationEvaluationFailed, RequirementID: "level", Analysis: "dc_operating_point", Metric: "output_voltage", OperatingCase: "nominal", CornerID: "center", ReportHash: strings.Repeat("5", 64), Actual: &actual, RequiredMin: &minimum, Report: &simmodel.Report{Status: "fail"}, Diagnostics: []ot.SimulationDiagnostic{{Code: "simulation_invalid"}}})
+	source.Diagnoses = []ot.Diagnosis{{Code: "assertion_below_minimum", RequirementID: "level", Analysis: "dc_operating_point", Metric: "output_voltage", OperatingCase: "nominal/center", EvidenceHash: strings.Repeat("5", 64), Actual: &actual, RequiredMin: &minimum}}
+	sealEvaluation(t, &source)
+	projection, err := ProjectEvaluation(source)
+	if err != nil || projection.FirstFailure.Stage != StageAssertion {
+		t.Fatalf("assertion code normalization not resolved: %+v %v", projection.FirstFailure, err)
+	}
+	source.Diagnoses[0].EvidenceHash = strings.Repeat("6", 64)
+	sealEvaluation(t, &source)
+	projection, err = ProjectEvaluation(source)
+	if err != nil || projection.FirstFailure.Stage != StageSolver {
+		t.Fatal("unrelated diagnosis overrode failure")
+	}
+	source.Diagnoses[0].EvidenceHash = strings.Repeat("5", 64)
+	for name, mutate := range map[string]func(*ot.SimulationAttempt, *ot.Diagnosis){
+		"missing attempt actual":   func(a *ot.SimulationAttempt, _ *ot.Diagnosis) { a.Actual = nil },
+		"missing diagnosis actual": func(_ *ot.SimulationAttempt, d *ot.Diagnosis) { d.Actual = nil },
+		"missing attempt bound":    func(a *ot.SimulationAttempt, _ *ot.Diagnosis) { a.RequiredMin = nil },
+		"missing diagnosis bound":  func(_ *ot.SimulationAttempt, d *ot.Diagnosis) { d.RequiredMin = nil },
+		"different exact value":    func(_ *ot.SimulationAttempt, d *ot.Diagnosis) { value := 2.0 + 1e-12; d.Actual = &value },
+		"solver failure present": func(a *ot.SimulationAttempt, _ *ot.Diagnosis) {
+			a.Diagnostics = append(a.Diagnostics, ot.SimulationDiagnostic{Code: "simulation_nonconvergent"})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			attempt, diagnosis := source.Attempts[0], source.Diagnoses[0]
+			mutate(&attempt, &diagnosis)
+			if assertionDiagnosisMatches(attempt, []ot.Diagnosis{diagnosis}) {
+				t.Fatal("incomplete or contradictory evidence classified as assertion-only")
+			}
+		})
+	}
+}

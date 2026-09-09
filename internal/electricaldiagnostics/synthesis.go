@@ -26,11 +26,13 @@ type CertifiedCandidate struct {
 // evaluation attached to each complete V21 structural certificate, not every
 // attempted candidate waveform. Run/replay hashes bind the complete source.
 type Synthesis struct {
-	Schema              string               `json:"schema"`
-	RunHash             string               `json:"run_sha256"`
-	ReplayHash          string               `json:"replay_sha256"`
-	RawSerializedBytes  int64                `json:"raw_serialized_bytes"`
-	RequirementHash     string               `json:"requirement_sha256"`
+	Schema             string `json:"schema"`
+	RunHash            string `json:"run_sha256"`
+	ReplayHash         string `json:"replay_sha256"`
+	RawSerializedBytes int64  `json:"raw_serialized_bytes"`
+	RequirementHash    string `json:"requirement_sha256"`
+	// InventoryHash is inherited report provenance, not the inventory of every
+	// successor evaluation. Each certificate binds its own exact inventory.
 	InventoryHash       string               `json:"inventory_sha256"`
 	Status              ot.Status            `json:"status"`
 	StopReason          ot.StopReason        `json:"stop_reason"`
@@ -74,8 +76,8 @@ func ProjectSynthesis(run ot.SynthesisRun) (Synthesis, error) {
 			return Synthesis{}, fmt.Errorf("inconsistent structural certificate")
 		}
 		graphHash, err := ot.GraphHash(selected.Graph)
-		if err != nil || graphHash != selected.GraphHash || graphHash != selected.Invariant.GraphHash || selected.Invariant.RequirementHash != result.RequirementHash || selected.Invariant.InventoryHash != result.InventoryHash {
-			return Synthesis{}, fmt.Errorf("structural certificate graph or requirement differs")
+		if err != nil || graphHash != selected.GraphHash || graphHash != selected.Invariant.GraphHash || selected.Invariant.RequirementHash != result.RequirementHash {
+			return Synthesis{}, fmt.Errorf("structural certificate binding differs: graph=%s selected=%s certificate=%s requirement=%s inherited=%s: %v", graphHash, selected.GraphHash, selected.Invariant.GraphHash, selected.Invariant.RequirementHash, result.RequirementHash, err)
 		}
 		certificate := selected.Invariant
 		certificate.Hash = ""

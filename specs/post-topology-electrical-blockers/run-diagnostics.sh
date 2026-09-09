@@ -2,11 +2,16 @@
 set -euo pipefail
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 freeze="$root/specs/post-topology-electrical-blockers"
-if [ "$#" -ne 1 ] || [[ "$1" != /* ]]; then
-  printf 'usage: bash %s /absolute/fresh/scratch-root\n' "$0" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [[ "$1" != /* ]]; then
+  printf 'usage: bash %s /absolute/fresh/scratch-root [--recovery-1]\n' "$0" >&2
   exit 2
 fi
 scratch=$1
+config="$freeze/DIAGNOSTIC_RUN.json"
+if [ "$#" -eq 2 ]; then
+  test "$2" = --recovery-1
+  config="$freeze/DIAGNOSTIC_RECOVERY_1.json"
+fi
 cd "$root"
 test -z "$(git status --porcelain --untracked-files=all)"
 revision=$(git rev-parse HEAD)
@@ -34,8 +39,8 @@ go build -trimpath -o "$scratch/diagnostic" ./cmd/kicadai-electrical-diagnostics
 shasum -a 256 "$scratch/diagnostic" > "$scratch/diagnostic.sha256"
 /usr/bin/time -l "$scratch/diagnostic" --repository-root "$root" \
   --output-root "$scratch/results" \
-  --cases "$(jq -er '.cases | join(",")' "$freeze/DIAGNOSTIC_RUN.json")" \
-  --timeout "$(jq -er '.timeout' "$freeze/DIAGNOSTIC_RUN.json")" \
+  --cases "$(jq -er '.cases | join(",")' "$config")" \
+  --timeout "$(jq -er '.timeout' "$config")" \
   > "$scratch/progress.log" 2> "$scratch/resource-usage.log"
 test "$(git rev-parse HEAD)" = "$revision"
 git diff --exit-code "$revision"

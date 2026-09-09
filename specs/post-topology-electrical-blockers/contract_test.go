@@ -88,7 +88,30 @@ func TestDiagnosticSourceFreeze(t *testing.T) {
 			t.Fatalf("diagnostic source differs: %s", path)
 		}
 	}
-	if len(seen) != 10 {
+	if len(seen) != 11 {
 		t.Fatalf("diagnostic source inventory size %d", len(seen))
+	}
+}
+
+func TestDiagnosticRecoveryPopulation(t *testing.T) {
+	data, err := os.ReadFile("DIAGNOSTIC_RECOVERY_1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Initial     string   `json:"initial_source_commit"`
+		Cases       []string `json:"cases"`
+		Runs        int      `json:"runs_per_case"`
+		Boundary    string   `json:"boundary"`
+		Match       bool     `json:"required_historical_replay_match"`
+		HeldOut     bool     `json:"held_out_access"`
+		Corrections bool     `json:"synthesis_corrections"`
+		Physical    bool     `json:"physical_promotion"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatal(err)
+	}
+	if config.Initial != "676e3f18da98864d8900e42047e4b685b129e66b" || !reflect.DeepEqual(config.Cases, []string{"v10_case_018", "v10_case_021"}) || config.Runs != 1 || config.Boundary != "unchanged_v21" || !config.Match || config.HeldOut || config.Corrections || config.Physical {
+		t.Fatal("instrumentation recovery boundary differs")
 	}
 }

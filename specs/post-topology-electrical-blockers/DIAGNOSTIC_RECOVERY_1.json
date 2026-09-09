@@ -1,0 +1,25 @@
+{
+  "schema": "kicadai.post-topology-diagnostic-recovery.v1",
+  "initial_source_commit": "676e3f18da98864d8900e42047e4b685b129e66b",
+  "initial_source_seal_sha256": "e34508afb7446c6e43409e9d9425350064b4745b70f85c6371d24be81591a913",
+  "initial_status": "projection_failed_after_third_synthesis",
+  "initial_completed_cases": ["v10_case_004", "v10_case_017"],
+  "initial_lost_trace_case": "v10_case_018",
+  "initial_unstarted_case": "v10_case_021",
+  "initial_evidence_sha256": {
+    "v10_case_004.measurements.json": "1e2b766c270bb5548f4715865de74ade4cf3e159011560d6b59cbac38ed96793",
+    "v10_case_004.trace.json": "76dcc8644585648607bddf3885eefd438e0cc9d17098612242bdc4891c6e7900",
+    "v10_case_017.measurements.json": "4ffcf6538668a75cbdde1559bef73d5e2db79118c2c97fa010ebdb497990709e",
+    "v10_case_017.trace.json": "07b589c9f4d36e54f2a60c5500c5cb2ba57373a158a45756221e64fe497b021d",
+    "resource-usage.log": "88e267f275b94154778359433dd80317bb31b394ef18551251fffd0e6954ac1c",
+    "progress.log": "9bfb729a433ec95263003824a2b582ae21e4e501e7cc0a53572f25a180e1c8e1"
+  },
+  "cases": ["v10_case_018", "v10_case_021"],
+  "runs_per_case": 1,
+  "timeout": "3h",
+  "boundary": "unchanged_v21",
+  "required_historical_replay_match": true,
+  "held_out_access": false,
+  "synthesis_corrections": false,
+  "physical_promotion": false
+}

@@ -101,6 +101,9 @@ func ProjectEvaluation(source opentopologysynthesis.SimulationEvaluation) (Evalu
 			continue
 		}
 		failure := projectFailure(attempt)
+		if assertionDiagnosisMatches(attempt, source.Diagnoses) {
+			failure.Stage = StageAssertion
+		}
 		if result.FirstFailure == nil {
 			result.FirstFailure = &failure
 		}
@@ -189,6 +192,35 @@ func projectFailure(attempt opentopologysynthesis.SimulationAttempt) Failure {
 		}
 	}
 	return result
+}
+
+// Historical attempts normalize lower-level assertion codes into the generic
+// simulation_invalid code. A bound, value, and report-bound structured diagnosis
+// restores that distinction without guessing from free-text messages.
+func assertionDiagnosisMatches(attempt opentopologysynthesis.SimulationAttempt, diagnoses []opentopologysynthesis.Diagnosis) bool {
+	if attempt.Report == nil || attempt.ReportHash == "" || attempt.Actual == nil || attempt.Status != opentopologysynthesis.SimulationEvaluationFailed {
+		return false
+	}
+	for _, diagnostic := range attempt.Diagnostics {
+		if diagnostic.Code != "simulation_invalid" && diagnostic.Code != simmodel.DiagnosticAssertionOutOfBounds {
+			return false
+		}
+	}
+	for _, diagnosis := range diagnoses {
+		if (diagnosis.Code != "assertion_below_minimum" && diagnosis.Code != "assertion_above_maximum") ||
+			diagnosis.EvidenceHash != attempt.ReportHash || diagnosis.RequirementID != attempt.RequirementID ||
+			diagnosis.OperatingCase != attempt.OperatingCase+"/"+attempt.CornerID || diagnosis.Analysis != attempt.Analysis ||
+			diagnosis.Metric != attempt.Metric || diagnosis.Actual == nil || *diagnosis.Actual != *attempt.Actual {
+			continue
+		}
+		if diagnosis.Code == "assertion_below_minimum" && diagnosis.RequiredMin != nil && attempt.RequiredMin != nil && *diagnosis.RequiredMin == *attempt.RequiredMin && *attempt.Actual < *attempt.RequiredMin {
+			return true
+		}
+		if diagnosis.Code == "assertion_above_maximum" && diagnosis.RequiredMax != nil && attempt.RequiredMax != nil && *diagnosis.RequiredMax == *attempt.RequiredMax && *attempt.Actual > *attempt.RequiredMax {
+			return true
+		}
+	}
+	return false
 }
 
 func admissionCode(code string) bool {
