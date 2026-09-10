@@ -132,6 +132,17 @@ support claim.
 See the [review and corrections](docs/project-review-2026-09-06.md) and
 [corrected V21 maintenance audit](specs/generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md).
 
+The subsequent V22 post-topology electrical-repair experiment completed all 24
+public cases twice. Compact first-failed-gate diagnostics identified the four
+selected candidates' electrical blockers, but bounded generic control-terminal
+rebinding produced no additional complete pass. All case outcomes, full replay
+hashes, and gate records remain identical to corrected V21; the existing pass
+again clears both installed-KiCad promotions. Independent development fixtures
+passed, but do not count as corpus improvement. V22 remains experimental and
+does not expand v1. See the [root-cause report](specs/post-topology-electrical-blockers/ROOT_CAUSE.md),
+[negative evaluation result](specs/post-topology-electrical-blockers/publication-v22/RESULTS.md),
+and [timing/evidence-size observations](specs/post-topology-electrical-blockers/publication-v22/PERFORMANCE_OBSERVATIONS.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.

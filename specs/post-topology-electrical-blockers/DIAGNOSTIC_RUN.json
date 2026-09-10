@@ -1,0 +1,20 @@
+{
+  "schema": "kicadai.post-topology-diagnostic-run.v1",
+  "base_commit": "abe617d182369352df8fe0e16f9071a539881b21",
+  "boundary": "unchanged_v21",
+  "diagnostic_only": true,
+  "cases": ["v10_case_004", "v10_case_017", "v10_case_018", "v10_case_021"],
+  "runs_per_case": 1,
+  "timeout": "3h",
+  "policy": "unchanged_DefaultPolicy",
+  "go_version": "go1.26.8",
+  "platform": "darwin/arm64",
+  "baseline_file_sha256": "949963f6f38574626d125fe8d4e2f34966437b9a3c21dfe6518ceff37985efb1",
+  "assessment_file_sha256": "26456f6f1e68d076b5b564c3f0a04d017dd8ee12d15a4806f6ff117a9fe34574",
+  "corpus_manifest_sha256": "0ec3834c832246e659b417dcef4aaae6d1634cbcd19c734518990280b124dc94",
+  "held_out_access": false,
+  "synthesis_corrections": false,
+  "physical_promotion": false,
+  "repeat_after_outcome": false,
+  "required_historical_replay_match": true
+}

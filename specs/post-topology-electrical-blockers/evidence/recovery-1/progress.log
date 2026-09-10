@@ -1,0 +1,4 @@
+diagnostic start: v10_case_018
+diagnostic complete: v10_case_018 historical_replay_match=true trace_bytes=8599 raw_bytes=19365810 synthesis_seconds=2.616 projection_seconds=0.330
+diagnostic start: v10_case_021
+diagnostic complete: v10_case_021 historical_replay_match=true trace_bytes=14989 raw_bytes=4829192142 synthesis_seconds=508.438 projection_seconds=79.174

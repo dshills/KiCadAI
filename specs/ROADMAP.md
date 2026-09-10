@@ -1287,14 +1287,20 @@ intent:
 ## Near-Term Recommended Sequence
 
 The v1.0.1 security maintenance release and its checksummed assets are verified.
-The separate corrected V21 public maintenance evaluation has now completed and
-passed its frozen advancement and preservation gates, with four structural
-advances but no additional complete circuit passes. Finish review and integration
-of that evaluation-only evidence before selecting further capability work.
-The next decision should use its remaining behavioral, bounded-topology, and
-causal-consistency blockers; do not infer a numerical root cause from a generic
-nonpassing-evidence label. See the
-[maintenance audit](generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md).
+The corrected V21 maintenance evaluation is integrated. Its four structural
+advances motivated compact first-failed-gate diagnostics and the separately
+frozen V22 electrical-repair experiment. V22 completed all 24 public cases twice
+and preserved every outcome, full replay hash, and gate record, but produced no
+additional complete simulation-and-KiCad pass. The experimental corpus therefore
+remains at 1/24, not a newly expanded supported capability.
+Finish review and integration of the [V22 evidence](post-topology-electrical-blockers/publication-v22/RESULTS.md).
+The next technical decision needs precise assertion/actual/bound diagnostics for
+rejected repair candidates before selecting another generic correction. Do not
+infer residual causes from pass counts, increase frozen budgets, weaken critical
+guards, or repeat this frozen evaluation in response to its negative outcome.
+The measured memory and evidence-processing costs also require profiling before
+additional case concurrency; performance work remains separate from capability
+claims. The v1 support boundary and all historical evaluations remain unchanged.
 
 The first generic promotions are complete: RC filter, protected USB-C LED,
 protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage

@@ -1,0 +1,12 @@
+{
+  "case_id": "v10_case_021",
+  "requirement_sha256": "37d77403b6712a22d930a249e2271b1fbfe01994196fd4ca61e006a98f015aa8",
+  "expected_replay_sha256": "0134916bbe2fc5a312c7aabafce53a8bc5b5d7299bd1d6d33f3843019befff39",
+  "replay_sha256": "0134916bbe2fc5a312c7aabafce53a8bc5b5d7299bd1d6d33f3843019befff39",
+  "replay_matches": true,
+  "trace_file_sha256": "ead9365598289ef7a10400124b2c7bafef3a09611f9f238ac1e52c051c9f51fe",
+  "trace_bytes": 14989,
+  "raw_serialized_bytes": 4829192142,
+  "synthesis_seconds": 508.438026875,
+  "projection_seconds": 79.173632375
+}

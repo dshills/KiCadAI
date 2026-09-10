@@ -1,0 +1,454 @@
+{
+  "schema": "kicadai.post-topology-electrical-diagnostics.v1",
+  "run_sha256": "9c2566f2c0ecd2404758d4be95689535957fb8576466d254608a90cea9036e95",
+  "replay_sha256": "3ba0036ac31f269c3b4da844b1f27133c2505ac5d47533049bf5b33ecdb15cec",
+  "raw_serialized_bytes": 144574696,
+  "requirement_sha256": "1ded31ddb876d9b714ac2cd8d4c7dce9b8b84dc19ec27b1a7c31382701ad4f57",
+  "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+  "status": "failed",
+  "stop_reason": "no_passing_graph",
+  "consumption": {
+    "expanded_states": 129,
+    "generated_graphs": 18673,
+    "complete_graphs": 154,
+    "candidate_simulations": 3568,
+    "corner_evaluations": 34036,
+    "value_trials": 2520,
+    "topology_repairs": 134,
+    "maximum_frontier": 6064,
+    "budget_exhausted": true
+  },
+  "candidate_count": 16,
+  "certified_candidates": [
+    {
+      "fingerprint": "05504f843f44c3a3f29b5d37f0003217584da4c9e152851144d032ef48627fb0",
+      "topology_plan_sha256": "26cfe3067cffc10df06e2c15b35b0fe40fc515633be0243ec021be7f63022503",
+      "certificate": {
+        "schema": "kicadai.topology-completion-plan.v21",
+        "version": 21,
+        "requirement_sha256": "1ded31ddb876d9b714ac2cd8d4c7dce9b8b84dc19ec27b1a7c31382701ad4f57",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "df8ebc8831bb7d6301e7b9d2e48782c49d8976ad7f4fa1ed2579e17df8347b98",
+        "obligations": [],
+        "complete": true,
+        "contradictory": false,
+        "hash": "b7b12a4553eec22b128e3b4ce15b500ca5f4387fbb2d7761f253e534b2008bd0"
+      },
+      "graph": {
+        "schema": "kicadai.open-topology-candidate-graph.v1",
+        "version": 1,
+        "nodes": [
+          {
+            "id": "port_current_excitation",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "current_excitation",
+            "domain": "signal_return",
+            "role": "output"
+          },
+          {
+            "id": "port_return_terminal",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "return_terminal",
+            "domain": "signal_return",
+            "role": "reference"
+          },
+          {
+            "id": "port_supply_input",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "supply_input",
+            "domain": "input_supply",
+            "role": "supply"
+          },
+          {
+            "id": "port_voltage_excitation",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "voltage_excitation",
+            "domain": "signal_return",
+            "role": "output"
+          },
+          {
+            "id": "internal_000",
+            "scope": "internal",
+            "role": "internal"
+          },
+          {
+            "id": "internal_001",
+            "scope": "internal",
+            "role": "internal"
+          },
+          {
+            "id": "internal_002",
+            "scope": "internal",
+            "role": "internal"
+          },
+          {
+            "id": "internal_003",
+            "scope": "internal",
+            "role": "internal"
+          }
+        ],
+        "instances": [
+          {
+            "id": "primitive_000",
+            "primitive_key": "opamp.ti.opa992idbvr.sot23_5|sot23_5",
+            "kind": "opamp",
+            "terminals": [
+              {
+                "terminal": "IN_MINUS",
+                "node": "internal_002"
+              },
+              {
+                "terminal": "IN_PLUS",
+                "node": "internal_001"
+              },
+              {
+                "terminal": "OUT",
+                "node": "port_current_excitation"
+              },
+              {
+                "terminal": "V_MINUS",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "V_PLUS",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_001",
+            "primitive_key": "resistor.vishay.tnpw0805.10k0.0p1|0805",
+            "kind": "resistor",
+            "value_si": 10000,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "B",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_002",
+            "primitive_key": "voltage_reference.analog_devices.max6006aeur_1v25.sot23|sot23",
+            "kind": "reference_diode",
+            "terminals": [
+              {
+                "terminal": "ANODE",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "CATHODE",
+                "node": "internal_000"
+              }
+            ]
+          },
+          {
+            "id": "primitive_003",
+            "primitive_key": "opamp.ti.opa992idbvr.sot23_5|sot23_5",
+            "kind": "opamp",
+            "terminals": [
+              {
+                "terminal": "IN_MINUS",
+                "node": "internal_001"
+              },
+              {
+                "terminal": "IN_PLUS",
+                "node": "internal_000"
+              },
+              {
+                "terminal": "OUT",
+                "node": "internal_002"
+              },
+              {
+                "terminal": "V_MINUS",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "V_PLUS",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_004",
+            "primitive_key": "bjt.onsemi.d44h11g.to220|to220_3",
+            "kind": "npn_bjt",
+            "terminals": [
+              {
+                "terminal": "BASE",
+                "node": "internal_003"
+              },
+              {
+                "terminal": "COLLECTOR",
+                "node": "internal_002"
+              },
+              {
+                "terminal": "EMITTER",
+                "node": "port_voltage_excitation"
+              }
+            ]
+          },
+          {
+            "id": "primitive_005",
+            "primitive_key": "resistor.vishay.tnpw0805.10k0.0p1|0805",
+            "kind": "resistor",
+            "value_si": 10000,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "internal_000"
+              },
+              {
+                "terminal": "B",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_006",
+            "primitive_key": "resistor.vishay.tnpw0805.10k0.0p1|0805",
+            "kind": "resistor",
+            "value_si": 10000,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "internal_001"
+              },
+              {
+                "terminal": "B",
+                "node": "port_voltage_excitation"
+              }
+            ]
+          },
+          {
+            "id": "primitive_007",
+            "primitive_key": "resistor.vishay.tnpw0805.10k0.0p1|0805",
+            "kind": "resistor",
+            "value_si": 10000,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "internal_001"
+              },
+              {
+                "terminal": "B",
+                "node": "port_return_terminal"
+              }
+            ]
+          },
+          {
+            "id": "primitive_008",
+            "primitive_key": "resistor.vishay.tnpw0805.10k0.0p1|0805",
+            "kind": "resistor",
+            "value_si": 10000,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "internal_002"
+              },
+              {
+                "terminal": "B",
+                "node": "internal_003"
+              }
+            ]
+          },
+          {
+            "id": "primitive_009",
+            "primitive_key": "capacitor.kemet.c1210k153f5eml.1210|1210",
+            "kind": "capacitor",
+            "value_si": 1.5e-8,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "B",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_010",
+            "primitive_key": "capacitor.kemet.c1210k153f5eml.1210|1210",
+            "kind": "capacitor",
+            "value_si": 1.5e-8,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "B",
+                "node": "port_voltage_excitation"
+              }
+            ]
+          },
+          {
+            "id": "primitive_011",
+            "primitive_key": "capacitor.kemet.c1210k153f5eml.1210|1210",
+            "kind": "capacitor",
+            "value_si": 1.5e-8,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "internal_001"
+              },
+              {
+                "terminal": "B",
+                "node": "internal_002"
+              }
+            ]
+          },
+          {
+            "id": "primitive_012",
+            "primitive_key": "opamp.ti.lm4562ma.soic8|soic8|A",
+            "kind": "opamp",
+            "terminals": [
+              {
+                "terminal": "IN_MINUS",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "IN_PLUS",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "OUT",
+                "node": "port_voltage_excitation"
+              },
+              {
+                "terminal": "V_MINUS",
+                "node": "port_return_terminal"
+              },
+              {
+                "terminal": "V_PLUS",
+                "node": "port_supply_input"
+              }
+            ]
+          }
+        ]
+      },
+      "operation_count": 1,
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "9ae7f45ee42d1ae48b12660f628a2052f34ba1d06627ef39bd059c1604c0c585",
+        "requirement_sha256": "1ded31ddb876d9b714ac2cd8d4c7dce9b8b84dc19ec27b1a7c31382701ad4f57",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "df8ebc8831bb7d6301e7b9d2e48782c49d8976ad7f4fa1ed2579e17df8347b98",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 1,
+          "corner_evaluations": 1,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 1,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "solver/simulation_invalid",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 1,
+          "stage": "solver",
+          "assertion": "a_voltage_excitation_level",
+          "analysis": "dc_operating_point",
+          "metric": "output_voltage",
+          "operating_case": "nominal_loading",
+          "corner": "nominal",
+          "workflow": "nonlinear_circuit_dc_v1",
+          "plan_sha256": "18f031e349675277a2a561453f9f0bdf3beb22f51af18e47669a6421c111693f",
+          "report_sha256": "15f5e9212e0b7faf9974a4fc64c5fa2574c434e823388c82a61d5a74c26f30fc",
+          "model_evidence_sha256": [
+            "07653a049eea282cf48c984b1e45b1874ca2a8daa09ed8f231f5f96e78cac446",
+            "136d4e6865c4ba741a471495d586dd648e207fdd42a452ad0ac479c17a684552",
+            "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+            "1f22c0ad0c6fefe927f26bda93c18547372532861617fc76cb82e00d94705ab4",
+            "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+            "222c2b60e834dcacb46ecefd8ec46840a33dff9930b0186a0713986d96b7c01d",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "4710633f28afb52e93954f3c15e64e1339ed176f93bc67ec96f136d6a66b0b30",
+            "4dccc3d4dffa13205947b3a7a34fa190567e9669eb0c3e652dcc9be617779985",
+            "522806f6dd901f39cb8363becf3a597096868e31509ba04dc94fefaf8c3ddb91",
+            "59877e10b9bef589318e4ac1e98bb6f5ee8efd037758ef4a7db45129e7695cb0",
+            "5e1e52386bbb6fcebe37895f3b1ccca57e56ad150a5eddd3bde52bdde6d98b9f",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "6a9b8bf65dd99fa8f0abcc85d7d252b70497afb238c5188819636f86eaee77c5",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "743aac00338a5457af650056b3cb890f8eda9c413b7eaf8f17981d702ff96bda",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "784915a4c6bdc4f763d8108796dce22a27da54b7ca3d96dfd99e513774c116e5",
+            "7d97c9d80da965d3ef5ec6d46a245e6f76e65e257bc059a467a3624b1fb8a90b",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+            "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+            "9905aa26bdf446c0fb1c661d80e25533d811e5af6570f1f38e568f6baad706a1",
+            "9be9fd5b26d51542bfbf19980832fd5289b0d0805eb64a9924e6ad045521995b",
+            "a1b889f227a9e448d3ad0f6630fbbc39d705dd5550a0d746777507f1d3171566",
+            "a4514fc918c864e66ba7ece390e823bbc022bc434b1bae290ebdc0f53942d2e5",
+            "aa97e70565f280b6883d86fb9bb44ee3ceeda2f0e11bf2cb75bf77afae5427c8",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "d275a1d4ee6d4142299fd51188c9e08f8a75add8a0b2991e0cdaa6065ff80c0e",
+            "d813554e4c738eb3b866870de5c20e753c49e66f92291ddd8b31e57fd671e72d",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+            "f125a11ee31a524654304a449fd80317be5469b144d40823fecb6383538adf6e"
+          ],
+          "actual": 2,
+          "minimum": 2.45,
+          "maximum": 2.55,
+          "diagnostics": [
+            {
+              "code": "simulation_invalid",
+              "path": "assertions.nominal_loading_a_voltage_excitation_level.port_voltage_excitation.voltage_v",
+              "message": "measured 2 is outside trusted bounds 2.45..2.55",
+              "suggestion": "adjust catalog-backed component values, connectivity, or bounded analysis conditions"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "assertion_below_minimum",
+            "requirement_id": "a_voltage_excitation_level",
+            "operating_case": "nominal_loading/nominal",
+            "analysis": "dc_operating_point",
+            "metric": "output_voltage",
+            "direction": "below_minimum",
+            "actual": 2,
+            "required_min": 2.45,
+            "required_max": 2.55,
+            "affected_cone_hash": "df8ebc8831bb7d6301e7b9d2e48782c49d8976ad7f4fa1ed2579e17df8347b98",
+            "evidence_hash": "15f5e9212e0b7faf9974a4fc64c5fa2574c434e823388c82a61d5a74c26f30fc",
+            "message": "measured 2 is outside trusted bounds 2.45..2.55"
+          }
+        ],
+        "hash": "3a9dc71b2172ce097ec815fb6cc9b38b9cebc55d108885f1e946259ba052fda3"
+      }
+    }
+  ],
+  "hash": "b478a5ddc0b674fe9de9f0ccfd2e5afa1e36a885337b90d1a8b74085073db9d7"
+}

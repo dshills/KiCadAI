@@ -1,0 +1,238 @@
+{
+  "schema": "kicadai.post-topology-electrical-diagnostics.v1",
+  "run_sha256": "49930fe770d13d0dd65ee7c7871abdcc99c7dca43f9b20b9450dd40a0a6b4d67",
+  "replay_sha256": "cfd8efc883290f882f34671aefc3f6ba0f24b020d83ee9f3bbe5d52af308cbca",
+  "raw_serialized_bytes": 760075794,
+  "requirement_sha256": "cacccc4a0319be6b6ff93fff47effafaf1da535081c88c5adf50e81e20d02a6e",
+  "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+  "status": "failed",
+  "stop_reason": "no_passing_graph",
+  "consumption": {
+    "expanded_states": 53,
+    "generated_graphs": 5687,
+    "complete_graphs": 88,
+    "candidate_simulations": 824,
+    "corner_evaluations": 2084,
+    "value_trials": 283,
+    "topology_repairs": 128,
+    "maximum_frontier": 38,
+    "budget_exhausted": true
+  },
+  "candidate_count": 16,
+  "certified_candidates": [
+    {
+      "fingerprint": "77ff4134add50b4d7aad75bb531ed76b8175ab51e5e91bd62224cd7778f00873",
+      "topology_plan_sha256": "fbecf317a0df8ed6bbe81357f6960f5a44f17c237d6179bd836ed289fe1e40fa",
+      "certificate": {
+        "schema": "kicadai.topology-completion-plan.v21",
+        "version": 21,
+        "requirement_sha256": "cacccc4a0319be6b6ff93fff47effafaf1da535081c88c5adf50e81e20d02a6e",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "1a50a498ed9918af06cb2aed053b1d0fa9c90e3c9fde6c06b8b9c952a4444b42",
+        "obligations": [],
+        "complete": true,
+        "contradictory": false,
+        "hash": "ec1c44f1521c0dcbc0cb8a12fd8f59eec56cd8c1f81e0372b1a23665fad143f0"
+      },
+      "graph": {
+        "schema": "kicadai.open-topology-candidate-graph.v1",
+        "version": 1,
+        "nodes": [
+          {
+            "id": "port_gate_input",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "gate_input",
+            "domain": "measurement_reference",
+            "role": "control"
+          },
+          {
+            "id": "port_measured_input",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "measured_input",
+            "domain": "measurement_reference",
+            "role": "input"
+          },
+          {
+            "id": "port_measurement_output",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "measurement_output",
+            "domain": "measurement_reference",
+            "role": "output"
+          },
+          {
+            "id": "port_measurement_return",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "measurement_return",
+            "domain": "measurement_reference",
+            "role": "reference"
+          },
+          {
+            "id": "port_supply_input",
+            "scope": "external",
+            "semantic_kind": "port",
+            "semantic_id": "supply_input",
+            "domain": "measurement_supply",
+            "role": "supply"
+          }
+        ],
+        "instances": [
+          {
+            "id": "primitive_000",
+            "primitive_key": "opamp.ti.tlv9061idbvr.sot23_5|sot23_5",
+            "kind": "opamp",
+            "terminals": [
+              {
+                "terminal": "IN_MINUS",
+                "node": "port_gate_input"
+              },
+              {
+                "terminal": "IN_PLUS",
+                "node": "port_measured_input"
+              },
+              {
+                "terminal": "OUT",
+                "node": "port_measurement_output"
+              },
+              {
+                "terminal": "V_MINUS",
+                "node": "port_measurement_return"
+              },
+              {
+                "terminal": "V_PLUS",
+                "node": "port_supply_input"
+              }
+            ]
+          },
+          {
+            "id": "primitive_001",
+            "primitive_key": "resistor.vishay.tnpw0805.49r9.0p1|0805",
+            "kind": "resistor",
+            "value_si": 49.9,
+            "terminals": [
+              {
+                "terminal": "A",
+                "node": "port_gate_input"
+              },
+              {
+                "terminal": "B",
+                "node": "port_measurement_output"
+              }
+            ]
+          }
+        ]
+      },
+      "operation_count": 0,
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "d4b61ab481b2c6bd9348d01816df2f831606aab715b274f304444b24bad98c99",
+        "requirement_sha256": "cacccc4a0319be6b6ff93fff47effafaf1da535081c88c5adf50e81e20d02a6e",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "1a50a498ed9918af06cb2aed053b1d0fa9c90e3c9fde6c06b8b9c952a4444b42",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 2,
+          "corner_evaluations": 2,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 2,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          },
+          {
+            "key": "unsupported",
+            "count": 1
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "pre_simulation/simulation_invalid",
+            "count": 1
+          },
+          {
+            "key": "solver/simulation_invalid",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 1,
+          "stage": "pre_simulation",
+          "assertion": "closed_loop_phase_margin",
+          "analysis": "stability",
+          "metric": "phase_margin",
+          "operating_case": "enabled_measurement",
+          "corner": "nominal",
+          "model_evidence_sha256": [
+            "34f16ac32be433823b167e761ea5374681ca6094bc9057e1620d02b7b7ffc203",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "5dc2c2b43bd014415de5df84aa9e00c6d03a08dc3ce1965c91e33496953ecfcb",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "9171de9e05b0fb51083f3ad38deb660a5cd2da3b6468f5dbc4248b88b98b5ee5",
+            "94f2d80e6243c6f270c61149d7580478e22d5c6a7e4a50f88391d7e81ccad514",
+            "9d09fdfbcd8e7c0380f3d56d38ee978b21bcaeb03aae5049fc942ec995f12e3d",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "cbcda31175017c9b2dad49f4b3207f2273b408f7ffa745fc50d789f2736df1a7",
+            "cc00b9050cfac67b0b63c71867bfe499f98f2dcc34410f9f72b3ab0f8722d877",
+            "e7d3e76fd3507ff4416909e364b3505915ffdbb689dd0aaca3639ee4c82ab884",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+          ],
+          "minimum": 60,
+          "diagnostics": [
+            {
+              "code": "simulation_invalid",
+              "path": "simulation.assertion.observation",
+              "message": "stability observation does not resolve to one catalog-modeled negative-feedback loop",
+              "suggestion": "retain a unique passive feedback path from the observed output to an active inverting input"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "simulation_invalid",
+            "requirement_id": "closed_loop_phase_margin",
+            "operating_case": "enabled_measurement/nominal",
+            "analysis": "stability",
+            "metric": "phase_margin",
+            "direction": "",
+            "required_min": 60,
+            "affected_cone_hash": "1a50a498ed9918af06cb2aed053b1d0fa9c90e3c9fde6c06b8b9c952a4444b42",
+            "evidence_hash": "8547e02a1e4deb30a58dd3e226de9f514e3b31662800533878655356632cb925",
+            "message": "stability observation does not resolve to one catalog-modeled negative-feedback loop"
+          },
+          {
+            "code": "assertion_above_maximum",
+            "requirement_id": "gate_output_overshoot",
+            "operating_case": "gate_transition/nominal",
+            "analysis": "transient",
+            "metric": "peak_voltage",
+            "direction": "above_maximum",
+            "actual": 4.98,
+            "required_max": 4.8,
+            "affected_cone_hash": "1a50a498ed9918af06cb2aed053b1d0fa9c90e3c9fde6c06b8b9c952a4444b42",
+            "evidence_hash": "b6989bd65004159eca182dba8b347fdd13cdfd79f2a714e5b61041565e9b5d82",
+            "message": "measured 4.98 is outside trusted bounds 0..4.8"
+          }
+        ],
+        "hash": "f36bbc61db4be62e79865916d4c7c1a66cb2aa3c17df3881d25304891d1757b2"
+      }
+    }
+  ],
+  "hash": "8ff9c6c28c31a7420b9be18201fa86966e6358fb778679903c904b14e54f6621"
+}

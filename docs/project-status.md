@@ -1,19 +1,21 @@
 # Project Status
 
-Last full bounded Go verification: 2026-09-08, including focused V21
-topology-completion, deterministic-replay, contract, evaluator-seal, and
-preservation suites. The latest release coverage baseline is 80.2% after
-excluding generated protobuf bindings; the required threshold remains 75%.
-The maintenance PR records the final source-bound coverage proof.
-The 13-case installed-KiCad design-example tier was reproduced on 2026-09-08
+Last full bounded Go verification: 2026-09-09 at the clean V22 freeze commit
+`d3b6088fbaa4f318b5685d62c4fc83eeba3eb4a2`, including deterministic replay,
+historical/current seals, race, external-review regressions, and preservation
+suites. Generated-code-excluded coverage was 80.1%; the required threshold
+remains 75%. The historical release coverage baseline is 80.2%.
+Separate post-run publication audits authenticate the retained V22 evidence.
+See [local validation](../specs/post-topology-electrical-blockers/public-evaluation-v22/LOCAL_VALIDATION.md).
+The 13-case installed-KiCad design-example tier was reproduced on 2026-09-09
 with KiCad 10.0.3, satisfying every declared success or fail-closed expectation.
 Successful cases passed clean ERC, strict DRC, connectivity, route completion,
-writer correctness, and zero round-trip differences. The September 8
+writer correctness, and zero round-trip differences. The September 9
 six-scenario clean-checkout promotion bundle
-`sha256-414ba1137410bf295156d794e8853b88ee8717769af48940147a751f9aceefe0`
+`sha256-3ad771fdc66c1dc2326908a11853dd8af463277fb408d5c0ef3d64a8f58141e8`
 passed two full iterations (12 total runs) with identical normalized
 inventories and 286 independently authenticated files. The five educational
-schematic layout/library checks passed twice on September 8. Closed-loop
+schematic layout/library checks passed twice on September 9. Closed-loop
 candidate evaluation now follows a deterministic structural, DC, AC,
 transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
 budgets, bounded content-addressed reuse, and auditable conservative
@@ -99,6 +101,22 @@ V21 remains experimental and does not change the v1 supported surface. See the
 [maintenance audit](../specs/generic-causal-topology-repair/maintenance-evaluation-1/AUDIT.md)
 for remaining behavioral/topology blockers, retention limits, and disabled
 KiCad check categories in the frozen configuration.
+
+V22's post-topology electrical-repair evaluation completed all 24 cases twice on
+September 9. All outcomes, full replay hashes, and gate records match corrected
+V21: 1 pass, 6 unsupported, 1 unsafe, and 16 exhausted. Both installed-KiCad
+promotions preserve the existing project identity. The four selected cases
+produced zero additional complete passes: two were refused by the critical-failure
+guard, one exhausted its candidate-evaluation budget, and one exhausted its
+available repair frontier without reaching that budget. Generic control-terminal
+rebinding passes independent single/dual-monitor fixtures but has not demonstrated
+corpus improvement. V22 remains experimental; the goal is not achieved and v1 is
+unchanged. The [results](../specs/post-topology-electrical-blockers/publication-v22/RESULTS.md)
+distinguish those outcomes from preservation and local-test success. The frozen
+run took 4 h 51 min and hashed 121,026,790,256 canonical synthesis bytes without
+writing synthesis spools; the compact publication is 488,885 bytes, not a lossless
+copy of every numerical report. Memory use remains substantial and is documented
+separately in the [resource measurements](../specs/post-topology-electrical-blockers/publication-v22/PERFORMANCE_OBSERVATIONS.md).
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.
