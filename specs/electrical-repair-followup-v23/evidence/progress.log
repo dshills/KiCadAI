@@ -1,0 +1,7 @@
+=== RUN   TestFrozenResidualDiagnostic
+    diagnostic_test.go:150: v10_case_004: 0/0 authenticated trials; 0 invocations; 42.292µs
+    diagnostic_test.go:150: v10_case_017: 114/114 authenticated trials; 114 invocations; 8.594189625s
+    diagnostic_test.go:150: v10_case_018: 4/4 authenticated trials; 4 invocations; 223.193667ms
+    diagnostic_test.go:150: v10_case_021: 0/0 authenticated trials; 0 invocations; 39.958µs
+--- PASS: TestFrozenResidualDiagnostic (8.86s)
+PASS
