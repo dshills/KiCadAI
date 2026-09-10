@@ -1,0 +1,139 @@
+{
+  "schema": "kicadai.practical-board-evidence-inventory.v1",
+  "evidence_root": "/tmp/kicadai-practical-sensor-controller-public-1",
+  "source_commit": "eb78476cf585d80a50e38a24db9aa71daceb76b8",
+  "freeze_sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e",
+  "phase": "baseline",
+  "status": "interrupted_before_provider_response",
+  "authenticated_utc": "2026-09-10T18:00:33.947Z",
+  "exact_environment_credential_scan": "absent_from_all_retained_files_including_decompressed_library_index",
+  "file_count": 25,
+  "total_bytes": 61899789,
+  "files": [
+    {
+      "path": "baseline/P01/attempt-1.diagnostics.json",
+      "bytes": 5,
+      "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+    },
+    {
+      "path": "baseline/P01/attempt-1.error.json",
+      "bytes": 90,
+      "sha256": "e9082a56c86d75f8755fe9e7a2db6f22e2ef002cdb6f2b98a308578fc5824b26"
+    },
+    {
+      "path": "baseline/P01/attempt-1.metadata.json",
+      "bytes": 54,
+      "sha256": "63eec44ed6ce266eb14cd4ebd2e2fdaf43aca59d8cfe82957c96f695477a92bc"
+    },
+    {
+      "path": "baseline/P01/attempt-1.timing.json",
+      "bytes": 189,
+      "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92"
+    },
+    {
+      "path": "baseline/P01/case.json",
+      "bytes": 3261,
+      "sha256": "d393ef569200fd9f27b1a1073400efdadac5ef7c488cc83a2f4f42d986b7eab9"
+    },
+    {
+      "path": "baseline/P01/http-001.request.json",
+      "bytes": 28008,
+      "sha256": "10dc605976b78bd7ba5cbee26962b0ce772134fc0c6ff2e72d4d3c45a8c1404d"
+    },
+    {
+      "path": "baseline/P01/http-001.transport-error.json",
+      "bytes": 56,
+      "sha256": "5fb5c7470c89e2181ab78d8ffe59e6f2d899099bbf30ae9bcd9f34a8a39e7b5d"
+    },
+    {
+      "path": "baseline/P01/installed-capabilities.json",
+      "bytes": 3939,
+      "sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388"
+    },
+    {
+      "path": "baseline/P01/inventory.json",
+      "bytes": 1732,
+      "sha256": "855fade437df11c278cc0bf0b66f2df810a2b9d92e8c422e4f9045b9d87fe0d3"
+    },
+    {
+      "path": "baseline/P01/prompt.txt",
+      "bytes": 1969,
+      "sha256": "66fc1f6e9ae7cdcd73db1fa4d330f6aa6e5bf5292b5f2bd81ae0e4e507c9825f"
+    },
+    {
+      "path": "baseline/P01/provider-context.json",
+      "bytes": 8228,
+      "sha256": "d58ba2305d1f5c5968b6c03cd743de8efe81a2f9e0be21561464dd9d05bab5af"
+    },
+    {
+      "path": "baseline/P01/provider-schema.json",
+      "bytes": 57443,
+      "sha256": "6f235ffa26ab23b4d7fcb24d6b0e03875c11c64d1741a3228a42448ca38c33e4"
+    },
+    {
+      "path": "baseline/P01/result.json",
+      "bytes": 365,
+      "sha256": "e20c1cfdffdf78ab1bfc221d94fd3c331424844eb77946ac58c999e53052d9bf"
+    },
+    {
+      "path": "baseline/P01.resources.json",
+      "bytes": 238,
+      "sha256": "72f8c8ecadb0a12018bc80b8e7093ee7850208ab0007e09373e9f45b373c2962"
+    },
+    {
+      "path": "baseline/P01.worker.log",
+      "bytes": 25,
+      "sha256": "729efe1d0f5ebb788a9ec7ff0c855b047913a34a3f3a51d2476889b3f658975f"
+    },
+    {
+      "path": "baseline/campaign-end.json",
+      "bytes": 1896,
+      "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28"
+    },
+    {
+      "path": "baseline/campaign-start.json",
+      "bytes": 2261,
+      "sha256": "31889d9ef90f33dfa5a839ae29f74e9ee445034f0ef2868c86d29662e8a10821"
+    },
+    {
+      "path": "baseline/environment-snapshot/closed-loop-policy.json",
+      "bytes": 359,
+      "sha256": "be252478c2381ceead0276c92ca95e8b4f2f41280105cb5bb8750bd556d99845"
+    },
+    {
+      "path": "baseline/environment-snapshot/installed-capabilities.json",
+      "bytes": 3939,
+      "sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388"
+    },
+    {
+      "path": "baseline/environment-snapshot/library-index.json.gz",
+      "bytes": 61550498,
+      "sha256": "2c24d170ee803eff5c3a6f86be208c8305db2bb4ac1cb6384bdb461148a93225"
+    },
+    {
+      "path": "baseline/environment-snapshot/library-load-issues.json",
+      "bytes": 176896,
+      "sha256": "e07b760e0f755c9c532a61ca350976aba9aeb07c52c85f357a5d8ae1b2c81ba0"
+    },
+    {
+      "path": "baseline/environment-snapshot/provider-schema.json",
+      "bytes": 57443,
+      "sha256": "6f235ffa26ab23b4d7fcb24d6b0e03875c11c64d1741a3228a42448ca38c33e4"
+    },
+    {
+      "path": "baseline/environment-snapshot/snapshot.json",
+      "bytes": 532,
+      "sha256": "20985dd6f3e9144d436bfcbe2ae47ced89aae5155ba96f0bdf9961670672bc29"
+    },
+    {
+      "path": "request-journal/001.reservation.json",
+      "bytes": 265,
+      "sha256": "ff9a063c8c801d1eb06a6e4d3627962044b205706cc6c42cdac1eecf8e1ee421"
+    },
+    {
+      "path": "request-journal/001.usage.json",
+      "bytes": 98,
+      "sha256": "061265d039f1ce79e9353c18da97ad24b85bb4adff1b6d9f75ec6dafdae5a09e"
+    }
+  ]
+}

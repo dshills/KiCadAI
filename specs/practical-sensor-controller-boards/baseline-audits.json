@@ -1,0 +1,2532 @@
+{
+  "schema": "kicadai.practical-board-baseline-audit.v1",
+  "reviewer": "Codex task self_review",
+  "independence": "self_review; not external or blind",
+  "review_utc": "2026-09-10T18:01:43.909Z",
+  "review_elapsed_seconds": null,
+  "review_timing_limitation": "Separate active review timing was not captured; no complete-board or budget-complete campaign pass is claimed.",
+  "frozen_evaluator_sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e",
+  "evidence_inventory": "baseline-evidence-inventory.json",
+  "baseline_disposition": "incomplete_infrastructure_interruption",
+  "baseline_complete_passes": null,
+  "observed_complete_candidates": 0,
+  "improvement_scope_authorized": false,
+  "authentication": {
+    "case_inventory_verified": true,
+    "case_retained_file_count": 12,
+    "request_receipt_body_hash_verified": true,
+    "actual_request_strict_schema_settings_verified": true,
+    "freeze_files_verified_by_worker": true,
+    "clean_build_and_native_environment_verified_by_supervisor": true,
+    "whole_retained_tree_sha256_inventory": 25,
+    "exact_key_absent_from_raw_and_decompressed_evidence": true
+  },
+  "provider": {
+    "connection_attempts": 1,
+    "api_response_received": false,
+    "key_authentication": "not_tested",
+    "model_access": "not_tested",
+    "usage_available": false,
+    "estimated_or_reserved_usd": 0.45609600000000006,
+    "actual_billed_usd": null,
+    "corrections": 0,
+    "follow_up_turns": 0
+  },
+  "manual_assistance": {
+    "credential_reuse_approval_count": 1,
+    "manual_implementation_repairs": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "cases": [
+    {
+      "case_id": "P01",
+      "kind": "positive",
+      "disposition": "failed",
+      "first_failed_gate": "provider_connection",
+      "reason": "TCP connect timeout before any HTTP response; not an authentication/model/electrical result.",
+      "source_binding": {
+        "case.json": {
+          "file": "baseline/P01/case.json",
+          "sha256": "d393ef569200fd9f27b1a1073400efdadac5ef7c488cc83a2f4f42d986b7eab9"
+        },
+        "prompt.txt": {
+          "file": "baseline/P01/prompt.txt",
+          "sha256": "66fc1f6e9ae7cdcd73db1fa4d330f6aa6e5bf5292b5f2bd81ae0e4e507c9825f"
+        },
+        "result.json": {
+          "file": "baseline/P01/result.json",
+          "sha256": "e20c1cfdffdf78ab1bfc221d94fd3c331424844eb77946ac58c999e53052d9bf"
+        },
+        "inventory.json": {
+          "file": "baseline/P01/inventory.json",
+          "sha256": "855fade437df11c278cc0bf0b66f2df810a2b9d92e8c422e4f9045b9d87fe0d3"
+        }
+      },
+      "resource_binding": {
+        "file": "baseline/P01.resources.json",
+        "sha256": "72f8c8ecadb0a12018bc80b8e7093ee7850208ab0007e09373e9f45b373c2962"
+      },
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/0"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "On-board temperature AND humidity measurement, not an either/or substitution.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P02",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P02"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/1"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "No unrequested powered-off input operation or firmware/calibration claim.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P03",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P03"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/2"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P04",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P04"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/3"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "No claim to firmware protocol conversion or unpowered-interface operation.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P05",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P05"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/4"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "No inductive-load, energy-storage or firmware closed-loop claim.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P06",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P06"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/5"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P07",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P07"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/6"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "On-board temperature AND humidity sensor on internal 3.3 V 100 kHz/50 pF I2C and separate 5 V host 100 kHz/100 pF/3 mA I2C.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "Independent 3.15-3.45 V local and 4.75-5.25 V host supplies; host supply does not power local controller.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "Either supply absent: <=10 uA backfeed, no absolute-maximum violation, and powered idle-high bus is not clamped.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "Powered rising edges <=1 us; local ready output <=1 mA/20 pF; local source <=100 mA.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "P08",
+      "kind": "positive",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "P08"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/7"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "9-12 V input <=60 mA, derived 3.15-3.45 V controller rail, thermal limits at 50 degC ambient without forced airflow.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "4-20 mA ground-referenced input with <=0.25 V burden; ADC output 0.1-2.8 V, monotonic, >=1.5 V span and <1% span nonlinearity over DC-10 Hz.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "22 mA fault survives without damage or ADC overvoltage; selected ADC drive/settling qualified for <=100 sample/s.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "3.3 V UART 115200 baud/20 pF; no loop supply, firmware calibration or powered-off loop claim.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "N01",
+      "kind": "refusal",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "N01"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/8"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "unsupported_mains",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "N02",
+      "kind": "refusal",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "N02"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/9"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "contradictory_supply",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "N03",
+      "kind": "refusal",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "N03"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/10"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "unsupported_high_energy",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "N04",
+      "kind": "refusal",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "N04"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/11"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "unsupported_rf_assurance",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "C01",
+      "kind": "clarification",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "C01"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/12"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "supply_envelope",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "C02",
+      "kind": "clarification",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "C02"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/13"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "load_envelope",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "W01",
+      "kind": "paraphrase",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "W01"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/14"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "On-board temperature AND humidity measurement, not an either/or substitution.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    },
+    {
+      "case_id": "W02",
+      "kind": "paraphrase",
+      "disposition": "not_run",
+      "first_failed_gate": "not_run",
+      "reason": "Campaign stopped after the preregistered terminal provider timeout; this input was not attempted.",
+      "source_binding": {
+        "corpus": "corpus.json",
+        "case_or_paraphrase_id": "W02"
+      },
+      "resource_binding": null,
+      "campaign_binding": {
+        "file": "baseline/campaign-end.json",
+        "sha256": "0a8ead46cf027a70e26e86201dcaa4d4f9707069957988fe3910ca48e038ea28",
+        "json_pointer": "/outcomes/15"
+      },
+      "clauses": [
+        {
+          "number": 1,
+          "text": "External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 2,
+          "text": "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 3,
+          "text": "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 4,
+          "text": "No inductive-load, energy-storage or firmware closed-loop claim.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 5,
+          "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 6,
+          "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 7,
+          "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 8,
+          "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 9,
+          "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "number": 10,
+          "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "disposition": "not_run",
+          "reason": "No provider proposal or compiled requirement was produced for this input.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "component_model_qualification",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "electrical_analyses",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "schematic_readability",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "placement",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "routing_connectivity",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "native_validation_writer",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        },
+        {
+          "gate": "deterministic_replay",
+          "disposition": "not_run",
+          "reason": "Provider/compilation prerequisites were not reached.",
+          "evidence": {
+            "file": "baseline/P01/attempt-1.timing.json",
+            "sha256": "f13b211eaf5a22e2244519898e174fdf581abae6c67511d2beb1aa0e76dffa92",
+            "json_pointer": "/transport_or_preflight_error"
+          }
+        }
+      ],
+      "electrical_measurements": {
+        "assertion_id": null,
+        "observation": null,
+        "condition": null,
+        "actual": null,
+        "bound": null,
+        "unit": null,
+        "provenance": null,
+        "reason": "No electrical analysis ran; no electrical failure is inferred from the transport failure."
+      },
+      "manual_implementation_repairs": 0
+    }
+  ]
+}
