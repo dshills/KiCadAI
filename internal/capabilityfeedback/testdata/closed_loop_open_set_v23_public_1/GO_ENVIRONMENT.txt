@@ -1,0 +1,10 @@
+# Values recorded by the frozen invocation; empty values are intentional.
+# Original go env output SHA-256: ef079e97b42009115cf7cb10efb5f09c9c37c1bbb6a58dcddbc606b43dd07f11
+GOVERSION=go1.26.8
+GOOS=darwin
+GOARCH=arm64
+CGO_ENABLED=1
+GOENV=
+GOWORK=off
+GOFLAGS=
+GOEXPERIMENT=

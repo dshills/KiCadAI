@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-09-08
+Date: 2026-09-10
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -41,6 +41,16 @@ boundary remain unchanged. KiCadAI v1 is the deterministic pass-or-refuse CLI
 described in
 [`SUPPORT.md`](../SUPPORT.md); arbitrary-circuit generation and fabrication
 approval are not v1 claims.
+
+The separate V23 electrical-repair experiment is complete. Its bounded generic
+solver correction passed local preservation checks, but the frozen 24-case /
+two-replay public evaluation produced zero additional complete passes. Outcomes
+remain 1 pass, 6 unsupported, 1 unsafe, and 16 exhausted, with unchanged case
+objects, full synthesis replay hashes, and gate records relative to V22.
+The preservation criterion passes; the improvement criterion fails. The
+authenticated negative publication does not admit a new v1 capability or
+authorize another correction iteration. See the
+[V23 results](electrical-repair-followup-v23/publication-v23/RESULTS.md).
 
 ### Implemented Foundations
 

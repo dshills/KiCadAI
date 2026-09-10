@@ -1,0 +1,83 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "0d692cf45d0d5af725768e4b4dcbfa6c",
+  "repo": {
+    "root": "/private/tmp/kicadai-v23-final-clean",
+    "head": "16013c7d3f4e44ae8cfbda18be655c853ef8f111",
+    "branch": "HEAD"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 1,
+      "medium": 1,
+      "high": 0
+    },
+    "highestSeverity": "medium"
+  },
+  "findings": [
+    {
+      "id": "79a401309ebb3516",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Non-deterministic hash calculation for Issues",
+      "message": "The hash of the physical promotion identity depends on the order of 'Issues'. If the generator does not provide a deterministic order, the hash will change across runs even if the content is identical, breaking the stability of the sealed identity.",
+      "suggestion": "Sort the 'Issues' slice by a stable identifier (e.g., ID or alphabetical message) before computing the hash to ensure the output is deterministic.",
+      "confidence": 0.9,
+      "locations": [
+        {
+          "path": "pkg/promotion/report.go",
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        }
+      ],
+      "tags": [
+        "hashing",
+        "determinism"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "d5ac61e47924e65a",
+      "severity": "low",
+      "category": "performance",
+      "title": "Redundant file reads of METRICS.json in test loop",
+      "message": "The 'METRICS.json' file is read multiple times within a nested loop in 'TestPublishedV23Inventory' and is subsequently read again by 'verifyManifest'. This causes unnecessary I/O overhead.",
+      "suggestion": "Parse 'METRICS.json' once and pass the resulting object to 'verifyManifest' or cache the data to avoid redundant disk access.",
+      "confidence": 1,
+      "locations": [
+        {
+          "path": "test/e2e/inventory_test.go",
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        }
+      ],
+      "tags": [
+        "performance",
+        "test-optimization"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 41572,
+    "totalMs": 73634
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ]
+}
