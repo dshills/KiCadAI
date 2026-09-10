@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.practical-board-offline-verification.v1",
+  "verified_utc": "2026-09-10T18:23:25.773Z",
+  "reviewed_source_commit": "ee7c0f42c01a2520b3545d9b6cda26c1e0d62b2a",
+  "frozen_files_verified": 18,
+  "logs": [
+    {
+      "path": "offline-bounded-tests.log",
+      "bytes": 7942,
+      "sha256": "0555ca21d99bc4f125cc414171d3c3cd1fed2c2d880eeaa8f70d401ac8b03770"
+    },
+    {
+      "path": "offline-native-reference.log",
+      "bytes": 169,
+      "sha256": "a1d044e7112755a131e483f5f3db84ccb3978fbd8544d8d01e87db72bdc7d163"
+    }
+  ],
+  "live_reservations": 1,
+  "scope": "offline regressions and self-review only; live baseline remains interrupted",
+  "credential_environment_removed": [
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "ANTHROPIC_API_KEY"
+  ],
+  "environment": {
+    "GOTOOLCHAIN": "go1.26.8",
+    "GOENV": "off",
+    "GOWORK": "off",
+    "GOFLAGS": "",
+    "GOEXPERIMENT": "",
+    "CGO_ENABLED": "1",
+    "GOMAXPROCS": "4"
+  },
+  "bounded_tests": {
+    "command": "go test -short -p=1 -count=1 -timeout=15m ./...",
+    "exit_code": 0,
+    "total": 162,
+    "passed": 148,
+    "no_test_files": 14,
+    "package_set_matches_go_list": true,
+    "total_wall_seconds": null,
+    "total_wall_time_limitation": "Not separately measured; per-package elapsed times retained in complete result log.",
+    "longest_package": "kicadai/internal/opentopologysynthesis",
+    "longest_package_seconds": 674.389
+  },
+  "lint": {
+    "command": "golangci-lint run ./cmd/... ./internal/...",
+    "exit_code": 0,
+    "issues": 0
+  },
+  "native_reference": {
+    "command": "go test ./internal/practicalboardeval -run '^TestEvaluatorOptionalNativePlumbingControl$' -count=1 -v -timeout=11m",
+    "exit_code": 0,
+    "test_body_seconds": 45.13,
+    "package_seconds": 45.664,
+    "clean_replays": 2,
+    "normalized_evidence_sha256": "868e6d2425d21eb4122d0fb3bda6d078004e4f0288a7ef30e69163d82a98b4d8",
+    "output": "/tmp/kicadai-practical-native-plumbing-4",
+    "disk_usage_kib": 175144,
+    "concurrent_with_bounded_unit_suite": true,
+    "new_corpus_passes": 0
+  },
+  "archive_identity": "baseline-archive.json",
+  "production_changes": false,
+  "external_review_invoked": false,
+  "live_recovery_approved": false,
+  "overall_milestone_complete": false
+}

@@ -1,0 +1,4 @@
+=== RUN   TestEvaluatorOptionalNativePlumbingControl
+--- PASS: TestEvaluatorOptionalNativePlumbingControl (45.13s)
+PASS
+ok  	kicadai/internal/practicalboardeval	45.664s
