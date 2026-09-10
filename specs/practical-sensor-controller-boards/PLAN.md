@@ -1,7 +1,7 @@
 # Implementation plan
 
-Status: preparation, not frozen. No production behavior changes authorized by
-baseline evidence yet; no live requests have run.
+Status at acceptance freeze: preparation complete; baseline not yet run. No
+production behavior changes are authorized by baseline evidence yet.
 
 1. Verify merged main, isolate a `codex/` branch, and record API-key reuse consent.
 2. Prepare eight practical positive briefs, four refusals, two clarifications,

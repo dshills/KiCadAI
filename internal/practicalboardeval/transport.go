@@ -28,9 +28,9 @@ type Reservation struct {
 }
 
 type Reconciliation struct {
-	Usage                aiprovider.Usage `json:"usage"`
-	ChargedOrReservedUSD float64          `json:"charged_or_reserved_usd"`
-	UsageAvailable       bool             `json:"usage_available"`
+	Usage                  aiprovider.Usage `json:"usage"`
+	EstimatedOrReservedUSD float64          `json:"estimated_or_reserved_usd"`
+	UsageAvailable         bool             `json:"usage_available"`
 }
 
 func Reserve(root, campaign, caseID string, body []byte) (Reservation, error) {
@@ -58,7 +58,7 @@ func Reserve(root, campaign, caseID string, body []byte) (Reservation, error) {
 		usagePath := strings.TrimSuffix(path, ".reservation.json") + ".usage.json"
 		var reconciled Reconciliation
 		if err := ReadJSON(usagePath, &reconciled); err == nil {
-			cost = reconciled.ChargedOrReservedUSD
+			cost = reconciled.EstimatedOrReservedUSD
 		} else if !os.IsNotExist(err) {
 			return Reservation{}, err
 		}
@@ -79,13 +79,14 @@ func Reserve(root, campaign, caseID string, body []byte) (Reservation, error) {
 }
 
 type RecordingTransport struct {
-	Base     http.RoundTripper
-	Journal  string
-	Output   string
-	Campaign string
-	CaseID   string
-	Secret   string
-	Last     *Reservation
+	Base      http.RoundTripper
+	Journal   string
+	Output    string
+	Campaign  string
+	CaseID    string
+	Secret    string
+	Last      *Reservation
+	LastError string
 }
 
 var keyPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]+`)
@@ -97,8 +98,14 @@ func Redact(data []byte, secret string) []byte {
 	return keyPattern.ReplaceAll(data, []byte("<redacted>"))
 }
 
-func (r *RecordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (r *RecordingTransport) RoundTrip(req *http.Request) (_ *http.Response, returnedErr error) {
 	r.Last = nil
+	r.LastError = ""
+	defer func() {
+		if returnedErr != nil {
+			r.LastError = string(Redact([]byte(returnedErr.Error()), r.Secret))
+		}
+	}()
 	if req.Method != http.MethodPost || req.URL.Scheme != "https" || req.URL.Host != "api.openai.com" || req.URL.Path != "/v1/responses" || req.URL.RawQuery != "" || req.URL.User != nil {
 		return nil, fmt.Errorf("unapproved evaluation endpoint")
 	}
@@ -108,6 +115,9 @@ func (r *RecordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	}
 	if err := req.Body.Close(); err != nil {
 		return nil, err
+	}
+	if len(body) == 0 || len(body) > MaxRequestBytes {
+		return nil, fmt.Errorf("request byte cap exceeded: %d", len(body))
 	}
 	// This asserts the actual client request, not merely the intended settings.
 	var config struct {

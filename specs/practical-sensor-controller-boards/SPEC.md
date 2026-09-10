@@ -1,7 +1,8 @@
 # Practical AI-generated sensor/controller boards
 
 Date: 2026-09-10
-Status: preparation; NOT FROZEN; no evaluation or live requests yet
+Status: acceptance frozen by the companion `freeze.json`; zero corpus executions
+or live requests occurred before sealing these bytes.
 
 ## Objective and authority
 
@@ -41,6 +42,10 @@ the corpus, feasibility review, evaluator source/tests, commands and toolchain
 inventory. A separate freeze record binds the production commit, evaluator
 commit, catalog/model/library identities and every acceptance file. Preparation
 tests use synthetic evaluator inputs only, never the candidate corpus.
+`QUALITY.md` specifies evidence grain, missing-data treatment and the sole
+library-identity normalization (collection timestamp only). `environment.json`
+pins the installed tools, baseline snapshot and unchanged closed-loop policy.
+The supervisor checks these identities before dispatching any provider request.
 
 Build executable workers with
 `-ldflags '-X kicadai/internal/practicalboardeval.FreezeSHA256=<freeze-file-sha256>'`.
@@ -195,3 +200,37 @@ per-case provider/resource/assistance metrics, reproduction instructions,
 inventory, review dispositions and a reviewed PR. A negative final result is
 published honestly with exact blockers; it does not authorize another correction
 cycle. No merge, release, fabrication approval or stable-support admission.
+
+## Pinned reproduction and verification commands
+
+Run from the repository root with `GOTOOLCHAIN=go1.26.8`, `GOENV=off`,
+`GOWORK=off`, empty `GOFLAGS`/`GOEXPERIMENT`, `CGO_ENABLED=1`, `GOMAXPROCS=4`,
+`GOCACHE=$PWD/.cache/go/build`, `GOMODCACHE=$PWD/.cache/go/mod`, and
+`GOLANGCI_LINT_CACHE=$PWD/.cache/golangci-lint`. Native commands require the
+CLI, symbols and footprints paths recorded in `environment.json` in
+`KICADAI_KICAD_CLI`, `KICADAI_SYMBOLS_ROOT`, `KICADAI_FOOTPRINTS_ROOT`.
+No other capability/model/catalog/library overrides are permitted.
+
+```sh
+go test -race ./internal/practicalboardeval ./cmd/practical-board-eval -count=1
+node --test specs/practical-sensor-controller-boards/evidence-utils.test.mjs
+node --check specs/practical-sensor-controller-boards/run-campaign.mjs
+go test -short -p=1 -count=1 -timeout=15m ./...
+golangci-lint run ./cmd/... ./internal/...
+```
+
+The final native regression command is
+`go test ./internal/practicalboardeval -run '^TestEvaluatorOptionalNativePlumbingControl$' -count=1 -v -timeout=11m`
+with `KICADAI_PRACTICAL_EVAL_SELFTEST=1` and a fresh
+`KICADAI_PRACTICAL_EVAL_SELFTEST_OUTPUT` outside historical evidence. It covers
+the existing regulated MCU/sensor subsystem twice, including power, simulation,
+schematic, routing and native writer/round-trip checks. Any additional regression
+needed for a scoped fix must be named in the pre-implementation scope decision;
+it cannot replace or weaken these required checks.
+
+Build with the embedded freeze hash as above into a new binary path. The single
+shared campaign root is `/tmp/kicadai-practical-sensor-controller-public-1`.
+Invoke `node specs/practical-sensor-controller-boards/run-campaign.mjs` with four
+arguments: absolute worker binary, absolute repository root, that campaign root,
+and `baseline`, `final`, or `paired`. Preserve all phase directories and the
+shared request journal. Never repeat a completed or interrupted live phase.

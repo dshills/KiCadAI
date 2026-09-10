@@ -1,8 +1,9 @@
 # Pre-evaluation feasibility review
 
 Date: 2026-09-10. Reviewer: the implementing Codex agent (self-review, not an
-independent engineer). Status: electrical consistency reviewed; final evaluator
-and environment freeze still pending. No corpus case has been executed.
+independent engineer). Status at sealing: electrical consistency reviewed;
+evaluator and environment bound by the companion freeze. No corpus case had
+been executed when these bytes were sealed.
 
 ## Meaning of this review
 

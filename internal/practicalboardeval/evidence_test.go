@@ -189,3 +189,35 @@ func TestFreezeDetectsMutation(t *testing.T) {
 		t.Fatal("escaping path accepted")
 	}
 }
+
+func TestPairedInventoryRejectsChangedOrAddedFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := WriteNew(filepath.Join(root, "prompt.txt"), []byte("synthetic")); err != nil {
+		t.Fatal(err)
+	}
+	files, err := Inventory(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSON(filepath.Join(root, "inventory.json"), files); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyInventory(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteNew(filepath.Join(root, "unrecorded.json"), []byte("{}")); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyInventory(root); err == nil {
+		t.Fatal("unrecorded paired evidence accepted")
+	}
+	if err := os.Remove(filepath.Join(root, "unrecorded.json")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "prompt.txt"), []byte("modified"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyInventory(root); err == nil {
+		t.Fatal("modified paired input accepted")
+	}
+}

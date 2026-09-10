@@ -1,6 +1,6 @@
 # Frozen adjudication procedure
 
-Status: draft, to be sealed with the evaluator before the baseline.
+Status: frozen by the companion `freeze.json` before the baseline.
 
 The automated runner intentionally reports candidates, not complete passes.
 The following read-only adjudication is part of the evaluator. It cannot be

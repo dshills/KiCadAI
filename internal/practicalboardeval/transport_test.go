@@ -63,7 +63,7 @@ func TestSpendCapAndMissingUsageStayConservative(t *testing.T) {
 	if err := ReadJSON(filepath.Join(root, "001.usage.json"), &reconciled); err != nil {
 		t.Fatal(err)
 	}
-	if reconciled.UsageAvailable || reconciled.ChargedOrReservedUSD != first.ReservedUSD {
+	if reconciled.UsageAvailable || reconciled.EstimatedOrReservedUSD != first.ReservedUSD {
 		t.Fatal("missing usage released the reservation")
 	}
 	if err := WriteJSON(filepath.Join(root, "002.reservation.json"), Reservation{Number: 2, Campaign: "baseline", ReservedUSD: MaxSpendUSD}); err != nil {
@@ -83,6 +83,9 @@ func TestUnsafeEndpointCannotDispatch(t *testing.T) {
 	}
 	if _, err := r.RoundTrip(req); err == nil || called {
 		t.Fatal("unapproved endpoint reached transport")
+	}
+	if r.LastError != "unapproved evaluation endpoint" || r.Last != nil {
+		t.Fatal("local rejection did not retain its reason")
 	}
 }
 

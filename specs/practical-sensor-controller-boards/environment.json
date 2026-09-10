@@ -1,0 +1,33 @@
+{
+  "node": "v26.8.2",
+  "node_binary_sha256": "902b6a6984d5d825829ea9064ab73b734548df37bc0683990dca31c8dc2a9253",
+  "platform": "darwin",
+  "arch": "arm64",
+  "go_version": "go1.26.8",
+  "kicad_cli": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+  "kicad_version": "10.0.3",
+  "kicad_binary_sha256": "cc5433d3b41421a4cba065f291aeeb1c5fa69c7a10305a3dc28854f4e6d69534",
+  "symbols_root": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+  "footprints_root": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+  "resource_policy": {
+    "sample_ms": 1000,
+    "case_wall_seconds": 1200,
+    "campaign_wall_seconds": 7200,
+    "process_tree_rss_bytes": 17179869184,
+    "evidence_bytes": 10737418240
+  },
+  "baseline_snapshot": {
+    "capabilities_bytes": 3939,
+    "capabilities_sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388",
+    "catalog_sha256": "f1debbcc174b7ccdaecf7b32cf45afe8e0cf16c916a3f4aac42f4b7698750154",
+    "library_footprints": 15433,
+    "library_index_sha256": "73b910723d12541ebe1ad6a086fc2ef7f029b2e5fa7263d3853ec88086f8203d",
+    "library_symbols": 22730,
+    "live_requests": 0,
+    "max_output_tokens": 16384,
+    "model": "gpt-5.6-sol",
+    "models_sha256": "23d562a3902987bcda8fd966e1a47e8caded66c3f92f0addfdea00a839a38208"
+  },
+  "closed_loop_policy_sha256": "be252478c2381ceead0276c92ca95e8b4f2f41280105cb5bb8750bd556d99845",
+  "preparation_snapshot_path": "/tmp/kicadai-practical-board-preparation-snapshot-3"
+}

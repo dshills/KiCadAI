@@ -229,9 +229,28 @@ func Inventory(root string) ([]FileRecord, error) {
 }
 
 type Freeze struct {
-	Schema         string       `json:"schema"`
-	BaselineCommit string       `json:"baseline_commit"`
-	Files          []FileRecord `json:"files"`
+	Schema          string       `json:"schema"`
+	BaselineCommit  string       `json:"baseline_commit"`
+	EvaluatorCommit string       `json:"evaluator_commit"`
+	Files           []FileRecord `json:"files"`
+}
+
+// VerifyInventory binds paired inputs to every retained baseline file. The
+// inventory itself is bound separately by the campaign publication inventory.
+func VerifyInventory(root string) error {
+	var expected []FileRecord
+	if err := ReadJSON(filepath.Join(root, "inventory.json"), &expected); err != nil {
+		return err
+	}
+	actual, err := Inventory(root)
+	if err != nil {
+		return err
+	}
+	actual = slices.DeleteFunc(actual, func(r FileRecord) bool { return r.Path == "inventory.json" })
+	if !slices.Equal(expected, actual) {
+		return fmt.Errorf("retained inventory mismatch")
+	}
+	return nil
 }
 
 func VerifyFreeze(root string, freeze Freeze) error {

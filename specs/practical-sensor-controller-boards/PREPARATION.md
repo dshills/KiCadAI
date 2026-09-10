@@ -1,6 +1,7 @@
 # Preparation log
 
-Status: NOT FROZEN. Zero new-corpus executions and zero live OpenAI requests.
+Status at sealing: preparation complete. Zero new-corpus executions and zero
+live OpenAI requests occurred before the companion freeze was committed.
 
 ## Completed preparation
 
@@ -54,15 +55,23 @@ All three preparation control directories are retained. None is counted as a
 new capability pass. Preparation corrections precede the acceptance freeze;
 they do not authorize post-freeze evaluator changes or final-result retries.
 
-## Still required before baseline execution
+## Final freeze preparation
 
-- Finish evaluator/supervisor review and negative tests, including source,
-  toolchain and environment binding and missing/partial evidence behavior.
-- Pin the exact installed KiCad/library/model/catalog and Go/Node environment.
-- Resolve remaining draft semantics and verify corpus byte/denominator seals.
-- Commit and seal the complete evaluator, corpus, SPEC, scoring and environment.
-- Build the baseline evaluator from that commit, verify production equality
-  with merged main and run the single authorized baseline campaign.
+The evidence-quality review added authenticated paired-input inventories,
+per-attempt elapsed times and local rejection reasons, precise estimated-cost
+labels, clean-build/current-source checks, native environment identities and
+synthetic process-monitor tests. The final focused race tests passed (1.717 s),
+focused lint reported zero issues, and all three Node test groups passed.
+Syntax and whitespace checks passed. Only evaluator/docs changed.
+
+Snapshot 3 records 22,730 symbols and 15,433 footprints with full compressed
+library evidence, baseline catalog/model/capability identities and closed-loop
+policy. `environment.json` pins those identities plus Go 1.26.8, Node 26.8.2 and
+KiCad 10.0.3 binary identities. `QUALITY.md` resolves steady-state rail-window
+semantics and independently audited physical constraints before any outcomes.
+
+The next action is to commit/seal these bytes, build the exact sealed worker,
+verify production equality with merged main, and run the one baseline campaign.
 
 Production improvements, the new baseline, final/paired evaluation, acceptance
 audits, capability-growth claims and PR publication are not complete.

@@ -102,7 +102,7 @@ func Snapshot(ctx context.Context, output string) error {
 	if err := WriteJSON(filepath.Join(output, "library-load-issues.json"), append(rootIssues, loadIssues...)); err != nil {
 		return err
 	}
-	indexJSON, err := json.Marshal(index)
+	indexHash, err := LibraryIdentity(index)
 	if err != nil {
 		return err
 	}
@@ -110,8 +110,19 @@ func Snapshot(ctx context.Context, output string) error {
 		"catalog_sha256": e.resolver.CatalogHash(), "models_sha256": e.modelHash,
 		"capabilities_sha256": SHA(e.capabilities), "capabilities_bytes": len(e.capabilities),
 		"model": Model, "max_output_tokens": MaxOutputTokens, "live_requests": 0,
-		"library_index_sha256": SHA(indexJSON), "library_symbols": len(index.Symbols), "library_footprints": len(index.Footprints),
+		"library_index_sha256": indexHash, "library_symbols": len(index.Symbols), "library_footprints": len(index.Footprints),
 	})
+}
+
+// LibraryIdentity removes only the index collection timestamp. Full raw
+// collection evidence is retained separately, including that timestamp.
+func LibraryIdentity(index libraryresolver.LibraryIndex) (string, error) {
+	index.GeneratedAt = time.Time{}
+	data, err := json.Marshal(index)
+	if err != nil {
+		return "", err
+	}
+	return SHA(data), nil
 }
 
 type RunOptions struct {
@@ -188,6 +199,16 @@ func RunCase(ctx context.Context, item Case, opts RunOptions) (returnedErr error
 	if opts.PairedInput == "" {
 		proposal, compilation, summary.ProviderAttempts, err = e.generate(ctx, item.Prompt, opts.Output, opts, item.ID, nil)
 	} else {
+		if err := VerifyInventory(opts.PairedInput); err != nil {
+			return fmt.Errorf("paired baseline authentication: %w", err)
+		}
+		inventoryBytes, readErr := os.ReadFile(filepath.Join(opts.PairedInput, "inventory.json"))
+		if readErr != nil {
+			return readErr
+		}
+		if err := WriteJSON(filepath.Join(opts.Output, "paired-source.json"), map[string]string{"source": opts.PairedInput, "inventory_sha256": SHA(inventoryBytes)}); err != nil {
+			return err
+		}
 		originalPrompt, readErr := os.ReadFile(filepath.Join(opts.PairedInput, "prompt.txt"))
 		if readErr != nil {
 			return readErr
@@ -358,8 +379,13 @@ func (e *engine) generate(ctx context.Context, prompt, output string, opts RunOp
 	var diagnostics []aiprovider.Diagnostic
 	for attempt := 1; attempt <= 2; attempt++ {
 		recorder.Last = nil // A client-side validation error must not reuse an earlier receipt.
+		recorder.LastError = ""
+		started := time.Now()
 		result, providerErr := provider.GenerateIntent(ctx, aiprovider.GenerateRequest{Prompt: prompt, CapabilityContext: contextJSON, OutputSchemaName: profile.SchemaName, OutputSchema: profile.IntentEnvelopeSchema(), SchemaVersion: aiprovider.EnvelopeSchemaV1, Attempt: attempt, Diagnostics: diagnostics, MaxOutputTokens: MaxOutputTokens})
 		prefix := filepath.Join(output, fmt.Sprintf("attempt-%d", attempt))
+		if err := WriteJSON(prefix+".timing.json", map[string]any{"started_utc": started.UTC().Format(time.RFC3339Nano), "wall_seconds": time.Since(started).Seconds(), "reservation_created": recorder.Last != nil, "transport_or_preflight_error": recorder.LastError}); err != nil {
+			return behavioralintent.Proposal{}, behavioralintent.Result{}, attempt, err
+		}
 		usage := result.Usage
 		var typedErr *aiprovider.ProviderError
 		if errors.As(providerErr, &typedErr) {

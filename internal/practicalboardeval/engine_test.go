@@ -9,8 +9,28 @@ import (
 	"time"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
+
+func TestLibraryIdentityIgnoresOnlyCollectionTime(t *testing.T) {
+	first := libraryresolver.LibraryIndex{GeneratedAt: time.Unix(1, 0)}
+	second := first
+	second.GeneratedAt = time.Unix(2, 0)
+	a, err := LibraryIdentity(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := LibraryIdentity(second)
+	if err != nil || a != b {
+		t.Fatalf("collection clock changed identity: %v", err)
+	}
+	second.Roots.SymbolsRoot = "different-library"
+	b, err = LibraryIdentity(second)
+	if err != nil || a == b {
+		t.Fatalf("library change escaped identity: %v", err)
+	}
+}
 
 // This pre-freeze plumbing control is NOT a member of the new corpus and is
 // never counted as a new board. It reads an existing regression requirement
