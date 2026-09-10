@@ -1,0 +1,82 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "c0d3d280e6e191f14dd2b2a7a89eac83",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "16013c7d3f4e44ae8cfbda18be655c853ef8f111",
+    "branch": "codex/electrical-repair-followup-v23"
+  },
+  "inputs": {
+    "mode": "unstaged"
+  },
+  "summary": {
+    "counts": {
+      "low": 1,
+      "medium": 1,
+      "high": 0
+    },
+    "highestSeverity": "medium"
+  },
+  "findings": [
+    {
+      "id": "0780cc6b54686247",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Possible version mismatch in repair limits check",
+      "message": "The validation check compares 'repair.Limits' against 'ot.DefaultElectricalRepairLimitsV22()', despite the schema being explicitly checked as 'kicadai.electrical-repair.v23'. This may cause validation failures if the specification limits were updated for v23.",
+      "suggestion": "Verify if 'ot.DefaultElectricalRepairLimitsV23()' should be used instead of 'V22'.",
+      "confidence": 0.8,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/evidence_test.go",
+          "lines": {
+            "start": 116,
+            "end": 116
+          }
+        }
+      ],
+      "tags": [
+        "v23",
+        "logic-error"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "3c5b111d8043770c",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Combined validation checks obscure failure reasons",
+      "message": "Multiple distinct fields (identity hash, schema, requirement hash, limits, and policy IDs) are checked in a single conditional block. If the test fails, the generic error message does not specify which condition was violated, making debugging difficult.",
+      "suggestion": "Split the validation into individual checks with specific error messages for each field.",
+      "confidence": 0.9,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/evidence_test.go",
+          "lines": {
+            "start": 110,
+            "end": 120
+          }
+        }
+      ],
+      "tags": [
+        "testing"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 41831,
+    "totalMs": 53631
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ]
+}

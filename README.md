@@ -143,6 +143,16 @@ does not expand v1. See the [root-cause report](specs/post-topology-electrical-b
 [negative evaluation result](specs/post-topology-electrical-blockers/publication-v22/RESULTS.md),
 and [timing/evidence-size observations](specs/post-topology-electrical-blockers/publication-v22/PERFORMANCE_OBSERVATIONS.md).
 
+V23 then isolated a generic stale op-amp clamp defect and added a bounded,
+version-isolated solver correction. Its separate frozen evaluation completed
+all 24 cases twice on September 10: 1 pass, 6 unsupported, 1 unsafe, and 16
+exhausted, with no additional complete passes. All case outcomes, full synthesis
+replay hashes, and gate records match V22; the existing KiCad-backed pass and
+safety outcomes are preserved. The complete retained evidence is authenticated,
+but the capability-improvement criterion was not met. V23 remains experimental
+and does not expand v1. See the [final results](specs/electrical-repair-followup-v23/publication-v23/RESULTS.md)
+and [validation](specs/electrical-repair-followup-v23/publication-v23/LOCAL_VALIDATION.md).
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.

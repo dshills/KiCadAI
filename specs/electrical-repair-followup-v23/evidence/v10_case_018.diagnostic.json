@@ -1,0 +1,539 @@
+{
+  "schema": "kicadai.residual-electrical-diagnostic.v23",
+  "case": "v10_case_018",
+  "source_trace_sha256": "36fe470161691ebc90af85558082aefbe3db7028dd88bcbd3758e9f4ca63e7d9",
+  "repair_sha256": "81f8f5cf496a62ed4f27f9fcfa8278b8306d410b233ec3a03330f3ba553107c2",
+  "initial_failure": {
+    "attempt": 1,
+    "stage": "electrical_assertion",
+    "assertion": "a_output_noise",
+    "analysis": "noise",
+    "metric": "output_noise_rms",
+    "operating_case": "nominal_transfer",
+    "corner": "nominal",
+    "workflow": "linear_circuit_mna_v1",
+    "plan_sha256": "deb91d028b42c615e59d16659735ee41d962de95bc7d757194289e817cb6e371",
+    "report_sha256": "bdf93111732e93b32d496c9c0c67158f8e6392c2cc231abb5de5f2a11a1b933b",
+    "model_evidence_sha256": [
+      "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+      "33512ff9b8a0ba2e7dff9952ec61716f338a60120ab63236affd4b0d04654e74",
+      "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+      "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+      "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "641da0614a589bc692d45d0cfd55595e7207a9117b2dc60fee4e9bc3795f863c",
+      "6601aea45719f5f2f03ed65d850cad5f61ef52a7d274653274001aed4994cc20",
+      "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+      "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+      "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+      "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+      "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+      "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+      "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+      "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+      "dfd2804e2dce498dcbc8a1402000f81b91a8113b18d354a54a83d13baac1b39e",
+      "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+      "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+    ],
+    "actual": 0.005277330782123311,
+    "maximum": 0.002,
+    "diagnostics": [
+      {
+        "code": "simulation_invalid",
+        "path": "assertions.nominal_transfer_a_output_noise.port_conditioned_output.integrated_noise_v_rms",
+        "message": "measured 0.00527733078212 is outside trusted bounds -1e+12..0.002",
+        "suggestion": "adjust catalog-backed component values, connectivity, or bounded analysis conditions"
+      }
+    ]
+  },
+  "v22_stop_reason": "repair_frontier_exhausted",
+  "trials": [
+    {
+      "trial": {
+        "number": 1,
+        "depth": 1,
+        "parent_graph_sha256": "047f70286c802fb0401da80dc7c30adfc849bd4f3012949fe242aa41192363e6",
+        "graph_sha256": "052b2c3e6ed815e8fd21ffb57353ae5802b762c0aa8a18a5f24b4dc8336d6cc5",
+        "evaluation_sha256": "feec5f5e7a2759508ab36c0464990d99a98b1ce0d760ca33d69d441644132b29",
+        "change": {
+          "kind": "redirect_terminal",
+          "primitive": "primitive_000",
+          "terminal": "IN_MINUS",
+          "from_node": "port_signal_input",
+          "to_node": "port_conditioned_output"
+        },
+        "status": "failed",
+        "passing_assertions": 2,
+        "continuable": true
+      },
+      "policy": {
+        "max_expanded_states": 20000,
+        "max_generated_graphs": 50000,
+        "max_primitive_instances": 32,
+        "max_internal_nodes": 32,
+        "max_candidate_simulations": 128,
+        "max_corner_evaluations": 4096,
+        "max_value_trials": 4096,
+        "max_topology_repairs": 128,
+        "max_retained_candidates": 16,
+        "max_diagnostic_samples": 32
+      },
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "feec5f5e7a2759508ab36c0464990d99a98b1ce0d760ca33d69d441644132b29",
+        "requirement_sha256": "8813f80bd3b8ca0f63442a06b3a81c40de45e6889ba947741acacbb48c90f497",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "052b2c3e6ed815e8fd21ffb57353ae5802b762c0aa8a18a5f24b4dc8336d6cc5",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 3,
+          "corner_evaluations": 17,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 3,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          },
+          {
+            "key": "passed",
+            "count": 2
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "solver/nonconvergent",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 3,
+          "stage": "solver",
+          "assertion": "b_transfer_gain",
+          "analysis": "dc_sweep",
+          "metric": "voltage_gain",
+          "operating_case": "nominal_transfer",
+          "corner": "nominal",
+          "workflow": "linear_circuit_mna_v1",
+          "plan_sha256": "cf930eae2e62c151beb90b268cbdd0499916b58442cf1aa7d8b6f0cc8f4f08a3",
+          "report_sha256": "bdf20fb4232df5a102a640a73077eb30898aa32199c1b2426e8ad31240cf9240",
+          "model_evidence_sha256": [
+            "0a5f1ea9c8d64bae5c8108aa96fa45e7a5b27d452e8df3629ceabe7e307c2b7f",
+            "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+            "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+            "33512ff9b8a0ba2e7dff9952ec61716f338a60120ab63236affd4b0d04654e74",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "4710633f28afb52e93954f3c15e64e1339ed176f93bc67ec96f136d6a66b0b30",
+            "6601aea45719f5f2f03ed65d850cad5f61ef52a7d274653274001aed4994cc20",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+            "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "dfd2804e2dce498dcbc8a1402000f81b91a8113b18d354a54a83d13baac1b39e",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+          ],
+          "minimum": 0.98,
+          "maximum": 1.02,
+          "diagnostics": [
+            {
+              "code": "nonconvergent",
+              "path": "devices",
+              "message": "bounded op-amp operating-point states did not converge",
+              "suggestion": "correct ambiguous positive feedback or add catalog-backed hysteresis and loading"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "nonconvergent",
+            "requirement_id": "b_transfer_gain",
+            "operating_case": "nominal_transfer/nominal",
+            "analysis": "dc_sweep",
+            "metric": "voltage_gain",
+            "direction": "",
+            "required_min": 0.98,
+            "required_max": 1.02,
+            "affected_cone_hash": "052b2c3e6ed815e8fd21ffb57353ae5802b762c0aa8a18a5f24b4dc8336d6cc5",
+            "evidence_hash": "a8f463ec8e438ed3ef811119d938eff5930741c2d4ffb890a6150ee4d96ffad3",
+            "message": "bounded op-amp operating-point states did not converge"
+          }
+        ],
+        "hash": "badbf8b8b3124494b6c79fc21021615a6e110cb02e52f1c5dbdb612caeb064e2"
+      }
+    },
+    {
+      "trial": {
+        "number": 2,
+        "depth": 1,
+        "parent_graph_sha256": "047f70286c802fb0401da80dc7c30adfc849bd4f3012949fe242aa41192363e6",
+        "graph_sha256": "0d36c595a1a9c9370200b83102a954b69c9b4f5e8d078acb755a00ff59371617",
+        "evaluation_sha256": "abe19bfa2e56fed72119e20b688eff591bccb5fcc0ef039dfd829a5175eff2bf",
+        "change": {
+          "kind": "redirect_terminal",
+          "primitive": "primitive_000",
+          "terminal": "IN_PLUS",
+          "from_node": "port_signal_input",
+          "to_node": "port_conditioned_output"
+        },
+        "status": "failed",
+        "passing_assertions": 0,
+        "continuable": true
+      },
+      "policy": {
+        "max_expanded_states": 20000,
+        "max_generated_graphs": 50000,
+        "max_primitive_instances": 32,
+        "max_internal_nodes": 32,
+        "max_candidate_simulations": 125,
+        "max_corner_evaluations": 4079,
+        "max_value_trials": 4096,
+        "max_topology_repairs": 128,
+        "max_retained_candidates": 16,
+        "max_diagnostic_samples": 32
+      },
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "abe19bfa2e56fed72119e20b688eff591bccb5fcc0ef039dfd829a5175eff2bf",
+        "requirement_sha256": "8813f80bd3b8ca0f63442a06b3a81c40de45e6889ba947741acacbb48c90f497",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "0d36c595a1a9c9370200b83102a954b69c9b4f5e8d078acb755a00ff59371617",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 1,
+          "corner_evaluations": 1,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 1,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "solver/unstable",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 1,
+          "stage": "solver",
+          "assertion": "a_output_noise",
+          "analysis": "noise",
+          "metric": "output_noise_rms",
+          "operating_case": "nominal_transfer",
+          "corner": "nominal",
+          "workflow": "linear_circuit_mna_v1",
+          "plan_sha256": "40d6e3205e2e94bb376c618d62febcac3484ae5d8abe9d51e63bd58d4a2d3fc2",
+          "report_sha256": "c25548e13500d93bffb62577a02aa55d6d74b16b3069b32d5d1549c8059c3164",
+          "model_evidence_sha256": [
+            "13058c24aa18282c356a2a06b078e4e718fe931c44abff2363ed802b6ab7567d",
+            "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+            "33512ff9b8a0ba2e7dff9952ec61716f338a60120ab63236affd4b0d04654e74",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "6601aea45719f5f2f03ed65d850cad5f61ef52a7d274653274001aed4994cc20",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+            "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "dfd2804e2dce498dcbc8a1402000f81b91a8113b18d354a54a83d13baac1b39e",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+          ],
+          "maximum": 0.002,
+          "diagnostics": [
+            {
+              "code": "unstable",
+              "path": "devices.primitive_000.stability",
+              "message": "catalog single-pole op-amp has unstable positive feedback (DC loop gain 12589254.1179)",
+              "suggestion": "reverse the feedback polarity or provide catalog-supported stable compensation"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "unstable",
+            "requirement_id": "a_output_noise",
+            "operating_case": "nominal_transfer/nominal",
+            "analysis": "noise",
+            "metric": "output_noise_rms",
+            "direction": "",
+            "required_max": 0.002,
+            "affected_cone_hash": "0d36c595a1a9c9370200b83102a954b69c9b4f5e8d078acb755a00ff59371617",
+            "evidence_hash": "a343efe4fed91f826f2e1700a6560af0526b50c2264af77717c8df36b0fa2f8b",
+            "message": "catalog single-pole op-amp has unstable positive feedback (DC loop gain 12589254.1179)"
+          }
+        ],
+        "hash": "ae31a37b30a06ab21aa5ddf0b35be1aefb3f313ba2efcce0c4c883d2f694b1dd"
+      }
+    },
+    {
+      "trial": {
+        "number": 3,
+        "depth": 1,
+        "parent_graph_sha256": "047f70286c802fb0401da80dc7c30adfc849bd4f3012949fe242aa41192363e6",
+        "graph_sha256": "e5c57542fbb28486507e9d68b1bfff23ff4a53ada7f99a4fe4889960cacf9151",
+        "evaluation_sha256": "062a0d298062e6d581d080f010ea5a52ed0bbf116c18b346b7abe1f67aa5e991",
+        "change": {
+          "kind": "redirect_terminal",
+          "primitive": "primitive_000",
+          "terminal": "IN_PLUS",
+          "from_node": "port_signal_input",
+          "to_node": "port_return_terminal"
+        },
+        "status": "failed",
+        "passing_assertions": 0,
+        "continuable": true
+      },
+      "policy": {
+        "max_expanded_states": 20000,
+        "max_generated_graphs": 50000,
+        "max_primitive_instances": 32,
+        "max_internal_nodes": 32,
+        "max_candidate_simulations": 124,
+        "max_corner_evaluations": 4078,
+        "max_value_trials": 4096,
+        "max_topology_repairs": 128,
+        "max_retained_candidates": 16,
+        "max_diagnostic_samples": 32
+      },
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "062a0d298062e6d581d080f010ea5a52ed0bbf116c18b346b7abe1f67aa5e991",
+        "requirement_sha256": "8813f80bd3b8ca0f63442a06b3a81c40de45e6889ba947741acacbb48c90f497",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "e5c57542fbb28486507e9d68b1bfff23ff4a53ada7f99a4fe4889960cacf9151",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 1,
+          "corner_evaluations": 1,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 1,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "electrical_assertion/simulation_invalid",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 1,
+          "stage": "electrical_assertion",
+          "assertion": "a_output_noise",
+          "analysis": "noise",
+          "metric": "output_noise_rms",
+          "operating_case": "nominal_transfer",
+          "corner": "nominal",
+          "workflow": "linear_circuit_mna_v1",
+          "plan_sha256": "76056b7d4228d0aaab5d32b1a8c7e6990da1b08b4c8501357bea63eeff94b551",
+          "report_sha256": "ee8f0ed5ddfce3014b7d99afa47088e68717aaa9760ae52f26d5c180c9d25af5",
+          "model_evidence_sha256": [
+            "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+            "33512ff9b8a0ba2e7dff9952ec61716f338a60120ab63236affd4b0d04654e74",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "6601aea45719f5f2f03ed65d850cad5f61ef52a7d274653274001aed4994cc20",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+            "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "bf54cc11cd7655f81e382d6e16bc757ec2e9feb1fcb75c32aab6ae3f39a2aa39",
+            "dfd2804e2dce498dcbc8a1402000f81b91a8113b18d354a54a83d13baac1b39e",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+          ],
+          "actual": 0.005277330782123312,
+          "maximum": 0.002,
+          "diagnostics": [
+            {
+              "code": "simulation_invalid",
+              "path": "assertions.nominal_transfer_a_output_noise.port_conditioned_output.integrated_noise_v_rms",
+              "message": "measured 0.00527733078212 is outside trusted bounds -1e+12..0.002",
+              "suggestion": "adjust catalog-backed component values, connectivity, or bounded analysis conditions"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "assertion_above_maximum",
+            "requirement_id": "a_output_noise",
+            "operating_case": "nominal_transfer/nominal",
+            "analysis": "noise",
+            "metric": "output_noise_rms",
+            "direction": "above_maximum",
+            "actual": 0.005277330782123312,
+            "required_max": 0.002,
+            "affected_cone_hash": "e5c57542fbb28486507e9d68b1bfff23ff4a53ada7f99a4fe4889960cacf9151",
+            "evidence_hash": "ee8f0ed5ddfce3014b7d99afa47088e68717aaa9760ae52f26d5c180c9d25af5",
+            "message": "measured 0.00527733078212 is outside trusted bounds -1e+12..0.002"
+          }
+        ],
+        "hash": "ebb66799402102b425d061e929ca02ac2b4a57b7bf9f3ae774a3380c0be024e6"
+      }
+    },
+    {
+      "trial": {
+        "number": 4,
+        "depth": 1,
+        "parent_graph_sha256": "047f70286c802fb0401da80dc7c30adfc849bd4f3012949fe242aa41192363e6",
+        "graph_sha256": "fed1013aba9c64265b8c79e125d8a66bf143607347db530d291290001c3eb80c",
+        "evaluation_sha256": "1f93915333d1f72dde73594072469ff22f9373bc52ac7a00bb7ab25694dec4c1",
+        "change": {
+          "kind": "redirect_terminal",
+          "primitive": "primitive_000",
+          "terminal": "IN_MINUS",
+          "from_node": "port_signal_input",
+          "to_node": "port_return_terminal"
+        },
+        "status": "failed",
+        "passing_assertions": 0,
+        "continuable": true
+      },
+      "policy": {
+        "max_expanded_states": 20000,
+        "max_generated_graphs": 50000,
+        "max_primitive_instances": 32,
+        "max_internal_nodes": 32,
+        "max_candidate_simulations": 123,
+        "max_corner_evaluations": 4077,
+        "max_value_trials": 4096,
+        "max_topology_repairs": 128,
+        "max_retained_candidates": 16,
+        "max_diagnostic_samples": 32
+      },
+      "evaluation": {
+        "schema": "kicadai.electrical-diagnostic-evaluation.v1",
+        "evaluation_sha256": "1f93915333d1f72dde73594072469ff22f9373bc52ac7a00bb7ab25694dec4c1",
+        "requirement_sha256": "8813f80bd3b8ca0f63442a06b3a81c40de45e6889ba947741acacbb48c90f497",
+        "inventory_sha256": "fe7e3eb97916309a1c8d429bfe7258f1477a27b67c9a090e46e605de4c84e782",
+        "graph_sha256": "fed1013aba9c64265b8c79e125d8a66bf143607347db530d291290001c3eb80c",
+        "status": "failed",
+        "consumption": {
+          "expanded_states": 0,
+          "generated_graphs": 0,
+          "complete_graphs": 0,
+          "candidate_simulations": 1,
+          "corner_evaluations": 1,
+          "value_trials": 0,
+          "topology_repairs": 0,
+          "maximum_frontier": 0,
+          "budget_exhausted": false
+        },
+        "attempt_count": 1,
+        "attempt_outcomes": [
+          {
+            "key": "failed",
+            "count": 1
+          }
+        ],
+        "failure_categories": [
+          {
+            "key": "electrical_assertion/simulation_invalid",
+            "count": 1
+          }
+        ],
+        "first_failure": {
+          "attempt": 1,
+          "stage": "electrical_assertion",
+          "assertion": "a_output_noise",
+          "analysis": "noise",
+          "metric": "output_noise_rms",
+          "operating_case": "nominal_transfer",
+          "corner": "nominal",
+          "workflow": "linear_circuit_mna_v1",
+          "plan_sha256": "3cd97abcdf9668e74e22e6d74b6800527a0f64a9f9e062c29f3259351cd758cf",
+          "report_sha256": "efd1e63004a383c7cc783017fd441ab9db8fc513b389b960bffa6488e153d402",
+          "model_evidence_sha256": [
+            "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+            "33512ff9b8a0ba2e7dff9952ec61716f338a60120ab63236affd4b0d04654e74",
+            "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+            "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+            "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "6601aea45719f5f2f03ed65d850cad5f61ef52a7d274653274001aed4994cc20",
+            "68bbafbc9a5b15fd02b7305a3bf63a7dc5e1a5deee42362bdd161ff513d513aa",
+            "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+            "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+            "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+            "8ea3aba87b79e055e113527d662d2c9afddc512d1e6f38c0da6fedf58950e63f",
+            "92b14a815c3b1f3a34835a6e632379babf82bb00f887636ec4be66879791f7ad",
+            "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+            "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+            "dfd2804e2dce498dcbc8a1402000f81b91a8113b18d354a54a83d13baac1b39e",
+            "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+            "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226"
+          ],
+          "actual": 0.005277330782123312,
+          "maximum": 0.002,
+          "diagnostics": [
+            {
+              "code": "simulation_invalid",
+              "path": "assertions.nominal_transfer_a_output_noise.port_conditioned_output.integrated_noise_v_rms",
+              "message": "measured 0.00527733078212 is outside trusted bounds -1e+12..0.002",
+              "suggestion": "adjust catalog-backed component values, connectivity, or bounded analysis conditions"
+            }
+          ]
+        },
+        "diagnoses": [
+          {
+            "code": "assertion_above_maximum",
+            "requirement_id": "a_output_noise",
+            "operating_case": "nominal_transfer/nominal",
+            "analysis": "noise",
+            "metric": "output_noise_rms",
+            "direction": "above_maximum",
+            "actual": 0.005277330782123312,
+            "required_max": 0.002,
+            "affected_cone_hash": "fed1013aba9c64265b8c79e125d8a66bf143607347db530d291290001c3eb80c",
+            "evidence_hash": "efd1e63004a383c7cc783017fd441ab9db8fc513b389b960bffa6488e153d402",
+            "message": "measured 0.00527733078212 is outside trusted bounds -1e+12..0.002"
+          }
+        ],
+        "hash": "583bd30fd169cd2d2d7ef871caef0fd42a2b2da77e549a14bebd8bc326cf2c20"
+      }
+    }
+  ]
+}

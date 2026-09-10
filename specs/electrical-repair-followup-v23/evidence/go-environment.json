@@ -1,0 +1,11 @@
+{
+  "GOVERSION": "go1.26.8",
+  "GOOS": "darwin",
+  "GOARCH": "arm64",
+  "CGO_ENABLED": "1",
+  "GOENV": "off",
+  "GOWORK": "off",
+  "GOFLAGS": "",
+  "GOEXPERIMENT": "",
+  "raw_go_env_stdout_sha256": "ef079e97b42009115cf7cb10efb5f09c9c37c1bbb6a58dcddbc606b43dd07f11"
+}

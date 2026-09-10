@@ -1,0 +1,8 @@
+6b8f5d1366ca6665f56d9d263877e4d3c02be26d8da7253d55f467c982671462  ADAPTER_IMPLEMENTATION.md
+e56a9903eca3d681cbd8914c4fb83812f862c0f683b75bb3cc64cb0ad96e0e0c  ../../internal/opentopologysynthesis/electrical_admission_v23.go
+34e0a31d85cc6c4772c09ace601d9664e2d28ed7cbfc8c3ed3293b339ece01ae  ../../internal/opentopologysynthesis/electrical_certificate_v23.go
+62cf9656b2ca201536354c8a9dbebdaed9541f82d559a0ce5f3dc1a8465ab4eb  ../../internal/opentopologysynthesis/electrical_numerical_v23.go
+46a9e7e83d085c0bdbf7e0a2152bd1ed69092a46d79f3d32d47a93ba7e129c57  ../../internal/opentopologysynthesis/electrical_simulation_v23.go
+e79fee0ab69fae00c5caa15e9f6674f27da4940137972694fa59564bbd1a347c  ../../internal/opentopologysynthesis/electrical_simulation_v23_test.go
+9a7dc90a81ea36afa8ee46551d62d74ac58efe0b281f22ba4555afd9cda17ec0  ../../internal/simmodel/solver_corners_v23.go
+186cd5032dbf13cb498a455e300667561941ff5883bc0258a08376be637a6cc4  ../../internal/simmodel/solver_corners_v23_test.go

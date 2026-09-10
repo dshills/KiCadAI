@@ -1,0 +1,154 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "82b832399c3ad22a023f59020e30250f",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "16013c7d3f4e44ae8cfbda18be655c853ef8f111",
+    "branch": "codex/electrical-repair-followup-v23"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 4,
+      "medium": 1,
+      "high": 0
+    },
+    "highestSeverity": "medium"
+  },
+  "findings": [
+    {
+      "id": "9507d249cd52e7e9",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Inefficient file reading in manifest verification",
+      "message": "The `verifyManifest` and `retainedProjectHash` functions use `os.ReadFile` to load entire files into memory just to calculate a SHA-256 hash. For large evidence files (the documentation mentions canonical synthesis streaming over 120GB), this could cause Out-Of-Memory (OOM) errors or significant performance degradation during test execution.",
+      "suggestion": "Use `os.Open` combined with `io.Copy` into the hash object to stream files instead of loading them entirely into memory. For example: `f, err := os.Open(path); if err != nil { return err }; defer f.Close(); h := sha256.New(); if _, err := io.Copy(h, f); err != nil { return err }`.",
+      "confidence": 0.95,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/manifest_test.go",
+          "lines": {
+            "start": 66,
+            "end": 70
+          }
+        }
+      ],
+      "tags": [
+        "memory-usage",
+        "io"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "3c4df2975cb32ac5",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Fragile relative paths in test constants",
+      "message": "The `repository` and `publication` constants use hardcoded relative paths ('../../..'). This makes the tests brittle and dependent on the exact directory structure and execution context, which may vary across different CI/CD environments or IDE test runners.",
+      "suggestion": "Consider calculating the base path using `runtime.Caller` or an environment variable to ensure the repository root is located reliably regardless of the working directory.",
+      "confidence": 0.8,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/evidence_test.go",
+          "lines": {
+            "start": 22,
+            "end": 23
+          }
+        }
+      ],
+      "tags": [
+        "testing",
+        "hardcoded-path"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "9c860c0637240d6c",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Confusing error reporting in sidecar authentication",
+      "message": "In `authenticateSidecar`, errors from `valueDigest` (which performs JSON marshaling) are swallowed and replaced by a generic error message indicating an identity mismatch. This obscures the root cause if, for example, a struct cannot be marshaled due to invalid data types.",
+      "suggestion": "Include the actual error in the return message or handle marshaling errors separately to provide clearer diagnostic info. For example: `if err != nil { return fmt.Errorf(\"failed to marshal repair data: %w\", err) }`.",
+      "confidence": 0.9,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/evidence_test.go",
+          "lines": {
+            "start": 113,
+            "end": 115
+          }
+        }
+      ],
+      "tags": [
+        "error-handling"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "e07d6b3c09cf4c34",
+      "severity": "low",
+      "category": "testing",
+      "title": "Test skip might hide publication failures",
+      "message": "The `TestPublishedV23ReplayEvidence` function automatically skips if `report.json` is missing. While intended to allow local development, in a CI environment this could hide the fact that a required artifact was accidentally deleted or renamed.",
+      "suggestion": "Check an environment variable (e.g., `CI=true`) to determine if the test should fail instead of skipping when the report is missing.",
+      "confidence": 0.7,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/evidence_test.go",
+          "lines": {
+            "start": 277,
+            "end": 279
+          }
+        }
+      ],
+      "tags": [
+        "ci",
+        "testing"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "0020d44cbde8dc43",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Incomplete project verification",
+      "message": "The `retainedProjectHash` function assumes a project is 'incomplete' if it has fewer than 3 files. This heuristic might fail for unconventional KiCad projects or multi-sheet schematics where the file count and extension patterns differ from the standard expected set.",
+      "suggestion": "Define an explicit list of required files based on the project manifest rather than a minimum count check.",
+      "confidence": 0.85,
+      "locations": [
+        {
+          "path": "specs/electrical-repair-followup-v23/publication-v23/native_project_test.go",
+          "lines": {
+            "start": 43,
+            "end": 45
+          }
+        }
+      ],
+      "tags": [
+        "kicad",
+        "logic"
+      ],
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 35927,
+    "totalMs": 36146
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview"
+    }
+  ]
+}

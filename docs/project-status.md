@@ -1,12 +1,13 @@
 # Project Status
 
-Last full bounded Go verification: 2026-09-09 at the clean V22 freeze commit
-`d3b6088fbaa4f318b5685d62c4fc83eeba3eb4a2`, including deterministic replay,
+Last full bounded Go verification: 2026-09-10 at the clean V23 freeze commit
+`16013c7d3f4e44ae8cfbda18be655c853ef8f111`, including deterministic replay,
 historical/current seals, race, external-review regressions, and preservation
-suites. Generated-code-excluded coverage was 80.1%; the required threshold
+suites. Generated-code-excluded coverage was 80.0%; the required threshold
 remains 75%. The historical release coverage baseline is 80.2%.
-Separate post-run publication audits authenticate the retained V22 evidence.
-See [local validation](../specs/post-topology-electrical-blockers/public-evaluation-v22/LOCAL_VALIDATION.md).
+Separate post-run publication audits authenticate the retained V23 evidence
+and unchanged V22 evidence. See
+[local validation](../specs/electrical-repair-followup-v23/publication-v23/LOCAL_VALIDATION.md).
 The 13-case installed-KiCad design-example tier was reproduced on 2026-09-09
 with KiCad 10.0.3, satisfying every declared success or fail-closed expectation.
 Successful cases passed clean ERC, strict DRC, connectivity, route completion,
@@ -117,6 +118,25 @@ run took 4 h 51 min and hashed 121,026,790,256 canonical synthesis bytes without
 writing synthesis spools; the compact publication is 488,885 bytes, not a lossless
 copy of every numerical report. Memory use remains substantial and is documented
 separately in the [resource measurements](../specs/post-topology-electrical-blockers/publication-v22/PERFORMANCE_OBSERVATIONS.md).
+
+V23 completed its separate frozen 24-case / two-replay evaluation on September
+10. Its version-isolated stale op-amp clamp correction passes independent
+regressions, but all four selected cases remain exhausted with zero additional
+complete passes. Aggregate outcomes remain 1 pass, 6 unsupported, 1 unsafe, and
+16 exhausted. All case objects, full synthesis replay hashes, and gate records
+match V22; the existing pass retains both installed-KiCad promotions and its
+project identity. The original native project bytes are also independently
+authenticated across all four clean projects. The frozen preservation criterion
+passes with no regressions; the electrical-improvement criterion fails.
+
+The one original run completed in 4 h 57 m 23.38 s without restarting any case.
+Its 154-file / 521,456-byte compact publication is authenticated by an exact
+pinned manifest and retains the final assessment and native measurements.
+It is not a lossless synthesis archive; native projects remain outside Git.
+No v1 capability, release asset, numerical bound, or safety guard changed.
+See the [negative results](../specs/electrical-repair-followup-v23/publication-v23/RESULTS.md),
+[review](../specs/electrical-repair-followup-v23/publication-v23/REVIEW.md), and
+[resource observations](../specs/electrical-repair-followup-v23/publication-v23/PERFORMANCE_OBSERVATIONS.md).
 
 The V18 versioned extension now produces a complete public pass for a
 low-voltage, high-input-impedance, multi-output analog threshold requirement.

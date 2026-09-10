@@ -1,0 +1,51 @@
+{
+  "schema": "kicadai.residual-electrical-diagnostic.v23",
+  "case": "v10_case_021",
+  "source_trace_sha256": "d2ce795fbd46299dcaebb7813922914f74a835910efee86d49ad4c0097666356",
+  "repair_sha256": "7214dc3569784fae6d2a72cd4af09f85588797ab539799a9d99978111444474f",
+  "initial_failure": {
+    "attempt": 2,
+    "stage": "solver",
+    "assertion": "high_output_inactive_level",
+    "analysis": "dc_operating_point",
+    "metric": "output_low_voltage",
+    "operating_case": "interior_window",
+    "corner": "nominal",
+    "workflow": "linear_circuit_mna_v1",
+    "plan_sha256": "997eec86de9b95631fa63e26824f31ed323fe102d1cdaff1be0d9347ed504b68",
+    "report_sha256": "ce649c2b21d6c8abefcbb41a456ebda48460bce1460f00b5423a0465c278c809",
+    "model_evidence_sha256": [
+      "1ff0a725efb15ce6f6aac8e14dca8a0624007541b9bb8fe235a89701b83b5e1a",
+      "387a2e931621bf1df13a789c23924c54da0dd70ab65fa116882d709928220fe1",
+      "3d94ff2b167591833753982b95316e6072c3308c3396ae6e1d0c54cc6825a8ab",
+      "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "694867720880d02c807797d700d3edd442348ba3716e19095393b727d892ec75",
+      "73370db67a036f84845d9b4e02aa1904fe549bccd9a3a6c6d1057529c53bd9b0",
+      "743aac00338a5457af650056b3cb890f8eda9c413b7eaf8f17981d702ff96bda",
+      "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+      "784915a4c6bdc4f763d8108796dce22a27da54b7ca3d96dfd99e513774c116e5",
+      "829ca481fa0ed8afad8010bfad689b932e63c77635a8e418f5c7b64134093cf6",
+      "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+      "90d51ce945f8be9ab3b959fc21b3403106405a1bf37d591b0c35306cc442b45f",
+      "987d1a361423ea7d9bb216f8f3361a35a6becbc88bfcca4e9a8d247a2a7364aa",
+      "9905aa26bdf446c0fb1c661d80e25533d811e5af6570f1f38e568f6baad706a1",
+      "a1ab4ce0bf2ff706a2792b6433bb9451d36e4eb3826b5d04e9ad1836e1942acf",
+      "a1b889f227a9e448d3ad0f6630fbbc39d705dd5550a0d746777507f1d3171566",
+      "a4514fc918c864e66ba7ece390e823bbc022bc434b1bae290ebdc0f53942d2e5",
+      "b01fec6dd1778c1bd1cb9ccc907bf831d139d3da88cd648ec1b8d666eda5df79",
+      "d813554e4c738eb3b866870de5c20e753c49e66f92291ddd8b31e57fd671e72d",
+      "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61"
+    ],
+    "maximum": 0.4,
+    "diagnostics": [
+      {
+        "code": "unstable",
+        "path": "devices.primitive_000.stability",
+        "message": "catalog single-pole op-amp has unstable positive feedback (DC loop gain 6294627.05897)",
+        "suggestion": "reverse the feedback polarity or provide catalog-supported stable compensation"
+      }
+    ]
+  },
+  "v22_stop_reason": "critical_failure",
+  "trials": []
+}
