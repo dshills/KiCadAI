@@ -1,0 +1,97 @@
+{
+  "schema": "kicadai.practical-board-freeze.v1",
+  "baseline_commit": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+  "evaluator_commit": "0572a70c5b5ff2065e6fe4fa0f7ef6cff42f2b5c",
+  "files": [
+    {
+      "path": "cmd/practical-board-eval/main.go",
+      "bytes": 3301,
+      "sha256": "6f44fa49f9dd5cf185a45f60503b35b98fdca5240b286003a6535d40a7c9a041"
+    },
+    {
+      "path": "internal/practicalboardeval/engine.go",
+      "bytes": 23822,
+      "sha256": "ae6d1b254a2e9a08bd411e77d6c1dcfaa6a96e61c1e5b8b1a76088c5e8145834"
+    },
+    {
+      "path": "internal/practicalboardeval/engine_test.go",
+      "bytes": 2453,
+      "sha256": "01fc5ccf1a67fff85552185712cc5fb1111138f75313170d83ba7f693bf159eb"
+    },
+    {
+      "path": "internal/practicalboardeval/evidence.go",
+      "bytes": 13906,
+      "sha256": "c2702786cb077d35b0719555b96ce96c212d72a82a48eb64b4d1f58c9124fdfb"
+    },
+    {
+      "path": "internal/practicalboardeval/evidence_test.go",
+      "bytes": 7578,
+      "sha256": "e75861af5a2d971c79c730edd8651b271c1dfc62122738381cc91754bf2024a7"
+    },
+    {
+      "path": "internal/practicalboardeval/transport.go",
+      "bytes": 6578,
+      "sha256": "9b17897e4d563cdd424f39e41d40e5a28e633f535a2d7ba8ef7266c958e87446"
+    },
+    {
+      "path": "internal/practicalboardeval/transport_test.go",
+      "bytes": 4432,
+      "sha256": "abadbdda74c2ce5997f3ff44be03b1243e287461dbce2c9d1dd1e494e0c1f84f"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/FEASIBILITY.md",
+      "bytes": 8828,
+      "sha256": "c1ae616119f16460c2e46363f7f69ed8e30424cee80f76154317458e482b8986"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/PLAN.md",
+      "bytes": 2419,
+      "sha256": "40a9f014fa439df3215345793fcfa0f4473ab38e42f8ae25cc3c1b18687e226b"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/PREPARATION.md",
+      "bytes": 4525,
+      "sha256": "27b6dda26400e9b74b83bfe7625009f9412edcc41c298419ace2f53e9c72e549"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/QUALITY.md",
+      "bytes": 4153,
+      "sha256": "97da754ce7c490d7d067e17a842507dc30a10d1b9d12a13f7a03ac596ad5dc67"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/SCORING.md",
+      "bytes": 5861,
+      "sha256": "b423e0b92f5dfc34709fdc2ecab6c2891b9a31cb10b36bcc8ab012f4bf676c65"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/SPEC.md",
+      "bytes": 14802,
+      "sha256": "6e36345326b8d8d5e9399d21ae18492dd164afcdb18a401d8325d90ca4a7f88e"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/corpus.json",
+      "bytes": 21034,
+      "sha256": "f70c78e71051d76baa18eb7bdf765db15dc854f5fdda7b35041b28b0c4d3b513"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/environment.json",
+      "bytes": 1509,
+      "sha256": "5e8f4e3caba90da8c16c42c2a6f3b96c7f979ae9c2bd37b460aeb378d0ba4625"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/evidence-utils.mjs",
+      "bytes": 3128,
+      "sha256": "9eb0e65c4b1ac1bd01ce287c83cea84ef06f1677acf51aba8dd32d6c4ba0a2d4"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/evidence-utils.test.mjs",
+      "bytes": 2065,
+      "sha256": "2cb14b1859f8fd99982e1758864e1ad39cb89805c0b362c7fd1241363d9e5c9f"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/run-campaign.mjs",
+      "bytes": 8564,
+      "sha256": "55b864fd927b82ed37351b30eced54a5fc61f96c6e3f03d28beafbe1cd7341c9"
+    }
+  ]
+}
