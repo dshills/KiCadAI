@@ -1,0 +1,185 @@
+{
+  "schema": "kicadai.interface-evaluation-corpus.v1",
+  "authorship": "Independently authored in the approved new scope before live execution; no practical-board case or synthetic-test value is reused as a fixture; expected clauses are withheld from provider input.",
+  "cases": [
+    {
+      "id": "I01",
+      "kind": "ready",
+      "title": "External analog filter interface",
+      "prompt": "Create the requirements for a low-voltage analog filter board. It has external supply and ground connections, an external analog input, and an external analog output. The supply is nominally 3.3 V and ranges from 3.1 to 3.5 V. The input signal is ground-referenced and stays between 0 and 0.9 V. The output drives a resistance of at least 180000 ohms. The low-pass cutoff must be 3300 Hz within five percent, measured at the analog output across the full supply range. Use no more than 16 components and fit within 38 by 27 mm. Do not add a controller, digital interface, protection function, or timing guarantee.",
+      "expected": "ready",
+      "answer": "",
+      "required_objectives": [
+        "frequency_filter"
+      ],
+      "required_analyses": [
+        "ac_sweep"
+      ],
+      "clauses": [
+        "External supply, ground, analog input and analog output remain distinct interfaces.",
+        "Nominal 3.3 V supply and complete 3.1–3.5 V range retained.",
+        "Ground-referenced input range 0–0.9 V retained.",
+        "Output load resistance minimum 180000 Ohm retained.",
+        "Low-pass cutoff target 3300 Hz, tolerance 5%, equivalently 3135–3465 Hz, observed on output.",
+        "Behavior evaluated across the full supplied voltage range.",
+        "Maximum 16 components and 38×27 mm retained.",
+        "No unrequested controller, digital interface, protection, timing, component choice or physical implementation."
+      ]
+    },
+    {
+      "id": "I02",
+      "kind": "ready",
+      "title": "Composed filter and gain interface",
+      "prompt": "Create requirements for a small analog signal-conditioning board powered by a nominal 5.1 V external supply ranging from 4.9 to 5.3 V, with an external ground return. An external input signal ranges from 0 to 0.06 V. First low-pass filter that signal with a cutoff of 1900 Hz within six percent, then amplify the filtered signal by a voltage gain of 2.5 within eight percent, and drive an external analog output loaded by at least 220000 ohms. The filtered signal is an internal connection shared only between those two functions, not an external connector. Verify the filter cutoff on that internal signal and the complete input-to-output gain at 100 Hz across the supply range. Fit at most 24 components in 46 by 31 mm. No controller, clock, bus, protection or startup behavior is requested.",
+      "expected": "ready",
+      "answer": "",
+      "required_objectives": [
+        "frequency_filter",
+        "signal_amplification"
+      ],
+      "required_analyses": [
+        "ac_sweep"
+      ],
+      "clauses": [
+        "External nominal 5.1 V supply, full 4.9–5.3 V range and ground return retained.",
+        "External analog input range 0–0.06 V retained.",
+        "Low-pass filter cutoff 1900 Hz ±6%, equivalently 1786–2014 Hz, observed on filtered internal signal.",
+        "Filter then amplification functional order preserved with one properly sourced/sunk internal signal, not a new external connector.",
+        "Amplification target 2.5 ratio ±8%, equivalently 2.3–2.7, for complete input-to-output gain at 100 Hz.",
+        "External output load resistance at least 220000 Ohm retained.",
+        "Both measurable requirements cover the full supply range; 100 Hz gain evaluation condition retained.",
+        "Maximum 24 components, 46×31 mm; no unrequested functions, physical topology, component identities or startup guarantees."
+      ]
+    },
+    {
+      "id": "I03",
+      "kind": "ready",
+      "title": "Existing controller participant endpoint",
+      "prompt": "Create requirements for a low-pass interface between an external analog input and the ADC input of an existing external controller participant. The existing controller is not a controller to design or program. Its ADC input is single-ended, ground-referenced, and has an input resistance of at least 150000 ohms. The external analog input ranges from 0 to 1.1 V. The board and controller share an external nominal 3.4 V supply ranging from 3.2 to 3.6 V and ground return. The filter cutoff from the board input to the controller ADC input must be 2700 Hz within seven percent across the supplied voltage range. Preserve the controller and its ADC input as a participant endpoint; do not replace it with a newly designed MCU or an unrelated external output. The board may use at most 15 components and must fit within 35 by 28 mm. No firmware, bus, clock, protection or timing behavior is requested.",
+      "expected": "ready",
+      "answer": "",
+      "required_objectives": [
+        "frequency_filter",
+        "programmable_controller"
+      ],
+      "required_analyses": [
+        "ac_sweep"
+      ],
+      "clauses": [
+        "Existing controller is a participant, not newly synthesized or programmed; its required ADC port is a single-ended analog sink.",
+        "External analog input range 0–1.1 V retained.",
+        "Controller ADC minimum input resistance 150000 Ohm and ground reference retained.",
+        "External shared nominal 3.4 V supply, full 3.2–3.6 V range, and ground return retained.",
+        "Filter binding terminates at declared participant/participant_port; no unrelated replacement output.",
+        "Cutoff 2700 Hz ±7%, equivalently 2511–2889 Hz, measured over the requested input-to-ADC interface across the full supply range.",
+        "Maximum 15 components and 35×28 mm apply to the interface board.",
+        "No new MCU, firmware, bus, clock, protection, timing guarantee or physical implementation supplied."
+      ]
+    },
+    {
+      "id": "I04",
+      "kind": "ready",
+      "title": "Regulation across supply and load cases",
+      "prompt": "Create requirements for a low-voltage supply-regulation board with an external nominal 7 V input ranging from 6.5 to 7.5 V, external ground, and a regulated external output. The output must remain between 2.94 and 3.06 V while sourcing any load current from 0.005 to 0.025 A. Verify that DC output-voltage range across the full input-voltage and load-current ranges at ambient temperatures from 10 to 35 degrees Celsius. Fit at most 18 components within 39 by 26 mm. Do not add a controller, digital bus, current-limit guarantee, fault-recovery timing, or a second output.",
+      "expected": "ready",
+      "answer": "",
+      "required_objectives": [
+        "voltage_regulation"
+      ],
+      "required_analyses": [
+        "dc_operating_point"
+      ],
+      "clauses": [
+        "External nominal 7 V input with full 6.5–7.5 V range and external ground retained.",
+        "One regulated external output, not a second output or an independent external source.",
+        "Output DC voltage bounds exactly 2.94–3.06 V; no weaker tolerance substituted.",
+        "Full sourced load-current range 0.005–0.025 A retained.",
+        "Measurable DC behavior covers full input-voltage, load-current and 10–35 degC ambient ranges.",
+        "Any derived supply-domain source uses a declared supply signal with coherent endpoint bindings, not an invented component or source.",
+        "Maximum 18 components, 39×26 mm.",
+        "No new controller, digital bus, current-limit guarantee, fault-recovery timing, components or physical implementation."
+      ]
+    },
+    {
+      "id": "R01",
+      "kind": "refusal",
+      "title": "Unavailable radiation calibration and certification",
+      "prompt": "Create a low-voltage ionizing-radiation dosimeter board whose reported dose rate is guaranteed accurate to one percent and independently certified traceable to a radiation standard. No dose-response model, radiation calibration measurements, or independent certification evidence is supplied. The guarantee and certification are mandatory; do not replace this with an uncalibrated detector or a different measurement.",
+      "expected": "unsupported",
+      "answer": "",
+      "required_objectives": [],
+      "required_analyses": [],
+      "clauses": [
+        "Structured unsupported result identifies unavailable trusted radiation dose-response/calibration and certification evidence.",
+        "Capability gap uses valid normalized identifiers and identifies missing evidence without inventing it.",
+        "Mandatory one-percent accuracy and certification are preserved, not relaxed into a detector or another measurement.",
+        "All material source statements have correct capability-gap coverage.",
+        "No executable requirement, circuit, board, misleading ready result or clarification that changes the demanded guarantee."
+      ]
+    },
+    {
+      "id": "R02",
+      "kind": "refusal",
+      "title": "Unavailable event-directed control contract",
+      "prompt": "Create a low-voltage controller board with a 3.3 V supply, an active-high enable input, an active-high fault input, and a switched output. The output must start disabled. If enable rises at 2 milliseconds, the output must transition on within 40 microseconds only after fault has remained inactive for 70 microseconds. If fault rises at 5 milliseconds, the output must transition off within 15 microseconds and remain off until enable falls and rises again. These event identities, prior-state dependencies, startup state and directional delay bounds are mandatory; do not substitute a static threshold or omit the fault sequence.",
+      "expected": "unsupported",
+      "answer": "",
+      "required_objectives": [],
+      "required_analyses": [],
+      "clauses": [
+        "Structured unsupported result identifies control/event/transition semantics unavailable through the advertised v3 contract.",
+        "Gap reason preserves startup-disabled, active-high enable/fault polarity and the requested event-dependent behavior.",
+        "Enable event at 2 ms, on delay ≤40 us, prior fault inactivity ≥70 us, fault event at 5 ms and off delay ≤15 us are not replaced with static behavior.",
+        "Fault latch/reset dependency remains a missing required capability rather than a guessed implementation.",
+        "Complete capability-gap source coverage and normalized gap identifiers.",
+        "No executable requirement or physical design; no clarification that changes mandatory behavior."
+      ]
+    },
+    {
+      "id": "C01",
+      "kind": "clarification",
+      "title": "Missing cutoff and tolerance",
+      "prompt": "Create requirements for a low-pass analog filter with external supply, ground, analog input and analog output. The external supply is nominally 4.1 V and ranges from 3.9 to 4.3 V. The ground-referenced input ranges from 0 to 0.8 V, and the output sees a resistance of at least 160000 ohms. The cutoff frequency and permitted cutoff tolerance have not been chosen; ask for those values rather than inventing them. The resulting cutoff must be verified across the full supply range. Use at most 14 components in 37 by 23 mm. No other functions or timing guarantees are requested.",
+      "expected": "needs_clarification_then_ready",
+      "answer": "Use a cutoff frequency of 4200 Hz with a permitted tolerance of seven percent, equivalent to a measured cutoff from 3906 to 4494 Hz across the already supplied voltage range.",
+      "required_objectives": [
+        "frequency_filter"
+      ],
+      "required_analyses": [
+        "ac_sweep"
+      ],
+      "clauses": [
+        "Before answers, one minimal question asks only for cutoff frequency and tolerance, with exact uncertainty ownership and no executable requirement.",
+        "No already supplied voltage, interfaces, load, component or board-size facts are re-asked or changed.",
+        "Original nominal 4.1 V supply and 3.9–4.3 V range; input 0–0.8 V; output load ≥160000 Ohm retained.",
+        "Frozen answer is bound to exact source, capability snapshot, prior proposal/compilation and owned uncertainty IDs.",
+        "After answer, cutoff 4200 Hz ±7% or 3906–4494 Hz is a measurable output behavior across the full supply range.",
+        "After answer, ready contract has no reused answered blocker identity, no missing original source coverage and no unrequested function.",
+        "Maximum 14 components and 37×23 mm retained; tampered answer bindings reject in offline replay."
+      ]
+    },
+    {
+      "id": "C02",
+      "kind": "clarification",
+      "title": "Missing regulated-load range",
+      "prompt": "Create requirements for a supply-regulation board with external input, ground and one regulated external output. The input is nominally 7.6 V and ranges from 7.2 to 8 V. The output must stay between 3.234 and 3.366 V at ambient temperatures from 20 to 30 degrees Celsius across the complete input range. The load-current range has not been chosen; ask for that range rather than guessing it. Use at most 17 components in 41 by 25 mm. No controller, digital interface, additional output, current-limit or fault-timing guarantee is requested.",
+      "expected": "needs_clarification_then_ready",
+      "answer": "The regulated output must source any load current from 0.006 to 0.018 A. Verify the previously requested output-voltage bounds across that complete load range together with the already supplied input-voltage and ambient-temperature ranges.",
+      "required_objectives": [
+        "voltage_regulation"
+      ],
+      "required_analyses": [
+        "dc_operating_point"
+      ],
+      "clauses": [
+        "Before answers, one minimal question asks only for load-current range with valid uncertainty ownership and no executable requirement.",
+        "Supplied input, output, temperature and board limits are not re-asked or changed.",
+        "Nominal 7.6 V input and full 7.2–8 V range, one external output 3.234–3.366 V, external ground and 20–30 degC retained.",
+        "Frozen 0.006–0.018 A answer is bound to exact prior source/capability/proposal/compilation and uncertainty identities.",
+        "After answer, ready DC voltage behavior covers complete input, load-current and ambient ranges without weakened output bounds.",
+        "Maximum 17 components and 41×25 mm retained; no added controller, digital interface, output, current-limit or fault-timing guarantee.",
+        "All original facts and coverage survive; answered blocker identities do not recur; tampered answer bindings reject offline."
+      ]
+    }
+  ]
+}
