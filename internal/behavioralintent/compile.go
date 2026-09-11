@@ -50,6 +50,9 @@ func Compile(prompt string, proposal Proposal, capabilitySHA256 string) Result {
 	requirementIDs := map[string]bool{}
 	materialRequirementIDs := map[string]bool{}
 	if proposal.Requirement != nil {
+		if proposal.Requirement.Schema != architecturesearch.SchemaIDV3 || proposal.Requirement.Version != architecturesearch.VersionV3 {
+			result.Issues = append(result.Issues, compilerIssue(CodeRequirementInvalid, "proposal.requirement", "behavioral intent requires the advertised v3 requirement schema and version"))
+		}
 		normalized := architecturesearch.Normalize(*proposal.Requirement)
 		applyMandatoryAcceptance(&normalized.Acceptance)
 		for _, issue := range architecturesearch.Validate(normalized) {
