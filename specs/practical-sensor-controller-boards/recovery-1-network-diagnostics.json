@@ -1,0 +1,166 @@
+{
+  "schema": "kicadai.practical-board-network-diagnostics.v1",
+  "cohort": "approved_recovery_1",
+  "purpose": "Post-terminal, credential-free TCP diagnostics; not corpus results and not a provider retry.",
+  "credential_environment_removed": true,
+  "api_requests": 0,
+  "evaluator_or_production_changes": 0,
+  "agent_firewall_rule_changes": 0,
+  "observations": [
+    {
+      "probe": "native_nc_ipv4",
+      "commands": [
+        "nc -4 -v -z -G 10 172.66.0.243 443",
+        "nc -4 -v -z -G 10 api.openai.com 443"
+      ],
+      "execution": "elevated",
+      "result": "both TCP connections succeeded; no HTTP request"
+    },
+    {
+      "probe": "node_spawned_nc",
+      "command": "Node spawnSync of /usr/bin/nc -4 -v -z -G 5 172.66.0.243 443",
+      "execution": "elevated",
+      "result": "exit 0; TCP connection succeeded; no HTTP request"
+    },
+    {
+      "probe": "node_tcp",
+      "target": "172.66.0.243:443",
+      "execution": "elevated",
+      "result": {
+        "api_requests": 0,
+        "wall_seconds": 0.013,
+        "connected": true
+      }
+    },
+    {
+      "probe": "go_tcp4",
+      "execution": "elevated; pinned go1.26.8",
+      "source": "/tmp/kicadai-recovery-network-diagnostic.go",
+      "source_sha256": "d232b9c75a58a9e384f37356d05e13a6e1972946eaa0ecb22ac36090fdc2be25",
+      "result": {
+        "api_requests": 0,
+        "go_version": "go1.26.8",
+        "probes": [
+          {
+            "address": "172.66.0.243:443",
+            "connected": false,
+            "error": "dial tcp4 172.66.0.243:443: i/o timeout",
+            "wall_seconds": 6.00115575
+          },
+          {
+            "address": "api.openai.com:443",
+            "connected": false,
+            "error": "dial tcp4 172.66.0.243:443: i/o timeout",
+            "wall_seconds": 6.004502958
+          }
+        ],
+        "resolved_addresses": [
+          {
+            "IP": "172.66.0.243",
+            "Zone": ""
+          },
+          {
+            "IP": "162.159.140.245",
+            "Zone": ""
+          },
+          {
+            "IP": "2a06:98c1:58::f3",
+            "Zone": ""
+          },
+          {
+            "IP": "2606:4700:7::f3",
+            "Zone": ""
+          }
+        ]
+      }
+    },
+    {
+      "probe": "go_blocking_syscall",
+      "execution": "elevated; pinned go1.26.8",
+      "source": "/tmp/kicadai-recovery-syscall-network-diagnostic.go",
+      "source_sha256": "ca8ab14835ec48f91023386ef81833259fb1295247aa0179b28a8602a00068a0",
+      "result": {
+        "probe": "go_blocking_socket",
+        "api_requests": 0,
+        "connected": false,
+        "error": "watchdog_timeout"
+      },
+      "program_exit_code": 2,
+      "go_run_exit_code": 1
+    },
+    {
+      "probe": "proxy_variable_presence",
+      "variables": [
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy"
+      ],
+      "all_absent": true
+    },
+    {
+      "probe": "apple_application_firewall",
+      "result": "disabled; this is distinct from LuLu"
+    },
+    {
+      "probe": "network_system_extensions",
+      "execution": "elevated",
+      "active": [
+        "com.objective-see.lulu.extension 4.5.1",
+        "io.tailscale.ipn.macsys.network-extension 1.102.3"
+      ]
+    },
+    {
+      "probe": "lulu_preferences_read_only",
+      "disabled": false,
+      "blockMode": false,
+      "passiveMode": false,
+      "allowApple": true,
+      "allowInstalled": true,
+      "allowDNS": true
+    },
+    {
+      "probe": "lulu_saved_rules_before_UI_inspection",
+      "recovery_and_diagnostic_path_matches": 0,
+      "original_baseline_path_present": true
+    },
+    {
+      "probe": "lulu_matching_unified_logs",
+      "window": "45 minutes preceding the diagnostic command",
+      "predicate": "subsystem CONTAINS lulu AND eventMessage contains one of the recovery worker or two diagnostic executable names",
+      "result": "No matching entries returned; this does not prove no firewall action occurred."
+    },
+    {
+      "probe": "lulu_current_rules",
+      "checked_utc": "2026-09-11T10:20:11.207Z",
+      "sources": [
+        "read-only plist extraction",
+        "LuLu Rules accessibility view filtered to kicadai-practical-board-eval"
+      ],
+      "rules": [
+        {
+          "path": "/tmp/kicadai-practical-board-eval-baseline-eb78476c",
+          "displayed_action": "Allow",
+          "endpoint_address": "*",
+          "endpoint_port": "*",
+          "creation_utc": "2026-09-11T07:50:54.456Z"
+        },
+        {
+          "path": "/tmp/kicadai-practical-board-eval-recovery-1",
+          "displayed_action": "Allow",
+          "endpoint_address": "*",
+          "endpoint_port": "*",
+          "creation_utc": "2026-09-11T10:17:50.797Z"
+        }
+      ],
+      "agent_actions": "Only opened the app, viewed rules and filtered the list; no settings or rule changes."
+    }
+  ],
+  "inference": "The recovery worker's Allow rule was created after its 09:43:28.637Z terminal timeout. Combined with working Node/native TCP and failing Go TCP, this is consistent with a pending application-specific firewall decision. No captured deny/pause event establishes causality, and no post-rule TCP test using the same recovery worker was performed.",
+  "credential_status": "No HTTP response in either corpus campaign: authentication, quota, model access, token usage and actual billing remain untested or unknown.",
+  "next_action_boundary": "Recovery 1 is terminal. Do not rerun it, change its frozen evaluator, bypass filtering, or spend another provider attempt without a separately recorded user authorization."
+}
