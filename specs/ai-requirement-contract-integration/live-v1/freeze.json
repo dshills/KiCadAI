@@ -1,0 +1,558 @@
+{
+  "schema": "kicadai.interface-evaluation-freeze.v1",
+  "source_commit": "008491ddee707d739c86a083ddb35a093d38f927",
+  "evidence_root": "/tmp/kicadai-ai-requirement-interface-v1",
+  "binary_path": "/tmp/kicadai-ai-requirement-eval-v1",
+  "files": [
+    {
+      "path": "cmd/ai-requirement-eval/main.go",
+      "bytes": 2152,
+      "sha256": "bbc1e9f6a57267a060b1d778996397e2fd531b37171cf6a5445bf6494fa6a962"
+    },
+    {
+      "path": "cmd/ai-requirement-eval/main_test.go",
+      "bytes": 414,
+      "sha256": "30afd3261ff769743f6b607733ce3c3b6fdbfb4717e61a6237a79ecd4a80327d"
+    },
+    {
+      "path": "go.mod",
+      "bytes": 228,
+      "sha256": "c75915ecfea53fdde56bb163adc699d408aaaf7c8e52a842ccd1d92840704dc9"
+    },
+    {
+      "path": "go.sum",
+      "bytes": 1840,
+      "sha256": "da21aedbd40990acd53552724bb1177bf132da95c7871f69d7f5bbab520a2b4f"
+    },
+    {
+      "path": "internal/aiprovider/decode.go",
+      "bytes": 1733,
+      "sha256": "e18545a7147d4ec12a96c861ee25e9b77bc7e5e188ee88240720f94a7aed20bb"
+    },
+    {
+      "path": "internal/aiprovider/model.go",
+      "bytes": 5942,
+      "sha256": "205e2360fe7bb3fc995d4624d96b750e09f17704ba8096b9d1ea981c2e29bf27"
+    },
+    {
+      "path": "internal/aiprovider/openai.go",
+      "bytes": 21555,
+      "sha256": "9be7410f621743b03e1e9c380aa034dd1ab122cff08f0b09aa85310b855a662e"
+    },
+    {
+      "path": "internal/aiprovider/openai_schema.go",
+      "bytes": 7000,
+      "sha256": "fbe2c4c30237f037e0bb3393dc8904c30cae66bce892e1f21500900bd86c47f0"
+    },
+    {
+      "path": "internal/aiprovider/recorded.go",
+      "bytes": 6616,
+      "sha256": "bde215fa41c655e8d5883394e11c21ade322b0e10fff15f18fa8e265c6a8221e"
+    },
+    {
+      "path": "internal/aiprovider/reference.go",
+      "bytes": 1261,
+      "sha256": "39bac9341cf936ef1242fb1e46161e20c0730158865517bef4f36a86ce32af17"
+    },
+    {
+      "path": "internal/aiprovider/reference_profiles.go",
+      "bytes": 4570,
+      "sha256": "79260e7152d88410ce2649414c33d9f1867fab308b485798ff9d109f82dbb878"
+    },
+    {
+      "path": "internal/airequirementeval/campaign.go",
+      "bytes": 16530,
+      "sha256": "b7ebcfced8cf5ca29738edf68533af3fcbd0e5f764d0f59a2582035616f10442"
+    },
+    {
+      "path": "internal/airequirementeval/eval_test.go",
+      "bytes": 23150,
+      "sha256": "83892984bf36ff39f39bc2479477865352b7966cc92f3f4dcbb6006b470c8f63"
+    },
+    {
+      "path": "internal/airequirementeval/model.go",
+      "bytes": 10288,
+      "sha256": "b986b4a51afc7a752aad345f772ab9fee032236cda349b76bad20eb8407c78f2"
+    },
+    {
+      "path": "internal/airequirementeval/prepare.go",
+      "bytes": 4762,
+      "sha256": "bd993a8e1fb01a53d336dee4fd8d9ebd25c45349ac58ac152d01ef5963dff0e2"
+    },
+    {
+      "path": "internal/airequirementeval/replay.go",
+      "bytes": 7742,
+      "sha256": "4b489cfef5653228a4a24ef96560009d0fc7519cbcedc57181a14e850373d701"
+    },
+    {
+      "path": "internal/airequirementeval/resources.go",
+      "bytes": 3678,
+      "sha256": "9e47f70c93e7a76f90a298df9a866088de81193bd7d2a2c401a3c7f7a29314f7"
+    },
+    {
+      "path": "internal/airequirementeval/transport.go",
+      "bytes": 11720,
+      "sha256": "e556c2f6fad41f86b0e61b9b9538902e08d7134ffeedb3225c969ce8dbbc2c16"
+    },
+    {
+      "path": "internal/architecturesearch/behavioral_projection.go",
+      "bytes": 34500,
+      "sha256": "e7822cc8acac6a805e17bdaeeef1671b219cf310ccb771d65152c911af8a2631"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider.go",
+      "bytes": 167653,
+      "sha256": "7383ab9622a5886db66902b02cf62493419f0913ef4c47a9d81c43f0a85e4a07"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_buck.go",
+      "bytes": 29242,
+      "sha256": "6678d2dcce2d935e9f7e08a82e17fef01f1d2bc76c681cb6c0830e629dc2953f"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_clock_generation.go",
+      "bytes": 48976,
+      "sha256": "7c6cf15a840f7a9df53b1115d478165b1636f20bb2fb84f6b374c560d1f6821d"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_current_regulator.go",
+      "bytes": 63896,
+      "sha256": "70c23a541ac55e95521fa2b5cb8e5228da578521f60ade9c0ee88765f8670a6d"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_multifunction.go",
+      "bytes": 276869,
+      "sha256": "4b27bf12676f1cd8c45b55a6fbd07e6944477404d3aac1532456dc84cbcac1c5"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_precision_rectifier.go",
+      "bytes": 16180,
+      "sha256": "8d704df358bf07b1daeeee3eb4062b5bd758f9b9b37174e6857a0f15a74dffb7"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_protected_isolated_converter.go",
+      "bytes": 44150,
+      "sha256": "dc80824735f9936504b924f477af2188f389f414c287efcb22caff027bc54430"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_protocol_bus.go",
+      "bytes": 32707,
+      "sha256": "e5920341056dfc30971b05791b30a3001a777b627043b81c0718daf4f9d87780"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_push_pull_isolation.go",
+      "bytes": 22620,
+      "sha256": "6c5e8484a738d3f96c69071decb20ab395b2617a369e59006d36363a6ff72854"
+    },
+    {
+      "path": "internal/architecturesearch/catalog_provider_push_pull_translation.go",
+      "bytes": 24053,
+      "sha256": "95e61197d10a76c50dcfccff617c0651df7de79dd4bd99ff96a099be758dc17d"
+    },
+    {
+      "path": "internal/architecturesearch/contracts.go",
+      "bytes": 42285,
+      "sha256": "72c4257ea5cba3675f1aedac710c4b55609889817e78454bd5e70356f38222cc"
+    },
+    {
+      "path": "internal/architecturesearch/decode.go",
+      "bytes": 1519,
+      "sha256": "9653d569913ee8e92fe5b476943151237c1bb9df9789c4773e2aab2e8200398b"
+    },
+    {
+      "path": "internal/architecturesearch/hierarchy.go",
+      "bytes": 48200,
+      "sha256": "a47b2c7cff60685b9a11bb5110713ef77622e24d2a61cdd769555c3d419e2972"
+    },
+    {
+      "path": "internal/architecturesearch/interface_conditioning.go",
+      "bytes": 32879,
+      "sha256": "c8bd720c228474bdccb74b2543b238858f7ceb4093fd952698cc1b2f1261abba"
+    },
+    {
+      "path": "internal/architecturesearch/mcu_assignment.go",
+      "bytes": 54139,
+      "sha256": "a2ec7bb7c0b0096e7f0e5926167890ac73c18c14fdeac4350b9a1217f748a354"
+    },
+    {
+      "path": "internal/architecturesearch/mcu_clock_programming.go",
+      "bytes": 19579,
+      "sha256": "2473a37d5c7f8b7c68137582ca8c68268f48de56d2b6bda6b49b4ea0b2694f18"
+    },
+    {
+      "path": "internal/architecturesearch/mcu_power_integrity.go",
+      "bytes": 26968,
+      "sha256": "e01d987b1e0b01a39b7df5badd04b50736855a3654c14b9053420b04527b5be6"
+    },
+    {
+      "path": "internal/architecturesearch/model.go",
+      "bytes": 12628,
+      "sha256": "193a399af855e7f3a119c450d9aa57d42bb02ef0f9a12f5b4da1cc782ee0fbc4"
+    },
+    {
+      "path": "internal/architecturesearch/normalize.go",
+      "bytes": 14271,
+      "sha256": "818717837088c1a47289901465b4d164e37c293ad4e29e2f9b085c6f67ff0f05"
+    },
+    {
+      "path": "internal/architecturesearch/power_decoupling.go",
+      "bytes": 5889,
+      "sha256": "1be4710a0e0aea9f3995643675da05fb176c640695ad2a0d2429d1b5832c6e60"
+    },
+    {
+      "path": "internal/architecturesearch/power_sequence.go",
+      "bytes": 10148,
+      "sha256": "4860eba3fe00bad4fbc7343ba2716b4b95621d86687ff8d77e684be74b6d816e"
+    },
+    {
+      "path": "internal/architecturesearch/power_tree.go",
+      "bytes": 6238,
+      "sha256": "c48bb2dc93aca6c76a0d4c40d1c649a7af4600f643187173133a560cb5a89ba5"
+    },
+    {
+      "path": "internal/architecturesearch/preferred_values.go",
+      "bytes": 4199,
+      "sha256": "7c01e7d2d97f877e880080ebc50ad0b696c0b8011556a2fe83ac84d906517312"
+    },
+    {
+      "path": "internal/architecturesearch/provider_vocabulary.go",
+      "bytes": 1123,
+      "sha256": "5f285601c5836a4870bfec104bcc47b0e7549560e401a6b4f0856c364b2bad9a"
+    },
+    {
+      "path": "internal/architecturesearch/realization.go",
+      "bytes": 18964,
+      "sha256": "e64f0595006d79a7f884822bbeb5835f7e06681e01bdc78cd4ffeac151ca20e7"
+    },
+    {
+      "path": "internal/architecturesearch/registry.go",
+      "bytes": 4080,
+      "sha256": "16a8d3f8793f8671815282807c70f81cfd0a87df0da2aa31f2c8d863afa732b4"
+    },
+    {
+      "path": "internal/architecturesearch/search.go",
+      "bytes": 78338,
+      "sha256": "a48069ef3869cf989c35277904a012b744a615e49d1274112a0a76645e63a527"
+    },
+    {
+      "path": "internal/architecturesearch/search_model.go",
+      "bytes": 11263,
+      "sha256": "f32118e60e704e86dc0f0a1fc4afe3cf90103f561e695cd697f5fd039377bc27"
+    },
+    {
+      "path": "internal/architecturesearch/semantic_capabilities.go",
+      "bytes": 11979,
+      "sha256": "6c31ec891dc769b273ed9404a1afdf2f46c0c38a983dbd3243100f52ff4f7579"
+    },
+    {
+      "path": "internal/architecturesearch/solvers_active.go",
+      "bytes": 19059,
+      "sha256": "842c3eed487d9755899a3afc328fc8fee5a425764cac26c5df0cad3ec79bee73"
+    },
+    {
+      "path": "internal/architecturesearch/solvers_current_sense.go",
+      "bytes": 5479,
+      "sha256": "44e67cdcfafa995cb3a4e68d311d8b9aa12da61bdbcd46e73ef807eedfb7f7ab"
+    },
+    {
+      "path": "internal/architecturesearch/solvers_filter.go",
+      "bytes": 10792,
+      "sha256": "87b3fb825a21a84b113ebf86f098ea735143b35705b3415307f9a7f3e19c58d5"
+    },
+    {
+      "path": "internal/architecturesearch/solvers_passive.go",
+      "bytes": 16830,
+      "sha256": "43d8aa18bd25622a54f7bb0243a9e8112d222f9787e6b55d25e47049b0aeeda2"
+    },
+    {
+      "path": "internal/architecturesearch/validate.go",
+      "bytes": 56499,
+      "sha256": "280adac0f08434660f817357ed18d8309a3756257e63e8e42b9280ee405b6361"
+    },
+    {
+      "path": "internal/architecturesearch/value_model.go",
+      "bytes": 9352,
+      "sha256": "e591f55902e9c0af8868828c73afbb98e1dcbb57f1ae333efdf79f2928e29189"
+    },
+    {
+      "path": "internal/behavioralintent/closed_loop.go",
+      "bytes": 2916,
+      "sha256": "c06c597a82b7f8e75f90ed009cb6af8cd9c987645da14bd551260ef27c3baf3b"
+    },
+    {
+      "path": "internal/behavioralintent/compile.go",
+      "bytes": 20741,
+      "sha256": "7dbea13c1b8f4122e89b979c385d9cf1c6083e78a90cae11e892bd58d10c4683"
+    },
+    {
+      "path": "internal/behavioralintent/decode.go",
+      "bytes": 2268,
+      "sha256": "984cb6b623e639f1f3f400a3c18cc3e4bb0891195c32ca19a774c0365cbf1c6d"
+    },
+    {
+      "path": "internal/behavioralintent/follow_up.go",
+      "bytes": 9019,
+      "sha256": "55d8adf38bfbab9fa53d4fd6d121b9235e8548a475ac453d835450c62a760624"
+    },
+    {
+      "path": "internal/behavioralintent/model.go",
+      "bytes": 6691,
+      "sha256": "9182261c7a46967033b38e68ecda30dcfecd01a4706939306da28ab66680c780"
+    },
+    {
+      "path": "internal/behavioralintent/provider_context.go",
+      "bytes": 8624,
+      "sha256": "c55f0c5d8f45b39ffd63d96a564c47f9cb79503d43cba0d70be08a7ef632cdd1"
+    },
+    {
+      "path": "internal/behavioralintent/schema.go",
+      "bytes": 3510,
+      "sha256": "44a5f28871dbcec05160518342b6a4a225661d2b8ff92fbe0666573dec53a8ad"
+    },
+    {
+      "path": "internal/behavioralintent/search.go",
+      "bytes": 5722,
+      "sha256": "bf5ab8b5b097fbde1729b4852754524be27dca1d16a7c71d5b1bf045904702a1"
+    },
+    {
+      "path": "internal/behavioralintent/semantic_schema.go",
+      "bytes": 12260,
+      "sha256": "699ccfe2339cfd01d2cae89dc3cc50b52d3c38e242ec05ae746f370126fd55e6"
+    },
+    {
+      "path": "internal/behavioralintent/source.go",
+      "bytes": 1834,
+      "sha256": "f9ecc8ebfd313e2d0bdb7a8307a74dd399cca789f77ffca2cca5ef3222f2178c"
+    },
+    {
+      "path": "internal/components/amplifier_evidence.go",
+      "bytes": 16171,
+      "sha256": "24b697654ce56a22e9c6b6149e9d2fc78dbff166d51c5fd90c43a6390f9add45"
+    },
+    {
+      "path": "internal/components/amplifier_output.go",
+      "bytes": 12259,
+      "sha256": "b476f8c07bd7096535c160c6105bd74f6ca7e085fb5063577242f1bbaa25004a"
+    },
+    {
+      "path": "internal/components/catalog.go",
+      "bytes": 87412,
+      "sha256": "fe47758a62407d5076844d28e929afaf88ef7a386cb6c4a705013287fd3a4e66"
+    },
+    {
+      "path": "internal/components/catalog_v18.go",
+      "bytes": 1375,
+      "sha256": "c9ccb1fbde5dadc91c8866ef01a0308a437b910a7a653903d43045077aed985a"
+    },
+    {
+      "path": "internal/components/coverage.go",
+      "bytes": 10109,
+      "sha256": "79ad7caab7bebcc5b5b8d0d7e5e29b8d1ddae966e34fc9ad17e0d1784b3d02ed"
+    },
+    {
+      "path": "internal/components/engineering_quantity.go",
+      "bytes": 6588,
+      "sha256": "41311a43cbd2855ee819f09cd7f6b59a7502ca779740bbb3cb5ef276daa4e973"
+    },
+    {
+      "path": "internal/components/evidence.go",
+      "bytes": 9833,
+      "sha256": "b9c5aa06587044aca833909fbb33d945831c75bf31960efd0f8fdbd17fbd368d"
+    },
+    {
+      "path": "internal/components/library_validation.go",
+      "bytes": 6008,
+      "sha256": "e5506331523d71deac31044f93b5a25d8c884406f0243dc602e45ebd345033a4"
+    },
+    {
+      "path": "internal/components/mcu_evidence.go",
+      "bytes": 25914,
+      "sha256": "99a3e22a5004fefacd275acde14841a3a5e45b6ea2f4d6761c85fa79ab3b519e"
+    },
+    {
+      "path": "internal/components/model.go",
+      "bytes": 54254,
+      "sha256": "1ef2401d8357bffba0b2a059105780bf572ac64f57ca0dc4714e2786f5d53952"
+    },
+    {
+      "path": "internal/components/resistor_evidence.go",
+      "bytes": 3668,
+      "sha256": "54ff0fe9ae9f1e73bb3c3760f942b41962e767381cda81fb4ba8045bbea340d9"
+    },
+    {
+      "path": "internal/components/selection.go",
+      "bytes": 57580,
+      "sha256": "6c5227c3ec4bbfaa99dbdab620232f8c3a47cbe6691194d326d6980336e69a9b"
+    },
+    {
+      "path": "internal/components/source.go",
+      "bytes": 13396,
+      "sha256": "05199df9aba33af23265000ce084fe00bcd4b197cae1bbc3417ad500a69d05d0"
+    },
+    {
+      "path": "internal/modelprovenance/registry.go",
+      "bytes": 7075,
+      "sha256": "fe48f0c125d28afe092c129befee2cb9f6f907ddf760ab64c81ce376f582da50"
+    },
+    {
+      "path": "internal/modelprovenance/registry_v18.go",
+      "bytes": 1066,
+      "sha256": "e03ddd8d2b3b0f34fefa448d71a9b273f2bd7606f52ee25f68b4cb4465917b10"
+    },
+    {
+      "path": "internal/practicalboardeval/engine.go",
+      "bytes": 24087,
+      "sha256": "c3515a0147750ea0bfd49279108ad35a078740fffc23b3d5660969c4f652ad7e"
+    },
+    {
+      "path": "internal/practicalboardeval/evidence.go",
+      "bytes": 13906,
+      "sha256": "c2702786cb077d35b0719555b96ce96c212d72a82a48eb64b4d1f58c9124fdfb"
+    },
+    {
+      "path": "internal/practicalboardeval/transport.go",
+      "bytes": 6578,
+      "sha256": "9b17897e4d563cdd424f39e41d40e5a28e633f535a2d7ba8ef7266c958e87446"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/LIVE-PROTOCOL-PROPOSAL.md",
+      "bytes": 8086,
+      "sha256": "b49cce009e1e272c42df3fb6b4d3e4d50e0f8f6c526157f4cb7e7008ed6b7909"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/AUTHORIZATION.md",
+      "bytes": 1650,
+      "sha256": "6eec6ee1970f852d7159fcc9f8a46cc43f6593e4496dd4bf10f6f21cf8454689"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/FEASIBILITY.md",
+      "bytes": 3910,
+      "sha256": "825fd2afd184a1bda3a124c48ac1e863da37703c7287a321d312d17939bebe4a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/PREPARATION-REVIEW.md",
+      "bytes": 6299,
+      "sha256": "60fdad47612ca56f47d12782c72d8462c52e786bcf7ef3379168b80f5bc6116f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/SPEC.md",
+      "bytes": 9411,
+      "sha256": "6620dabd488792289d4d28651dca1a6c98354ad7e9a67632957b015f0534f241"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/authenticate.mjs",
+      "bytes": 15528,
+      "sha256": "7e04164854a0e756ac3754d683b75ae0494eb15225a70feaf71078df61fac72c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/authenticate.test.mjs",
+      "bytes": 1908,
+      "sha256": "01bfd65b8a62c1990f4ec8e71ccac0db2bdc10d0c305484cfd45347c8428f82b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/corpus.json",
+      "bytes": 14668,
+      "sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/pricing.json",
+      "bytes": 1156,
+      "sha256": "e4ebbd0fa65c0364fc4301a0ed60ab52900eca9663c0a68f97336c795d1edf2b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C01.initial.request.json",
+      "bytes": 91483,
+      "sha256": "f7e9135a66e0d3bd43b5d567849b3e0da1f1316fe4417b6d9b529ec35ac2b199"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C01.max_diagnostics.request.json",
+      "bytes": 104144,
+      "sha256": "342b3934579a8cee255f4b49d9a0d40a3fd37f60c49bbacc22f8b0178b6894ff"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C02.initial.request.json",
+      "bytes": 91309,
+      "sha256": "540c307bd377f3d8477402e6cc493dee0007472d9e665eda9e75633ab98a6d33"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C02.max_diagnostics.request.json",
+      "bytes": 103970,
+      "sha256": "3af48e241774c89df29d4b8e8a8bc2dde5443b23971fb7aee856ac999b0aa27f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I01.initial.request.json",
+      "bytes": 91553,
+      "sha256": "5a910edb97bb8b0d9f1b9bff8ea520b866ce0868a463db235d1d1a1a8a492a4b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I01.max_diagnostics.request.json",
+      "bytes": 104214,
+      "sha256": "f75710dca34631b45a29374360a53bf79c9caeeece0d1a7849caa11d518e3510"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I02.initial.request.json",
+      "bytes": 91815,
+      "sha256": "6e316e740f9790dcad406b7f2865061f473bd282bdd5bf22742840da31631af0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I02.max_diagnostics.request.json",
+      "bytes": 104476,
+      "sha256": "ea8863247cd04ecb9f4e9da0a12a64d58fc4a9fdf4d7b221e8e552456d993876"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I03.initial.request.json",
+      "bytes": 92325,
+      "sha256": "0bf1b5aa3139054a693091534cef8c186511d8265b4eef38a40f01f4550040a4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I03.max_diagnostics.request.json",
+      "bytes": 104986,
+      "sha256": "672bee4b9352ce6840eaeee68f24861eab7465c5a5d175cfe341db95e5e34799"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I04.initial.request.json",
+      "bytes": 91173,
+      "sha256": "c083784fc07962b535b3d11a7819fef0e0ba234423d5d3bfe98fd88d78bdbdce"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I04.max_diagnostics.request.json",
+      "bytes": 103834,
+      "sha256": "1d57ff210d0bcf5863d7bd26f474dd5850b6c0d32d32aab81cf0c259ddea83fc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R01.initial.request.json",
+      "bytes": 90763,
+      "sha256": "8000464d76acf6b189111e1178986f95dbc7e717f158d3114899a16788b6b73a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R01.max_diagnostics.request.json",
+      "bytes": 103424,
+      "sha256": "898783b40b1d39ba976177b00eb42b4a82aa6e8e2e332d9dee6e15f0b56260e7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R02.initial.request.json",
+      "bytes": 91389,
+      "sha256": "47c3aa240b406d32c0ff0530a48570cff5be5afc127f0feaf8542ca770ed7778"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R02.max_diagnostics.request.json",
+      "bytes": 104050,
+      "sha256": "a330f36490f71f4002f23cd7893589ca85e718e3f8f09f88ced2622a7f778f73"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/installed-capabilities.json",
+      "bytes": 3939,
+      "sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/preflight.json",
+      "bytes": 3382,
+      "sha256": "5af557e1da37f5482ff89bcffb9f0c7539d147b2f19fb0a6c8e0a9e98596a721"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/provider-schema.json",
+      "bytes": 80241,
+      "sha256": "5c7cbfaf57e60e1d11a6462c1f7771befd0e1c72f4f68429d3c837521e32083a"
+    }
+  ]
+}
