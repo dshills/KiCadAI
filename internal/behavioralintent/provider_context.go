@@ -118,6 +118,12 @@ func BuildProviderContext(prompt string, capabilities json.RawMessage) (string, 
 			"explicit/bounded uncertainty has empty resolved_by; capability_gap uncertainty names its gap ID; do not mix clarification and capability_gap outcomes; use requirement null when blocked",
 			"bindings select exactly one external port, one directed signal, or one participant/participant_port pair; all other selector strings are empty; signal endpoints require one source and sinks, or at least two bidirectional endpoints",
 			"domain source is external or a declared supply signal ID; use the registered metric/analysis/unit and operating-axis/unit combinations exactly; cross-reference existence and numeric bound ordering are compiler-enforced",
+			"requirement coverage IDs are exactly declared domain, external port, signal, participant, objective, operating-case and behavioral-requirement IDs; project names, constraint names and local participant-port IDs are not coverage identities; cover a participant port through its participant ID without discarding the port facts",
+			"numeric operating targets are circuit or declared domain, external port or signal IDs, never objective names or participant IDs; use circuit for a truly whole-circuit ambient range and retain endpoint-specific ranges on the appropriate declared target",
+			"constraint names are unique within each constraint list; retain a voltage nominal value and its full bounds in the domain or port nominal/minimum/maximum fields rather than duplicating a constraint name or dropping a bound",
+			"voltage_regulation must produce a declared power signal that is the source of its derived supply domain; a regulated output is not an independent external supply; preserve coherent source/sink bindings and do not add a fictitious consumer or function to make a signal valid",
+			"v3 observations are port, signal, domain, or circuit; circuit observation ID must be exactly circuit; participant/local-port IDs are not directly observable; do not replace a required participant endpoint with an unrelated external connector or a whole-circuit claim that cannot identify the required measurement; if no faithful supported representation exists, emit a capability gap",
+			"diagnostic paths describe the normalized proposal with arrays sorted by semantic identity; use the named failing identity, not the index into your original unsorted arrays, when applying a correction",
 		},
 	}
 	encoded, err := json.Marshal(context)

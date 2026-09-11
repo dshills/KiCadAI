@@ -38,6 +38,7 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.signals()
 	validator.participants()
 	validator.objectives()
+	validator.regulationSources()
 	validator.multiControlSafetyObjectives()
 	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
 	validator.operatingCases()
@@ -700,7 +701,7 @@ func (validator *requirementValidator) operatingCondition(path string, condition
 		return
 	}
 	if !validator.semanticTargetExists(condition.Target) {
-		validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic target")
+		validator.add(CodeBindingUnresolved, path+".target", fmt.Sprintf("operating target %q must be circuit or a declared domain, external port or signal ID; objective and participant IDs are not operating targets", condition.Target))
 	}
 	if condition.Selection != "" {
 		validator.add(CodeOperatingCaseInvalid, path+".selection", "numeric operating axes cannot declare a corner selection")
@@ -1024,7 +1025,7 @@ func (validator *requirementValidator) constraints(path string, constraints []Co
 		if !validSemanticID(constraint.Name) {
 			validator.add(CodeConstraintInvalid, constraintPath+".name", "constraint name must be a normalized semantic identifier")
 		} else if seen[constraint.Name] {
-			validator.add(CodeIdentityDuplicate, constraintPath+".name", "constraint name is duplicated")
+			validator.add(CodeIdentityDuplicate, constraintPath+".name", fmt.Sprintf("constraint name %q is duplicated; use one constraint per name and retain nominal/minimum/maximum voltage in domain or port fields where applicable", constraint.Name))
 		}
 		seen[constraint.Name] = true
 		if !allowedRelation(constraint.Relation) {

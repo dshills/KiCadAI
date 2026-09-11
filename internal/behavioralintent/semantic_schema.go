@@ -160,7 +160,12 @@ func constrainProviderType(value reflect.Type, schema map[string]any) map[string
 		}
 		return map[string]any{"anyOf": branches}
 	case reflect.TypeOf(architecturesearch.Observation{}):
-		p["kind"] = enumSchema("port", "signal", "domain", "circuit")
+		endpoint := maps.Clone(p)
+		endpoint["kind"] = enumSchema("port", "signal", "domain")
+		circuit := maps.Clone(p)
+		circuit["kind"] = schemaConstant("string", "circuit")
+		circuit["id"] = schemaConstant("string", "circuit")
+		return map[string]any{"anyOf": []any{strictSchemaObject(endpoint), strictSchemaObject(circuit)}}
 	case reflect.TypeOf(architecturesearch.Acceptance{}):
 		var mandatory architecturesearch.Acceptance
 		applyMandatoryAcceptance(&mandatory)

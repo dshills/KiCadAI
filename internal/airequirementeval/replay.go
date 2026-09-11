@@ -30,8 +30,12 @@ func canonicalCompilation(result behavioralintent.Result) ([]byte, error) {
 		return nil, err
 	}
 	var issues []json.RawMessage
-	if err := json.Unmarshal(fields["issues"], &issues); err != nil {
-		return nil, err
+	// Result omits issues when empty. Preserve that absence instead of decoding
+	// a nil RawMessage (which reports unexpected end of JSON input).
+	if raw, present := fields["issues"]; present {
+		if err := json.Unmarshal(raw, &issues); err != nil {
+			return nil, err
+		}
 	}
 	if len(issues) > 1 {
 		slices.SortFunc(issues, func(a, b json.RawMessage) int { return bytes.Compare(a, b) })

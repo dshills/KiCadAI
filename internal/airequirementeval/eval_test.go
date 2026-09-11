@@ -338,7 +338,14 @@ func TestRunCaseRequiresBoundReviewBeforeFixedAnswer(t *testing.T) {
 				for {
 					data, err := os.ReadFile(filepath.Join(root, "initial", "selected.json"))
 					if err == nil && json.Valid(data) {
-						reviewError <- writeJSON(filepath.Join(root, "answer-review.json"), ReviewDecision{"C01", sha(data), approve, "offline test", "Question matches only the missing cutoff"})
+						// Publish a complete decision atomically. The reader correctly
+						// fails closed on malformed JSON, including a partial write.
+						staged := filepath.Join(root, "answer-review.staged.json")
+						err = writeJSON(staged, ReviewDecision{"C01", sha(data), approve, "offline test", "Question matches only the missing cutoff"})
+						if err == nil {
+							err = os.Link(staged, filepath.Join(root, "answer-review.json"))
+						}
+						reviewError <- err
 						return
 					}
 					select {
@@ -434,6 +441,15 @@ func TestResourceTreeRejectsSymlinks(t *testing.T) {
 }
 
 func TestOfflineReplayRecompilesAndRejectsInventoryTampering(t *testing.T) {
+	for _, zeroIssues := range []bool{false, true} {
+		t.Run(fmt.Sprintf("zero_issues_%t", zeroIssues), func(t *testing.T) {
+			testOfflineReplayAndInventoryTampering(t, zeroIssues)
+		})
+	}
+}
+
+func testOfflineReplayAndInventoryTampering(t *testing.T, zeroIssues bool) {
+	t.Helper()
 	parent := t.TempDir()
 	root := filepath.Join(parent, "raw")
 	frozen := filepath.Join(root, "frozen-inputs", SpecPath)
@@ -446,6 +462,11 @@ func TestOfflineReplayRecompilesAndRejectsInventoryTampering(t *testing.T) {
 	var corpus Corpus
 	if err := readJSON(filepath.Join("..", "..", SpecPath, "corpus.json"), &corpus); err != nil {
 		t.Fatal(err)
+	}
+	if zeroIssues {
+		// One synthetic source statement matches the fixture's complete coverage.
+		// This edits only an in-memory test corpus, never the frozen input file.
+		corpus.Cases[0].Prompt = "Use a 2.9 to 3.1 V supply, ground, analog input and output to filter at a cutoff between 1350 and 1650 Hz across the complete supply range with at most 10 components in 30 by 20 mm."
 	}
 	capabilities, err := loadCapabilities(context.Background())
 	if err != nil {
@@ -490,6 +511,9 @@ func TestOfflineReplayRecompilesAndRejectsInventoryTampering(t *testing.T) {
 	if reports.HasBlockingIssue(compiled.Issues) {
 		compiled.Status = behavioralintent.StatusInvalid
 		compiled.Requirement = nil
+	}
+	if zeroIssues && (compiled.Status != behavioralintent.StatusReady || len(compiled.Issues) != 0) {
+		t.Fatalf("synthetic no-issue replay fixture is not ready: %#v", compiled)
 	}
 	if err := writeNew(filepath.Join(initial, "attempt-1.intent.json"), intent); err != nil {
 		t.Fatal(err)
