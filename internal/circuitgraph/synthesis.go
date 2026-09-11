@@ -10,12 +10,15 @@ import (
 	"unicode"
 
 	"kicadai/internal/components"
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
+	"kicadai/internal/schematiclayout"
 )
 
 const (
 	SynthesisReportSchema                       = "kicadai.function-synthesis-report.v1"
+	SchematicLayoutTopologyV1                   = "topology-v1"
 	synthesisEstimatedComponentPitchMM          = 5.0
 	synthesisCongestedComponentPitchMM          = 7.5
 	synthesisCongestedComponentCount            = 32
@@ -101,6 +104,11 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		return Document{}, report, report.Issues
 	}
 
+	if profile := resolver.options.SchematicLayoutProfile; profile != "" && profile != SchematicLayoutTopologyV1 {
+		issue := synthesisIssue(CodeSynthesisIntentInvalid, "synthesis.layout_profile", "unsupported schematic layout profile", "select an explicitly supported schematic layout profile")
+		report.Issues = []reports.Issue{issue}
+		return Document{}, report, report.Issues
+	}
 	intent := *normalized.Synthesis
 	lowered := Document{
 		Schema: SchemaID, Version: Version,
@@ -254,6 +262,10 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 
 	layoutIssues := deriveFunctionLayout(&lowered, intent, report.Selections, resolver.recordsByID)
 	issues = append(issues, layoutIssues...)
+	if resolver.options.SchematicLayoutProfile == SchematicLayoutTopologyV1 {
+		applySynthesizedTopologyLayout(&lowered)
+		report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{Kind: "schematic_layout_profile", Subject: lowered.Project.Name, Value: SchematicLayoutTopologyV1, Source: SchematicLayoutTopologyV1})
+	}
 	assignSynthesisClockReturnPaths(&lowered)
 	if !reports.HasBlockingIssue(issues) {
 		if validationIssues := Validate(Normalize(lowered)); reports.HasBlockingIssue(validationIssues) {
@@ -1195,6 +1207,21 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	document.PCB.Keepouts = []PCBKeepout{}
 	document.PCB.Zones = []PCBZone{}
 	return nil
+}
+
+// applySynthesizedTopologyLayout operates only on the synthesized layout, not
+// on user-authored explicit placement constraints or any electrical/PCB data.
+func applySynthesizedTopologyLayout(document *Document) {
+	// Removing the single fixed-rank group also allows the shared role/topology
+	// inference to choose rotations and relative placements.
+	document.Schematic.Groups = nil
+	document.Schematic.Placements = nil
+	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
+	document.Schematic.Rules.MinGroupSpacingMM = float64(rules.MinStageSpacing) / float64(kicadfiles.MM(1))
+	document.Schematic.Rules.MinComponentSpacingMM = float64(rules.MinComponentSpacing) / float64(kicadfiles.MM(1))
+	document.Schematic.Rules.ReserveTitleBlock = true
+	document.Schematic.Rules.OrientEndpointLabels = true
+	document.Schematic.Rules.MaxAuxiliaryPerRank = 3
 }
 
 func synthesisCopperLayerCount(componentCount int, nets []Net) int {

@@ -183,11 +183,12 @@ type PadSpec struct {
 }
 
 type CreateProjectOperation struct {
-	Op            OperationKind     `json:"op"`
-	Name          string            `json:"name"`
-	Paper         string            `json:"paper,omitempty"`
-	PaperPortrait bool              `json:"paper_portrait,omitempty"`
-	TextVariables map[string]string `json:"text_variables,omitempty"`
+	SchematicNetClassDefaults bool              `json:"schematic_net_class_defaults,omitempty"`
+	Op                        OperationKind     `json:"op"`
+	Name                      string            `json:"name"`
+	Paper                     string            `json:"paper,omitempty"`
+	PaperPortrait             bool              `json:"paper_portrait,omitempty"`
+	TextVariables             map[string]string `json:"text_variables,omitempty"`
 }
 
 type SetBoardOutlineOperation struct {

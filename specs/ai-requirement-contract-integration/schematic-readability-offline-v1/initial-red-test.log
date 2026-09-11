@@ -1,0 +1,7 @@
+--- FAIL: TestSynthesizedSchematicLayoutDoesNotPinEveryComponentToOneRank (0.00s)
+    synthesized_readability_test.go:15: synthesis must leave schematic groups and orientations to role/topology inference
+    synthesized_readability_test.go:18: PCB spacing must not override standard schematic spacing
+    synthesized_readability_test.go:21: generated schematics must orient labels away from bodies and reserve the title block
+FAIL
+FAIL	kicadai/internal/circuitgraph	0.357s
+FAIL

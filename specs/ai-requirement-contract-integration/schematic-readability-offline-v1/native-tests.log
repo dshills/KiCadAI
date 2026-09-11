@@ -1,0 +1,8 @@
+=== RUN   TestTopologyReadabilityNativePromotion
+=== RUN   TestTopologyReadabilityNativePromotion/standalone_regulator
+=== RUN   TestTopologyReadabilityNativePromotion/controller_adc_100ma
+--- PASS: TestTopologyReadabilityNativePromotion (30.83s)
+    --- PASS: TestTopologyReadabilityNativePromotion/standalone_regulator (7.79s)
+    --- PASS: TestTopologyReadabilityNativePromotion/controller_adc_100ma (10.94s)
+PASS
+ok  	kicadai/internal/compositionlowering	31.237s

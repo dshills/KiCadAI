@@ -520,7 +520,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		routesByKey:         layoutRouteHints(layoutResult, labelConflicts),
 		labelsByKey:         layoutEndpointLabelHints(layoutResult, labelConflicts),
 		netLabelPreferences: netLabelPreferences,
-		textByID:            layoutTextPlacements(layoutResult),
+		textByID:            layoutTextPlacements(layoutResult, document.Layout.Rules.OrientEndpointLabels),
 		issues:              preflightIssues,
 	}
 	state.indexSchematicCollisionAnchors()
@@ -709,10 +709,13 @@ func readableLayoutDiagnosticAllowed(result schematiclayout.Result, code string)
 
 func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
-		Op:            transactions.OpCreateProject,
-		Name:          state.document.Metadata.Name,
-		Paper:         state.paper,
-		PaperPortrait: state.paperPortrait,
+		// The opt-in oriented schematic profile includes explicit native wire
+		// drawing defaults; an incomplete Default net class can plot invisibly.
+		SchematicNetClassDefaults: state.document.Layout.Rules.OrientEndpointLabels,
+		Op:                        transactions.OpCreateProject,
+		Name:                      state.document.Metadata.Name,
+		Paper:                     state.paper,
+		PaperPortrait:             state.paperPortrait,
 	}
 	state.appendOperation(tx, transactions.OpCreateProject, payload, "", "")
 }
@@ -955,27 +958,39 @@ type layoutTextPlacement struct {
 	value     *transactions.Point
 }
 
-func layoutTextPlacements(result schematiclayout.Result) map[string]layoutTextPlacement {
+func layoutTextPlacements(result schematiclayout.Result, nativeCentered bool) map[string]layoutTextPlacement {
 	placements := make(map[string]layoutTextPlacement, len(result.Components))
 	for _, component := range result.Components {
 		placement := layoutTextPlacement{}
 		if !component.ReferenceText.Box.Empty() {
+			at := component.ReferenceText.At
+			if nativeCentered {
+				at = textBoxCenter(component.ReferenceText.Box)
+			}
 			point := transactions.Point{
-				XMM: float64(component.PlacedAt.X+component.ReferenceText.At.X) / 1_000_000,
-				YMM: float64(component.PlacedAt.Y+component.ReferenceText.At.Y) / 1_000_000,
+				XMM: float64(component.PlacedAt.X+at.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+at.Y) / 1_000_000,
 			}
 			placement.reference = &point
 		}
 		if !component.ValueText.Box.Empty() {
+			at := component.ValueText.At
+			if nativeCentered {
+				at = textBoxCenter(component.ValueText.Box)
+			}
 			point := transactions.Point{
-				XMM: float64(component.PlacedAt.X+component.ValueText.At.X) / 1_000_000,
-				YMM: float64(component.PlacedAt.Y+component.ValueText.At.Y) / 1_000_000,
+				XMM: float64(component.PlacedAt.X+at.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+at.Y) / 1_000_000,
 			}
 			placement.value = &point
 		}
 		placements[component.Ref] = placement
 	}
 	return placements
+}
+
+func textBoxCenter(box schematiclayout.Rect) kicadfiles.Point {
+	return kicadfiles.Point{X: (box.MinX + box.MaxX) / 2, Y: (box.MinY + box.MaxY) / 2}
 }
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
@@ -2289,6 +2304,13 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			}
 		}
 		geometry := schematicLayoutGeometry(component, index)
+		pins := schematicLayoutPins(component, index)
+		if rules.OrientEndpointLabels {
+			// Reserve the external pin-number/name area as well as the drawn
+			// body. Body-only placement can put a neighboring amplifier across
+			// a controller's connection anchors even when bodies do not overlap.
+			geometry.Body = schematicAnnotationEnvelope(geometry.Body, pins)
+		}
 		flowRank := group.Rank
 		rankFixed := group.ID != "" && !group.Inferred
 		if schematicComponentIsPowerFlag(component) {
@@ -2331,7 +2353,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			Body:            geometry.Body,
 			BodyKnown:       geometry.known(),
 			GeometrySource:  geometry.Source,
-			Pins:            schematicLayoutPins(component, index),
+			Pins:            pins,
 			OriginalOrdinal: ordinalByID[component.ID],
 		})
 	}
@@ -3068,6 +3090,16 @@ func stringSliceContains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func schematicAnnotationEnvelope(body schematiclayout.Rect, pins []schematiclayout.Pin) schematiclayout.Rect {
+	for _, pin := range pins {
+		body.MinX = min(body.MinX, pin.At.X)
+		body.MinY = min(body.MinY, pin.At.Y)
+		body.MaxX = max(body.MaxX, pin.At.X)
+		body.MaxY = max(body.MaxY, pin.At.Y)
+	}
+	return body.Inflate(kicadfiles.MM(2.54))
 }
 
 func layoutRotations(document Document) map[string]float64 {
