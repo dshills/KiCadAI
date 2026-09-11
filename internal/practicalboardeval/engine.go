@@ -352,6 +352,12 @@ type followState struct {
 	input       behavioralintent.FollowUp
 }
 
+// Protocol v2 changes only the experimental provider request deadline.
+// Production defaults and all acceptance, attempt and resource caps are unchanged.
+func providerHTTPClient(transport http.RoundTripper) *http.Client {
+	return &http.Client{Transport: transport, Timeout: 5 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
 func (e *engine) generate(ctx context.Context, prompt, output string, opts RunOptions, caseID string, follow *followState) (behavioralintent.Proposal, behavioralintent.Result, int, error) {
 	contextJSON, err := behavioralintent.BuildProviderContext(prompt, e.capabilities)
 	if err != nil {
@@ -372,7 +378,7 @@ func (e *engine) generate(ctx context.Context, prompt, output string, opts RunOp
 		return behavioralintent.Proposal{}, behavioralintent.Result{}, 0, err
 	}
 	recorder := &RecordingTransport{Journal: opts.Journal, Output: output, Campaign: opts.Campaign, CaseID: caseID, Secret: os.Getenv("OPENAI_API_KEY")}
-	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: recorder.Secret, Model: Model, MaxOutputTokens: MaxOutputTokens, HTTPClient: &http.Client{Transport: recorder, Timeout: 2 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}})
+	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: recorder.Secret, Model: Model, MaxOutputTokens: MaxOutputTokens, HTTPClient: providerHTTPClient(recorder)})
 	if err != nil {
 		return behavioralintent.Proposal{}, behavioralintent.Result{}, 0, err
 	}

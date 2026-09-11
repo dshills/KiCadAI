@@ -1,0 +1,18 @@
+{
+  "schema": "kicadai.practical-board-protocol-verification.v1",
+  "protocol": "v2",
+  "verified_utc": "2026-09-11T12:09:25.665Z",
+  "verification_scope": "Timeout-only evaluator revision and seal-routing supervisor; no production/electrical/layout behavior changed.",
+  "go_command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY GOTOOLCHAIN=go1.26.8 GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod go test -short -race -p=1 -count=1 -timeout=3m ./internal/practicalboardeval ./internal/aiprovider ./cmd/practical-board-eval",
+  "go_exit_code": 0,
+  "go_output": "ok  \tkicadai/internal/practicalboardeval\t1.932s\nok  \tkicadai/internal/aiprovider\t1.963s\n?   \tkicadai/cmd/practical-board-eval\t[no test files]\n",
+  "node_command": "node --test specs/practical-sensor-controller-boards/evidence-utils.test.mjs specs/practical-sensor-controller-boards/protocol-v2.test.mjs",
+  "node_tests_passed": 5,
+  "node_tests_failed": 0,
+  "syntax_and_diff_checks": "pass",
+  "self_review": "Only helper extraction plus timeout 120->300 seconds changes evaluator execution. Versioned supervisor differs only in freeze routing, required seal coverage and recorded protocol metadata. Source reconstruction test proves every original frozen byte unchanged except this approved evaluator patch.",
+  "production_diff_outside_experiment": "none",
+  "corpus_passes_claimed": 0,
+  "provider_requests_for_verification": 0,
+  "full_regression_scope": "Previously recorded full offline and native reference controls were not rerun for this timeout-only change; their historical results are not new corpus passes."
+}
