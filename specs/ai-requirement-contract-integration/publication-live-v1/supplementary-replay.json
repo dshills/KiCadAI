@@ -1,0 +1,194 @@
+{
+  "audit_binary_sha256": "6e46b445c64c8b6a92d95ce3d61e2591e85977abba96254af62ce81d7d6074a5",
+  "audit_source_sha256": "63cbbf0aa480596d828ef84ef155fb98ff4fdb53913425a0042620b284e40090",
+  "board_generation_performed": false,
+  "comparison": "exact typed compilation values; only full issue objects sorted, duplicates retained; absent issues remain absent",
+  "frozen_inputs_verified": 110,
+  "limitation": "Post-run supplementary checker, not the sealed evaluator. The sealed replay failed on an omitted issues member and remains failed.",
+  "production_compiler_modified": false,
+  "provider_calls": 0,
+  "raw_inventory_authenticated": true,
+  "raw_root": "/tmp/kicadai-ai-requirement-interface-v1",
+  "replayed_attempts": [
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "2453b4e87051095256c812a21459bbc0b2e1cae632b245858bcec84e02ab4271",
+      "case_id": "I01",
+      "intent_sha256": "9c5e332c1696371ef9f3ebfe11991f98d9cc9c8cf7fa4b7c3062c9830c436a90",
+      "issues": 7,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 2,
+      "canonical_compilation_sha256": "660dd1e83bf60cec55cbc52878a77b9c4aad41d4d88d4c8b19a681c043cd775f",
+      "case_id": "I01",
+      "intent_sha256": "e2fbaefe649b19e5a299869287bc9b464ca745c9afd4583809dfd8c31ae21e8b",
+      "issues": 0,
+      "leg": "initial",
+      "status": "ready"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "8f31b2292bf9c1d26703b0904986ac9ba51fb5cbbc9e53106ae3e34aee7e22b9",
+      "case_id": "I02",
+      "intent_sha256": "da05faaa8c625164cc744e7ac8c28591345b61765369274349efd88f8ae78684",
+      "issues": 1,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 2,
+      "canonical_compilation_sha256": "0fde6a94f07c7393830f7c61e0e2c2d1be689f2601042f95f1ef8a2f705ccd36",
+      "case_id": "I02",
+      "intent_sha256": "136c5cb3d30989e2199130c4d6c77c6c86d2527cefe924749d511f3d8355106a",
+      "issues": 1,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "a16ea234367539e54ae8048634c019df063e144dfa5cd01fca6940effae5c2e0",
+      "case_id": "I03",
+      "intent_sha256": "73ba5302a6e7c5040c9fd5be74f96144923c8fd39617f1a13bb08d2b8d1d709d",
+      "issues": 2,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 2,
+      "canonical_compilation_sha256": "60528e765f75221fecf29e2fa188b3bf0e1daebb0c67f5d164c3d92651719883",
+      "case_id": "I03",
+      "intent_sha256": "3d201703022887af04a45d38ba5f7f3458ed4d42491961ff3e90777e76ffb3e6",
+      "issues": 5,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "35d7b99dedf449cd502cbb49381f95f1e54f924138b29934bffb94633f9b478d",
+      "case_id": "I04",
+      "intent_sha256": "13d10501777e302172f0092e3638900c530ebc18dc8e6cda048587eee94a4fda",
+      "issues": 7,
+      "leg": "initial",
+      "status": "invalid"
+    },
+    {
+      "attempt": 2,
+      "canonical_compilation_sha256": "03f4bcdc8e1c421e3a335ab8755872616a6852e54f334d4d9e112cb614ffec5e",
+      "case_id": "I04",
+      "intent_sha256": "ea3ff80eaed18fec6316a56a61a47046285576d0b56b29de48ec445a87c94b02",
+      "issues": 0,
+      "leg": "initial",
+      "status": "ready"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "e3327725e9d9302011395a4373b1b7146f180785bf09858857d11ce7a88a0454",
+      "case_id": "R01",
+      "intent_sha256": "54bc45d909821fb284c2238441638dbd04930f90212cca6efde24a51ba43afa6",
+      "issues": 0,
+      "leg": "initial",
+      "status": "unsupported"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "0fa0332d34014919ceecceb4fbd9308cb27ad937bbdae2dd31532bc3c48d3a21",
+      "case_id": "R02",
+      "intent_sha256": "a034d3cdde6d9ab4ca4e6b716898fa0ba138a6517f0890716df86790ebacd5d3",
+      "issues": 0,
+      "leg": "initial",
+      "status": "unsupported"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "5ee6f06d2a3d790d7525e3d9036ee1e92833a603252082bf8efaaa2c95878c1c",
+      "case_id": "C01",
+      "intent_sha256": "520468180841a63c85896a33a505a9b83df53eea1ecf17f97a6b416543b3dbaa",
+      "issues": 0,
+      "leg": "initial",
+      "status": "needs_clarification"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "3ffdb49405121fc59891803d4ce0e4f155cbf6d22d78a6079deac49d55d20175",
+      "case_id": "C01",
+      "intent_sha256": "47a075ddc0a52f82ce03606fb8a807e354543bb6aa788bf3fa977a931450e8fe",
+      "issues": 0,
+      "leg": "follow-up",
+      "status": "ready"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "420110b70e2f1d9485a4b33b97537168ae94f82d0981c37228029dac015068ff",
+      "case_id": "C02",
+      "intent_sha256": "36c7b73eb1ec8e10022ad94efd80d9b889e2256da6aa1a0dda72a5a3a2e6ec42",
+      "issues": 0,
+      "leg": "initial",
+      "status": "needs_clarification"
+    },
+    {
+      "attempt": 1,
+      "canonical_compilation_sha256": "6dce5df6488dc64846c773fe93f3e8999a653b454b636e1f54fd5bf28a34b160",
+      "case_id": "C02",
+      "intent_sha256": "4eea5e584bdb2c11b3c9300c821e505f5293f1a385a0bf8cc571375fe1c7db83",
+      "issues": 5,
+      "leg": "follow-up",
+      "status": "invalid"
+    },
+    {
+      "attempt": 2,
+      "canonical_compilation_sha256": "ceffbae27ea89427f687bda216783ee5ecfdd73db7bd6af76c29e19a1a89180c",
+      "case_id": "C02",
+      "intent_sha256": "be7e063ca0444110bd22fb5b1c7be2277c12c38b2a46a38934333255a709b8d7",
+      "issues": 3,
+      "leg": "follow-up",
+      "status": "invalid"
+    }
+  ],
+  "schema": "kicadai.interface-supplementary-offline-audit.v1",
+  "sealed_evaluator_binary_sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f",
+  "sealed_replay_passed": false,
+  "tampered_answer_controls": [
+    {
+      "case_id": "C01",
+      "field": "SourceSHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C01",
+      "field": "CapabilitySHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C01",
+      "field": "PriorProposalSHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C01",
+      "field": "PriorCompilationSHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C02",
+      "field": "SourceSHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C02",
+      "field": "CapabilitySHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C02",
+      "field": "PriorProposalSHA256",
+      "rejected": true
+    },
+    {
+      "case_id": "C02",
+      "field": "PriorCompilationSHA256",
+      "rejected": true
+    }
+  ]
+}

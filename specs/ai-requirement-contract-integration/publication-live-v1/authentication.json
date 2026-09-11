@@ -1,0 +1,174 @@
+{
+  "schema": "kicadai.interface-authentication.v1",
+  "verified_utc": "2026-09-11T15:27:13.609Z",
+  "raw_root": "/tmp/kicadai-ai-requirement-interface-v1",
+  "source_commit": "008491ddee707d739c86a083ddb35a093d38f927",
+  "binary_source_commit": "909c6a0290be26c7f13b96ea0c7cb81c60c58756",
+  "binary_sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f",
+  "freeze_sha256": "fafd5c8e381fc51e7633e5677b583ca6f041db9c3753151e0d51dc1109fef57a",
+  "raw_inventory_sha256": "fada814dd6f4c8e32dc5797ead08455bb86eb977283e411e026b4a5fbfb330d9",
+  "file_count": 304,
+  "total_bytes": 16140341,
+  "exact_environment_credential_scan": "absent",
+  "frozen_files_verified": 110,
+  "case_count": 8,
+  "clause_count": 57,
+  "resources_within_limits": true,
+  "campaign_stop_reason": "",
+  "requests": [
+    {
+      "number": 1,
+      "case_id": "I01",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 134225,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 2,
+      "case_id": "I01",
+      "leg": "initial",
+      "attempt": 2,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 159105,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 3,
+      "case_id": "I02",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 152550,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 4,
+      "case_id": "I02",
+      "leg": "initial",
+      "attempt": 2,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 147430,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 5,
+      "case_id": "I03",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 169725,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 6,
+      "case_id": "I03",
+      "leg": "initial",
+      "attempt": 2,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 161495,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 7,
+      "case_id": "I04",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 131730,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 8,
+      "case_id": "I04",
+      "leg": "initial",
+      "attempt": 2,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 157265,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 9,
+      "case_id": "R01",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 101980,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 10,
+      "case_id": "R02",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 97525,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 11,
+      "case_id": "C01",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 101865,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 12,
+      "case_id": "C01",
+      "leg": "follow-up",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 144435,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 13,
+      "case_id": "C02",
+      "leg": "initial",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 88155,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 14,
+      "case_id": "C02",
+      "leg": "follow-up",
+      "attempt": 1,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 156835,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    },
+    {
+      "number": 15,
+      "case_id": "C02",
+      "leg": "follow-up",
+      "attempt": 2,
+      "transport": "complete_capture",
+      "estimated_or_reserved_microusd": 160870,
+      "usage_available": true,
+      "supplemental_unaccepted_usage": null
+    }
+  ],
+  "estimated_or_reserved_usd": 2.06519,
+  "actual_billed_usd": null,
+  "provider_calls_by_authenticator": 0,
+  "semantic_faithfulness_audited_by_this_script": false
+}

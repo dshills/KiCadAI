@@ -1,0 +1,351 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "title": "KiCadAI interface evaluation: gate not met",
+    "surface": "report",
+    "generatedAt": "2026-09-11T15:24:12.265946Z",
+    "sources": [
+      {
+        "id": "results",
+        "label": "Authenticated receipts and source-bound clause audits",
+        "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql",
+        "query": {
+          "sql": "-- Read-only SQLite JSON aggregation of authenticated receipts and clause audits.\n-- Run from the repository root: sqlite3 -json :memory: \".read specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql\"\nWITH receipts AS (\n SELECT json_extract(value,'$.case_id') case_id,\n        COUNT(*) requests,\n        SUM(json_extract(value,'$.estimated_or_reserved_microusd')) cost_microusd\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/authentication.json'),'$.requests')\n GROUP BY case_id\n), reviewed AS (\n SELECT CAST(c.key AS INTEGER)+1 sequence, c.value audit,\n        json_extract(c.value,'$.case_id') case_id,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses') AS clause WHERE json_extract(clause.value,'$.status')='pass') passing_clauses,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses')) all_clauses\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/audits.json'),'$.cases') AS c\n)\nSELECT sequence AS \"order\", reviewed.case_id,\n json_extract(audit,'$.title') title, json_extract(audit,'$.kind') kind,\n receipts.requests, json_extract(audit,'$.initial_attempts') initial_requests,\n json_extract(audit,'$.follow_up_attempts') follow_up_requests,\n json_extract(audit,'$.first_attempt_status') first_status,\n COALESCE(NULLIF(json_extract(audit,'$.follow_up_final_status'),''),json_extract(audit,'$.initial_final_status')) final_status,\n CASE reviewed.case_id\n WHEN 'I01' THEN 'Faithful after correction'\n WHEN 'I02' THEN 'Failed: coverage reference'\n WHEN 'I03' THEN 'Failed: coverage/endpoints'\n WHEN 'I04' THEN 'Failed: external output source'\n WHEN 'R01' THEN 'Valid refusal'\n WHEN 'R02' THEN 'Valid refusal'\n WHEN 'C01' THEN 'Faithful clarification'\n WHEN 'C02' THEN 'Failed: follow-up contract' END outcome,\n passing_clauses || '/' || all_clauses clauses,\n cost_microusd/1000000.0 estimated_usd,\n (passing_clauses=all_clauses AND CASE json_extract(audit,'$.kind')\n WHEN 'ready' THEN json_extract(audit,'$.initial_final_status')='ready'\n WHEN 'refusal' THEN json_extract(audit,'$.initial_final_status')='unsupported'\n ELSE json_extract(audit,'$.initial_final_status')='needs_clarification' AND json_extract(audit,'$.follow_up_final_status')='ready' END) faithful,\n 0 sealed_replay_passed\nFROM reviewed JOIN receipts USING (case_id)\nORDER BY sequence;\n",
+          "language": "sql",
+          "engine": "SQLite (in-memory, read-only JSON inputs)",
+          "description": "Independent aggregation of generation receipts and all case clauses. Audits are hash-bound to raw evidence by derive.mjs; no rows are excluded. Fixed outcome labels summarize local semantic review.",
+          "tables_used": [
+            "authentication.json",
+            "audits.json"
+          ],
+          "metric_definitions": {
+            "requests": "Count of journal reservation records for each case, including one bounded correction per leg.",
+            "estimated_usd": "Sum of accepted input tokens at USD 5/million plus output tokens at USD 20/million, or unreleased reservations. Actual billing unknown.",
+            "faithful": "Appropriate compiler status and every frozen semantic clause passes, supported by raw authentication and supplementary offline checks; not a sealed replay pass or a board pass."
+          }
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# KiCadAI interface evaluation: gate not met"
+      },
+      {
+        "id": "summary",
+        "type": "markdown",
+        "body": "## Technical summary\n\nThe approved eight-case run completed, but it does not justify moving to board evaluation. Source-bound review found faithful outcomes in **1/4 ready cases, 2/2 refusals and 1/2 clarification workflows**. No full board was generated. The sealed replay failed because its comparator cannot handle an omitted empty issue list; a separate post-run offline checker matched all 15 compiler results and rejected all eight tampered answer bindings. These supplementary checks do not turn the sealed replay into a pass.",
+        "sourceId": "results"
+      },
+      {
+        "id": "findings",
+        "type": "markdown",
+        "body": "## Findings\n\nAll four ready cases initially failed compilation. One recovered faithfully within its single allowed correction. I04 also became compiler-ready, but incorrectly treated the regulated output supply as an independent external source: a compiler-accepted semantic counterexample. Both refusal cases passed on their first attempt. C01 completed clarification without correction; C02's follow-up stayed invalid after correction.",
+        "sourceId": "results"
+      },
+      {
+        "id": "requests",
+        "type": "chart",
+        "chartId": "requests"
+      },
+      {
+        "id": "case_table",
+        "type": "table",
+        "tableId": "cases"
+      },
+      {
+        "id": "method",
+        "type": "markdown",
+        "body": "## Definitions and method\n\nThis is a public-frozen interface test, not a blind test or a PCB reliability sample. Denominators are fixed at four ready, two refusal and two clarification cases, with no exclusions or unrun cases. A faithful workflow requires the appropriate compiler status and every case-specific semantic clause. First-attempt results require no correction in either leg: ready 0/4, refusals 2/2, completed clarifications 1/2. Correctly asking the initial clarification question was 2/2, which is distinct from completing the workflow. The chart counts every live generation POST, including corrections and bound-answer follow-ups.",
+        "sourceId": "results"
+      },
+      {
+        "id": "evidence",
+        "type": "markdown",
+        "body": "## Evidence and limits\n\nAll 304 raw files and 110 frozen inputs authenticated; all 57 clauses have exact file/hash/pointer links. There are 52 passing clauses, but clause totals do not override case failures. The run used 15/20 allowed requests and USD 2.065190 of conservative estimated/reserved spend against USD 25; this is not an invoice. Elapsed time was 13m 23s, with no sampling errors and sampled resource limits met. RSS sampling does not prove the instantaneous peak. Local SHA-256 provenance checks establish retained-byte consistency, not an independent provider-signed attestation. Semantic review was performed locally by Codex, not an independent reviewer.",
+        "sourceId": "results"
+      },
+      {
+        "id": "next",
+        "type": "markdown",
+        "body": "## Decision and next step\n\nThe interface gate is not met. Keep this evaluation immutable. The next proposed scope is an offline repair and regression-test pass for source modeling, legal coverage references, operating-condition targets and the replay comparator, followed by a separately approved evaluation on new held-out cases. No new API campaign, provider review, merge, release or fabrication is authorized by this result. The original six-board/two-uplift milestone remains unachieved."
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "body": "## Open questions\n\nCan the compiler reject a regulated rail mislabeled as an external source? Can the provider reliably emit legal coverage and measurement endpoints without correction? Will fixes generalize beyond this now-exposed corpus? Board synthesis, simulation, ERC/DRC, routing and manufacturing artifacts remain untested by this interface run."
+      }
+    ],
+    "charts": [
+      {
+        "id": "requests",
+        "type": "bar",
+        "title": "Generation requests by case",
+        "description": "Corrections and bound-answer follow-ups count toward the same fixed budget.",
+        "sourceId": "results",
+        "encodings": {
+          "x": {
+            "field": "case_id",
+            "type": "nominal",
+            "label": "Case"
+          },
+          "y": {
+            "field": "requests",
+            "type": "quantitative",
+            "label": "Generation POSTs"
+          }
+        },
+        "options": {
+          "orientation": "vertical",
+          "showLegend": false
+        },
+        "dataset": "cases",
+        "source": {
+          "id": "results",
+          "label": "Authenticated receipts and source-bound clause audits",
+          "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql",
+          "query": {
+            "sql": "-- Read-only SQLite JSON aggregation of authenticated receipts and clause audits.\n-- Run from the repository root: sqlite3 -json :memory: \".read specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql\"\nWITH receipts AS (\n SELECT json_extract(value,'$.case_id') case_id,\n        COUNT(*) requests,\n        SUM(json_extract(value,'$.estimated_or_reserved_microusd')) cost_microusd\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/authentication.json'),'$.requests')\n GROUP BY case_id\n), reviewed AS (\n SELECT CAST(c.key AS INTEGER)+1 sequence, c.value audit,\n        json_extract(c.value,'$.case_id') case_id,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses') AS clause WHERE json_extract(clause.value,'$.status')='pass') passing_clauses,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses')) all_clauses\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/audits.json'),'$.cases') AS c\n)\nSELECT sequence AS \"order\", reviewed.case_id,\n json_extract(audit,'$.title') title, json_extract(audit,'$.kind') kind,\n receipts.requests, json_extract(audit,'$.initial_attempts') initial_requests,\n json_extract(audit,'$.follow_up_attempts') follow_up_requests,\n json_extract(audit,'$.first_attempt_status') first_status,\n COALESCE(NULLIF(json_extract(audit,'$.follow_up_final_status'),''),json_extract(audit,'$.initial_final_status')) final_status,\n CASE reviewed.case_id\n WHEN 'I01' THEN 'Faithful after correction'\n WHEN 'I02' THEN 'Failed: coverage reference'\n WHEN 'I03' THEN 'Failed: coverage/endpoints'\n WHEN 'I04' THEN 'Failed: external output source'\n WHEN 'R01' THEN 'Valid refusal'\n WHEN 'R02' THEN 'Valid refusal'\n WHEN 'C01' THEN 'Faithful clarification'\n WHEN 'C02' THEN 'Failed: follow-up contract' END outcome,\n passing_clauses || '/' || all_clauses clauses,\n cost_microusd/1000000.0 estimated_usd,\n (passing_clauses=all_clauses AND CASE json_extract(audit,'$.kind')\n WHEN 'ready' THEN json_extract(audit,'$.initial_final_status')='ready'\n WHEN 'refusal' THEN json_extract(audit,'$.initial_final_status')='unsupported'\n ELSE json_extract(audit,'$.initial_final_status')='needs_clarification' AND json_extract(audit,'$.follow_up_final_status')='ready' END) faithful,\n 0 sealed_replay_passed\nFROM reviewed JOIN receipts USING (case_id)\nORDER BY sequence;\n",
+            "language": "sql",
+            "engine": "SQLite (in-memory, read-only JSON inputs)",
+            "description": "Independent aggregation of generation receipts and all case clauses. Audits are hash-bound to raw evidence by derive.mjs; no rows are excluded. Fixed outcome labels summarize local semantic review.",
+            "tables_used": [
+              "authentication.json",
+              "audits.json"
+            ],
+            "metric_definitions": {
+              "requests": "Count of journal reservation records for each case, including one bounded correction per leg.",
+              "estimated_usd": "Sum of accepted input tokens at USD 5/million plus output tokens at USD 20/million, or unreleased reservations. Actual billing unknown.",
+              "faithful": "Appropriate compiler status and every frozen semantic clause passes, supported by raw authentication and supplementary offline checks; not a sealed replay pass or a board pass."
+            }
+          }
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "cases",
+        "title": "Complete frozen case outcomes",
+        "sourceId": "results",
+        "columns": [
+          {
+            "field": "order",
+            "label": "#",
+            "type": "number"
+          },
+          {
+            "field": "case_id",
+            "label": "Case",
+            "type": "string"
+          },
+          {
+            "field": "first_status",
+            "label": "First response",
+            "type": "string"
+          },
+          {
+            "field": "outcome",
+            "label": "Reviewed outcome",
+            "type": "string"
+          },
+          {
+            "field": "clauses",
+            "label": "Clauses",
+            "type": "string"
+          },
+          {
+            "field": "requests",
+            "label": "POSTs",
+            "type": "number"
+          }
+        ],
+        "defaultSort": {
+          "field": "order",
+          "direction": "asc"
+        },
+        "dataset": "cases",
+        "source": {
+          "id": "results",
+          "label": "Authenticated receipts and source-bound clause audits",
+          "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql",
+          "query": {
+            "sql": "-- Read-only SQLite JSON aggregation of authenticated receipts and clause audits.\n-- Run from the repository root: sqlite3 -json :memory: \".read specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql\"\nWITH receipts AS (\n SELECT json_extract(value,'$.case_id') case_id,\n        COUNT(*) requests,\n        SUM(json_extract(value,'$.estimated_or_reserved_microusd')) cost_microusd\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/authentication.json'),'$.requests')\n GROUP BY case_id\n), reviewed AS (\n SELECT CAST(c.key AS INTEGER)+1 sequence, c.value audit,\n        json_extract(c.value,'$.case_id') case_id,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses') AS clause WHERE json_extract(clause.value,'$.status')='pass') passing_clauses,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses')) all_clauses\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/audits.json'),'$.cases') AS c\n)\nSELECT sequence AS \"order\", reviewed.case_id,\n json_extract(audit,'$.title') title, json_extract(audit,'$.kind') kind,\n receipts.requests, json_extract(audit,'$.initial_attempts') initial_requests,\n json_extract(audit,'$.follow_up_attempts') follow_up_requests,\n json_extract(audit,'$.first_attempt_status') first_status,\n COALESCE(NULLIF(json_extract(audit,'$.follow_up_final_status'),''),json_extract(audit,'$.initial_final_status')) final_status,\n CASE reviewed.case_id\n WHEN 'I01' THEN 'Faithful after correction'\n WHEN 'I02' THEN 'Failed: coverage reference'\n WHEN 'I03' THEN 'Failed: coverage/endpoints'\n WHEN 'I04' THEN 'Failed: external output source'\n WHEN 'R01' THEN 'Valid refusal'\n WHEN 'R02' THEN 'Valid refusal'\n WHEN 'C01' THEN 'Faithful clarification'\n WHEN 'C02' THEN 'Failed: follow-up contract' END outcome,\n passing_clauses || '/' || all_clauses clauses,\n cost_microusd/1000000.0 estimated_usd,\n (passing_clauses=all_clauses AND CASE json_extract(audit,'$.kind')\n WHEN 'ready' THEN json_extract(audit,'$.initial_final_status')='ready'\n WHEN 'refusal' THEN json_extract(audit,'$.initial_final_status')='unsupported'\n ELSE json_extract(audit,'$.initial_final_status')='needs_clarification' AND json_extract(audit,'$.follow_up_final_status')='ready' END) faithful,\n 0 sealed_replay_passed\nFROM reviewed JOIN receipts USING (case_id)\nORDER BY sequence;\n",
+            "language": "sql",
+            "engine": "SQLite (in-memory, read-only JSON inputs)",
+            "description": "Independent aggregation of generation receipts and all case clauses. Audits are hash-bound to raw evidence by derive.mjs; no rows are excluded. Fixed outcome labels summarize local semantic review.",
+            "tables_used": [
+              "authentication.json",
+              "audits.json"
+            ],
+            "metric_definitions": {
+              "requests": "Count of journal reservation records for each case, including one bounded correction per leg.",
+              "estimated_usd": "Sum of accepted input tokens at USD 5/million plus output tokens at USD 20/million, or unreleased reservations. Actual billing unknown.",
+              "faithful": "Appropriate compiler status and every frozen semantic clause passes, supported by raw authentication and supplementary offline checks; not a sealed replay pass or a board pass."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "status": "ready",
+    "generatedAt": "2026-09-11T15:24:12.265946Z",
+    "datasets": {
+      "cases": [
+        {
+          "order": 1,
+          "case_id": "I01",
+          "title": "External analog filter interface",
+          "kind": "ready",
+          "requests": 2,
+          "initial_requests": 2,
+          "follow_up_requests": 0,
+          "first_status": "invalid",
+          "final_status": "ready",
+          "outcome": "Faithful after correction",
+          "clauses": "8/8",
+          "estimated_usd": 0.29333,
+          "faithful": 1,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 2,
+          "case_id": "I02",
+          "title": "Composed filter and gain interface",
+          "kind": "ready",
+          "requests": 2,
+          "initial_requests": 2,
+          "follow_up_requests": 0,
+          "first_status": "invalid",
+          "final_status": "invalid",
+          "outcome": "Failed: coverage reference",
+          "clauses": "8/8",
+          "estimated_usd": 0.29998,
+          "faithful": 0,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 3,
+          "case_id": "I03",
+          "title": "Existing controller participant endpoint",
+          "kind": "ready",
+          "requests": 2,
+          "initial_requests": 2,
+          "follow_up_requests": 0,
+          "first_status": "invalid",
+          "final_status": "invalid",
+          "outcome": "Failed: coverage/endpoints",
+          "clauses": "7/8",
+          "estimated_usd": 0.33122,
+          "faithful": 0,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 4,
+          "case_id": "I04",
+          "title": "Regulation across supply and load cases",
+          "kind": "ready",
+          "requests": 2,
+          "initial_requests": 2,
+          "follow_up_requests": 0,
+          "first_status": "invalid",
+          "final_status": "ready",
+          "outcome": "Failed: external output source",
+          "clauses": "6/8",
+          "estimated_usd": 0.288995,
+          "faithful": 0,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 5,
+          "case_id": "R01",
+          "title": "Unavailable radiation calibration and certification",
+          "kind": "refusal",
+          "requests": 1,
+          "initial_requests": 1,
+          "follow_up_requests": 0,
+          "first_status": "unsupported",
+          "final_status": "unsupported",
+          "outcome": "Valid refusal",
+          "clauses": "5/5",
+          "estimated_usd": 0.10198,
+          "faithful": 1,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 6,
+          "case_id": "R02",
+          "title": "Unavailable event-directed control contract",
+          "kind": "refusal",
+          "requests": 1,
+          "initial_requests": 1,
+          "follow_up_requests": 0,
+          "first_status": "unsupported",
+          "final_status": "unsupported",
+          "outcome": "Valid refusal",
+          "clauses": "6/6",
+          "estimated_usd": 0.097525,
+          "faithful": 1,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 7,
+          "case_id": "C01",
+          "title": "Missing cutoff and tolerance",
+          "kind": "clarification",
+          "requests": 2,
+          "initial_requests": 1,
+          "follow_up_requests": 1,
+          "first_status": "needs_clarification",
+          "final_status": "ready",
+          "outcome": "Faithful clarification",
+          "clauses": "7/7",
+          "estimated_usd": 0.2463,
+          "faithful": 1,
+          "sealed_replay_passed": 0
+        },
+        {
+          "order": 8,
+          "case_id": "C02",
+          "title": "Missing regulated-load range",
+          "kind": "clarification",
+          "requests": 3,
+          "initial_requests": 1,
+          "follow_up_requests": 2,
+          "first_status": "needs_clarification",
+          "final_status": "invalid",
+          "outcome": "Failed: follow-up contract",
+          "clauses": "5/7",
+          "estimated_usd": 0.40586,
+          "faithful": 0,
+          "sealed_replay_passed": 0
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "results",
+      "label": "Authenticated receipts and source-bound clause audits",
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql",
+      "query": {
+        "sql": "-- Read-only SQLite JSON aggregation of authenticated receipts and clause audits.\n-- Run from the repository root: sqlite3 -json :memory: \".read specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql\"\nWITH receipts AS (\n SELECT json_extract(value,'$.case_id') case_id,\n        COUNT(*) requests,\n        SUM(json_extract(value,'$.estimated_or_reserved_microusd')) cost_microusd\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/authentication.json'),'$.requests')\n GROUP BY case_id\n), reviewed AS (\n SELECT CAST(c.key AS INTEGER)+1 sequence, c.value audit,\n        json_extract(c.value,'$.case_id') case_id,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses') AS clause WHERE json_extract(clause.value,'$.status')='pass') passing_clauses,\n        (SELECT COUNT(*) FROM json_each(c.value,'$.clauses')) all_clauses\n FROM json_each(readfile('specs/ai-requirement-contract-integration/publication-live-v1/audits.json'),'$.cases') AS c\n)\nSELECT sequence AS \"order\", reviewed.case_id,\n json_extract(audit,'$.title') title, json_extract(audit,'$.kind') kind,\n receipts.requests, json_extract(audit,'$.initial_attempts') initial_requests,\n json_extract(audit,'$.follow_up_attempts') follow_up_requests,\n json_extract(audit,'$.first_attempt_status') first_status,\n COALESCE(NULLIF(json_extract(audit,'$.follow_up_final_status'),''),json_extract(audit,'$.initial_final_status')) final_status,\n CASE reviewed.case_id\n WHEN 'I01' THEN 'Faithful after correction'\n WHEN 'I02' THEN 'Failed: coverage reference'\n WHEN 'I03' THEN 'Failed: coverage/endpoints'\n WHEN 'I04' THEN 'Failed: external output source'\n WHEN 'R01' THEN 'Valid refusal'\n WHEN 'R02' THEN 'Valid refusal'\n WHEN 'C01' THEN 'Faithful clarification'\n WHEN 'C02' THEN 'Failed: follow-up contract' END outcome,\n passing_clauses || '/' || all_clauses clauses,\n cost_microusd/1000000.0 estimated_usd,\n (passing_clauses=all_clauses AND CASE json_extract(audit,'$.kind')\n WHEN 'ready' THEN json_extract(audit,'$.initial_final_status')='ready'\n WHEN 'refusal' THEN json_extract(audit,'$.initial_final_status')='unsupported'\n ELSE json_extract(audit,'$.initial_final_status')='needs_clarification' AND json_extract(audit,'$.follow_up_final_status')='ready' END) faithful,\n 0 sealed_replay_passed\nFROM reviewed JOIN receipts USING (case_id)\nORDER BY sequence;\n",
+        "language": "sql",
+        "engine": "SQLite (in-memory, read-only JSON inputs)",
+        "description": "Independent aggregation of generation receipts and all case clauses. Audits are hash-bound to raw evidence by derive.mjs; no rows are excluded. Fixed outcome labels summarize local semantic review.",
+        "tables_used": [
+          "authentication.json",
+          "audits.json"
+        ],
+        "metric_definitions": {
+          "requests": "Count of journal reservation records for each case, including one bounded correction per leg.",
+          "estimated_usd": "Sum of accepted input tokens at USD 5/million plus output tokens at USD 20/million, or unreleased reservations. Actual billing unknown.",
+          "faithful": "Appropriate compiler status and every frozen semantic clause passes, supported by raw authentication and supplementary offline checks; not a sealed replay pass or a board pass."
+        }
+      }
+    }
+  ]
+}

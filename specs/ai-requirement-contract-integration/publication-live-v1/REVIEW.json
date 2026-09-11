@@ -1,0 +1,46 @@
+{
+  "schema": "kicadai.interface-publication-review.v1",
+  "reviewer": "Codex local review",
+  "independent_reviewer": false,
+  "live_calls_after_terminal": 0,
+  "scope": "Evidence publication and supplementary offline audit only; frozen and production sources unchanged.",
+  "tests": [
+    {
+      "command": "go test -race ./specs/ai-requirement-contract-integration/publication-live-v1/replay-audit ./internal/aiprovider ./internal/behavioralintent",
+      "result": "passed"
+    },
+    {
+      "command": "node --test specs/ai-requirement-contract-integration/live-v1/authenticate.test.mjs",
+      "result": "3 tests passed"
+    },
+    {
+      "command": "node specs/practical-sensor-controller-boards/publication-v2/authenticate.mjs",
+      "result": "passed; 472 files, 101237999 bytes"
+    },
+    {
+      "command": "node specs/practical-sensor-controller-boards/publication-v2/verify-publication.mjs --verify-local-archive",
+      "result": "passed; old archive verified"
+    },
+    {
+      "command": "node specs/practical-sensor-controller-boards/publication-v2/verify-audits.mjs",
+      "result": "passed; all 108 clauses"
+    }
+  ],
+  "render": {
+    "payload_validation": "passed",
+    "render_artifact": "accepted report payload",
+    "visual_inspection": "unavailable: computer-use access to Codex app denied for safety; no screenshot or pixel-level QA claim",
+    "sites_published": false
+  },
+  "comparison_methods": {
+    "node": "derive.mjs derives all source-bound cases and metrics",
+    "sql": "report-query.sql independently aggregates receipts and clause/status records; full row equality with Node verified"
+  },
+  "unresolved": [
+    "Interface gate not met",
+    "I04 compiler-accepted semantic defect",
+    "I02/I03/C02 compiler failures",
+    "Sealed replay comparator fails on omitted issues; supplementary audit does not replace frozen result"
+  ],
+  "recommendation": "New decision required before any production repair or live evaluation."
+}
