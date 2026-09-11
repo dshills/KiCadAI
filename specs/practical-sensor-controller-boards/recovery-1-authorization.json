@@ -1,0 +1,37 @@
+{
+  "schema": "kicadai.practical-board-recovery-authorization.v1",
+  "recorded_utc": "2026-09-11T09:39:23.059Z",
+  "authorization_text": "I approve the separately recorded recovery baseline",
+  "scope": "One separately recorded recovery baseline; unchanged frozen tests, model, evaluator, acceptance criteria, and original cumulative limits. No authorization for another recovery, automatic retry, merge, release, or support-boundary expansion.",
+  "original_root": "/tmp/kicadai-practical-sensor-controller-public-1",
+  "recovery_root": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-1",
+  "original_evidence_inventory": "baseline-evidence-inventory.json",
+  "original_evidence_inventory_sha256": "48502181af3ae2e94f7cf4854560764ac13e9d75d0abe96a78bf71d07281bf34",
+  "original_freeze_sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e",
+  "verified_before_recovery": {
+    "frozen_files": 18,
+    "original_evidence_files": 25,
+    "tools_match_frozen_environment": true,
+    "production_matches_merged_V23": true,
+    "source_commit_before_recovery_record": "f381829ead1bbb24d642838f380e02bdcc81dfd7"
+  },
+  "journal_policy": {
+    "canonical_for_recovery_and_later_final": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-1/request-journal",
+    "copied_original_entries": [
+      "001.reservation.json",
+      "001.usage.json"
+    ],
+    "copied_receipts_are_not_new_requests": true,
+    "original_journal_remains_immutable": true,
+    "carryover_request_count": 1,
+    "carryover_estimated_or_reserved_usd": 0.45609600000000006,
+    "maximum_baseline_requests_including_carryover": 36,
+    "remaining_baseline_requests": 35,
+    "maximum_total_requests_including_carryover": 72,
+    "remaining_total_requests": 71,
+    "maximum_estimated_or_reserved_usd": 50,
+    "remaining_estimated_or_reserved_usd": 49.543904
+  },
+  "comparison_policy": "The original interrupted run remains separately reported, with no capability score. The approved recovery cohort supplies baseline design outcomes if complete; recovery attempts are labeled as such and cannot be represented as uninterrupted first-workflow successes. No case or criterion is removed.",
+  "implementation_policy": "No production changes before a recovery-baseline-driven scope decision demonstrating a credible path to two distinct complete uplifts under at most three generic fixes. Reserved cases remain excluded from implementation tuning."
+}
