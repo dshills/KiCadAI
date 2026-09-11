@@ -81,8 +81,7 @@ func constrainProviderType(value reflect.Type, schema map[string]any) map[string
 		p["control_transitions"] = emptyArraySchema()
 	case reflect.TypeOf(architecturesearch.Domain{}):
 		p["kind"] = enumSchema("reference", "supply")
-		p["source"] = semanticIDSchema(false)
-		p["source"].(map[string]any)["description"] = "external, or the ID of a declared supply signal with resolved source/sink bindings; never a component or port ID"
+		p["source"] = map[string]any{"anyOf": []any{semanticIDSchema(false), map[string]any{"type": "string", "pattern": `^port:[a-z][a-z0-9_]{0,63}$`, "maxLength": 69}}, "description": "external, a declared supply signal ID with resolved source/sink bindings, or port:<id> for a same-domain generated power output with one objective output-role producer and one circuit reference domain; never a component ID"}
 		p["nominal_voltage_v"] = numberSchema(-1000, 1000)
 		for _, name := range []string{"min_voltage_v", "max_voltage_v"} {
 			p[name] = nullableSchema(numberSchema(-1000, 1000))
@@ -165,7 +164,10 @@ func constrainProviderType(value reflect.Type, schema map[string]any) map[string
 		circuit := maps.Clone(p)
 		circuit["kind"] = schemaConstant("string", "circuit")
 		circuit["id"] = schemaConstant("string", "circuit")
-		return map[string]any{"anyOf": []any{strictSchemaObject(endpoint), strictSchemaObject(circuit)}}
+		participant := maps.Clone(p)
+		participant["kind"] = schemaConstant("string", "participant_port")
+		participant["id"] = map[string]any{"type": "string", "pattern": `^[a-z][a-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,63}$`, "maxLength": 129}
+		return map[string]any{"anyOf": []any{strictSchemaObject(endpoint), strictSchemaObject(circuit), strictSchemaObject(participant)}}
 	case reflect.TypeOf(architecturesearch.Acceptance{}):
 		var mandatory architecturesearch.Acceptance
 		applyMandatoryAcceptance(&mandatory)

@@ -837,6 +837,23 @@ func behavioralObservationReferenceNode(requirement architecturesearch.Requireme
 	}
 	domainID := ""
 	switch observation.Kind {
+	case "participant_port":
+		// Until participants carry explicit reference routing, the public
+		// contract supports one reference domain only. Do not bypass that
+		// boundary with a name-based ground guess during direct plan binding.
+		references := 0
+		for _, domain := range requirement.Requirements.Domains {
+			if domain.Kind == "reference" {
+				references++
+			}
+		}
+		if references != 1 {
+			return "", true
+		}
+		participant, _, exists := architecturesearch.ResolveParticipantPort(requirement, observation.ID)
+		if exists {
+			domainID = participant.Domain
+		}
 	case "port":
 		for _, port := range requirement.Requirements.Ports {
 			if port.ID == observation.ID {

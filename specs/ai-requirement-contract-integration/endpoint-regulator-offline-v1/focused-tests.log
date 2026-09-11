@@ -1,0 +1,78 @@
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc_sibling
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/controller.unknown
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/missing.adc
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/adc
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc.extra
+=== RUN   TestParticipantPortObservationValidatesExactScalarEndpoint/controller.bus
+--- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc_sibling (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/controller.unknown (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/missing.adc (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/adc (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/controller.adc.extra (0.00s)
+    --- PASS: TestParticipantPortObservationValidatesExactScalarEndpoint/controller.bus (0.00s)
+=== RUN   TestParticipantPortObservationScopesProducerWithoutSiblingLeakage
+--- PASS: TestParticipantPortObservationScopesProducerWithoutSiblingLeakage (0.00s)
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/external_substitution
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/unknown_output
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/input_masquerades_as_producer
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/wrong_domain
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/wrong_kind
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/ambiguous_reference_routing
+=== RUN   TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/missing_producer
+--- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/external_substitution (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/unknown_output (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/input_masquerades_as_producer (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/wrong_domain (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/wrong_kind (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/ambiguous_reference_routing (0.00s)
+    --- PASS: TestStandaloneRegulatorOutputUsesRealPortWithoutInventedConsumer/missing_producer (0.00s)
+=== RUN   TestGeneratedOutputConsumersAreNotProducers
+--- PASS: TestGeneratedOutputConsumersAreNotProducers (0.00s)
+=== RUN   TestParticipantObservationRejectsUnroutableMultipleReferences
+--- PASS: TestParticipantObservationRejectsUnroutableMultipleReferences (0.00s)
+=== RUN   TestStandaloneRegulatorPowerTreeRetainsProducerAndCycleGates
+--- PASS: TestStandaloneRegulatorPowerTreeRetainsProducerAndCycleGates (0.00s)
+=== RUN   TestStandaloneRegulatorRejectsDuplicateDeclaredProducerAndLegacySyntax
+--- PASS: TestStandaloneRegulatorRejectsDuplicateDeclaredProducerAndLegacySyntax (0.00s)
+=== RUN   TestGeneratedOutputRejectsCrossRailCycle
+--- PASS: TestGeneratedOutputRejectsCrossRailCycle (0.00s)
+PASS
+ok  	kicadai/internal/architecturesearch	0.315s
+=== RUN   TestProviderSchemaExposesQualifiedPinAndGeneratedOutputForms
+--- PASS: TestProviderSchemaExposesQualifiedPinAndGeneratedOutputForms (0.01s)
+=== RUN   TestCompilerRetainsQualifiedParticipantObservationWithoutPublicSubstitute
+--- PASS: TestCompilerRetainsQualifiedParticipantObservationWithoutPublicSubstitute (0.00s)
+PASS
+ok  	kicadai/internal/behavioralintent	0.638s
+=== RUN   TestParticipantPinAssertionUsesExactNodeAndLocalReference
+--- PASS: TestParticipantPinAssertionUsesExactNodeAndLocalReference (0.00s)
+PASS
+ok  	kicadai/internal/closedloopsynthesis	0.460s
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/standalone_regulator
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:198: simulation measurements=[{RequirementID:rail OperatingCase:supply_load Actual:3.3} {RequirementID:thermal OperatingCase:supply_load Actual:103.04950000000001}] evidence=4b97c30cf4bfa12854debfc80fc77c2164aab21cc2f9d9463a5b633a913abfdd
+    endpoint_contracts_test.go:199: selected=633d0f643ef8ced14c451eacdfb57363cc34354ea55ddc964203f1af4116cb9b components=8 physical_nets=3 plans=2 exact_adc=
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_150ma_thermal_rejected
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:121: participant:controller.adc -> participant_controller__mcu.PA0 symbol_pin=7 pad=7 net=composition_net_005
+    endpoint_contracts_test.go:122: participant:controller.power -> participant_controller__mcu.VDD symbol_pin=4 pad=4 net=composition_net_003
+    endpoint_contracts_test.go:170: retained engineering rejection: trusted simulation plan 2 (nonlinear_circuit_dc_v1: thermal,thermal,thermal,thermal,thermal,thermal,thermal,thermal) failed: analyses.thermal_supply_load_b75160283b925b95.devices.objective_regulate__regulator: predicted steady-state temperature 125.049500001 C exceeds catalog-backed maximum 125 C
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_100ma
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:121: participant:controller.adc -> participant_controller__mcu.PA0 symbol_pin=7 pad=7 net=composition_net_005
+    endpoint_contracts_test.go:122: participant:controller.power -> participant_controller__mcu.VDD symbol_pin=4 pad=4 net=composition_net_003
+    endpoint_contracts_test.go:198: simulation measurements=[{RequirementID:adc_cutoff OperatingCase:supply_load Actual:923.3612800239786} {RequirementID:rail OperatingCase:supply_load Actual:3.3} {RequirementID:thermal OperatingCase:supply_load Actual:114.049500001452}] evidence=01080c1df3bdf35260ac83184eec3ca6c734023ce6d4ab4f78861fddadea7477
+    endpoint_contracts_test.go:199: selected=a2a18c2983f97b67e3662923f8f9f31e61241d54e5645f50de5e63f6b6594dcf components=21 physical_nets=10 plans=3 exact_adc=composition_net_005
+--- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests (0.32s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/standalone_regulator (0.02s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_150ma_thermal_rejected (0.12s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_100ma (0.16s)
+PASS
+ok  	kicadai/internal/compositionlowering	1.099s

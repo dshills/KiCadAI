@@ -10,12 +10,34 @@ func (validator *requirementValidator) regulationSources() {
 	if !supportsBehavioralVerification(validator.requirement.Version) {
 		return
 	}
+	for index, domain := range validator.requirement.Requirements.Domains {
+		if _, explicit := generatedPortSourceID(domain.Source); !explicit {
+			continue
+		}
+		source, valid := generatedSupplySource(validator.requirement, domain)
+		if !valid {
+			continue
+		} // The domain-source validator reports this.
+		if _, unique := generatedSupplyProducer(validator.requirement, source); !unique {
+			validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "derived supply output port must have exactly one declared objective producer")
+		}
+	}
 	for index, objective := range validator.requirement.Requirements.Objectives {
 		if objective.Capability != "voltage_regulation" {
 			continue
 		}
 		path := fmt.Sprintf("requirements.objectives[%d].bindings", index)
 		produced := map[string]bool{}
+		for _, domain := range validator.requirement.Requirements.Domains {
+			source, valid := generatedSupplySource(validator.requirement, domain)
+			if !valid || source.Kind != "port" {
+				continue
+			}
+			producer, unique := generatedSupplyProducer(validator.requirement, source)
+			if unique && producer.ID == objective.ID {
+				produced[domain.ID] = true
+			}
+		}
 		for bindingIndex, binding := range objective.Bindings {
 			if binding.Signal == "" || binding.Direction != "source" {
 				continue
@@ -32,7 +54,7 @@ func (validator *requirementValidator) regulationSources() {
 			produced[domain.ID] = true
 		}
 		if len(produced) == 0 {
-			validator.add(CodeDomainInvalid, path, "voltage_regulation must produce a declared power signal for a derived supply domain; an independent external supply is not a regulated output")
+			validator.add(CodeDomainInvalid, path, "voltage_regulation must produce a declared power signal or explicit power-output port for a derived supply domain; an independent external supply is not a regulated output")
 		}
 		for bindingIndex, binding := range objective.Bindings {
 			// The registered input role is an input even in legacy declarations

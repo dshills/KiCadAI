@@ -1769,6 +1769,9 @@ func participantAnchor(participant, port string) string {
 }
 
 func requirementDomainAnchor(requirement Requirement, domain Domain) string {
+	if source, valid := generatedSupplySource(requirement, domain); valid && source.Kind == "port" {
+		return externalAnchor(source.ID)
+	}
 	if domain.Source != "" && domain.Source != "external" && domain.Source != "generated" {
 		for _, signal := range requirement.Requirements.Signals {
 			if signal.ID == domain.Source {

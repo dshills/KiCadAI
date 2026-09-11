@@ -229,8 +229,8 @@ func (validator *requirementValidator) domains() {
 			if domain.Source != "external" && domain.Source != "generated" {
 				validator.add(CodeDomainInvalid, path+".source", "v1 domain source must be external or generated")
 			}
-		} else if domain.Source != "external" && !validSemanticID(domain.Source) {
-			validator.add(CodeDomainInvalid, path+".source", "typed domain source must be external or a signal identity")
+		} else if _, portSource := generatedPortSourceID(domain.Source); domain.Source != "external" && !validSemanticID(domain.Source) && !(supportsBehavioralVerification(validator.requirement.Version) && portSource) {
+			validator.add(CodeDomainInvalid, path+".source", "typed domain source must be external, a signal identity, or (v3+) port:<generated_power_output_id>")
 		}
 		if !finiteInRange(domain.NominalVoltageV, -1000, 1000) {
 			validator.add(CodeDomainInvalid, path+".nominal_voltage_v", "nominal voltage must be finite and within policy bounds")
@@ -283,6 +283,15 @@ func (validator *requirementValidator) signals() {
 	}
 	for index, domain := range validator.requirement.Requirements.Domains {
 		if domain.Source == "external" {
+			continue
+		}
+		if _, explicit := generatedPortSourceID(domain.Source); explicit && supportsBehavioralVerification(validator.requirement.Version) {
+			if !hasSingleReferenceDomain(validator.requirement) {
+				validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "generated output-port sources currently require one reference domain; explicit multi-reference routing is not supported")
+			}
+			if _, valid := generatedSupplySource(validator.requirement, domain); !valid {
+				validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "derived supply port source must identify a source-direction power output in the same supply domain")
+			}
 			continue
 		}
 		signal, exists := validator.signalsByID[domain.Source]
@@ -838,6 +847,15 @@ func (validator *requirementValidator) behavioralRequirements() {
 
 func (validator *requirementValidator) behaviorObservation(path string, observation Observation) {
 	switch observation.Kind {
+	case "participant_port":
+		_, port, exists := ResolveParticipantPort(validator.requirement, observation.ID)
+		if !supportsBehavioralVerification(validator.requirement.Version) || !exists {
+			validator.add(CodeBindingUnresolved, path+".id", fmt.Sprintf("participant-port observation %q requires v3+ and a declared participant_id.port_id", observation.ID))
+		} else if !scalarParticipantPort(port) {
+			validator.add(CodeBehaviorInvalid, path+".id", "participant-port observation requires a scalar endpoint; bundled interfaces need an explicit lane and cannot select the first lane")
+		} else if !hasSingleReferenceDomain(validator.requirement) {
+			validator.add(CodeBehaviorInvalid, path+".id", "participant-port observation currently requires one reference domain; explicit participant reference routing is not supported")
+		}
 	case "port":
 		if _, exists := validator.portsByID[observation.ID]; !exists {
 			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown port")
@@ -861,7 +879,7 @@ func (validator *requirementValidator) behaviorObservation(path string, observat
 			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown event")
 		}
 	default:
-		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, domain, circuit, or event")
+		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, participant_port, domain, circuit, or event")
 	}
 }
 

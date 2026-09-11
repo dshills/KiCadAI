@@ -40,7 +40,14 @@ func validatePowerTreeTopology(requirement Requirement, selections []FragmentSel
 			checks = append(checks, GlobalCheck{Code: CodePowerRailSourceMissing, Path: path + ".source", Message: "supply rail is explicitly externally sourced", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
 			continue
 		}
-		anchor := signalAnchor(domain.Source)
+		source, valid := generatedSupplySource(requirement, domain)
+		if !valid {
+			return nil, &candidateValidation{Code: CodePowerRailSourceMissing, Path: path + ".source", Message: "generated supply rail source does not resolve to a same-domain power endpoint"}
+		}
+		anchor := signalAnchor(source.ID)
+		if source.Kind == "port" {
+			anchor = externalAnchor(source.ID)
+		}
 		producers := 0
 		for _, contract := range selectedPorts[anchor] {
 			if contract.Kind == "power" && contract.Direction == "source" && contract.Domain == domain.ID {
@@ -55,7 +62,7 @@ func validatePowerTreeTopology(requirement Requirement, selections []FragmentSel
 		}
 		checks = append(checks, GlobalCheck{Code: CodePowerRailSourceMissing, Path: path + ".source", Message: "generated supply rail has exactly one selected power producer", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
 
-		producer, ok := powerSignalProducer(requirement, domain.Source)
+		producer, ok := generatedSupplyProducer(requirement, source)
 		if !ok {
 			return nil, &candidateValidation{Code: CodePowerRailSourceMissing, Path: path + ".producer", Message: "generated supply rail lacks a unique behavioral producer"}
 		}
@@ -64,7 +71,7 @@ func validatePowerTreeTopology(requirement Requirement, selections []FragmentSel
 				continue
 			}
 			inputDomain, ok := powerBindingDomain(requirement, binding)
-			if !ok || inputDomain == domain.ID {
+			if !ok {
 				continue
 			}
 			if edges[inputDomain] == nil {

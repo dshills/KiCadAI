@@ -1153,6 +1153,12 @@ func hierarchicalObjectiveCone(requirement Requirement, observation Observation)
 		anchorsByObjective[objective.ID] = anchors
 	}
 	observedAnchor := observation.Kind + ":" + observation.ID
+	if observation.Kind == "participant_port" {
+		participant, port, exists := ResolveParticipantPort(requirement, observation.ID)
+		if exists && scalarParticipantPort(port) {
+			observedAnchor = participantAnchor(participant.ID, port.ID)
+		}
+	}
 	for _, objectiveID := range objectivesByAnchor[observedAnchor] {
 		cone[objectiveID] = true
 	}
