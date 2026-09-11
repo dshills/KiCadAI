@@ -1,0 +1,9 @@
+{
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-evidence-eb78476c/baseline.tar",
+  "bytes": 61985280,
+  "sha256": "affbb52048d5ddcb70d100458cdbefb2be31ec465a2e0895a0974d86fcc37fbf",
+  "verified_files": 25,
+  "raw_original_retained": true,
+  "original_evidence_inventory": "baseline-evidence-inventory.json",
+  "storage_scope": "project-local ignored archive; not uploaded, not a Git-tracked payload"
+}

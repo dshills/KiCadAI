@@ -1,0 +1,11 @@
+{
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-evidence-recovery-2-4341df79/recovery-2.tar",
+  "bytes": 63031296,
+  "sha256": "58aad6b57e9b077b4e0724b36f32ca40bf31132333053ecbdb5b57fba97f6c7f",
+  "verified_files": 31,
+  "duplicate_members": false,
+  "extra_or_missing_payloads": false,
+  "raw_original_retained": true,
+  "original_evidence_inventory": "recovery-2-evidence-inventory.json",
+  "storage_scope": "project-local ignored archive; not uploaded, not a Git-tracked payload"
+}

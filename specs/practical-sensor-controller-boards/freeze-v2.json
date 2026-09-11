@@ -1,0 +1,132 @@
+{
+  "schema": "kicadai.practical-board-freeze.v1",
+  "baseline_commit": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+  "evaluator_commit": "eb3fef1ea1d1a1a66867c9977fda3079cad3548c",
+  "files": [
+    {
+      "path": "cmd/practical-board-eval/main.go",
+      "bytes": 3301,
+      "sha256": "6f44fa49f9dd5cf185a45f60503b35b98fdca5240b286003a6535d40a7c9a041"
+    },
+    {
+      "path": "internal/practicalboardeval/engine.go",
+      "bytes": 24087,
+      "sha256": "c3515a0147750ea0bfd49279108ad35a078740fffc23b3d5660969c4f652ad7e"
+    },
+    {
+      "path": "internal/practicalboardeval/engine_test.go",
+      "bytes": 2453,
+      "sha256": "01fc5ccf1a67fff85552185712cc5fb1111138f75313170d83ba7f693bf159eb"
+    },
+    {
+      "path": "internal/practicalboardeval/evidence.go",
+      "bytes": 13906,
+      "sha256": "c2702786cb077d35b0719555b96ce96c212d72a82a48eb64b4d1f58c9124fdfb"
+    },
+    {
+      "path": "internal/practicalboardeval/evidence_test.go",
+      "bytes": 7578,
+      "sha256": "e75861af5a2d971c79c730edd8651b271c1dfc62122738381cc91754bf2024a7"
+    },
+    {
+      "path": "internal/practicalboardeval/protocol_v2_test.go",
+      "bytes": 662,
+      "sha256": "7bd24525e9ef5902d1a63c89bc572a4d99010ebd7d13e0ffcd883404f8e533e9"
+    },
+    {
+      "path": "internal/practicalboardeval/transport.go",
+      "bytes": 6578,
+      "sha256": "9b17897e4d563cdd424f39e41d40e5a28e633f535a2d7ba8ef7266c958e87446"
+    },
+    {
+      "path": "internal/practicalboardeval/transport_test.go",
+      "bytes": 4432,
+      "sha256": "abadbdda74c2ce5997f3ff44be03b1243e287461dbce2c9d1dd1e494e0c1f84f"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/FEASIBILITY.md",
+      "bytes": 8828,
+      "sha256": "c1ae616119f16460c2e46363f7f69ed8e30424cee80f76154317458e482b8986"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/PLAN.md",
+      "bytes": 2419,
+      "sha256": "40a9f014fa439df3215345793fcfa0f4473ab38e42f8ae25cc3c1b18687e226b"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/PREPARATION.md",
+      "bytes": 4525,
+      "sha256": "27b6dda26400e9b74b83bfe7625009f9412edcc41c298419ace2f53e9c72e549"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/PROTOCOL-V2.md",
+      "bytes": 5449,
+      "sha256": "5a6d40a881a33c2825948ed09cc642dd783e913e3e241282b7878d479442a6a6"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/QUALITY.md",
+      "bytes": 4153,
+      "sha256": "97da754ce7c490d7d067e17a842507dc30a10d1b9d12a13f7a03ac596ad5dc67"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/SCORING.md",
+      "bytes": 5861,
+      "sha256": "b423e0b92f5dfc34709fdc2ecab6c2891b9a31cb10b36bcc8ab012f4bf676c65"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/SPEC.md",
+      "bytes": 14802,
+      "sha256": "6e36345326b8d8d5e9399d21ae18492dd164afcdb18a401d8325d90ca4a7f88e"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/corpus.json",
+      "bytes": 21034,
+      "sha256": "f70c78e71051d76baa18eb7bdf765db15dc854f5fdda7b35041b28b0c4d3b513"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/environment.json",
+      "bytes": 1509,
+      "sha256": "5e8f4e3caba90da8c16c42c2a6f3b96c7f979ae9c2bd37b460aeb378d0ba4625"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/evidence-utils.mjs",
+      "bytes": 3128,
+      "sha256": "9eb0e65c4b1ac1bd01ce287c83cea84ef06f1677acf51aba8dd32d6c4ba0a2d4"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/evidence-utils.test.mjs",
+      "bytes": 2065,
+      "sha256": "2cb14b1859f8fd99982e1758864e1ad39cb89805c0b362c7fd1241363d9e5c9f"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/freeze.json",
+      "bytes": 3510,
+      "sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/protocol-v2-authorization.json",
+      "bytes": 3521,
+      "sha256": "4da192121c0c45807dbf875a94421c4307be18f82108d023c768a065f56b9b3a"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/protocol-v2-verification.json",
+      "bytes": 1793,
+      "sha256": "39bc99cee60f89a8bf6b51e8a42b17ad99480b4c3c9df35dca9b5555a4794f15"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/protocol-v2.test.mjs",
+      "bytes": 2728,
+      "sha256": "1f058d316ed6401f11bd1a96d009c82e3ba1f10ee1beb0b76355e8ad64ea1bab"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/run-campaign-v2.mjs",
+      "bytes": 8783,
+      "sha256": "4d95bf5b9efe17364e0a16c8c93460f8f8b003888d3805de0f5b6d569c878aa6"
+    },
+    {
+      "path": "specs/practical-sensor-controller-boards/run-campaign.mjs",
+      "bytes": 8564,
+      "sha256": "55b864fd927b82ed37351b30eced54a5fc61f96c6e3f03d28beafbe1cd7341c9"
+    }
+  ]
+}

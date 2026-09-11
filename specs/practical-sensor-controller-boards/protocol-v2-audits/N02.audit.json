@@ -1,0 +1,220 @@
+{
+  "schema": "kicadai.practical-board-case-audit.v1",
+  "cohort": "approved_protocol_v2_baseline",
+  "case_id": "N02",
+  "kind": "refusal",
+  "reviewer": "Codex task 019f6b30-5004-73b1-9a3b-678a961c7c8f",
+  "independence": "self_review; not external or blind",
+  "review_started_utc": "2026-09-11T12:59:45.280Z",
+  "review_utc": "2026-09-11T13:01:16.989Z",
+  "review_elapsed_seconds": 91.709,
+  "review_timing_basis": "Measured read-only adjudication wall time, not human-active time; automated byte-authentication is separate.",
+  "source_binding": {
+    "case.json": {
+      "file": "baseline/N02/case.json",
+      "sha256": "07b8e7926a998923accadf767122046153a6cabcd1f53cf56ab19dff41e72340",
+      "json_pointer": ""
+    },
+    "prompt.txt": {
+      "file": "baseline/N02/prompt.txt",
+      "sha256": "65141639d7712fb3e1d1d2d7cd29ff1be277bc94ff5a8611d891d3e3721fe355",
+      "line": 1
+    },
+    "result.json": {
+      "file": "baseline/N02/result.json",
+      "sha256": "585ffb5e3619da4451fd284d4da10247a1c254b1b50ab63d2a84a59f0a746c60",
+      "json_pointer": ""
+    },
+    "inventory.json": {
+      "file": "baseline/N02/inventory.json",
+      "sha256": "6bb0a9e378a3efea95fcf35882d7c5cbc54198f925a2f013eea518143562befb",
+      "json_pointer": ""
+    }
+  },
+  "resource_binding": {
+    "file": "baseline/N02.resources.json",
+    "sha256": "484e948f73b3f14d184514c0c1caeae65b6b0009ca28a3f5f03ba934a159dc20",
+    "json_pointer": ""
+  },
+  "disposition": "passed",
+  "first_failed_gate": null,
+  "clauses": [
+    {
+      "number": 1,
+      "text": "Refuse the mathematically contradictory single-rail bounds without silently splitting the rail, weakening a limit or generating a project.",
+      "disposition": "pass",
+      "reason": "The accepted unsupported/refusal-candidate result explicitly rejects the unsplit rail because V >= 4.75 V and V <= 3.45 V have no common value. It preserves the prohibition on splitting or weakening bounds. The selected proposal has requirement=null, and the authenticated inventory contains no compiled requirement, replay or native project.",
+      "evidence": [
+        {
+          "file": "baseline/N02/result.json",
+          "sha256": "585ffb5e3619da4451fd284d4da10247a1c254b1b50ab63d2a84a59f0a746c60",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/N02/compilation.json",
+          "sha256": "40f587473dedf7ac9240d01c82f333a9e845961cb950c76214b2f00b98838dca",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/N02/compilation.json",
+          "sha256": "40f587473dedf7ac9240d01c82f333a9e845961cb950c76214b2f00b98838dca",
+          "json_pointer": "/capability_gaps/0/reason"
+        },
+        {
+          "file": "baseline/N02/inventory.json",
+          "sha256": "6bb0a9e378a3efea95fcf35882d7c5cbc54198f925a2f013eea518143562befb",
+          "json_pointer": ""
+        }
+      ]
+    }
+  ],
+  "gates": [],
+  "positive_gates_not_applicable": "Refusal and clarification are separate behavioral criteria, not primary board designs.",
+  "observed_diagnostics": [],
+  "provider_behavior_observation": {
+    "requirement_is_null": true,
+    "capability_gaps": [
+      {
+        "capability": "satisfy_contradictory_shared_supply_voltage_bounds",
+        "id": "gap_001",
+        "path": "requirement.requirements.behavioral_requirements",
+        "reason": "A single unsplit rail cannot simultaneously remain at or above 4.75 V and at or below 3.45 V at any instant because the permitted voltage intervals have no intersection. The prohibition on splitting the rail or changing either bound prevents a feasible requirement from being formed.",
+        "required_evidence": [
+          "A nonempty voltage range satisfying both V >= 4.75 V and V <= 3.45 V for the same rail at the same instant."
+        ]
+      }
+    ],
+    "clarifications": [],
+    "not_an_accepted_workflow": false,
+    "evidence": {
+      "file": "baseline/N02/selected-intent.json",
+      "sha256": "6e64813f6ae4abc3d465e70de6897880dfa73b66d529035924bebbdaed6de101",
+      "json_pointer": ""
+    },
+    "correct_predetermined_refusal": true,
+    "acceptance_scope": "Valid refusal workflow only; no board capability pass."
+  },
+  "resource_observation": {
+    "id": "N02",
+    "exit_code": 0,
+    "signal": null,
+    "wall_seconds": 32.567,
+    "peak_sampled_process_tree_rss_bytes": 34242560,
+    "sampling_interval_ms": 1000,
+    "sampling_errors": 0,
+    "stop_reason": null,
+    "evidence_bytes": 394825
+  },
+  "manual_assistance": {
+    "manual_implementation_repairs": 0,
+    "fixed_clarification_answer_turns": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "first_attempt_success": false,
+  "success_after_permitted_correction": true,
+  "authentication": {
+    "case_id": "N02",
+    "result": {
+      "case_id": "N02",
+      "kind": "refusal",
+      "campaign": "baseline",
+      "status": "refusal_candidate",
+      "first_failed_gate": "independent_acceptance_audit",
+      "compilation_status": "unsupported",
+      "provider_attempts": 2,
+      "follow_up_attempts": 0,
+      "replays_completed": 0,
+      "wall_seconds": 32.543239333,
+      "manual_implementation_repairs": 0,
+      "independent_acceptance_audit_required": true
+    },
+    "resources": {
+      "id": "N02",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 32.567,
+      "peak_sampled_process_tree_rss_bytes": 34242560,
+      "sampling_interval_ms": 1000,
+      "sampling_errors": 0,
+      "stop_reason": null,
+      "evidence_bytes": 394825
+    },
+    "retained_files": 25,
+    "retained_bytes": 394825,
+    "inventory_sha256": "6bb0a9e378a3efea95fcf35882d7c5cbc54198f925a2f013eea518143562befb",
+    "redaction_markers": 0,
+    "requests": [
+      {
+        "number": 21,
+        "case_id": "N02",
+        "request_sha256": "4f23564dde0ca1c5e860430c68654a60cc4ef5fd5729a6504785b464172ac2c3",
+        "estimated_or_reserved_usd": 0.031636,
+        "stream": {
+          "http_status": 200,
+          "bytes": 133345,
+          "metadata_pre_redaction_bytes": 133345,
+          "redacted_paths": [],
+          "events": 266,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4074,
+            "input_tokens_details": {
+              "cache_write_tokens": 1474,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 767,
+            "output_tokens_details": {
+              "reasoning_tokens": 494
+            },
+            "total_tokens": 4841
+          },
+          "client_rejected_complete_response": false
+        }
+      },
+      {
+        "number": 22,
+        "case_id": "N02",
+        "request_sha256": "aa275f32ee4de52bdd350248c91e8ec09e7d59b7420c15cc631e8dd26a19e390",
+        "estimated_or_reserved_usd": 0.027208000000000003,
+        "stream": {
+          "http_status": 200,
+          "bytes": 132279,
+          "metadata_pre_redaction_bytes": 132279,
+          "redacted_paths": [],
+          "events": 276,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4192,
+            "input_tokens_details": {
+              "cache_write_tokens": 1592,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 522,
+            "output_tokens_details": {
+              "reasoning_tokens": 239
+            },
+            "total_tokens": 4714
+          },
+          "client_rejected_complete_response": false
+        }
+      }
+    ],
+    "issue_counts": {},
+    "automated_authentication_elapsed_seconds": 0.003017291999999998
+  },
+  "campaign_binding": {
+    "file": "baseline/campaign-end.json",
+    "sha256": "cec2dc2549a53dd0c5eaf4b9a7737e2ee53a371d1d6556e3cd16a9148e23d4b9",
+    "json_pointer": "/outcomes/9"
+  },
+  "freeze_binding": {
+    "file": "freeze-v2.json",
+    "sha256": "f8d32e64e628126dd4cea846733de67d581ae50747cada830a85600ce1247799",
+    "json_pointer": ""
+  }
+}

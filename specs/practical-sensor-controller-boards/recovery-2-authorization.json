@@ -1,0 +1,64 @@
+{
+  "schema": "kicadai.practical-board-recovery-authorization.v1",
+  "recovery_number": 2,
+  "recorded_utc": "2026-09-11T10:32:14.128Z",
+  "authorization_text": "I approve one additional recorded recovery baseline using the existing key, unchanged frozen evaluation, and remaining original budget.",
+  "scope": "One separately recorded recovery baseline 2; unchanged frozen tests, model, evaluator, acceptance criteria and original cumulative limits. No further recovery, automatic provider retry, firewall modification, merge, release or support-boundary expansion is authorized.",
+  "original_root": "/tmp/kicadai-practical-sensor-controller-public-1",
+  "prior_recovery_root": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-1",
+  "recovery_root": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-2",
+  "original_evidence_inventory": "baseline-evidence-inventory.json",
+  "original_evidence_inventory_sha256": "48502181af3ae2e94f7cf4854560764ac13e9d75d0abe96a78bf71d07281bf34",
+  "prior_recovery_evidence_inventory": "recovery-1-evidence-inventory.json",
+  "prior_recovery_evidence_inventory_sha256": "b05ac83e87cef9710b0cfa582ac883ccab5fc3ca1033cb4d51a209ae464755ed",
+  "original_freeze_sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e",
+  "verified_before_recovery": {
+    "frozen_files": 18,
+    "original_evidence_files": 25,
+    "prior_recovery_evidence_files": 28,
+    "credential_present_without_disclosure": true,
+    "unexpected_application_override_names": [],
+    "source_commit_before_recovery_record": "642bc8601d4fd6e4ae08cbca047d096d27461243"
+  },
+  "execution_source": {
+    "checkout": "/tmp/kicadai-practical-recovery-2-source",
+    "commit": "4341df799c25c811cd05e80f5d860c009ea50585",
+    "binary": "/tmp/kicadai-practical-board-eval-recovery-1",
+    "binary_sha256": "45e6c24392f1ba3469e5a6b9d4cd6857eb617bfa39de59c1ee87294660fe0ee3",
+    "reason": "Reuse the exact authenticated binary now allowed by LuLu without replacing it or changing firewall settings. A detached clean checkout matches its build metadata; subsequent current-branch commits contain only recovery reporting and a post-freeze read-only authentication script. The unchanged supervisor must verify build, frozen files, merged-V23 production identity, tool identities and environment snapshot before dispatch.",
+    "firewall_precheck": {
+      "checked_utc": "2026-09-11T10:31:05.875Z",
+      "rule": {
+        "path": "/tmp/kicadai-practical-board-eval-recovery-1",
+        "action": "1",
+        "endpointAddr": "*",
+        "endpointPort": "*",
+        "isDisabled": "$null",
+        "creation_utc": "2026-09-11T10:17:50.797Z"
+      },
+      "modified_by_agent": false
+    }
+  },
+  "journal_policy": {
+    "canonical_for_recovery_and_later_final": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-2/request-journal",
+    "copied_prior_entries": [
+      "001.reservation.json",
+      "001.usage.json",
+      "002.reservation.json",
+      "002.usage.json"
+    ],
+    "copied_receipts_are_not_new_requests": true,
+    "original_and_prior_recovery_journals_remain_immutable": true,
+    "carryover_request_count": 2,
+    "carryover_estimated_or_reserved_usd": 0.9121920000000001,
+    "maximum_baseline_requests_including_carryover": 36,
+    "remaining_baseline_requests": 34,
+    "maximum_total_requests_including_carryover": 72,
+    "remaining_total_requests": 70,
+    "maximum_estimated_or_reserved_usd": 50,
+    "remaining_estimated_or_reserved_usd": 49.087808
+  },
+  "comparison_policy": "Both interrupted cohorts remain separately reported with no design-capability score. Only this approved recovery cohort may supply baseline design outcomes if complete. Label recovery first attempts and corrections explicitly; do not represent them as uninterrupted first-workflow outcomes or double-count carried receipts. All eight positives, four refusals, two clarifications and two paraphrases remain unchanged.",
+  "implementation_policy": "No production changes before an authenticated baseline-driven scope decision demonstrating a credible path to two distinct complete uplifts under at most three generic fixes. Public-frozen reserved cases remain excluded from implementation tuning.",
+  "stopping_policy": "The frozen supervisor controls terminal provider errors and resource caps. Any further terminal interruption ends recovery 2 and does not authorize recovery 3."
+}

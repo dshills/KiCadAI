@@ -1,0 +1,62 @@
+{
+  "schema": "kicadai.practical-board-protocol-authorization.v1",
+  "protocol": "v2",
+  "recorded_utc": "2026-09-11T12:07:59.397Z",
+  "authorization_text": "I approve",
+  "approved_question": "Increase only the request timeout from two to five minutes and authorize one new baseline, keeping every other frozen setting and remaining budget unchanged.",
+  "authorized_change": {
+    "provider_request_timeout_seconds": {
+      "from": 120,
+      "to": 300
+    },
+    "new_baseline_count": 1,
+    "production_behavior_change": false,
+    "other_acceptance_or_resource_changes": false
+  },
+  "credential_policy": "Reuse the already authorized existing OpenAI key without printing or persisting its value.",
+  "original_protocol_source_commit": "ea3eef2c5aeed972d6ded2cacca0eaf2ece1360c",
+  "original_protocol_source_checkout": "/tmp/kicadai-practical-protocol-v1-source",
+  "original_freeze": "freeze.json",
+  "original_freeze_sha256": "d5da087982ff7cb4281a51c9ca86b6b48a1c2859806926e80d2b222947a8a94e",
+  "revised_freeze": "freeze-v2.json",
+  "revised_supervisor": "run-campaign-v2.mjs",
+  "evidence_root": "/tmp/kicadai-practical-sensor-controller-public-1-protocol-v2",
+  "prior_canonical_journal": "/tmp/kicadai-practical-sensor-controller-public-1-recovery-2/request-journal",
+  "journal_policy": {
+    "copy_exactly_once": [
+      "001.reservation.json",
+      "001.usage.json",
+      "002.reservation.json",
+      "002.usage.json",
+      "003.reservation.json",
+      "003.usage.json"
+    ],
+    "carried_request_count": 3,
+    "carried_estimated_or_reserved_usd": 1.3682880000000002,
+    "first_new_reservation_number": 4,
+    "maximum_baseline_requests_including_carryover": 36,
+    "remaining_baseline_requests": 33,
+    "maximum_total_requests_including_carryover": 72,
+    "remaining_total_requests": 69,
+    "maximum_estimated_or_reserved_usd": 50,
+    "remaining_estimated_or_reserved_usd": 48.631712,
+    "actual_billing_known": false,
+    "all_prior_journals_immutable": true
+  },
+  "verified_before_revision": {
+    "checked_utc": "2026-09-11T12:04:01.836Z",
+    "key_present": true,
+    "frozen_files_verified": 18,
+    "original_files_verified": 25,
+    "recovery_1_files_verified": 28,
+    "recovery_2_files_verified": 31,
+    "recovery_2_inventory_sha256": "2930f9a9fa63f0c01a63c12c7871358531cba5d86a4c344d417f69f1a0cd39de",
+    "cumulative_requests": 3,
+    "cumulative_reserved_usd": 1.3682880000000002,
+    "remaining_reserved_usd": 48.631712,
+    "unexpected_KICADAI_override_names": []
+  },
+  "comparison_policy": "No scores or partial output from the three interrupted v1 cohorts are promoted into accepted input. The newly approved v2 baseline and any originally planned scoped final/paired comparison must use the same v2 freeze. Public-frozen reserved cases are excluded from implementation tuning. The cohort denominator and all 108 acceptance clauses remain unchanged.",
+  "preservation_policy": "Original freeze, supervisor, acceptance documents, historical V18-V23 evidence, all three interrupted raw cohorts, archives, receipts and reports remain intact. Because the current engine is now versioned v2, run prior post-freeze authentication scripts from the preserved v1 source checkout, not against v2 engine bytes.",
+  "stopping_policy": "One v2 baseline is authorized. A terminal provider/resource failure stops it under the unchanged stopping policy. No unapproved retry, additional recovery, scope/denominator change, firewall modification, merge, release or fabrication approval."
+}

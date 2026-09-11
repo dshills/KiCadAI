@@ -1,0 +1,819 @@
+{
+  "schema": "kicadai.practical-board-case-audit.v1",
+  "cohort": "approved_protocol_v2_baseline",
+  "case_id": "C01",
+  "kind": "clarification",
+  "reviewer": "Codex task 019f6b30-5004-73b1-9a3b-678a961c7c8f",
+  "independence": "self_review; not external or blind",
+  "review_started_utc": "2026-09-11T13:04:07.151Z",
+  "review_utc": "2026-09-11T13:06:17.624Z",
+  "review_elapsed_seconds": 130.473,
+  "review_timing_basis": "Measured read-only adjudication wall time, not human-active time; automated byte-authentication is separate.",
+  "source_binding": {
+    "case.json": {
+      "file": "baseline/C01/case.json",
+      "sha256": "9efab7cc546f2c40c4903889efc26d0d6d5f5ecfeac31fb343b682875a9f8ef5",
+      "json_pointer": ""
+    },
+    "prompt.txt": {
+      "file": "baseline/C01/prompt.txt",
+      "sha256": "0989ec07cff40f2d9b9b9ba705ef3e1e2c3bfafe8b010c8199027ffc12f993fe",
+      "line": 1
+    },
+    "result.json": {
+      "file": "baseline/C01/result.json",
+      "sha256": "d1d8632e1e01c065a79504b01df3f7f81f347683d7ab38e1a999b56e0c9960b5",
+      "json_pointer": ""
+    },
+    "inventory.json": {
+      "file": "baseline/C01/inventory.json",
+      "sha256": "3a4191feb466df0e44bb34a71e2ddb33a0c873682ed9501e39da76f941cd5cce",
+      "json_pointer": ""
+    }
+  },
+  "resource_binding": {
+    "file": "baseline/C01.resources.json",
+    "sha256": "029518537f272a9181dab51107980a8c36ddef8c3bb3d1979f03b1c97056b580",
+    "json_pointer": ""
+  },
+  "disposition": "failed",
+  "first_failed_gate": "provider",
+  "clauses": [
+    {
+      "number": 1,
+      "text": "Ask specifically for supply minimum/maximum voltage and available current; do not choose an assumed supply or power path first.",
+      "disposition": "fail",
+      "reason": "A targeted supply question is present in the first failed proposal, but a valid clarification state was never established; the partial requirement and bindings were rejected. The permitted correction then ended without a terminal response. This is not credited as a usable clarification workflow.",
+      "evidence": [
+        {
+          "file": "baseline/C01/result.json",
+          "sha256": "d1d8632e1e01c065a79504b01df3f7f81f347683d7ab38e1a999b56e0c9960b5",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/C01/attempt-1.compilation.json",
+          "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+          "json_pointer": "/issues"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "text": "Initial response has needs_clarification and no accepted design request. The single fixed answer is bound to the prior source/proposal/capability identity and its supplied values are retained.",
+      "disposition": "fail",
+      "reason": "No valid clarification workflow was established: the initial proposal failed compilation, and the permitted correction failed at provider completion. No fixed-answer turn or accepted executable request was produced.",
+      "evidence": [
+        {
+          "file": "baseline/C01/result.json",
+          "sha256": "d1d8632e1e01c065a79504b01df3f7f81f347683d7ab38e1a999b56e0c9960b5",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/C01/attempt-1.compilation.json",
+          "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+          "json_pointer": "/issues"
+        }
+      ]
+    }
+  ],
+  "gates": [],
+  "positive_gates_not_applicable": "Refusal and clarification are separate behavioral criteria, not primary board designs.",
+  "observed_diagnostics": [
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BEHAVIOR_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.behavioral_requirements",
+        "message": "v3 requires at least one measurable behavioral requirement"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/0"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_LIMIT_EXCEEDED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.constraints.max_components",
+        "message": "max_components must be between 1 and 64"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/1"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_DOMAIN_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.domains[0].kind",
+        "message": "domain kind must be reference or supply"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/2"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.domains[0].source",
+        "message": "derived domain source references an unknown signal"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/3"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_DOMAIN_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.domains[0].source",
+        "message": "typed domain source must be external or a signal identity"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/4"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.objectives[0].bindings",
+        "message": "objective requires at least one binding"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/5"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_CONSTRAINT_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.objectives[0].constraints[0].value",
+        "message": "required relation must have boolean value true"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/6"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_CONSTRAINT_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.objectives[0].constraints[1].value",
+        "message": "required relation must have boolean value true"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/7"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.objectives[1].bindings",
+        "message": "objective requires at least one binding"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/8"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_CONSTRAINT_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.objectives[1].constraints[1].value",
+        "message": "required relation must have boolean value true"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/9"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.operating_cases[0].conditions[0].target",
+        "message": "operating condition references an unknown semantic target"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/10"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_OPERATING_CASE_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.operating_cases[0].conditions[1].unit",
+        "message": "operating condition requires canonical unit F"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/11"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_OPERATING_CASE_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.operating_cases[0].conditions[2].unit",
+        "message": "operating condition requires canonical unit F"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/12"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_OPERATING_CASE_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.operating_cases[0].conditions[3].unit",
+        "message": "operating condition requires canonical unit F"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/13"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.ports[2].domain",
+        "message": "external port references an unknown domain"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/14"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_SIGNAL_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.signals[0]",
+        "message": "signal endpoints require one source and at least one sink, or at least two bidirectional endpoints; got 0 source, 0 sink, 0 bidirectional"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/15"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.signals[0].domain",
+        "message": "signal references an unknown domain"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/16"
+      }
+    },
+    {
+      "issue": {
+        "code": "ARCHITECTURE_CONSTRAINT_INVALID",
+        "severity": "error",
+        "path": "proposal.requirement.requirements.system_constraints[4].value",
+        "message": "required relation must have boolean value true"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/17"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/18"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/19"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/20"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "one clarification must coalesce every unresolved uncertainty at its requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/21"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[0].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/22"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[1].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/23"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[2].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/24"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/25"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/26"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/27"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/28"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/29"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[1].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/30"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/31"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/32"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[3].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/33"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[4].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/34"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[5].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/35"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[5].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/36"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[5].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/37"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement environmental_and_loading_limits has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/38"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement uart_3v3 has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/39"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement uart_rx has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/40"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement uart_tx has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/41"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement wired_programming has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/42"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement environment_sensor has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/43"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage",
+        "message": "material requirement programmable_controller has no source statement evidence"
+      },
+      "evidence": {
+        "file": "baseline/C01/attempt-1.compilation.json",
+        "sha256": "aa4ed1fac7d5214644e223a81f049ecdb804cbbb624854ff939174f58439383e",
+        "json_pointer": "/issues/44"
+      }
+    }
+  ],
+  "provider_behavior_observation": {
+    "requirement_is_null": false,
+    "capability_gaps": [],
+    "clarifications": [
+      {
+        "choices": [],
+        "id": "clarify_external_supply",
+        "path": "/intent/requirement/requirements/domains",
+        "question": "What are the external supply minimum voltage, maximum voltage, and available current in V, V, and A, respectively?",
+        "uncertainty_ids": [
+          "uncertainty_supply_min_voltage",
+          "uncertainty_supply_max_voltage",
+          "uncertainty_supply_available_current"
+        ],
+        "why_needed": "All three values are required before selecting or specifying the board power path; no supply values will be assumed."
+      }
+    ],
+    "not_an_accepted_workflow": true,
+    "evidence": {
+      "file": "baseline/C01/attempt-1.intent.txt",
+      "sha256": "102fefe9fed8e66f051d233287e3a14372ed4c0f3a4685a3bb5fd27d06808d0b",
+      "line": 1
+    },
+    "retained_proposal_is_only_initial_failed_attempt": true,
+    "raw_question_targets_required_facts": true,
+    "semantic_note": "The first failed proposal asks specifically for external minimum voltage, maximum voltage and current, but also contains an invalid partial requirement and invalid uncertainty bindings. No valid clarification candidate was established, the correction stream was incomplete, and no bound fixed-answer turn ran."
+  },
+  "resource_observation": {
+    "id": "C01",
+    "exit_code": 1,
+    "signal": null,
+    "wall_seconds": 91.874,
+    "peak_sampled_process_tree_rss_bytes": 36306944,
+    "sampling_interval_ms": 1000,
+    "sampling_errors": 0,
+    "stop_reason": null,
+    "evidence_bytes": 825878
+  },
+  "manual_assistance": {
+    "manual_implementation_repairs": 0,
+    "fixed_clarification_answer_turns": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "provider_failure": {
+    "diagnostic": {
+      "code": "ai_provider_incomplete",
+      "error": "OpenAI stream ended without a terminal response",
+      "usage": {}
+    },
+    "evidence": {
+      "file": "baseline/C01/attempt-2.error.json",
+      "sha256": "9bcf3967af56bae332dd8b36e159f5302cbc139f7ad321a6c89b9bbf3e56eba7",
+      "json_pointer": "/error"
+    }
+  },
+  "authentication": {
+    "case_id": "C01",
+    "result": {
+      "case_id": "C01",
+      "kind": "clarification",
+      "campaign": "baseline",
+      "status": "failed",
+      "first_failed_gate": "provider",
+      "provider_attempts": 2,
+      "follow_up_attempts": 0,
+      "replays_completed": 0,
+      "error": "OpenAI stream ended without a terminal response",
+      "wall_seconds": 91.844657417,
+      "manual_implementation_repairs": 0,
+      "independent_acceptance_audit_required": true
+    },
+    "resources": {
+      "id": "C01",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 91.874,
+      "peak_sampled_process_tree_rss_bytes": 36306944,
+      "sampling_interval_ms": 1000,
+      "sampling_errors": 0,
+      "stop_reason": null,
+      "evidence_bytes": 825878
+    },
+    "retained_files": 22,
+    "retained_bytes": 825878,
+    "inventory_sha256": "3a4191feb466df0e44bb34a71e2ddb33a0c873682ed9501e39da76f941cd5cce",
+    "redaction_markers": 1,
+    "requests": [
+      {
+        "number": 27,
+        "case_id": "C01",
+        "request_sha256": "a2a1bfa75cf1adb767a6b601754361c1df7255d8c8034d35bff11146df28ced4",
+        "estimated_or_reserved_usd": 0.09894800000000001,
+        "stream": {
+          "http_status": 200,
+          "bytes": 643862,
+          "metadata_pre_redaction_bytes": 647823,
+          "redacted_paths": [
+            "/events/5/item/encrypted_content"
+          ],
+          "events": 1962,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4307,
+            "input_tokens_details": {
+              "cache_write_tokens": 1707,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 4086,
+            "output_tokens_details": {
+              "reasoning_tokens": 2125
+            },
+            "total_tokens": 8393
+          },
+          "client_rejected_complete_response": false
+        }
+      },
+      {
+        "number": 28,
+        "case_id": "C01",
+        "request_sha256": "83c166ffe2d00561fedd4373b23d2162edd17eee242750c5112ede8b648a8013",
+        "estimated_or_reserved_usd": 0.44332800000000006,
+        "stream": {
+          "http_status": 200,
+          "bytes": 33634,
+          "metadata_pre_redaction_bytes": 33634,
+          "redacted_paths": [],
+          "events": 3,
+          "terminal": null,
+          "final_status": null,
+          "usage_available_in_frozen_journal": false,
+          "raw_stream_usage": null,
+          "client_rejected_complete_response": false
+        }
+      }
+    ],
+    "issue_counts": null,
+    "automated_authentication_elapsed_seconds": 0.004491874999999993
+  },
+  "campaign_binding": {
+    "file": "baseline/campaign-end.json",
+    "sha256": "cec2dc2549a53dd0c5eaf4b9a7737e2ee53a371d1d6556e3cd16a9148e23d4b9",
+    "json_pointer": "/outcomes/12"
+  },
+  "freeze_binding": {
+    "file": "freeze-v2.json",
+    "sha256": "f8d32e64e628126dd4cea846733de67d581ae50747cada830a85600ce1247799",
+    "json_pointer": ""
+  }
+}

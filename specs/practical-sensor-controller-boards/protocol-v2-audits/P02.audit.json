@@ -1,0 +1,700 @@
+{
+  "schema": "kicadai.practical-board-case-audit.v1",
+  "cohort": "approved_protocol_v2_baseline",
+  "case_id": "P02",
+  "kind": "positive",
+  "reserved": false,
+  "reviewer": "Codex task 019f6b30-5004-73b1-9a3b-678a961c7c8f",
+  "independence": "self_review; not external or blind",
+  "review_started_utc": "2026-09-11T12:42:30.380Z",
+  "review_utc": "2026-09-11T12:42:44.207Z",
+  "review_elapsed_seconds": 13.827,
+  "review_timing_basis": "Measured read-only adjudication wall time, not human-active time. Automated byte-authentication is reported separately.",
+  "source_binding": {
+    "case.json": {
+      "file": "baseline/P02/case.json",
+      "sha256": "d9d1604e3c4fd22b118639da47bc502fffb91c66a4512eb886863da2c3d04164",
+      "json_pointer": ""
+    },
+    "prompt.txt": {
+      "file": "baseline/P02/prompt.txt",
+      "sha256": "630dc4a36d518ecb100c1e7ddb896c2a2f4b5c40e017039e14efb41322f86224",
+      "line": 1
+    },
+    "result.json": {
+      "file": "baseline/P02/result.json",
+      "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+      "json_pointer": ""
+    },
+    "inventory.json": {
+      "file": "baseline/P02/inventory.json",
+      "sha256": "28d1351634c12658537fd48328fdf1cbe4467bdf55dd04ae11a55f95fd0e0dca",
+      "json_pointer": ""
+    }
+  },
+  "resource_binding": {
+    "file": "baseline/P02.resources.json",
+    "sha256": "3ae9297ae40b941fc383b40a86fc022dbba38768b075dafe08c81640f4f390ca",
+    "json_pointer": ""
+  },
+  "disposition": "failed",
+  "first_failed_gate": "requirement_compilation",
+  "clauses": [
+    {
+      "number": 1,
+      "text": "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 2,
+      "text": "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 3,
+      "text": "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 4,
+      "text": "No unrequested powered-off input operation or firmware/calibration claim.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 5,
+      "text": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 6,
+      "text": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 7,
+      "text": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 8,
+      "text": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 9,
+      "text": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    },
+    {
+      "number": 10,
+      "text": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+      "disposition": "not_run",
+      "reason": "The retained provider proposal was rejected as an invalid requirement after the permitted attempts. No compiled requirement, circuit, board or downstream measurement was produced; this clause is not established.",
+      "evidence": [
+        {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ],
+      "measurement": {
+        "assertion": null,
+        "condition": null,
+        "actual": null,
+        "required_bound": null,
+        "unit": null,
+        "provenance": null,
+        "unavailable_reason": "Compilation failed before electrical and physical evaluation. The required behavior and bounds remain in this unchanged clause and the bound frozen case prompt; no measured value is inferred."
+      }
+    }
+  ],
+  "gates": [
+    {
+      "number": 1,
+      "name": "requirement interpretation",
+      "disposition": "fail",
+      "reason": "The proposed requirement fails the frozen compiler; it cannot establish a faithful accepted input.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/first_failed_gate"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "name": "component/model qualification",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "name": "electrical analyses",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "name": "schematic/readability",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "name": "placement",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "name": "routing/connectivity",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "name": "native validation/writer",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "name": "deterministic replay",
+      "disposition": "not_run",
+      "reason": "No compiled requirement was accepted, so this downstream gate was not executed.",
+      "evidence": [
+        {
+          "file": "baseline/P02/result.json",
+          "sha256": "e64848b22c28f7465f4a234293e06d49a7868b0eea0f32bf29074d4925e131a5",
+          "json_pointer": "/replays_completed"
+        }
+      ]
+    }
+  ],
+  "observed_compiler_issues": {
+    "count": 103,
+    "by_code": {
+      "ARCHITECTURE_BINDING_UNRESOLVED": 14,
+      "ARCHITECTURE_OPERATING_CASE_INVALID": 5,
+      "ARCHITECTURE_SIGNAL_INVALID": 7,
+      "ARCHITECTURE_SCHEMA_INVALID": 1,
+      "ARCHITECTURE_CONSTRAINT_INVALID": 3,
+      "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+      "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+      "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 1,
+      "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+      "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 68
+    },
+    "representative_issues": [
+      {
+        "issue": {
+          "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.objectives[0].bindings[0]",
+          "message": "binding must select exactly one external, participant, or directed signal endpoint"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/0"
+        }
+      },
+      {
+        "issue": {
+          "code": "ARCHITECTURE_OPERATING_CASE_INVALID",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.operating_cases[1].conditions[2].unit",
+          "message": "operating condition requires canonical unit F"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/11"
+        }
+      },
+      {
+        "issue": {
+          "code": "ARCHITECTURE_SIGNAL_INVALID",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.signals[0]",
+          "message": "signal endpoints require one source and at least one sink, or at least two bidirectional endpoints; got 0 source, 0 sink, 0 bidirectional"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/19"
+        }
+      },
+      {
+        "issue": {
+          "code": "ARCHITECTURE_SCHEMA_INVALID",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.signals[3].control",
+          "message": "control semantics require the v6 schema"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/23"
+        }
+      },
+      {
+        "issue": {
+          "code": "ARCHITECTURE_CONSTRAINT_INVALID",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.system_constraints[13].value",
+          "message": "required relation must have boolean value true"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/27"
+        }
+      },
+      {
+        "issue": {
+          "code": "BEHAVIORAL_INTENT_PROPOSAL_INVALID",
+          "severity": "error",
+          "path": "proposal",
+          "message": "a proposal cannot mix clarification and capability-gap terminal outcomes"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/30"
+        }
+      },
+      {
+        "issue": {
+          "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+          "severity": "error",
+          "path": "proposal.clarifications[0].uncertainty_ids",
+          "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/31"
+        }
+      },
+      {
+        "issue": {
+          "code": "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID",
+          "severity": "error",
+          "path": "proposal.capability_gaps[0]",
+          "message": "capability gap requires semantic capability, path, reason, and evidence needed to close the gap"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/33"
+        }
+      },
+      {
+        "issue": {
+          "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+          "severity": "error",
+          "path": "proposal.uncertainties[0].resolution",
+          "message": "unsupported uncertainty resolution"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/34"
+        }
+      },
+      {
+        "issue": {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[0].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        },
+        "evidence": {
+          "file": "baseline/P02/compilation.json",
+          "sha256": "5a274f79582eb2ea12fe9285ed50c4e510ea95a5b760c5e2f9eb47cbfc544353",
+          "json_pointer": "/issues/35"
+        }
+      }
+    ]
+  },
+  "resource_observation": {
+    "id": "P02",
+    "exit_code": 0,
+    "signal": null,
+    "wall_seconds": 275.3,
+    "peak_sampled_process_tree_rss_bytes": 44056576,
+    "sampling_interval_ms": 1000,
+    "sampling_errors": 0,
+    "stop_reason": null,
+    "evidence_bytes": 3956517
+  },
+  "manual_assistance": {
+    "manual_implementation_repairs": 0,
+    "fixed_clarification_answer_turns": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "semantic_review_limit": "The audit independently confirms that compilation did not accept an executable contract and that no downstream artifacts exist. It does not equate provider coverage assertions with satisfaction of board requirements or infer electrical impossibility from this early failure.",
+  "authentication": {
+    "case_id": "P02",
+    "result": {
+      "case_id": "P02",
+      "kind": "positive",
+      "campaign": "baseline",
+      "status": "failed",
+      "first_failed_gate": "requirement_compilation",
+      "compilation_status": "invalid",
+      "provider_attempts": 2,
+      "follow_up_attempts": 0,
+      "replays_completed": 0,
+      "wall_seconds": 275.283154208,
+      "manual_implementation_repairs": 0,
+      "independent_acceptance_audit_required": true
+    },
+    "resources": {
+      "id": "P02",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 275.3,
+      "peak_sampled_process_tree_rss_bytes": 44056576,
+      "sampling_interval_ms": 1000,
+      "sampling_errors": 0,
+      "stop_reason": null,
+      "evidence_bytes": 3956517
+    },
+    "retained_files": 25,
+    "retained_bytes": 3956517,
+    "inventory_sha256": "28d1351634c12658537fd48328fdf1cbe4467bdf55dd04ae11a55f95fd0e0dca",
+    "redaction_markers": 0,
+    "requests": [
+      {
+        "number": 6,
+        "case_id": "P02",
+        "request_sha256": "71c89aa586b6f4ab78b85f518eb963f852d1858f0295bf5c96d2c83658d812ab",
+        "estimated_or_reserved_usd": 0.19185599999999997,
+        "stream": {
+          "http_status": 200,
+          "bytes": 1876418,
+          "metadata_pre_redaction_bytes": 1876418,
+          "redacted_paths": [],
+          "events": 6314,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 5304,
+            "input_tokens_details": {
+              "cache_write_tokens": 2704,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 8532,
+            "output_tokens_details": {
+              "reasoning_tokens": 2219
+            },
+            "total_tokens": 13836
+          },
+          "client_rejected_complete_response": false
+        }
+      },
+      {
+        "number": 7,
+        "case_id": "P02",
+        "request_sha256": "f016e1f0382c592a0a45caa18ac81036aa37dff98e669a5a1b4c4f85f26e0ed6",
+        "estimated_or_reserved_usd": 0.19409200000000001,
+        "stream": {
+          "http_status": 200,
+          "bytes": 1727121,
+          "metadata_pre_redaction_bytes": 1727121,
+          "redacted_paths": [],
+          "events": 5745,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 5593,
+            "input_tokens_details": {
+              "cache_write_tokens": 2993,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 8586,
+            "output_tokens_details": {
+              "reasoning_tokens": 2844
+            },
+            "total_tokens": 14179
+          },
+          "client_rejected_complete_response": false
+        }
+      }
+    ],
+    "issue_counts": {
+      "ARCHITECTURE_BINDING_UNRESOLVED": 14,
+      "ARCHITECTURE_OPERATING_CASE_INVALID": 5,
+      "ARCHITECTURE_SIGNAL_INVALID": 7,
+      "ARCHITECTURE_SCHEMA_INVALID": 1,
+      "ARCHITECTURE_CONSTRAINT_INVALID": 3,
+      "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+      "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+      "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 1,
+      "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+      "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 68
+    },
+    "automated_authentication_elapsed_seconds": 0.019985457999999994
+  },
+  "campaign_binding": {
+    "file": "baseline/campaign-end.json",
+    "sha256": "cec2dc2549a53dd0c5eaf4b9a7737e2ee53a371d1d6556e3cd16a9148e23d4b9",
+    "json_pointer": "/outcomes/1"
+  },
+  "freeze_binding": {
+    "file": "freeze-v2.json",
+    "sha256": "f8d32e64e628126dd4cea846733de67d581ae50747cada830a85600ce1247799",
+    "json_pointer": ""
+  }
+}

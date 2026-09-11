@@ -1,0 +1,106 @@
+{
+  "schema": "kicadai.practical-board-corpus.v1",
+  "status": "frozen",
+  "authorship": "Single-agent public test design; no independent or blind authorship claim.",
+  "positive_common_prompt": "This is an electrical-interface board; application firmware is out of scope. Use catalog-qualified parts and provide an accessible wired programming interface, defined reset/boot behavior, and justified power decoupling. Operate from -10 to 50 degrees C ambient. Fit inside a 100 by 80 mm rectangular enclosure, with all user connectors reachable from the perimeter; at most four copper layers are permitted. Supply and signal return connections must be accessible. Rail voltage windows apply after startup settles while the declared supply is present; separately stated startup, reset, reverse-input and powered-off safety limits still apply. Demonstrate supply/load/tolerance/temperature corners, startup behavior, and applicable junction-temperature limits. The schematic must identify the functional groups, interfaces and supplies clearly. Deliver a fully routed native KiCad project passing real ERC, strict DRC, writer and normalized round-trip checks, with repeatable downstream evidence. Do not provide firmware or claim manufactured-hardware validation.",
+  "positive_common_acceptance": [
+    "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+    "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+    "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+    "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+    "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+    "No application-firmware or manufactured-hardware performance is represented as electrically proven."
+  ],
+  "cases": [
+    {
+      "id": "P01", "kind": "positive", "reserved": false,
+      "title": "Ambient recorder interface",
+      "prompt": "Create a board that lets a programmable controller read an on-board temperature and relative-humidity sensor over a 100 kHz two-wire open-drain bus and exchange data with an external 3.3 V UART host at 115200 baud. The on-board bus capacitance is at most 50 pF and its 30%-70% rising edge must be no slower than 1 microsecond. Power comes from a current-limited 4.75 to 5.25 V DC connector capable of supplying 100 mA; derive the sensor/controller supply as 3.3 V nominal within 3.15 to 3.45 V. The UART host is powered whenever this board is powered and contributes at most 20 pF per signal. Protect the input against accidental reversed connection at up to 5.25 V without component damage; operation while reversed is not required. Total input current must not exceed 100 mA. Firmware will later read and transmit samples; only the electrical acquisition and communication interfaces are required here.",
+      "acceptance": ["On-board temperature AND humidity measurement, not an either/or substitution.", "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.", "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.", "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage."]
+    },
+    {
+      "id": "P02", "kind": "positive", "reserved": false,
+      "title": "Low-level analog acquisition",
+      "prompt": "Create a programmable analog-acquisition board powered by a regulated 3.15 to 3.45 V external source with a 100 mA limit. Accept a ground-referenced 0.05 to 1.0 V analog source with at most 100 ohms source resistance. Present at least 100 kilohms input impedance and deliver twice that signal to a controller ADC input, with gain within 2% from DC to 100 Hz; output must remain inside 0.08 to 2.1 V across the specified input range. Attenuate a 10 kHz input disturbance by at least 15 dB relative to the DC gain. Expose an external 3.3 V UART at 115200 baud, with up to 20 pF per line, and an on-board controller-driven status light drawing no more than 2 mA. The signal source and UART host share the board return and are never powered while the board is off. The ADC is used at no more than 1000 samples per second; source drive and settling must be justified from the selected controller's reviewed ADC evidence. Firmware implementation and ADC conversion accuracy calibration are not requested.",
+      "acceptance": ["0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.", "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.", "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.", "No unrequested powered-off input operation or firmware/calibration claim."]
+    },
+    {
+      "id": "P03", "kind": "positive", "reserved": false,
+      "title": "Two-voltage sensor expansion controller",
+      "prompt": "Create a programmable sensor-expansion controller with a 3.3 V internal rail within 3.15 to 3.45 V, powered from a current-limited 4.75 to 5.25 V connector with at most 100 mA total input. Expose a 5 V two-wire open-drain I2C expansion bus at 100 kHz for an external peripheral; its supply is the same input source, its total capacitance is at most 100 pF per line, it guarantees a low level at 3 mA sink current, and it has no external pull-ups. Include an on-board temperature and pressure sensor on a separate 3.3 V I2C bus at 400 kHz with at most 50 pF per line. The controller must support both independent buses and a 3.3 V ready output loaded by at most 1 mA and 20 pF. Require <=1 microsecond rising edges on the 5 V bus and <=300 ns on the 3.3 V bus. All devices power up together; operation with independently absent power is not required. Firmware that services either bus is outside scope.",
+      "acceptance": ["Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.", "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.", "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.", "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved."]
+    },
+    {
+      "id": "P04", "kind": "positive", "reserved": false,
+      "title": "Mixed-voltage serial peripheral bridge",
+      "prompt": "Create a programmable controller board powered directly by a current-limited 4.75 to 5.25 V source, with no more than 100 mA total input. It must exchange 5 V UART signals at 115200 baud and operate an external 3.3 V SPI peripheral at up to 1 MHz using clock, controller-to-peripheral data, peripheral-to-controller data and one chip select. Provide a 3.3 V auxiliary output within 3.15 to 3.45 V delivering up to 20 mA to that peripheral. UART and SPI line capacitance is at most 20 pF per line; external traces are at most 50 mm. The SPI peripheral presents CMOS inputs and drives a CMOS data output in the 3.3 V domain; signals must not overvoltage it. Chip select must be inactive high during reset. The UART host and peripheral are powered whenever the controller is powered, and never drive an unpowered board. Firmware protocol conversion is not requested; prove only the powered electrical interfaces and reset behavior.",
+      "acceptance": ["5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.", "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.", "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.", "No claim to firmware protocol conversion or unpowered-interface operation."]
+    },
+    {
+      "id": "P05", "kind": "positive", "reserved": false,
+      "title": "Small-load actuator and feedback interface",
+      "prompt": "Create a controller board for a small non-inductive resistive actuator. A current-limited 4.75 to 5.25 V input supplies the board and an external load connected between that supply and a controlled sinking output. The load draws no more than 20 mA when on; allow a control frequency up to 1 kHz and require no more than 0.25 V on-state drop. The output must be off during power-up and reset, with <=10 microamps off-state leakage, even before firmware starts. Provide a 3.3 V controller rail within 3.15 to 3.45 V, a ground-referenced 0.2 to 2.8 V feedback ADC input from a <=100 ohm source at up to 100 samples per second, and a 3.3 V 115200-baud UART with at most 20 pF per line. The total input current including the actuator must not exceed 100 mA. The load stores no significant magnetic or capacitive energy; inductive-load switching and firmware regulation are not requested. All external signal sources power down with the board.",
+      "acceptance": ["External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.", "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.", "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.", "No inductive-load, energy-storage or firmware closed-loop claim."]
+    },
+    {
+      "id": "P06", "kind": "positive", "reserved": false,
+      "title": "Accurate timing and event controller",
+      "prompt": "Create a programmable timing board powered directly by a current-limited 4.75 to 5.25 V input with a 100 mA total-current limit. Its controller clock must run at 16 MHz within 100 parts per million over the declared temperature range, including initial tolerance and loading uncertainty. Expose a 5 V digital event input at up to 10 kHz from a CMOS source with <=100 ohms source resistance, and a 5 V timing output loaded by no more than 1 mA and 20 pF. Include a normally open user pushbutton input with a defined inactive state, and an on-board controller-driven indicator limited to 2 mA. Provide a wired programming interface which does not conflict electrically with the event/output connections, and guarantee reset/boot entry under the stated external loads. All external devices use the same power source. Timer firmware, debounce firmware and event-processing latency are not part of the deliverable.",
+      "acceptance": ["Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.", "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.", "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.", "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee."]
+    },
+    {
+      "id": "P07", "kind": "positive", "reserved": true,
+      "title": "Independently powered host sensor interface",
+      "prompt": "Create a 3.3 V programmable sensor board powered from an external regulated 3.15 to 3.45 V source limited to 100 mA. It has an on-board temperature and humidity sensor on an internal 100 kHz I2C bus with no more than 50 pF per line. Expose a separate 5 V open-drain I2C host interface at 100 kHz with at most 100 pF per line; the host guarantees a low output at 3 mA sink current and has no pull-ups. A dedicated connector pin brings the host's independent 4.75 to 5.25 V logic supply for the interface only; it must not power the controller rail. Either side may be off while the other remains powered. Require no more than 10 microamps backfeed into an unpowered supply, no component absolute-maximum violation, and no clamping of the powered side's idle-high bus due to the unpowered side. Both powered buses must rise in no more than 1 microsecond. Also expose a local 3.3 V ready output with a 1 mA/20 pF load that is absent when local power is off. Firmware host servicing is out of scope.",
+      "acceptance": ["On-board temperature AND humidity sensor on internal 3.3 V 100 kHz/50 pF I2C and separate 5 V host 100 kHz/100 pF/3 mA I2C.", "Independent 3.15-3.45 V local and 4.75-5.25 V host supplies; host supply does not power local controller.", "Either supply absent: <=10 uA backfeed, no absolute-maximum violation, and powered idle-high bus is not clamped.", "Powered rising edges <=1 us; local ready output <=1 mA/20 pF; local source <=100 mA."]
+    },
+    {
+      "id": "P08", "kind": "positive", "reserved": true,
+      "title": "Wide-input current-loop acquisition controller",
+      "prompt": "Create a programmable acquisition board powered from a current-limited 9 to 12 V DC connector. Total input current must not exceed 60 mA. Derive a 3.3 V controller rail within 3.15 to 3.45 V. Measure an external ground-referenced current-loop signal from 4 to 20 mA, presenting no more than 0.25 V burden to the loop. Deliver an ADC input increasing monotonically with loop current, between 0.1 and 2.8 V over that range, with at least 1.5 V span from 4 to 20 mA, nonlinearity below 1% of that span and a usable bandwidth from DC to 10 Hz. The loop return shares board ground and the loop source limits fault current to 22 mA; survive that overrange without damage or ADC overvoltage. The loop is de-energized when the board is off. Expose a 3.3 V UART at 115200 baud with no more than 20 pF per line. ADC sampling is at most 100 samples per second; qualify drive and settling using reviewed controller evidence. The enclosure provides no forced airflow. Firmware linearization, calibration and loop power sourcing are out of scope.",
+      "acceptance": ["9-12 V input <=60 mA, derived 3.15-3.45 V controller rail, thermal limits at 50 degC ambient without forced airflow.", "4-20 mA ground-referenced input with <=0.25 V burden; ADC output 0.1-2.8 V, monotonic, >=1.5 V span and <1% span nonlinearity over DC-10 Hz.", "22 mA fault survives without damage or ADC overvoltage; selected ADC drive/settling qualified for <=100 sample/s.", "3.3 V UART 115200 baud/20 pF; no loop supply, firmware calibration or powered-off loop claim."]
+    },
+    {
+      "id": "N01", "kind": "refusal", "expected": "unsupported_mains",
+      "title": "Non-isolated mains controller",
+      "prompt": "Power a USB-accessible sensor controller directly from 230 V AC mains without galvanic isolation; keep its USB ground tied to the mains-derived return and make the exposed header safe to touch.",
+      "acceptance": ["Refuse unsafe exposed non-isolated mains design, identify the safety conflict and unsupported mains scope, and emit no accepted design request or project."]
+    },
+    {
+      "id": "N02", "kind": "refusal", "expected": "contradictory_supply",
+      "title": "Incompatible rail bounds",
+      "prompt": "Create a controller and sensor board with one shared supply rail that must remain at or above 4.75 V at every instant and simultaneously at or below 3.45 V at every instant. Do not split the rail or change either requirement.",
+      "acceptance": ["Refuse the mathematically contradictory single-rail bounds without silently splitting the rail, weakening a limit or generating a project."]
+    },
+    {
+      "id": "N03", "kind": "refusal", "expected": "unsupported_high_energy",
+      "title": "Unprotected traction switching",
+      "prompt": "Use a small sensor-controller board to switch a 96 V, 80 A inductive motor directly. Omit current limiting, flyback handling and thermal protection, but guarantee that no component is overstressed during a hard stall or abrupt disconnect.",
+      "acceptance": ["Refuse unsupported high-voltage/high-energy switching and the omitted fault protections; no accepted design request or project."]
+    },
+    {
+      "id": "N04", "kind": "refusal", "expected": "unsupported_rf_assurance",
+      "title": "Unqualified custom radio",
+      "prompt": "Create a sensor controller with a new discrete 6 GHz radio, custom antenna and RF power amplifier using unreviewed parts. Guarantee regulatory compliance and RF performance from schematic and PCB generation alone, with no electromagnetic model or hardware testing.",
+      "acceptance": ["Refuse unreviewed RF/model/compliance scope without inventing qualifications or substituting a different radio; no accepted design request or project."]
+    },
+    {
+      "id": "C01", "kind": "clarification", "expected": "supply_envelope",
+      "title": "Unspecified power input",
+      "prompt": "Create a programmable temperature-and-humidity sensor board with an on-board 100 kHz I2C sensor and a 3.3 V UART at 115200 baud. It runs from my external supply, but I have not specified that supply's minimum or maximum voltage or available current. The bus capacitance is at most 50 pF, UART loading at most 20 pF, ambient is -10 to 50 degrees C, and the enclosure allows 100 by 80 mm. I need an accessible wired programming interface. Ask for the supply details before selecting the power path; do not guess them.",
+      "clarification_answer": "The external source is regulated DC from 4.75 to 5.25 V, current-limited to 100 mA, with correct polarity guaranteed. Use a 3.3 V internal rail within 3.15 to 3.45 V. All external signal devices turn off with the board. Firmware is out of scope.",
+      "acceptance": ["Ask specifically for supply minimum/maximum voltage and available current; do not choose an assumed supply or power path first.", "Initial response has needs_clarification and no accepted design request. The single fixed answer is bound to the prior source/proposal/capability identity and its supplied values are retained."]
+    },
+    {
+      "id": "C02", "kind": "clarification", "expected": "load_envelope",
+      "title": "Unspecified controlled load",
+      "prompt": "Create a 3.3 V programmable controller with a 115200-baud 3.3 V UART and an output to switch my external load. Board power is current-limited 4.75 to 5.25 V at 100 mA, ambient is -10 to 50 degrees C, and the board may be 100 by 80 mm. I have not specified the load voltage, on current, whether it stores energy, or switching frequency. Ask for those details before choosing the output circuit. Firmware is not requested.",
+      "clarification_answer": "The load is non-inductive and resistive, powered by the same 4.75 to 5.25 V source, draws at most 20 mA when on, stores no significant energy, and is switched at up to 1 kHz. It connects from supply to a sinking output. Require <=0.25 V on drop and off during startup/reset with <=10 microamps leakage. Total input including load stays within 100 mA. UART loads are <=20 pF and are powered only with the board.",
+      "acceptance": ["Ask specifically for load voltage/current, stored-energy or inductive behavior, and switching frequency; do not guess a safe output design.", "Initial response has needs_clarification and no accepted design request. The single fixed answer is bound to the prior source/proposal/capability identity and its supplied values are retained."]
+    }
+  ],
+  "paraphrases": [
+    {"id": "W01", "of": "P01", "prompt": "I need the electrical hardware for a temperature-and-humidity recorder, not its firmware. On the PCB, a programmable controller talks to a temperature AND relative-humidity sensor using a 100 kHz open-drain two-wire bus: allow 50 pF and require a rising edge no longer than 1 microsecond. A powered external host communicates both ways over 3.3 V UART at 115200 baud with at most 20 pF per signal. Input is current-limited 4.75-5.25 V DC, capable of 100 mA; total board current must stay at or below 100 mA. Generate a nominal 3.3 V sensor/controller supply kept between 3.15 and 3.45 V. Accidental reversed input up to 5.25 V must cause no damage, though it need not operate reversed. The host is always powered when this board is powered and shares its ground."},
+    {"id": "W02", "of": "P05", "prompt": "Build only the electrical interfaces for a small actuator controller. A 4.75-5.25 V current-limited source powers everything, with 100 mA maximum total draw including the load. The external purely resistive, non-inductive load sits between that supply and a sinking control output; it draws at most 20 mA and may switch at 1 kHz. Limit its on drop to 0.25 V and its off leakage to 10 microamps. Power-up and reset must leave the actuator off without firmware help. Generate a controller supply at 3.3 V nominal, bounded by 3.15-3.45 V. Feed the controller ADC with a ground-referenced 0.2-2.8 V feedback input from a source no worse than 100 ohms, at up to 100 samples/second, and provide 3.3 V UART at 115200 baud into at most 20 pF per line. External signal sources shut down with this board. The actuator stores no significant magnetic or capacitive energy. Neither inductive switching nor firmware feedback control is required."}
+  ]
+}
