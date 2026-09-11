@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.practical-board-archive.v1",
+  "path": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-evidence-protocol-v2-91cce832/baseline-v2.tar",
+  "format": "tar",
+  "bytes": 102119424,
+  "sha256": "92982ba1bfe6bb8e067981e7777b5870005785f0541683947632049fbf51da54",
+  "retained_payloads": 472,
+  "retained_payload_bytes": 101237999,
+  "verification": "Every extracted file matches the sealed raw tree by relative path, byte count and SHA-256; no extras or missing payloads",
+  "verified_utc": "2026-09-11T13:15:41.766Z",
+  "remote_publication": false
+}

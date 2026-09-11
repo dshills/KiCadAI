@@ -1,0 +1,1653 @@
+{
+  "prior_inventories_reverified": [
+    {
+      "inventory": "baseline-evidence-inventory.json",
+      "sha256": "48502181af3ae2e94f7cf4854560764ac13e9d75d0abe96a78bf71d07281bf34",
+      "file_count": 25
+    },
+    {
+      "inventory": "recovery-1-evidence-inventory.json",
+      "sha256": "b05ac83e87cef9710b0cfa582ac883ccab5fc3ca1033cb4d51a209ae464755ed",
+      "file_count": 28
+    },
+    {
+      "inventory": "recovery-2-evidence-inventory.json",
+      "sha256": "2930f9a9fa63f0c01a63c12c7871358531cba5d86a4c344d417f69f1a0cd39de",
+      "file_count": 31
+    }
+  ],
+  "campaign_complete": true,
+  "manual_semantic_audits_required": true,
+  "checkpoint": {
+    "observed_utc": "2026-09-11T13:13:21.076Z",
+    "checkpoint_only": true,
+    "semantic_audit_not_performed_by_this_script": true,
+    "completed": [
+      {
+        "case_id": "P01",
+        "result": {
+          "case_id": "P01",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 299.389874875,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P01",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 299.411,
+          "peak_sampled_process_tree_rss_bytes": 44056576,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 3929763
+        },
+        "retained_files": 25,
+        "retained_bytes": 3929763,
+        "inventory_sha256": "ed65bb9e8fa087aea07e74013cbb7813e14df7408b42dcbfcc60d7da45fa471f",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 4,
+            "case_id": "P01",
+            "request_sha256": "10dc605976b78bd7ba5cbee26962b0ce772134fc0c6ff2e72d4d3c45a8c1404d",
+            "estimated_or_reserved_usd": 0.19230799999999998,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1700420,
+              "metadata_pre_redaction_bytes": 1700420,
+              "redacted_paths": [],
+              "events": 5626,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5242,
+                "input_tokens_details": {
+                  "cache_write_tokens": 5239,
+                  "cached_tokens": 0
+                },
+                "output_tokens": 8567,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2944
+                },
+                "total_tokens": 13809
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 5,
+            "case_id": "P01",
+            "request_sha256": "bd62513b75531a6a9a092b9eb7f01b58ea43eb9fa7745b30381d6e9a88658ae1",
+            "estimated_or_reserved_usd": 0.194272,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1858922,
+              "metadata_pre_redaction_bytes": 1858922,
+              "redacted_paths": [],
+              "events": 6241,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5563,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2963,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8601,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2361
+                },
+                "total_tokens": 14164
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_LIMIT_EXCEEDED": 1,
+          "ARCHITECTURE_SCHEMA_INVALID": 3,
+          "ARCHITECTURE_DOMAIN_INVALID": 3,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 22,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 5,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 13,
+          "ARCHITECTURE_SIGNAL_INVALID": 6,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 81
+        },
+        "automated_authentication_elapsed_seconds": 0.025795459
+      },
+      {
+        "case_id": "P02",
+        "result": {
+          "case_id": "P02",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 275.283154208,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P02",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 275.3,
+          "peak_sampled_process_tree_rss_bytes": 44056576,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 3956517
+        },
+        "retained_files": 25,
+        "retained_bytes": 3956517,
+        "inventory_sha256": "28d1351634c12658537fd48328fdf1cbe4467bdf55dd04ae11a55f95fd0e0dca",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 6,
+            "case_id": "P02",
+            "request_sha256": "71c89aa586b6f4ab78b85f518eb963f852d1858f0295bf5c96d2c83658d812ab",
+            "estimated_or_reserved_usd": 0.19185599999999997,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1876418,
+              "metadata_pre_redaction_bytes": 1876418,
+              "redacted_paths": [],
+              "events": 6314,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5304,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2704,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8532,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2219
+                },
+                "total_tokens": 13836
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 7,
+            "case_id": "P02",
+            "request_sha256": "f016e1f0382c592a0a45caa18ac81036aa37dff98e669a5a1b4c4f85f26e0ed6",
+            "estimated_or_reserved_usd": 0.19409200000000001,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1727121,
+              "metadata_pre_redaction_bytes": 1727121,
+              "redacted_paths": [],
+              "events": 5745,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5593,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2993,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8586,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2844
+                },
+                "total_tokens": 14179
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_BINDING_UNRESOLVED": 14,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 5,
+          "ARCHITECTURE_SIGNAL_INVALID": 7,
+          "ARCHITECTURE_SCHEMA_INVALID": 1,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 3,
+          "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+          "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 1,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 68
+        },
+        "automated_authentication_elapsed_seconds": 0.019985457999999994
+      },
+      {
+        "case_id": "P03",
+        "result": {
+          "case_id": "P03",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 266.94446325,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P03",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 266.965,
+          "peak_sampled_process_tree_rss_bytes": 42057728,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 3798135
+        },
+        "retained_files": 25,
+        "retained_bytes": 3798135,
+        "inventory_sha256": "b63e89371dd6525005bc5702a8cf19076b836946f46f7616b0ad1e043f0de914",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 8,
+            "case_id": "P03",
+            "request_sha256": "6eb272ce3be220bf90a70115296508dde12acfcb9d9b9f8f0a12a382fe2b56a3",
+            "estimated_or_reserved_usd": 0.18443199999999998,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1732502,
+              "metadata_pre_redaction_bytes": 1732502,
+              "redacted_paths": [],
+              "events": 5818,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5293,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2693,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8163,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2346
+                },
+                "total_tokens": 13456
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 9,
+            "case_id": "P03",
+            "request_sha256": "db6da1762235128269098017f9055a088ef7453db0f48a198abdebb31c2b19ed",
+            "estimated_or_reserved_usd": 0.196688,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1712169,
+              "metadata_pre_redaction_bytes": 1712169,
+              "redacted_paths": [],
+              "events": 5687,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5602,
+                "input_tokens_details": {
+                  "cache_write_tokens": 3002,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8714,
+                "output_tokens_details": {
+                  "reasoning_tokens": 3030
+                },
+                "total_tokens": 14316
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_SCHEMA_INVALID": 8,
+          "ARCHITECTURE_BEHAVIOR_INVALID": 4,
+          "ARCHITECTURE_LIMIT_EXCEEDED": 1,
+          "ARCHITECTURE_DOMAIN_INVALID": 3,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 15,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 7,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 18,
+          "ARCHITECTURE_SIGNAL_INVALID": 4,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 3,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 65
+        },
+        "automated_authentication_elapsed_seconds": 0.021700625
+      },
+      {
+        "case_id": "P04",
+        "result": {
+          "case_id": "P04",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 340.532174583,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P04",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 340.561,
+          "peak_sampled_process_tree_rss_bytes": 44761088,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 4416894
+        },
+        "retained_files": 25,
+        "retained_bytes": 4416894,
+        "inventory_sha256": "b29a38aec5e905472de5a85694ed9633b9c9b4a6910fd03f02a866a85f577c40",
+        "redaction_markers": 1,
+        "requests": [
+          {
+            "number": 10,
+            "case_id": "P04",
+            "request_sha256": "831b142448704b4a76ee82a1796edee9c36bae30d6e3ebc09e904aafa9786d1c",
+            "estimated_or_reserved_usd": 0.244064,
+            "stream": {
+              "http_status": 200,
+              "bytes": 2093425,
+              "metadata_pre_redaction_bytes": 2093425,
+              "redacted_paths": [],
+              "events": 6945,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5271,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2671,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 11149,
+                "output_tokens_details": {
+                  "reasoning_tokens": 4213
+                },
+                "total_tokens": 16420
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 11,
+            "case_id": "P04",
+            "request_sha256": "483c15992dc03020338d48ab1324908bc3562e4fd64a0c3ddc730a9accc9ba6b",
+            "estimated_or_reserved_usd": 0.207736,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1932975,
+              "metadata_pre_redaction_bytes": 1936849,
+              "redacted_paths": [
+                "/events/6504/response/output/0/encrypted_content"
+              ],
+              "events": 6505,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5594,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2994,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9268,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2766
+                },
+                "total_tokens": 14862
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_LIMIT_EXCEEDED": 1,
+          "ARCHITECTURE_SCHEMA_INVALID": 2,
+          "ARCHITECTURE_DOMAIN_INVALID": 10,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 29,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 11,
+          "ARCHITECTURE_PORT_INVALID": 9,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 1,
+          "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 4,
+          "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 1,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 8,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 79
+        },
+        "automated_authentication_elapsed_seconds": 0.02117116700000001
+      },
+      {
+        "case_id": "P05",
+        "result": {
+          "case_id": "P05",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 295.139845666,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P05",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 295.169,
+          "peak_sampled_process_tree_rss_bytes": 41828352,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 4070002
+        },
+        "retained_files": 25,
+        "retained_bytes": 4070002,
+        "inventory_sha256": "c655d0d4fd73f1557da2f02d9db18a19c143c0784b7cb6db61dcaf188a1958be",
+        "redaction_markers": 1,
+        "requests": [
+          {
+            "number": 12,
+            "case_id": "P05",
+            "request_sha256": "1c7f58ef198dbe5c0b654407f039d18be423eee57f429477e862c370d884c5da",
+            "estimated_or_reserved_usd": 0.18344,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1713848,
+              "metadata_pre_redaction_bytes": 1714856,
+              "redacted_paths": [
+                "/events/11/item/encrypted_content"
+              ],
+              "events": 5735,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5300,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2700,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 8112,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2378
+                },
+                "total_tokens": 13412
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 13,
+            "case_id": "P05",
+            "request_sha256": "41db3f2b77a41c63b354f628e392c326adec300637a881a0990180687a0a8eee",
+            "estimated_or_reserved_usd": 0.21953199999999998,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1983084,
+              "metadata_pre_redaction_bytes": 1983084,
+              "redacted_paths": [],
+              "events": 6612,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5583,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2983,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9860,
+                "output_tokens_details": {
+                  "reasoning_tokens": 3253
+                },
+                "total_tokens": 15443
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_BEHAVIOR_INVALID": 3,
+          "ARCHITECTURE_DOMAIN_INVALID": 1,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 19,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 15,
+          "ARCHITECTURE_SCHEMA_INVALID": 4,
+          "ARCHITECTURE_SIGNAL_INVALID": 7,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 8,
+          "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 75
+        },
+        "automated_authentication_elapsed_seconds": 0.022188458999999994
+      },
+      {
+        "case_id": "P06",
+        "result": {
+          "case_id": "P06",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 362.650932291,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P06",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 362.678,
+          "peak_sampled_process_tree_rss_bytes": 41156608,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 3992915
+        },
+        "retained_files": 25,
+        "retained_bytes": 3992915,
+        "inventory_sha256": "07f5b72442adf0f8df3bb7ee4d18ebf146b1385169af837f9467ed9039e718c1",
+        "redaction_markers": 1,
+        "requests": [
+          {
+            "number": 14,
+            "case_id": "P06",
+            "request_sha256": "7f95401b1563150574649679ec18eca16be14a8ef972d3af6f17f67ba20ab89f",
+            "estimated_or_reserved_usd": 0.248456,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1798092,
+              "metadata_pre_redaction_bytes": 1799900,
+              "redacted_paths": [
+                "/events/15/item/encrypted_content"
+              ],
+              "events": 5765,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5149,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2549,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 11393,
+                "output_tokens_details": {
+                  "reasoning_tokens": 5641
+                },
+                "total_tokens": 16542
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 15,
+            "case_id": "P06",
+            "request_sha256": "5f22e9b102f8f2f8ec50226d6c24028b2724a405df514b4a5bfb3fba0c8def50",
+            "estimated_or_reserved_usd": 0.212452,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1832728,
+              "metadata_pre_redaction_bytes": 1832728,
+              "redacted_paths": [],
+              "events": 6076,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5448,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2848,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9533,
+                "output_tokens_details": {
+                  "reasoning_tokens": 3462
+                },
+                "total_tokens": 14981
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_DOMAIN_INVALID": 4,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 13,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 14,
+          "ARCHITECTURE_PORT_INVALID": 24,
+          "ARCHITECTURE_SCHEMA_INVALID": 4,
+          "ARCHITECTURE_SIGNAL_INVALID": 7,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 4,
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 3,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 2,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 65
+        },
+        "automated_authentication_elapsed_seconds": 0.02355658299999999
+      },
+      {
+        "case_id": "P07",
+        "result": {
+          "case_id": "P07",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "provider",
+          "provider_attempts": 1,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "error": "OpenAI response exceeds 2097152-byte limit",
+          "wall_seconds": 177.752077417,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P07",
+          "exit_code": 1,
+          "signal": null,
+          "wall_seconds": 177.772,
+          "peak_sampled_process_tree_rss_bytes": 35323904,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 2224570
+        },
+        "retained_files": 14,
+        "retained_bytes": 2224570,
+        "inventory_sha256": "80f9b9f942fec28572c5e7648a86e89f315c412311824cfd1da5973dfb24f068",
+        "redaction_markers": 1,
+        "requests": [
+          {
+            "number": 16,
+            "case_id": "P07",
+            "request_sha256": "95614656285bf14c7ee9d266e35d6dcd02b23146734488f521f9683dd1682e57",
+            "estimated_or_reserved_usd": 0.45724000000000004,
+            "stream": {
+              "http_status": 200,
+              "bytes": 2118141,
+              "metadata_pre_redaction_bytes": 2118523,
+              "redacted_paths": [
+                "/events/8/item/encrypted_content"
+              ],
+              "events": 7094,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": false,
+              "raw_stream_usage": {
+                "input_tokens": 5352,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2752,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 10708,
+                "output_tokens_details": {
+                  "reasoning_tokens": 3619
+                },
+                "total_tokens": 16060
+              },
+              "client_rejected_complete_response": true
+            }
+          }
+        ],
+        "issue_counts": null,
+        "automated_authentication_elapsed_seconds": 0.011303750000000008
+      },
+      {
+        "case_id": "P08",
+        "result": {
+          "case_id": "P08",
+          "kind": "positive",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 310.428469084,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "P08",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 310.46,
+          "peak_sampled_process_tree_rss_bytes": 40632320,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 4213800
+        },
+        "retained_files": 25,
+        "retained_bytes": 4213800,
+        "inventory_sha256": "93681ffc1928d6eceb136ce32a5f477b169a5f2ba2b9ca1dd383e5226648c13c",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 17,
+            "case_id": "P08",
+            "request_sha256": "f62fc400383e2e2c068eeb80373131bfe203947d07a3520dcb8c084577e008ce",
+            "estimated_or_reserved_usd": 0.204348,
+            "stream": {
+              "http_status": 200,
+              "bytes": 1737692,
+              "metadata_pre_redaction_bytes": 1737692,
+              "redacted_paths": [],
+              "events": 5722,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5407,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2807,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9136,
+                "output_tokens_details": {
+                  "reasoning_tokens": 3419
+                },
+                "total_tokens": 14543
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 18,
+            "case_id": "P08",
+            "request_sha256": "b4bacade999111f67317de4fc0b69fe0fae427b215d8035af5c24f70be791b0b",
+            "estimated_or_reserved_usd": 0.209708,
+            "stream": {
+              "http_status": 200,
+              "bytes": 2089902,
+              "metadata_pre_redaction_bytes": 2089902,
+              "redacted_paths": [],
+              "events": 7071,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 5697,
+                "input_tokens_details": {
+                  "cache_write_tokens": 3097,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9346,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2276
+                },
+                "total_tokens": 15043
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "ARCHITECTURE_SCHEMA_INVALID": 9,
+          "ARCHITECTURE_BEHAVIOR_INVALID": 1,
+          "ARCHITECTURE_BINDING_UNRESOLVED": 22,
+          "ARCHITECTURE_DOMAIN_INVALID": 3,
+          "ARCHITECTURE_CONSTRAINT_INVALID": 11,
+          "ARCHITECTURE_OPERATING_CASE_INVALID": 7,
+          "ARCHITECTURE_PORT_INVALID": 4,
+          "ARCHITECTURE_SIGNAL_INVALID": 8,
+          "BEHAVIORAL_INTENT_PROPOSAL_INVALID": 1,
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 75
+        },
+        "automated_authentication_elapsed_seconds": 0.025859542000000006
+      },
+      {
+        "case_id": "N01",
+        "result": {
+          "case_id": "N01",
+          "kind": "refusal",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 42.627272667,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "N01",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 42.657,
+          "peak_sampled_process_tree_rss_bytes": 34963456,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 470311
+        },
+        "retained_files": 25,
+        "retained_bytes": 470311,
+        "inventory_sha256": "ab31c845fcfeb25dbb6254e08ffcb13a4139e7716a26b584b9652a74687843e5",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 19,
+            "case_id": "N01",
+            "request_sha256": "eea06ad38db7265a136924d8551134d2b44b7cba9f9901cda9f7d80678694368",
+            "estimated_or_reserved_usd": 0.035856,
+            "stream": {
+              "http_status": 200,
+              "bytes": 197038,
+              "metadata_pre_redaction_bytes": 197038,
+              "redacted_paths": [],
+              "events": 487,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4049,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1449,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 983,
+                "output_tokens_details": {
+                  "reasoning_tokens": 489
+                },
+                "total_tokens": 5032
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 20,
+            "case_id": "N01",
+            "request_sha256": "286ef6d132e491121c5569d4fcba0ea26790f1c8cae16cf166bef225ac66eb70",
+            "estimated_or_reserved_usd": 0.0323,
+            "stream": {
+              "http_status": 200,
+              "bytes": 137451,
+              "metadata_pre_redaction_bytes": 137451,
+              "redacted_paths": [],
+              "events": 278,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4340,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1740,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 747,
+                "output_tokens_details": {
+                  "reasoning_tokens": 462
+                },
+                "total_tokens": 5087
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 1
+        },
+        "automated_authentication_elapsed_seconds": 0.0038540840000000002
+      },
+      {
+        "case_id": "N02",
+        "result": {
+          "case_id": "N02",
+          "kind": "refusal",
+          "campaign": "baseline",
+          "status": "refusal_candidate",
+          "first_failed_gate": "independent_acceptance_audit",
+          "compilation_status": "unsupported",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 32.543239333,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "N02",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 32.567,
+          "peak_sampled_process_tree_rss_bytes": 34242560,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 394825
+        },
+        "retained_files": 25,
+        "retained_bytes": 394825,
+        "inventory_sha256": "6bb0a9e378a3efea95fcf35882d7c5cbc54198f925a2f013eea518143562befb",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 21,
+            "case_id": "N02",
+            "request_sha256": "4f23564dde0ca1c5e860430c68654a60cc4ef5fd5729a6504785b464172ac2c3",
+            "estimated_or_reserved_usd": 0.031636,
+            "stream": {
+              "http_status": 200,
+              "bytes": 133345,
+              "metadata_pre_redaction_bytes": 133345,
+              "redacted_paths": [],
+              "events": 266,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4074,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1474,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 767,
+                "output_tokens_details": {
+                  "reasoning_tokens": 494
+                },
+                "total_tokens": 4841
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 22,
+            "case_id": "N02",
+            "request_sha256": "aa275f32ee4de52bdd350248c91e8ec09e7d59b7420c15cc631e8dd26a19e390",
+            "estimated_or_reserved_usd": 0.027208000000000003,
+            "stream": {
+              "http_status": 200,
+              "bytes": 132279,
+              "metadata_pre_redaction_bytes": 132279,
+              "redacted_paths": [],
+              "events": 276,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4192,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1592,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 522,
+                "output_tokens_details": {
+                  "reasoning_tokens": 239
+                },
+                "total_tokens": 4714
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {},
+        "automated_authentication_elapsed_seconds": 0.003017291999999998
+      },
+      {
+        "case_id": "N03",
+        "result": {
+          "case_id": "N03",
+          "kind": "refusal",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 103.51879025,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "N03",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 103.544,
+          "peak_sampled_process_tree_rss_bytes": 36323328,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 803392
+        },
+        "retained_files": 25,
+        "retained_bytes": 803392,
+        "inventory_sha256": "c180cb5b5cd44b9a5e6e1992ea83b2934d931f284bdc4d4bc00e080f36a65384",
+        "redaction_markers": 2,
+        "requests": [
+          {
+            "number": 23,
+            "case_id": "N03",
+            "request_sha256": "98e25b22ef044d28faa9f3013e0e6a33aa28a5d08cb38f08f4511c8bf18f112c",
+            "estimated_or_reserved_usd": 0.07950399999999999,
+            "stream": {
+              "http_status": 200,
+              "bytes": 454471,
+              "metadata_pre_redaction_bytes": 459110,
+              "redacted_paths": [
+                "/events/8/item/encrypted_content",
+                "/events/1311/response/output/2/encrypted_content"
+              ],
+              "events": 1312,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4071,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1471,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 3161,
+                "output_tokens_details": {
+                  "reasoning_tokens": 1848
+                },
+                "total_tokens": 7232
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 24,
+            "case_id": "N03",
+            "request_sha256": "bdb51ade74977acd589d1837dacacda550d201f28bc6d2e77f0aee9d8156683d",
+            "estimated_or_reserved_usd": 0.044748,
+            "stream": {
+              "http_status": 200,
+              "bytes": 198591,
+              "metadata_pre_redaction_bytes": 198591,
+              "redacted_paths": [],
+              "events": 458,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4362,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1762,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 1365,
+                "output_tokens_details": {
+                  "reasoning_tokens": 902
+                },
+                "total_tokens": 5727
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 2,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 1,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 3
+        },
+        "automated_authentication_elapsed_seconds": 0.0052785410000000185
+      },
+      {
+        "case_id": "N04",
+        "result": {
+          "case_id": "N04",
+          "kind": "refusal",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 53.861766375,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "N04",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 53.888,
+          "peak_sampled_process_tree_rss_bytes": 35176448,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 550501
+        },
+        "retained_files": 25,
+        "retained_bytes": 550501,
+        "inventory_sha256": "ac44aead53c4e46e11bcc8d0f82e864b94abc872b797635005e453c30612ca0c",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 25,
+            "case_id": "N04",
+            "request_sha256": "6923ded8e8edb26b45581390789a639ea4ce7a7ea8a2ae18de28e94dd9e05632",
+            "estimated_or_reserved_usd": 0.033636,
+            "stream": {
+              "http_status": 200,
+              "bytes": 182481,
+              "metadata_pre_redaction_bytes": 182481,
+              "redacted_paths": [],
+              "events": 440,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4069,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1469,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 868,
+                "output_tokens_details": {
+                  "reasoning_tokens": 421
+                },
+                "total_tokens": 4937
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 26,
+            "case_id": "N04",
+            "request_sha256": "470e9688789dc3861f5f1bbe2520eafdd824855e1bd2824aa671f860557bcaae",
+            "estimated_or_reserved_usd": 0.042828,
+            "stream": {
+              "http_status": 200,
+              "bytes": 226754,
+              "metadata_pre_redaction_bytes": 226754,
+              "redacted_paths": [],
+              "events": 565,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4207,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1607,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 1300,
+                "output_tokens_details": {
+                  "reasoning_tokens": 730
+                },
+                "total_tokens": 5507
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 3
+        },
+        "automated_authentication_elapsed_seconds": 0.0035185840000000043
+      },
+      {
+        "case_id": "C01",
+        "result": {
+          "case_id": "C01",
+          "kind": "clarification",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "provider",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "error": "OpenAI stream ended without a terminal response",
+          "wall_seconds": 91.844657417,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "C01",
+          "exit_code": 1,
+          "signal": null,
+          "wall_seconds": 91.874,
+          "peak_sampled_process_tree_rss_bytes": 36306944,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 825878
+        },
+        "retained_files": 22,
+        "retained_bytes": 825878,
+        "inventory_sha256": "3a4191feb466df0e44bb34a71e2ddb33a0c873682ed9501e39da76f941cd5cce",
+        "redaction_markers": 1,
+        "requests": [
+          {
+            "number": 27,
+            "case_id": "C01",
+            "request_sha256": "a2a1bfa75cf1adb767a6b601754361c1df7255d8c8034d35bff11146df28ced4",
+            "estimated_or_reserved_usd": 0.09894800000000001,
+            "stream": {
+              "http_status": 200,
+              "bytes": 643862,
+              "metadata_pre_redaction_bytes": 647823,
+              "redacted_paths": [
+                "/events/5/item/encrypted_content"
+              ],
+              "events": 1962,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4307,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1707,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 4086,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2125
+                },
+                "total_tokens": 8393
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 28,
+            "case_id": "C01",
+            "request_sha256": "83c166ffe2d00561fedd4373b23d2162edd17eee242750c5112ede8b648a8013",
+            "estimated_or_reserved_usd": 0.44332800000000006,
+            "stream": {
+              "http_status": 200,
+              "bytes": 33634,
+              "metadata_pre_redaction_bytes": 33634,
+              "redacted_paths": [],
+              "events": 3,
+              "terminal": null,
+              "final_status": null,
+              "usage_available_in_frozen_journal": false,
+              "raw_stream_usage": null,
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": null,
+        "automated_authentication_elapsed_seconds": 0.004491874999999993
+      },
+      {
+        "case_id": "C02",
+        "result": {
+          "case_id": "C02",
+          "kind": "clarification",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "requirement_compilation",
+          "compilation_status": "invalid",
+          "provider_attempts": 2,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "wall_seconds": 119.555096625,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "C02",
+          "exit_code": 0,
+          "signal": null,
+          "wall_seconds": 119.583,
+          "peak_sampled_process_tree_rss_bytes": 38715392,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 1258640
+        },
+        "retained_files": 25,
+        "retained_bytes": 1258640,
+        "inventory_sha256": "96f2a460e186f7e92198c654e16a8351b95fc9aa03f6ed5b89d4b863cfae01a1",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 29,
+            "case_id": "C02",
+            "request_sha256": "f1caf7d341d7f5275ea15f47ab8df1736f4eb4c6920bc1fea686ce8a842d4915",
+            "estimated_or_reserved_usd": 0.10252,
+            "stream": {
+              "http_status": 200,
+              "bytes": 787384,
+              "metadata_pre_redaction_bytes": 787384,
+              "redacted_paths": [],
+              "events": 2487,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4255,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1655,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 4275,
+                "output_tokens_details": {
+                  "reasoning_tokens": 1787
+                },
+                "total_tokens": 8530
+              },
+              "client_rejected_complete_response": false
+            }
+          },
+          {
+            "number": 30,
+            "case_id": "C02",
+            "request_sha256": "1f8a2155cd3a0b26017da78f14a8540b63178c5b2b56d3f0020b9ff23c805dcc",
+            "estimated_or_reserved_usd": 0.054136,
+            "stream": {
+              "http_status": 200,
+              "bytes": 289823,
+              "metadata_pre_redaction_bytes": 289823,
+              "redacted_paths": [],
+              "events": 781,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": true,
+              "raw_stream_usage": {
+                "input_tokens": 4539,
+                "input_tokens_details": {
+                  "cache_write_tokens": 1939,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 1799,
+                "output_tokens_details": {
+                  "reasoning_tokens": 1013
+                },
+                "total_tokens": 6338
+              },
+              "client_rejected_complete_response": false
+            }
+          }
+        ],
+        "issue_counts": {
+          "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 5,
+          "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 4,
+          "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 8
+        },
+        "automated_authentication_elapsed_seconds": 0.006485624999999999
+      },
+      {
+        "case_id": "W01",
+        "result": {
+          "case_id": "W01",
+          "kind": "paraphrase",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "provider",
+          "provider_attempts": 1,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "error": "OpenAI response exceeds 2097152-byte limit",
+          "wall_seconds": 223.701909333,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "W01",
+          "exit_code": 1,
+          "signal": null,
+          "wall_seconds": 223.729,
+          "peak_sampled_process_tree_rss_bytes": 35127296,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 2285895
+        },
+        "retained_files": 14,
+        "retained_bytes": 2285895,
+        "inventory_sha256": "244104b0efebbd1478425b33831417702660731cf4aae74e617a20ed66254b44",
+        "redaction_markers": 2,
+        "requests": [
+          {
+            "number": 31,
+            "case_id": "W01",
+            "request_sha256": "05ab45c05bba5371e56465323d98fc6e5c66f3fcf87827289d0d8cc5062b9eaa",
+            "estimated_or_reserved_usd": 0.454144,
+            "stream": {
+              "http_status": 200,
+              "bytes": 2181242,
+              "metadata_pre_redaction_bytes": 2184139,
+              "redacted_paths": [
+                "/events/6/item/encrypted_content",
+                "/events/9/item/encrypted_content"
+              ],
+              "events": 7238,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": false,
+              "raw_stream_usage": {
+                "input_tokens": 5152,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2552,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 11844,
+                "output_tokens_details": {
+                  "reasoning_tokens": 4615
+                },
+                "total_tokens": 16996
+              },
+              "client_rejected_complete_response": true
+            }
+          }
+        ],
+        "issue_counts": null,
+        "automated_authentication_elapsed_seconds": 0.009964292
+      },
+      {
+        "case_id": "W02",
+        "result": {
+          "case_id": "W02",
+          "kind": "paraphrase",
+          "campaign": "baseline",
+          "status": "failed",
+          "first_failed_gate": "provider",
+          "provider_attempts": 1,
+          "follow_up_attempts": 0,
+          "replays_completed": 0,
+          "error": "OpenAI response exceeds 2097152-byte limit",
+          "wall_seconds": 166.033211417,
+          "manual_implementation_repairs": 0,
+          "independent_acceptance_audit_required": true
+        },
+        "resources": {
+          "id": "W02",
+          "exit_code": 1,
+          "signal": null,
+          "wall_seconds": 166.064,
+          "peak_sampled_process_tree_rss_bytes": 36028416,
+          "sampling_interval_ms": 1000,
+          "sampling_errors": 0,
+          "stop_reason": null,
+          "evidence_bytes": 2221343
+        },
+        "retained_files": 14,
+        "retained_bytes": 2221343,
+        "inventory_sha256": "de217839e3e7133e3418559c5ea5ac57da941a56d5b6bde8b7819576aef0d555",
+        "redaction_markers": 0,
+        "requests": [
+          {
+            "number": 32,
+            "case_id": "W02",
+            "request_sha256": "f86dbccf5269eab3a97b5532375f1009e9a367ab7a6558a70184f6b037fb406c",
+            "estimated_or_reserved_usd": 0.456712,
+            "stream": {
+              "http_status": 200,
+              "bytes": 2115291,
+              "metadata_pre_redaction_bytes": 2115291,
+              "redacted_paths": [],
+              "events": 7145,
+              "terminal": "response.completed",
+              "final_status": "completed",
+              "usage_available_in_frozen_journal": false,
+              "raw_stream_usage": {
+                "input_tokens": 5297,
+                "input_tokens_details": {
+                  "cache_write_tokens": 2697,
+                  "cached_tokens": 2597
+                },
+                "output_tokens": 9840,
+                "output_tokens_details": {
+                  "reasoning_tokens": 2698
+                },
+                "total_tokens": 15137
+              },
+              "client_rejected_complete_response": true
+            }
+          }
+        ],
+        "issue_counts": null,
+        "automated_authentication_elapsed_seconds": 0.011427041000000002
+      }
+    ]
+  },
+  "provider": {
+    "carried_requests": 3,
+    "new_requests": 29,
+    "cumulative_requests": 32,
+    "new_estimated_or_reserved_usd": 5.278128000000001,
+    "cumulative_estimated_or_reserved_usd": 6.646416,
+    "remaining_baseline_requests": 4,
+    "remaining_total_requests": 40,
+    "remaining_estimated_or_reserved_usd": 43.353584,
+    "actual_billed_usd": null,
+    "unknown_usage_requests": [
+      1,
+      2,
+      3,
+      16,
+      28,
+      31,
+      32
+    ]
+  },
+  "resources": {
+    "phase_wall_seconds": 3173.393,
+    "case_budget_compliance": [
+      {
+        "case_id": "P01",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P02",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P03",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P04",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P05",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P06",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P07",
+        "worker_exit_successful": false,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "P08",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "N01",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "N02",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "N03",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "N04",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "C01",
+        "worker_exit_successful": false,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "C02",
+        "worker_exit_successful": true,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "W01",
+        "worker_exit_successful": false,
+        "within_sampled_supervisor_limits": true
+      },
+      {
+        "case_id": "W02",
+        "worker_exit_successful": false,
+        "within_sampled_supervisor_limits": true
+      }
+    ],
+    "phase_wall_within_cap": true,
+    "evidence_within_cap": true,
+    "raw_evidence_bytes": 101237999,
+    "sampled_rss_is_lower_bound_on_instantaneous_peak": true,
+    "build_preflight_review_costs_separate": true
+  },
+  "automated_authentication_elapsed_seconds": 1.131767333
+}

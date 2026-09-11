@@ -1,0 +1,461 @@
+{
+  "schema": "kicadai.practical-board-case-audit.v1",
+  "cohort": "approved_protocol_v2_baseline",
+  "case_id": "C02",
+  "kind": "clarification",
+  "reviewer": "Codex task 019f6b30-5004-73b1-9a3b-678a961c7c8f",
+  "independence": "self_review; not external or blind",
+  "review_started_utc": "2026-09-11T13:05:28.945Z",
+  "review_utc": "2026-09-11T13:06:24.427Z",
+  "review_elapsed_seconds": 55.482,
+  "review_timing_basis": "Measured read-only adjudication wall time, not human-active time; automated byte-authentication is separate.",
+  "source_binding": {
+    "case.json": {
+      "file": "baseline/C02/case.json",
+      "sha256": "66eb3e76b6d2a55580715315178c317a01fe398de9a25f4cbfb1d5b1e66fd700",
+      "json_pointer": ""
+    },
+    "prompt.txt": {
+      "file": "baseline/C02/prompt.txt",
+      "sha256": "b5012a11e8654dae2312854e14a90a589df52e379d340083c16c5ba24086fccb",
+      "line": 1
+    },
+    "result.json": {
+      "file": "baseline/C02/result.json",
+      "sha256": "4ed1d04c0d170e6581b8be5dbca5f56b295221896b22f9cd710672bc315b9cea",
+      "json_pointer": ""
+    },
+    "inventory.json": {
+      "file": "baseline/C02/inventory.json",
+      "sha256": "96f2a460e186f7e92198c654e16a8351b95fc9aa03f6ed5b89d4b863cfae01a1",
+      "json_pointer": ""
+    }
+  },
+  "resource_binding": {
+    "file": "baseline/C02.resources.json",
+    "sha256": "377237f835adc33b96d8793dee9d89f3f7f222525c5f211799e6b03089f458cf",
+    "json_pointer": ""
+  },
+  "disposition": "failed",
+  "first_failed_gate": "requirement_compilation",
+  "clauses": [
+    {
+      "number": 1,
+      "text": "Ask specifically for load voltage/current, stored-energy or inductive behavior, and switching frequency; do not guess a safe output design.",
+      "disposition": "pass",
+      "reason": "The retained selected proposal explicitly asks for load voltage/range, maximum on-state current, load type/stored-energy behavior and switching frequency, and has requirement=null. This satisfies the narrow question-content/no-guessed-design clause only; invalid structured uncertainty bindings still fail the complete clarification workflow.",
+      "evidence": [
+        {
+          "file": "baseline/C02/selected-intent.json",
+          "sha256": "6110b38e3034bdcb75e67a6f61513ac5206aed49b4875ab18b3b9865911965c9",
+          "json_pointer": "/clarifications/0/question"
+        },
+        {
+          "file": "baseline/C02/selected-intent.json",
+          "sha256": "6110b38e3034bdcb75e67a6f61513ac5206aed49b4875ab18b3b9865911965c9",
+          "json_pointer": "/requirement"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "text": "Initial response has needs_clarification and no accepted design request. The single fixed answer is bound to the prior source/proposal/capability identity and its supplied values are retained.",
+      "disposition": "fail",
+      "reason": "The initial workflow returned failed/invalid after its permitted attempts, not clarification_candidate. Frozen SCORING does not count an unrelated or malformed compilation failure as the required behavior. No accepted executable request or project was emitted.",
+      "evidence": [
+        {
+          "file": "baseline/C02/result.json",
+          "sha256": "4ed1d04c0d170e6581b8be5dbca5f56b295221896b22f9cd710672bc315b9cea",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/C02/compilation.json",
+          "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+          "json_pointer": "/issues"
+        }
+      ]
+    }
+  ],
+  "gates": [],
+  "positive_gates_not_applicable": "Refusal and clarification are separate behavioral criteria, not primary board designs.",
+  "observed_diagnostics": [
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/0"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/1"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/2"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "clarification may own only clarification-resolved uncertainties at its exact requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/3"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CLARIFICATION_INVALID",
+        "severity": "error",
+        "path": "proposal.clarifications[0].uncertainty_ids",
+        "message": "one clarification must coalesce every unresolved uncertainty at its requirement path"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/4"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[0].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/5"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[1].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/6"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[2].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/7"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID",
+        "severity": "error",
+        "path": "proposal.uncertainties[3].resolution",
+        "message": "unsupported uncertainty resolution"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/8"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[0].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/9"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[1].references",
+        "message": "material source coverage requires at least one normalized reference"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/10"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/11"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/12"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/13"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[2].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/14"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[3].references",
+        "message": "coverage reference is unknown or inconsistent with its disposition"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/15"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+        "severity": "error",
+        "path": "proposal.coverage[4].references",
+        "message": "material source coverage requires at least one normalized reference"
+      },
+      "evidence": {
+        "file": "baseline/C02/compilation.json",
+        "sha256": "05f42daccee72023073a0674ed5146095e076e5ce94a83ad43904bf17f97266a",
+        "json_pointer": "/issues/16"
+      }
+    }
+  ],
+  "provider_behavior_observation": {
+    "requirement_is_null": true,
+    "capability_gaps": [],
+    "clarifications": [
+      {
+        "choices": [
+          "Provide the load voltage or voltage range",
+          "Provide the maximum on-state load current",
+          "Identify whether the load is resistive, inductive, capacitive, or another type",
+          "Provide the switching frequency or state that it is static/on-off only"
+        ],
+        "id": "clarification_001",
+        "path": "/requirements/objectives/output_switch",
+        "question": "Before the output circuit can be selected, what are the external load voltage or voltage range, maximum on-state current, load type or stored-energy behavior, and required switching frequency?",
+        "uncertainty_ids": [
+          "uncertainty_001",
+          "uncertainty_002",
+          "uncertainty_003",
+          "uncertainty_004"
+        ],
+        "why_needed": "These values determine the required switched-load interface and protection behavior. Output-circuit selection must remain blocked until they are supplied."
+      }
+    ],
+    "not_an_accepted_workflow": true,
+    "evidence": {
+      "file": "baseline/C02/selected-intent.json",
+      "sha256": "6110b38e3034bdcb75e67a6f61513ac5206aed49b4875ab18b3b9865911965c9",
+      "json_pointer": ""
+    },
+    "raw_question_targets_required_facts": true,
+    "semantic_note": "Correct targeted question content does not override 17 compiler issues in clarification/uncertainty ownership and coverage. No needs_clarification result or bound answer turn was produced."
+  },
+  "resource_observation": {
+    "id": "C02",
+    "exit_code": 0,
+    "signal": null,
+    "wall_seconds": 119.583,
+    "peak_sampled_process_tree_rss_bytes": 38715392,
+    "sampling_interval_ms": 1000,
+    "sampling_errors": 0,
+    "stop_reason": null,
+    "evidence_bytes": 1258640
+  },
+  "manual_assistance": {
+    "manual_implementation_repairs": 0,
+    "fixed_clarification_answer_turns": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "authentication": {
+    "case_id": "C02",
+    "result": {
+      "case_id": "C02",
+      "kind": "clarification",
+      "campaign": "baseline",
+      "status": "failed",
+      "first_failed_gate": "requirement_compilation",
+      "compilation_status": "invalid",
+      "provider_attempts": 2,
+      "follow_up_attempts": 0,
+      "replays_completed": 0,
+      "wall_seconds": 119.555096625,
+      "manual_implementation_repairs": 0,
+      "independent_acceptance_audit_required": true
+    },
+    "resources": {
+      "id": "C02",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 119.583,
+      "peak_sampled_process_tree_rss_bytes": 38715392,
+      "sampling_interval_ms": 1000,
+      "sampling_errors": 0,
+      "stop_reason": null,
+      "evidence_bytes": 1258640
+    },
+    "retained_files": 25,
+    "retained_bytes": 1258640,
+    "inventory_sha256": "96f2a460e186f7e92198c654e16a8351b95fc9aa03f6ed5b89d4b863cfae01a1",
+    "redaction_markers": 0,
+    "requests": [
+      {
+        "number": 29,
+        "case_id": "C02",
+        "request_sha256": "f1caf7d341d7f5275ea15f47ab8df1736f4eb4c6920bc1fea686ce8a842d4915",
+        "estimated_or_reserved_usd": 0.10252,
+        "stream": {
+          "http_status": 200,
+          "bytes": 787384,
+          "metadata_pre_redaction_bytes": 787384,
+          "redacted_paths": [],
+          "events": 2487,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4255,
+            "input_tokens_details": {
+              "cache_write_tokens": 1655,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 4275,
+            "output_tokens_details": {
+              "reasoning_tokens": 1787
+            },
+            "total_tokens": 8530
+          },
+          "client_rejected_complete_response": false
+        }
+      },
+      {
+        "number": 30,
+        "case_id": "C02",
+        "request_sha256": "1f8a2155cd3a0b26017da78f14a8540b63178c5b2b56d3f0020b9ff23c805dcc",
+        "estimated_or_reserved_usd": 0.054136,
+        "stream": {
+          "http_status": 200,
+          "bytes": 289823,
+          "metadata_pre_redaction_bytes": 289823,
+          "redacted_paths": [],
+          "events": 781,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4539,
+            "input_tokens_details": {
+              "cache_write_tokens": 1939,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 1799,
+            "output_tokens_details": {
+              "reasoning_tokens": 1013
+            },
+            "total_tokens": 6338
+          },
+          "client_rejected_complete_response": false
+        }
+      }
+    ],
+    "issue_counts": {
+      "BEHAVIORAL_INTENT_CLARIFICATION_INVALID": 5,
+      "BEHAVIORAL_INTENT_UNCERTAINTY_INVALID": 4,
+      "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID": 8
+    },
+    "automated_authentication_elapsed_seconds": 0.006485624999999999
+  },
+  "campaign_binding": {
+    "file": "baseline/campaign-end.json",
+    "sha256": "cec2dc2549a53dd0c5eaf4b9a7737e2ee53a371d1d6556e3cd16a9148e23d4b9",
+    "json_pointer": "/outcomes/13"
+  },
+  "freeze_binding": {
+    "file": "freeze-v2.json",
+    "sha256": "f8d32e64e628126dd4cea846733de67d581ae50747cada830a85600ce1247799",
+    "json_pointer": ""
+  }
+}

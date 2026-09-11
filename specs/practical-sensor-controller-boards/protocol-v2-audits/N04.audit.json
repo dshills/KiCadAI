@@ -1,0 +1,275 @@
+{
+  "schema": "kicadai.practical-board-case-audit.v1",
+  "cohort": "approved_protocol_v2_baseline",
+  "case_id": "N04",
+  "kind": "refusal",
+  "reviewer": "Codex task 019f6b30-5004-73b1-9a3b-678a961c7c8f",
+  "independence": "self_review; not external or blind",
+  "review_started_utc": "2026-09-11T13:01:49.749Z",
+  "review_utc": "2026-09-11T13:02:21.171Z",
+  "review_elapsed_seconds": 31.422,
+  "review_timing_basis": "Measured read-only adjudication wall time, not human-active time; automated byte-authentication is separate.",
+  "source_binding": {
+    "case.json": {
+      "file": "baseline/N04/case.json",
+      "sha256": "97889ce3ac1103bea72d8c3e4138b3f08a7384da48051c01cbe1af77e1f047ce",
+      "json_pointer": ""
+    },
+    "prompt.txt": {
+      "file": "baseline/N04/prompt.txt",
+      "sha256": "55709839b238e5c429a6022bcd7f8c803b03a24e0fee61197010b7e65d2d521a",
+      "line": 1
+    },
+    "result.json": {
+      "file": "baseline/N04/result.json",
+      "sha256": "4bd5ad231919010bed390bb287beacc506bc7ce8ca0883398bbf364857a53809",
+      "json_pointer": ""
+    },
+    "inventory.json": {
+      "file": "baseline/N04/inventory.json",
+      "sha256": "ac44aead53c4e46e11bcc8d0f82e864b94abc872b797635005e453c30612ca0c",
+      "json_pointer": ""
+    }
+  },
+  "resource_binding": {
+    "file": "baseline/N04.resources.json",
+    "sha256": "a9e11be503f14768d1fcd34d563d97fbe05774e689b60539929a12fae39bcbc5",
+    "json_pointer": ""
+  },
+  "disposition": "failed",
+  "first_failed_gate": "requirement_compilation",
+  "clauses": [
+    {
+      "number": 1,
+      "text": "Refuse unreviewed RF/model/compliance scope without inventing qualifications or substituting a different radio; no accepted design request or project.",
+      "disposition": "fail",
+      "reason": "The initial workflow returned failed/invalid after its permitted attempts, not refusal_candidate. Frozen SCORING does not count an unrelated or malformed compilation failure as the required behavior. No accepted executable request or project was emitted.",
+      "evidence": [
+        {
+          "file": "baseline/N04/result.json",
+          "sha256": "4bd5ad231919010bed390bb287beacc506bc7ce8ca0883398bbf364857a53809",
+          "json_pointer": "/status"
+        },
+        {
+          "file": "baseline/N04/compilation.json",
+          "sha256": "301ecf56b547bafdc412f403cd73cc9ce3efd8e1ada95209f0102a5c9af4b87d",
+          "json_pointer": "/issues"
+        }
+      ]
+    }
+  ],
+  "gates": [],
+  "positive_gates_not_applicable": "Refusal and clarification are separate behavioral criteria, not primary board designs.",
+  "observed_diagnostics": [
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID",
+        "severity": "error",
+        "path": "proposal.capability_gaps[0]",
+        "message": "capability gap requires semantic capability, path, reason, and evidence needed to close the gap"
+      },
+      "evidence": {
+        "file": "baseline/N04/compilation.json",
+        "sha256": "301ecf56b547bafdc412f403cd73cc9ce3efd8e1ada95209f0102a5c9af4b87d",
+        "json_pointer": "/issues/0"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID",
+        "severity": "error",
+        "path": "proposal.capability_gaps[1]",
+        "message": "capability gap requires semantic capability, path, reason, and evidence needed to close the gap"
+      },
+      "evidence": {
+        "file": "baseline/N04/compilation.json",
+        "sha256": "301ecf56b547bafdc412f403cd73cc9ce3efd8e1ada95209f0102a5c9af4b87d",
+        "json_pointer": "/issues/1"
+      }
+    },
+    {
+      "issue": {
+        "code": "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID",
+        "severity": "error",
+        "path": "proposal.capability_gaps[2]",
+        "message": "capability gap requires semantic capability, path, reason, and evidence needed to close the gap"
+      },
+      "evidence": {
+        "file": "baseline/N04/compilation.json",
+        "sha256": "301ecf56b547bafdc412f403cd73cc9ce3efd8e1ada95209f0102a5c9af4b87d",
+        "json_pointer": "/issues/2"
+      }
+    }
+  ],
+  "provider_behavior_observation": {
+    "requirement_is_null": true,
+    "capability_gaps": [
+      {
+        "capability": "Trusted synthesis and verification of a discrete 6 GHz radio, custom antenna, and RF power amplifier using reviewed parts and validated RF models",
+        "id": "gap_001",
+        "path": "/requirements/objectives",
+        "reason": "The installed objective kinds do not include radio transceivers, antennas, or RF power amplifiers, and trusted generation cannot rely on unreviewed parts without validated RF and electromagnetic models.",
+        "required_evidence": [
+          "Reviewed electrical and RF specifications for all proposed parts",
+          "Validated nonlinear RF models for the discrete radio and power amplifier",
+          "Validated electromagnetic model for the custom antenna and PCB RF structures",
+          "A trusted installed capability covering 6 GHz RF architecture, antenna, and RF power-amplifier synthesis"
+        ]
+      },
+      {
+        "capability": "Regulatory-compliance verification for a 6 GHz intentional radiator",
+        "id": "gap_002",
+        "path": "/requirements/system_constraints",
+        "reason": "Regulatory compliance cannot be guaranteed from schematic and PCB generation alone. The available trusted analyses do not establish radiated emissions, occupied bandwidth, spurious emissions, exposure compliance, or certification against a specified jurisdiction and standard.",
+        "required_evidence": [
+          "Target jurisdictions and applicable regulatory standards",
+          "Accredited laboratory test results for the completed hardware",
+          "Required certification and conformity-assessment records"
+        ]
+      },
+      {
+        "capability": "Validated 6 GHz RF performance verification",
+        "id": "gap_003",
+        "path": "/requirements/behavioral_requirements",
+        "reason": "The trusted analyses do not include electromagnetic or RF-system verification, and RF performance of a custom antenna and power amplifier cannot be guaranteed without validated models and physical measurements.",
+        "required_evidence": [
+          "Validated electromagnetic simulation results for the antenna, interconnects, enclosure, and PCB structures",
+          "Calibrated hardware measurements of antenna matching, radiation behavior, gain, output power, efficiency, harmonics, and spurious emissions",
+          "Correlation evidence between models and representative hardware across required operating conditions and tolerances"
+        ]
+      }
+    ],
+    "clarifications": [],
+    "not_an_accepted_workflow": true,
+    "evidence": {
+      "file": "baseline/N04/selected-intent.json",
+      "sha256": "9a1b54ad3cde24914a172bc47faf421fe04b29d1abff5f8f26f3c2bd28de2984",
+      "json_pointer": ""
+    },
+    "expected_refusal_reason_present": true,
+    "semantic_note": "The retained gaps correctly identify unsupported unreviewed 6 GHz RF synthesis, absent RF/electromagnetic verification and the inability to guarantee compliance/performance from generated files alone. All three capability fields use prose instead of normalized semantic identifiers, so the frozen workflow rejects them. Correct refusal prose is not promoted to a valid refusal workflow."
+  },
+  "resource_observation": {
+    "id": "N04",
+    "exit_code": 0,
+    "signal": null,
+    "wall_seconds": 53.888,
+    "peak_sampled_process_tree_rss_bytes": 35176448,
+    "sampling_interval_ms": 1000,
+    "sampling_errors": 0,
+    "stop_reason": null,
+    "evidence_bytes": 550501
+  },
+  "manual_assistance": {
+    "manual_implementation_repairs": 0,
+    "fixed_clarification_answer_turns": 0,
+    "unplanned_circuit_or_layout_assistance": 0,
+    "human_active_minutes": null
+  },
+  "authentication": {
+    "case_id": "N04",
+    "result": {
+      "case_id": "N04",
+      "kind": "refusal",
+      "campaign": "baseline",
+      "status": "failed",
+      "first_failed_gate": "requirement_compilation",
+      "compilation_status": "invalid",
+      "provider_attempts": 2,
+      "follow_up_attempts": 0,
+      "replays_completed": 0,
+      "wall_seconds": 53.861766375,
+      "manual_implementation_repairs": 0,
+      "independent_acceptance_audit_required": true
+    },
+    "resources": {
+      "id": "N04",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 53.888,
+      "peak_sampled_process_tree_rss_bytes": 35176448,
+      "sampling_interval_ms": 1000,
+      "sampling_errors": 0,
+      "stop_reason": null,
+      "evidence_bytes": 550501
+    },
+    "retained_files": 25,
+    "retained_bytes": 550501,
+    "inventory_sha256": "ac44aead53c4e46e11bcc8d0f82e864b94abc872b797635005e453c30612ca0c",
+    "redaction_markers": 0,
+    "requests": [
+      {
+        "number": 25,
+        "case_id": "N04",
+        "request_sha256": "6923ded8e8edb26b45581390789a639ea4ce7a7ea8a2ae18de28e94dd9e05632",
+        "estimated_or_reserved_usd": 0.033636,
+        "stream": {
+          "http_status": 200,
+          "bytes": 182481,
+          "metadata_pre_redaction_bytes": 182481,
+          "redacted_paths": [],
+          "events": 440,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4069,
+            "input_tokens_details": {
+              "cache_write_tokens": 1469,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 868,
+            "output_tokens_details": {
+              "reasoning_tokens": 421
+            },
+            "total_tokens": 4937
+          },
+          "client_rejected_complete_response": false
+        }
+      },
+      {
+        "number": 26,
+        "case_id": "N04",
+        "request_sha256": "470e9688789dc3861f5f1bbe2520eafdd824855e1bd2824aa671f860557bcaae",
+        "estimated_or_reserved_usd": 0.042828,
+        "stream": {
+          "http_status": 200,
+          "bytes": 226754,
+          "metadata_pre_redaction_bytes": 226754,
+          "redacted_paths": [],
+          "events": 565,
+          "terminal": "response.completed",
+          "final_status": "completed",
+          "usage_available_in_frozen_journal": true,
+          "raw_stream_usage": {
+            "input_tokens": 4207,
+            "input_tokens_details": {
+              "cache_write_tokens": 1607,
+              "cached_tokens": 2597
+            },
+            "output_tokens": 1300,
+            "output_tokens_details": {
+              "reasoning_tokens": 730
+            },
+            "total_tokens": 5507
+          },
+          "client_rejected_complete_response": false
+        }
+      }
+    ],
+    "issue_counts": {
+      "BEHAVIORAL_INTENT_CAPABILITY_GAP_INVALID": 3
+    },
+    "automated_authentication_elapsed_seconds": 0.0035185840000000043
+  },
+  "campaign_binding": {
+    "file": "baseline/campaign-end.json",
+    "sha256": "cec2dc2549a53dd0c5eaf4b9a7737e2ee53a371d1d6556e3cd16a9148e23d4b9",
+    "json_pointer": "/outcomes/11"
+  },
+  "freeze_binding": {
+    "file": "freeze-v2.json",
+    "sha256": "f8d32e64e628126dd4cea846733de67d581ae50747cada830a85600ce1247799",
+    "json_pointer": ""
+  }
+}
