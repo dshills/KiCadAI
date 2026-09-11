@@ -40,4 +40,13 @@ func TestParticipantPinAssertionUsesExactNodeAndLocalReference(t *testing.T) {
 	if _, diagnostic := resolvedAssertionBinding(PlannedAssertion{RequirementID: "voltage", Metric: "dc_voltage", Target: node}, "", nil, nil, simmodel.Plan{Nodes: []string{"ADC_NODE", "OTHER_NODE", "REMOTE_RETURN", "HOST_RETURN"}}, r, bindings); diagnostic == nil {
 		t.Fatal("ambiguous participant reference routing accepted")
 	}
+	r.Requirements.Domains[0].ReferenceDomain = "host_ground"
+	binding, diagnostic = resolvedAssertionBinding(PlannedAssertion{RequirementID: "voltage", Metric: "dc_voltage", Target: node}, "", nil, nil, simmodel.Plan{Nodes: []string{"ADC_NODE", "OTHER_NODE", "REMOTE_RETURN", "HOST_RETURN"}}, r, bindings)
+	if diagnostic != nil || len(binding.Prototypes) != 1 || binding.Prototypes[0].ReferenceNode != "HOST_RETURN" {
+		t.Fatalf("explicit return did not override misleading remote ground name: %#v %v", binding, diagnostic)
+	}
+	r.Requirements.Domains[0].ReferenceDomain = "missing"
+	if _, diagnostic := resolvedAssertionBinding(PlannedAssertion{RequirementID: "voltage", Metric: "dc_voltage", Target: node}, "", nil, nil, simmodel.Plan{Nodes: []string{"ADC_NODE", "OTHER_NODE", "REMOTE_RETURN", "HOST_RETURN"}}, r, bindings); diagnostic == nil {
+		t.Fatal("invalid explicit reference fell back")
+	}
 }

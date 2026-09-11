@@ -1,0 +1,85 @@
+{
+  "schema": "kicadai.offline-repair-preservation.v1",
+  "verified_utc": "2026-09-11T17:39:46.900Z",
+  "historical_source": "49953eaa599612aaf8e60f31ab3e786f32ddc722",
+  "historical_source_checkout": "/Users/dshills/Development/projects/KiCadAI/.cache/interface-v1-source-49953",
+  "historical_tracked_paths_unchanged": true,
+  "interface": {
+    "schema": "kicadai.interface-publication-verification.v1",
+    "verified_utc": "2026-09-11T17:39:45.469Z",
+    "raw_authenticated": true,
+    "raw_files": 304,
+    "frozen_files": 110,
+    "source_bound_cases": 8,
+    "source_bound_clauses": 57,
+    "reproduced_results": true,
+    "independent_sql_node_rows_match": true,
+    "report_rows": 8,
+    "publication_files": 18,
+    "publication_inventory_verified": true,
+    "publication_secret_scan": "absent",
+    "raw_and_binary_archive_contents_verified": true,
+    "temporary_verification_directory": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-interface-archive-verification-55LgEA",
+    "sealed_replay_passed": false,
+    "supplementary_attempts_matched": 15,
+    "tampered_bindings_rejected": 8,
+    "provider_calls": 0,
+    "gate_passed": false
+  },
+  "practical": {
+    "raw_files": 472,
+    "raw_bytes": 101237999,
+    "exact_secret_scan": "absent_from_all_retained_files_including_decompressed_library_index",
+    "campaign_complete": true,
+    "prior_inventories_reverified": [
+      {
+        "inventory": "baseline-evidence-inventory.json",
+        "sha256": "48502181af3ae2e94f7cf4854560764ac13e9d75d0abe96a78bf71d07281bf34",
+        "file_count": 25
+      },
+      {
+        "inventory": "recovery-1-evidence-inventory.json",
+        "sha256": "b05ac83e87cef9710b0cfa582ac883ccab5fc3ca1033cb4d51a209ae464755ed",
+        "file_count": 28
+      },
+      {
+        "inventory": "recovery-2-evidence-inventory.json",
+        "sha256": "2930f9a9fa63f0c01a63c12c7871358531cba5d86a4c344d417f69f1a0cd39de",
+        "file_count": 31
+      }
+    ],
+    "publication": {
+      "verified_utc": "2026-09-11T17:39:46.774Z",
+      "cases": 16,
+      "clauses": 108,
+      "table_rows": 16,
+      "local_links": 38,
+      "local_archive_sha256_verified": true,
+      "raw_evidence_authenticated_by_this_script": false,
+      "provider_calls": 0
+    },
+    "audit_count": 16,
+    "clauses": 108
+  },
+  "fixture": {
+    "path": "internal/behavioralintent/testdata/interface_v1_i04_counterexample.json",
+    "original_sha256": "ea3ff80eaed18fec6316a56a61a47046285576d0b56b29de48ec445a87c94b02",
+    "repository_sha256": "1db54ac9e1953cb99682d0c7507705fb7c71c110fc0a34c6bede5aba2a21ebfb",
+    "change": "one final LF only"
+  },
+  "sealed_binaries_unchanged": [
+    {
+      "path": "/tmp/kicadai-ai-requirement-eval-v1",
+      "sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f"
+    },
+    {
+      "path": "/tmp/kicadai-practical-board-eval-protocol-v2",
+      "sha256": "2628c1017a32837b69c230cf3690c8f4ba8f0089e1899967bde525cb2f370a94"
+    }
+  ],
+  "changed_files_secret_scan": "absent",
+  "changed_files_scanned": 74,
+  "provider_calls": 0,
+  "historical_gate_passed": false,
+  "new_live_evaluation_performed": false
+}

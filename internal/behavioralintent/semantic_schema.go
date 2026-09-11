@@ -81,7 +81,9 @@ func constrainProviderType(value reflect.Type, schema map[string]any) map[string
 		p["control_transitions"] = emptyArraySchema()
 	case reflect.TypeOf(architecturesearch.Domain{}):
 		p["kind"] = enumSchema("reference", "supply")
-		p["source"] = map[string]any{"anyOf": []any{semanticIDSchema(false), map[string]any{"type": "string", "pattern": `^port:[a-z][a-z0-9_]{0,63}$`, "maxLength": 69}}, "description": "external, a declared supply signal ID with resolved source/sink bindings, or port:<id> for a same-domain generated power output with one objective output-role producer and one circuit reference domain; never a component ID"}
+		p["source"] = map[string]any{"anyOf": []any{semanticIDSchema(false), map[string]any{"type": "string", "pattern": `^port:[a-z][a-z0-9_]{0,63}$`, "maxLength": 69}}, "description": "external, a declared supply signal ID, or port:<id> for a same-domain generated power output with one objective output-role producer; never a component ID"}
+		p["reference_domain"] = semanticIDSchema(true)
+		p["reference_domain"].(map[string]any)["description"] = "Supply return reference-domain ID; empty only for an unambiguous single reference or legacy form. Reference domains use empty."
 		p["nominal_voltage_v"] = numberSchema(-1000, 1000)
 		for _, name := range []string{"min_voltage_v", "max_voltage_v"} {
 			p[name] = nullableSchema(numberSchema(-1000, 1000))

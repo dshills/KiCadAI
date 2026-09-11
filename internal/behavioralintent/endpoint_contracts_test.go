@@ -32,6 +32,12 @@ func TestProviderSchemaExposesQualifiedPinAndGeneratedOutputForms(t *testing.T) 
 			t.Fatalf("wrong schema result for source %s", tc.source)
 		}
 	}
+	for _, reference := range []string{"", "local_return", "bad.id"} {
+		p.Requirement.Requirements.Domains[1].ReferenceDomain = reference
+		if got := providerSchemaAccepts(t, ProposalSchema(), providerWireValue(reflect.ValueOf(p))); got != (reference != "bad.id") {
+			t.Fatalf("reference schema %q accepted=%v", reference, got)
+		}
+	}
 }
 
 func TestCompilerRetainsQualifiedParticipantObservationWithoutPublicSubstitute(t *testing.T) {

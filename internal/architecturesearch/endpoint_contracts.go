@@ -29,16 +29,6 @@ func scalarParticipantPort(port ParticipantPort) bool {
 	return port.Kind != "digital_bus" && port.Kind != "differential_analog" && allowedPortKind(port.Kind)
 }
 
-func hasSingleReferenceDomain(requirement Requirement) bool {
-	count := 0
-	for _, domain := range requirement.Requirements.Domains {
-		if domain.Kind == "reference" {
-			count++
-		}
-	}
-	return count == 1
-}
-
 func participantBindingEndpoint(requirement Requirement, binding Binding, produces bool) (string, bool) {
 	participant, port, found := ResolveParticipantPort(requirement, binding.Participant+"."+binding.ParticipantPort)
 	if !found || !scalarParticipantPort(port) {

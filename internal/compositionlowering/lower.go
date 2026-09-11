@@ -986,6 +986,12 @@ func firstReferenceDomain(requirement architecturesearch.Requirement) string {
 }
 
 func referenceDomainForPower(requirement architecturesearch.Requirement, powerDomain string) string {
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == powerDomain && domain.ReferenceDomain != "" {
+			reference, _ := architecturesearch.ResolveReferenceDomain(requirement, powerDomain)
+			return reference
+		}
+	}
 	references := []string{}
 	for _, domain := range requirement.Requirements.Domains {
 		if domain.Kind == "reference" {

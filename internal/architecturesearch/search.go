@@ -456,6 +456,10 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 		}
 		ports = append(ports, RoleContract{Role: "power", Anchor: requirementDomainAnchor(requirement, domain), Contract: NormalizePortContract(powerContract)})
 		referenceDomain := firstReferenceDomain(requirement)
+		if domain.ReferenceDomain != "" {
+			id, _ := ResolveReferenceDomain(requirement, domain.ID)
+			referenceDomain = requirementDomain(requirement, id)
+		}
 		referenceContract := PortContract{
 			ID: participant.ID + "_reference", Kind: "reference", Direction: "bidirectional", Domain: referenceDomain.ID,
 			Voltage:         domainVoltageRange(referenceDomain),

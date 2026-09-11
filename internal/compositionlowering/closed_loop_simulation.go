@@ -1258,6 +1258,9 @@ func planHasVoltageSourceAtNode(plan simmodel.Plan, node string) bool {
 func transientStimulusHarnessDevice(requirement architecturesearch.Requirement, bindings []closedloopsynthesis.SemanticBinding, stimulus behavioralTransientStimulus) (operatingHarnessDevice, error) {
 	ground := ""
 	referenceID := firstReferenceDomain(requirement)
+	if explicit, declared := explicitSemanticReference(requirement, "port", stimulus.SemanticID); declared {
+		referenceID = explicit
+	}
 	for _, binding := range bindings {
 		if binding.Kind == "domain" && binding.ID == referenceID {
 			ground = binding.Target
@@ -1633,6 +1636,11 @@ func voltageEventHarnessDevices(requirement architecturesearch.Requirement, targ
 				continue
 			}
 			target := targets[event.Target.Kind+"\x00"+event.Target.ID]
+			eventGround := ground
+			if reference, declared := explicitSemanticReference(requirement, event.Target.Kind, event.Target.ID); declared {
+				eventGround = targets["domain\x00"+reference]
+			}
+			ground := eventGround
 			if target == "" {
 				return nil, fmt.Errorf("%s event target %q does not resolve to a semantic net", event.Kind, event.Target.ID)
 			}
@@ -1868,6 +1876,11 @@ func participantControlOutputHarnessDevices(requirement architecturesearch.Requi
 			if port.Protocol != nil && strings.TrimSpace(port.Protocol.Mode) != "" && !strings.EqualFold(strings.TrimSpace(port.Protocol.Mode), "push_pull") {
 				continue
 			}
+			participantGround := ground
+			if domains[participant.Domain].ReferenceDomain != "" {
+				participantGround = targets["domain\x00"+referenceDomainForPower(requirement, participant.Domain)]
+			}
+			ground := participantGround
 			if ground == "" {
 				return nil, fmt.Errorf("participant control-output harness requires one resolved reference domain")
 			}
@@ -1924,9 +1937,6 @@ func participantBehavioralOutputHarnessDevices(requirement architecturesearch.Re
 			return nil, fmt.Errorf("behavioral participant output %q does not resolve to a semantic net", stimulus.SemanticID)
 		}
 		referenceDomain := referenceDomainForPower(requirement, stimulus.Participant.Domain)
-		if referenceDomain == "" {
-			referenceDomain = firstReferenceDomain(requirement)
-		}
 		ground := targets["domain\x00"+referenceDomain]
 		if ground == "" || target == ground {
 			return nil, fmt.Errorf("behavioral participant output %q requires a distinct resolved reference domain", stimulus.SemanticID)
@@ -2285,6 +2295,13 @@ func operatingConditionReferenceTarget(requirement architecturesearch.Requiremen
 	domainID, ok := operatingConditionTargetDomain(requirement, condition.Target)
 	if !ok {
 		return "", false
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == domainID && domain.ReferenceDomain != "" {
+			reference, valid := architecturesearch.ResolveReferenceDomain(requirement, domainID)
+			target := targets["domain\x00"+reference]
+			return target, valid && target != ""
+		}
 	}
 	if referenceID, ok := objectiveReferenceDomainForOperatingLoad(requirement, domainID); ok {
 		target := targets["domain\x00"+referenceID]
