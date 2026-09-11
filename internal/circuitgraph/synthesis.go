@@ -19,6 +19,7 @@ import (
 const (
 	SynthesisReportSchema                       = "kicadai.function-synthesis-report.v1"
 	SchematicLayoutTopologyV1                   = "topology-v1"
+	SchematicLayoutTopologyV2                   = "topology-v2"
 	synthesisEstimatedComponentPitchMM          = 5.0
 	synthesisCongestedComponentPitchMM          = 7.5
 	synthesisCongestedComponentCount            = 32
@@ -104,7 +105,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		return Document{}, report, report.Issues
 	}
 
-	if profile := resolver.options.SchematicLayoutProfile; profile != "" && profile != SchematicLayoutTopologyV1 {
+	if profile := resolver.options.SchematicLayoutProfile; profile != "" && profile != SchematicLayoutTopologyV1 && profile != SchematicLayoutTopologyV2 {
 		issue := synthesisIssue(CodeSynthesisIntentInvalid, "synthesis.layout_profile", "unsupported schematic layout profile", "select an explicitly supported schematic layout profile")
 		report.Issues = []reports.Issue{issue}
 		return Document{}, report, report.Issues
@@ -262,9 +263,12 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 
 	layoutIssues := deriveFunctionLayout(&lowered, intent, report.Selections, resolver.recordsByID)
 	issues = append(issues, layoutIssues...)
-	if resolver.options.SchematicLayoutProfile == SchematicLayoutTopologyV1 {
+	if profile := resolver.options.SchematicLayoutProfile; profile == SchematicLayoutTopologyV1 || profile == SchematicLayoutTopologyV2 {
 		applySynthesizedTopologyLayout(&lowered)
-		report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{Kind: "schematic_layout_profile", Subject: lowered.Project.Name, Value: SchematicLayoutTopologyV1, Source: SchematicLayoutTopologyV1})
+		if profile == SchematicLayoutTopologyV2 {
+			lowered.Schematic.Rules.NativeProfile = schematiclayout.NativeAnnotationV2
+		}
+		report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{Kind: "schematic_layout_profile", Subject: lowered.Project.Name, Value: profile, Source: profile})
 	}
 	assignSynthesisClockReturnPaths(&lowered)
 	if !reports.HasBlockingIssue(issues) {

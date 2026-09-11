@@ -322,6 +322,7 @@ type SchematicPlacement struct {
 }
 
 type SchematicRules struct {
+	NativeProfile           string  `json:"native_profile,omitempty"`
 	PositivePowerTop        *bool   `json:"positive_power_top"`
 	GroundBottom            *bool   `json:"ground_bottom"`
 	CenterOnPage            *bool   `json:"center_on_page"`

@@ -1,0 +1,14 @@
+{
+  "verified_utc": "2026-09-11T19:41:55.382Z",
+  "previous_source_commit": "ec2ececb4e52643f0767d0fcbb70213f1ec7209c",
+  "previous_source_files_authenticated": 16,
+  "previous_reports_unchanged": true,
+  "previous_archive_bytes": 758924689,
+  "previous_archive_sha256": "4f92199d5d04da2d3760b076b95ad2af58ee6aa94815e3920a720ae272bff8d0",
+  "previous_raw_inventory": {
+    "file_count": 380,
+    "total_bytes": 1529020156,
+    "sha256": "4bf3e2c52f64e33eefcf27d115ced94bf78815a7ce6594439f93b79349be32ff"
+  },
+  "provider_calls": 0
+}

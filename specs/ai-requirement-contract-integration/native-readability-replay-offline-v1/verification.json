@@ -1,0 +1,402 @@
+{
+  "schema": "kicadai.native-readability-replay-offline-verification.v1",
+  "base": "ec2ececb4e52643f0767d0fcbb70213f1ec7209c",
+  "root": "/tmp/kicadai-native-readability-replay-offline-v1-final",
+  "source": [
+    {
+      "path": "internal/circuitgraph/model.go",
+      "sha256": "bc3b2c8763fb90799e4531c697a9a4b2895e1c3f1d505d08ed3fad634d587ce7"
+    },
+    {
+      "path": "internal/circuitgraph/schematic.go",
+      "sha256": "ff9a7cc0214075653eb4170f696a0f4a3146c312cbae19912d866e758e7e10ab"
+    },
+    {
+      "path": "internal/circuitgraph/synthesis.go",
+      "sha256": "989265c3fc165fe1009611317d70718b1847a3a8df380990b48018dee2a90ca0"
+    },
+    {
+      "path": "internal/circuitgraph/validate.go",
+      "sha256": "b4558b598f93e0bc37170b194b279a163c5c4f91f0fd56474a220c001d5f48a4"
+    },
+    {
+      "path": "internal/compositionlowering/native_readability_replay_test.go",
+      "sha256": "35bc8a27d95927783217b9ff8b2ab051c440e73f11452b15b1a237a9bcfe1f68"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder.go",
+      "sha256": "964a883a8772855c9b5b772fe9be693c7f02250b6810e3fc6b72f488cbbb36b7"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_audit.go",
+      "sha256": "efc6c83719c8f90a4f26a66e43068a04a89f8d5ffd000c30ff21e0132ca34a33"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotations.go",
+      "sha256": "1f4f0a390318682e848ccb34db78ff79e528840dc5379f8af4160362e9dd6400"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_collision_regression_test.go",
+      "sha256": "249325aa476126f499a1201d46cef898b7bfa05ac1a273c4974a62371e36e084"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_reading_guide.go",
+      "sha256": "41a477c9fb07b21a8f6bd443f0d7efa23c3b443ea8ad66ccc26a6e40153dbb57"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read.go",
+      "sha256": "7c386864c7eefa73fcc77b5fb2b83032e87c16d3de249195d6b80fd274cf4670"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read_native_text.go",
+      "sha256": "a3845bf724e4b9fde2f133e132026b854164e6a778ed43d7176cc1de9b361e3d"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read_native_text_test.go",
+      "sha256": "83d7309a2535d617fb50c01c7e817f83f6fc12583fc47e3516917bc5e9367015"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/schematic.go",
+      "sha256": "149ef5dfc75d4b07a5003bcd9f6c3521df03b7559c8801cb82b8c4b5ee7d0901"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "sha256": "0ad392f6717bdaab3b903c942e7dc5e27099c6f60f97578eefa08d60bf323076"
+    },
+    {
+      "path": "internal/schematicir/layout.go",
+      "sha256": "903cbc27e068aeee99833e47d789434d074d41d3451745d32c7d1706ea137655"
+    },
+    {
+      "path": "internal/schematicir/model.go",
+      "sha256": "0fb438176bd140014be3b6a9d51a01b239757a32a36338fd920582e661f0aaa6"
+    },
+    {
+      "path": "internal/schematicir/native_annotations.go",
+      "sha256": "ccebbf56c33f10769bfab1d05aa5d070c26ca6586e7e2f0c1d49b3542b1371f5"
+    },
+    {
+      "path": "internal/schematicir/serialized_native_layout_test.go",
+      "sha256": "3ac206f8ef6c9dd9396c9c49b7148cdfce9b24f86fafaf61d4eb2a8f4a87b453"
+    },
+    {
+      "path": "internal/schematicir/validate.go",
+      "sha256": "22da182bd82528692cb7327518dc99dd4ba2e02d23c2afc973ed393feb99c301"
+    },
+    {
+      "path": "internal/schematiclayout/native_text.go",
+      "sha256": "67e0231def0bb5c87ef9a957cc94c171a3eb1e8be552e17f21319994f777b157"
+    },
+    {
+      "path": "internal/transactions/apply.go",
+      "sha256": "8b21918ea7f52140baf587e1d6cb602768667a3f5e94b03135583c0b5def92ad"
+    },
+    {
+      "path": "internal/transactions/model.go",
+      "sha256": "219e2e4419ff98f28ca26fc7fb9813d1b7bc2d0364e0a080a2b4b6b7c8965cca"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "components": 8,
+      "requirements_unchanged": true,
+      "resolution_provenance": {
+        "previous": "d45724fca08e28a54b40e5c4c56756e00e3d29a9ff946074c0c8d54218c66c7c",
+        "current": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "electrical_and_pcb_input_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 3,
+      "native_physical_endpoints": 16,
+      "pcb": {
+        "connected_pads": 16,
+        "unconnected_pads": 0,
+        "physical_connectivity_verified": true,
+        "geometry_unchanged": false,
+        "changed_placement_count": 8,
+        "previous_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "current_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "6",
+              "13.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "15",
+              "9",
+              "90"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "2.5",
+              "14.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "14",
+              "13.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "12.5"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "3",
+              "9.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "10.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5",
+              "90"
+            ]
+          }
+        ],
+        "previous_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "current_route_sha256": "c71da9fe8ad70a9e66335d5d839a4e26eeec26590fa40098df6a68c0e3dcd4c3",
+        "previous_segments": 37,
+        "current_segments": 38,
+        "previous_vias": 3,
+        "current_vias": 5,
+        "previous_generation_seed": "aa9ea7fa25d049b93ae2a42043a898f1d5d9f9ee0086f3cbee325486c66664f6",
+        "current_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; placement and routing differences retained as a failed invariant",
+        "previous_paper": [
+          "paper",
+          "A4",
+          "portrait"
+        ],
+        "current_paper": [
+          "paper",
+          "A4",
+          "portrait"
+        ]
+      },
+      "project_files": 14,
+      "actual_json_serialized_request_replay": true,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 103.04950000000001,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.17560399999999993,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "name": "controller_adc_100ma",
+      "requirements_unchanged": true,
+      "electrical_and_pcb_intent_unchanged": true,
+      "resolution_provenance": {
+        "previous": "f505b3bf1248286a918222e8b2e8db920655fff2c4dc3d49e8b54cee4280c55e",
+        "current": "0bfff70f00e69d4a3911cd19faeb3acfaf5d94fa688985d6a2bfcefba45106ce",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "promotion": "pass",
+      "final_native_gate": "failed",
+      "blocking_stage": "project_write",
+      "reason": "native annotation profile does not support rotated field C1.property.7",
+      "native_projects": 0,
+      "serialized_project_replay": "not reached",
+      "assertions": [
+        {
+          "requirement_id": "adc_cutoff",
+          "operating_case": "supply_load",
+          "analysis": "ac_sweep",
+          "metric": "cutoff_frequency",
+          "actual": 923.3612800239786,
+          "min": 900,
+          "max": 1100,
+          "critical": false,
+          "normalized_margin": 0.02123752729452597,
+          "pass": true
+        },
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 114.049500001452,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.08760399998838397,
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "inventory": {
+    "file_count": 170,
+    "total_bytes": 1520345919,
+    "sha256": "03a8607120794aa86323a68970137aa085d1b727984d94140d61d49437e9c036"
+  },
+  "provider_calls": 0,
+  "frozen_cases_added": 0,
+  "phase_gate_passed": false,
+  "complete_phase_examples": 0,
+  "planned_examples": 2,
+  "readability": "separate visual review; native checks do not establish readability"
+}

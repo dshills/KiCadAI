@@ -4,6 +4,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"kicadai/internal/schematiclayout"
 )
 
 // CloneLayout returns an independent copy suitable for carrying layout intent
@@ -152,6 +154,9 @@ func NormalizeLayoutIntent(document Document) Document {
 	groups := make([]Group, len(document.Layout.Groups))
 	for index, group := range document.Layout.Groups {
 		groups[index] = group
+		if document.Layout.NativeProfile == schematiclayout.NativeAnnotationV2 && group.RankPolicy == "inferred-v1" {
+			groups[index].Inferred = true
+		}
 		groups[index].Members = append([]string(nil), group.Members...)
 	}
 	groupIndexes := map[string]int{}
@@ -196,6 +201,13 @@ func NormalizeLayoutIntent(document Document) Document {
 			return generated[left].ID < generated[right].ID
 		})
 		groups = append(groups, generated...)
+	}
+	if document.Layout.NativeProfile == schematiclayout.NativeAnnotationV2 {
+		for i := range groups {
+			if groups[i].Inferred {
+				groups[i].RankPolicy = "inferred-v1"
+			}
+		}
 	}
 	document.Layout.Groups = groups
 	explicitPlacementIntent := indexExplicitPlacementIntent(document.Layout.Placements)

@@ -520,7 +520,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		routesByKey:         layoutRouteHints(layoutResult, labelConflicts),
 		labelsByKey:         layoutEndpointLabelHints(layoutResult, labelConflicts),
 		netLabelPreferences: netLabelPreferences,
-		textByID:            layoutTextPlacements(layoutResult, document.Layout.Rules.OrientEndpointLabels),
+		textByID:            layoutTextPlacements(layoutResult, nativeAnnotationGeometry(document)),
 		issues:              preflightIssues,
 	}
 	state.indexSchematicCollisionAnchors()
@@ -709,9 +709,11 @@ func readableLayoutDiagnosticAllowed(result schematiclayout.Result, code string)
 
 func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
+		NativeSchematicProfile: state.document.Layout.NativeProfile,
+		NativeSchematicNotes:   nativeSchematicNotes(state.document),
 		// The opt-in oriented schematic profile includes explicit native wire
 		// drawing defaults; an incomplete Default net class can plot invisibly.
-		SchematicNetClassDefaults: state.document.Layout.Rules.OrientEndpointLabels,
+		SchematicNetClassDefaults: nativeAnnotationGeometry(state.document),
 		Op:                        transactions.OpCreateProject,
 		Name:                      state.document.Metadata.Name,
 		Paper:                     state.paper,
@@ -1167,7 +1169,7 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				Waypoints:           waypoints,
 				FromLabelAt:         fromLabelAt,
 				ToLabelAt:           toLabelAt,
-				OrientLabelsOutward: state.document.Layout.Rules.OrientEndpointLabels,
+				OrientLabelsOutward: nativeAnnotationGeometry(state.document),
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
@@ -2278,7 +2280,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	}
 	rules.MaxAuxiliaryPerRank = document.Layout.Rules.MaxAuxiliaryPerRank
 	rules.ReserveTitleBlock = document.Layout.Rules.ReserveTitleBlock
-	rules.OrientEndpointLabels = document.Layout.Rules.OrientEndpointLabels
+	rules.OrientEndpointLabels = nativeAnnotationGeometry(document)
 	if document.Layout.Rules.PreferLabelsForLongNets != nil {
 		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
 		rules.LabelFallbackConfigured = true

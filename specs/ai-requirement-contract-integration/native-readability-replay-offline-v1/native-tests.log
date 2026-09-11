@@ -1,0 +1,14 @@
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:135: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (40.58s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (10.20s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (2.16s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	41.097s
+FAIL

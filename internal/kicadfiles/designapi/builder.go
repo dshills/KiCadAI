@@ -26,17 +26,20 @@ import (
 // Builder accumulates a KiCad design through ordered mutations. It is not
 // safe for concurrent use by multiple goroutines.
 type Builder struct {
-	nativeSchematicLabels bool
-	name                  string
-	generator             kicadfiles.DeterministicIDGenerator
-	design                kicaddesign.Design
-	libraryIndex          *libraryresolver.LibraryIndex
-	resolverSymbolIDs     map[string]struct{}
-	nets                  *pcb.NetRegistry
-	netParents            map[string]string
-	symbols               map[string]*symbolState
-	symbolUnits           map[string][]*symbolState
-	symbolKeys            map[string]string
+	nativeSchematicProfile string
+	nativeSchematicNotes   []string
+	nativeAnnotationError  error
+	nativeSchematicLabels  bool
+	name                   string
+	generator              kicadfiles.DeterministicIDGenerator
+	design                 kicaddesign.Design
+	libraryIndex           *libraryresolver.LibraryIndex
+	resolverSymbolIDs      map[string]struct{}
+	nets                   *pcb.NetRegistry
+	netParents             map[string]string
+	symbols                map[string]*symbolState
+	symbolUnits            map[string][]*symbolState
+	symbolKeys             map[string]string
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
 	schematicPinAnchors  map[kicadfiles.Point]struct{}
@@ -60,6 +63,10 @@ type pendingSchematicRouteLabel struct {
 }
 
 type Options struct {
+	// NativeSchematicProfile selects a versioned annotation/replay contract.
+	// Empty preserves legacy behavior independently of drawing defaults.
+	NativeSchematicProfile     string
+	NativeSchematicNotes       []string
 	SchematicNetClassDefaults  bool
 	Name                       string
 	DesignID                   kicadfiles.UUID
@@ -291,6 +298,15 @@ const usbCPowerOnlyConnectorLibraryID = "kicadai:USB_C_Receptacle_PowerOnly_6P"
 const usbCPowerOnlyFullConnectorLibraryID = "kicadai:usb_c_receptacle_poweronly_full"
 
 func New(options Options) (*Builder, error) {
+	if options.NativeSchematicProfile != "" && options.NativeSchematicProfile != schematiclayout.NativeAnnotationV2 {
+		return nil, fmt.Errorf("unsupported native schematic profile %q", options.NativeSchematicProfile)
+	}
+	if len(options.NativeSchematicNotes) != 0 && options.NativeSchematicProfile != schematiclayout.NativeAnnotationV2 {
+		return nil, fmt.Errorf("native schematic notes require annotation-v2")
+	}
+	if options.NativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+		options.SchematicNetClassDefaults = true
+	}
 	name := strings.TrimSpace(options.Name)
 	var wireWidth, busWidth kicadfiles.IU
 	if options.SchematicNetClassDefaults {
@@ -323,26 +339,28 @@ func New(options Options) (*Builder, error) {
 		return nil, fmt.Errorf("copper layer count must be 1, 2, or 4")
 	}
 	builder := &Builder{
-		nativeSchematicLabels: options.SchematicNetClassDefaults,
-		name:                  name,
-		generator:             generator,
-		libraryIndex:          options.LibraryIndex,
-		resolverSymbolIDs:     map[string]struct{}{},
-		nets:                  pcb.NewNetRegistry(),
-		netParents:            map[string]string{},
-		symbols:               map[string]*symbolState{},
-		symbolUnits:           map[string][]*symbolState{},
-		symbolKeys:            map[string]string{},
-		schematicPinAnchors:   map[kicadfiles.Point]struct{}{},
-		schematicPinBuckets:   map[kicadfiles.Point][]schematicPinAnchorRef{},
-		schematicWireEnds:     map[kicadfiles.Point]struct{}{},
-		schematicWireNets:     map[kicadfiles.UUID]string{},
-		schematicWires:        map[kicadfiles.UUID]schematic.Wire{},
-		schematicWireBuckets:  map[kicadfiles.Point][]kicadfiles.UUID{},
-		finalRouteLabelUUIDs:  map[kicadfiles.UUID]struct{}{},
-		footprints:            map[string]int{},
-		pads:                  map[string]map[string][]int{},
-		routeViaCounts:        map[string]int{},
+		nativeSchematicProfile: options.NativeSchematicProfile,
+		nativeSchematicNotes:   append([]string(nil), options.NativeSchematicNotes...),
+		nativeSchematicLabels:  options.SchematicNetClassDefaults,
+		name:                   name,
+		generator:              generator,
+		libraryIndex:           options.LibraryIndex,
+		resolverSymbolIDs:      map[string]struct{}{},
+		nets:                   pcb.NewNetRegistry(),
+		netParents:             map[string]string{},
+		symbols:                map[string]*symbolState{},
+		symbolUnits:            map[string][]*symbolState{},
+		symbolKeys:             map[string]string{},
+		schematicPinAnchors:    map[kicadfiles.Point]struct{}{},
+		schematicPinBuckets:    map[kicadfiles.Point][]schematicPinAnchorRef{},
+		schematicWireEnds:      map[kicadfiles.Point]struct{}{},
+		schematicWireNets:      map[kicadfiles.UUID]string{},
+		schematicWires:         map[kicadfiles.UUID]schematic.Wire{},
+		schematicWireBuckets:   map[kicadfiles.Point][]kicadfiles.UUID{},
+		finalRouteLabelUUIDs:   map[kicadfiles.UUID]struct{}{},
+		footprints:             map[string]int{},
+		pads:                   map[string]map[string][]int{},
+		routeViaCounts:         map[string]int{},
 	}
 	builder.design = kicaddesign.Design{
 		Name: name,
@@ -1485,6 +1503,10 @@ func (builder *Builder) schematicRouteLabelTextOverlapsExisting(netName string, 
 }
 
 func (builder *Builder) labelTextBounds(text string, position kicadfiles.Point, rotation kicadfiles.Angle, justifyRight bool) schematicLabelTextRect {
+	if builder != nil && builder.nativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+		box := schematiclayout.NativeLabelBounds(text, position, rotation, justifyRight)
+		return schematicLabelTextRect{minX: box.MinX, minY: box.MinY, maxX: box.MaxX, maxY: box.MaxY}
+	}
 	if builder != nil && builder.nativeSchematicLabels {
 		return nativeSchematicLabelTextBounds(text, position, rotation, justifyRight)
 	}
@@ -1582,7 +1604,18 @@ func (builder *Builder) schematicStubTouchesVisibleText(anchor, labelPoint kicad
 		return false
 	}
 	segment := schematiclayout.WireSegment{From: anchor, To: labelPoint}
+	if builder.nativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+		for _, label := range builder.design.Schematic.Labels {
+			box := schematiclayout.NativeLabelBounds(label.Text, label.Position, label.Rotation, containsFold(label.Justify, "right"))
+			if schematiclayout.SegmentIntersectsRect(segment, box.Inflate(-1)) {
+				return true
+			}
+		}
+	}
 	intersects := func(text string, position kicadfiles.Point) bool {
+		if builder.nativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+			return schematiclayout.SegmentIntersectsRect(segment, schematiclayout.NativeFieldBounds(text, position))
+		}
 		// Match the conservative field box used by post-write readability
 		// validation so an in-memory clear stub remains clear after parsing.
 		return schematiclayout.SegmentIntersectsRect(segment, schematiclayout.TextEstimate(text, position, 0, 0))
@@ -2560,7 +2593,21 @@ func (builder *Builder) Design() kicaddesign.Design {
 	if builder == nil {
 		return kicaddesign.Design{}
 	}
+	if builder.nativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+		// Final drawing positions are a projection, not new input to the next
+		// Design/Write call. Retain the pre-finalization routing state.
+		original := builder.design.Schematic
+		builder.design.Schematic = cloneDesign(builder.design).Schematic
+		defer func() { builder.design.Schematic = original }()
+	}
 	builder.finalizeSchematicRouteLabels()
+	if builder.nativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
+		if len(builder.finalRouteLabelUUIDs) != len(builder.pendingRouteLabels) {
+			builder.nativeAnnotationError = fmt.Errorf("native annotation profile lost a required routed-net label")
+		} else {
+			builder.nativeAnnotationError = builder.finalizeNativeAnnotations()
+		}
+	}
 	builder.syncPCBNets()
 	design := cloneDesign(builder.design)
 	builder.resolveDesignNets(&design)
@@ -2572,6 +2619,9 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 		return kicaddesign.WriteResult{}, fmt.Errorf("builder required")
 	}
 	design := builder.Design()
+	if builder.nativeAnnotationError != nil {
+		return kicaddesign.WriteResult{}, builder.nativeAnnotationError
+	}
 	if err := builder.applySchematicHierarchy(&design); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
@@ -2579,6 +2629,9 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 		return kicaddesign.WriteResult{}, err
 	}
 	if err := ensureGeneratedLocalFootprintLibraries(&design); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
+	if err := builder.auditSerializedNativeAnnotations(design.Schematic); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
 	return kicaddesign.WriteProjectDirectory(root, design, options)
@@ -2591,12 +2644,18 @@ func (builder *Builder) WriteSchematicProject(root string, options kicaddesign.W
 	// Design returns a cloned design, so omitting PCB data here does not mutate
 	// the builder's accumulated board state.
 	design := builder.Design()
+	if builder.nativeAnnotationError != nil {
+		return kicaddesign.WriteResult{}, builder.nativeAnnotationError
+	}
 	if err := builder.applySchematicHierarchy(&design); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
 	design.PCB = nil
 	design.ExpectedNets = nil
 	if err := ensureGeneratedLocalSymbolLibraries(&design, builder.libraryIndex, builder.resolverSymbolIDs); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
+	if err := builder.auditSerializedNativeAnnotations(design.Schematic); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
 	return kicaddesign.WriteProjectDirectory(root, design, options)

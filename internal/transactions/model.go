@@ -183,6 +183,8 @@ type PadSpec struct {
 }
 
 type CreateProjectOperation struct {
+	NativeSchematicNotes      []string          `json:"native_schematic_notes,omitempty"`
+	NativeSchematicProfile    string            `json:"native_schematic_profile,omitempty"`
 	SchematicNetClassDefaults bool              `json:"schematic_net_class_defaults,omitempty"`
 	Op                        OperationKind     `json:"op"`
 	Name                      string            `json:"name"`

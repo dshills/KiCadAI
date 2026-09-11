@@ -212,6 +212,7 @@ const (
 )
 
 type Layout struct {
+	NativeProfile         string      `json:"native_profile,omitempty"`
 	Flow                  Flow        `json:"flow"`
 	Origin                Origin      `json:"origin"`
 	Groups                []Group     `json:"groups,omitempty"`
@@ -246,6 +247,9 @@ type Group struct {
 	// Inferred is runtime-only normalization evidence. Explicit groups are hard
 	// rank constraints; inferred groups remain graph-layout hints.
 	Inferred bool `json:"-"`
+	// RankPolicy persists inferred rank semantics only in the versioned native
+	// profile. Empty continues to mean an explicit/fixed serialized group.
+	RankPolicy string `json:"rank_policy,omitempty"`
 }
 
 type GroupRole string
