@@ -96,6 +96,13 @@ func supportOwnerPinCorridors(owner Component, nets []Net, origin kicadfiles.Poi
 				p.X += origin.X
 				p.Y += origin.Y
 				length := NativeFieldBounds(net.Name, kicadfiles.Point{}).Width() + kicadfiles.MM(10.16)
+				if net.LocalWiring && len(net.Endpoints) > 1 && net.Role == "power" {
+					// Local supply conductors need pin access, not a full net-name
+					// glyph corridor at every endpoint. Ground, signal/interface and
+					// cross-group singleton endpoints retain full label clearance.
+					// Final native annotations are checked after actual routing.
+					length = kicadfiles.MM(10.16)
+				}
 				q := p
 				switch {
 				case absIU(d.X) > absIU(d.Y) && d.X < 0:

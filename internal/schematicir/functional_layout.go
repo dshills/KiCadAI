@@ -14,7 +14,7 @@ func validateFunctionalLayout(document Document, add func(string, string)) {
 		}
 		return
 	}
-	if (layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV1 && layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV2 && (layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV3 && layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV4)) || layout.NativeProfile != schematiclayout.NativeAnnotationV2 {
+	if (layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV1 && layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV2 && (layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV3 && layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV4 && layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV5)) || layout.NativeProfile != schematiclayout.NativeAnnotationV2 {
 		add("layout.functional_profile", "unsupported functional profile or missing annotation-v2")
 	}
 	components := indexComponentsByID(document.Circuit.Components)
@@ -37,7 +37,7 @@ func validateFunctionalLayout(document Document, add func(string, string)) {
 		if !known || duplicate || owner.Group == "" || membership[owner.Component] != owner.Group || owner.Source == "" {
 			add("layout.functional_owners", "invalid functional membership or provenance")
 		}
-		if layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4) {
+		if layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5) {
 			valid := false
 			switch {
 			case strings.HasPrefix(owner.Source, "fragment:"):

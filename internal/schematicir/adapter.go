@@ -2287,10 +2287,11 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4),
+		FunctionalLocalWiring: document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5,
+		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5),
 		FunctionalLocality:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
-		FunctionalJoint:       document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4,
-		FunctionalPinAware:    (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4),
+		FunctionalJoint:       document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5,
+		FunctionalPinAware:    (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5),
 		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
@@ -2374,6 +2375,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			continue
 		}
 		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: netOrdinalByName[net.Name], PreferDirect: stateDocumentHasPortNet(document, net.Name)}
+		layoutNet.LocalWiring = request.FunctionalLocalWiring && functionalLocalWiringEligible(document, net, index, componentsByID)
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
 			layoutNet.EndpointLabels = *net.UseLabel

@@ -15,6 +15,8 @@ const FunctionalOwnershipV3 = "ownership-v3"
 
 const FunctionalOwnershipV4 = "ownership-v4"
 
+const FunctionalOwnershipV5 = "ownership-v5"
+
 // functionalGroupPositions lays out each explicitly owned circuit block using
 // the existing topology/role engine, then packs whole blocks into stable rows.
 // Global power rails no longer create one remote capacitor bank. No electrical
@@ -30,6 +32,10 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 	positions := map[string]kicadfiles.Point{}
 	var x, y, rowHeight kicadfiles.IU
 	width := kicadfiles.MM(420)
+	columns, packed := 1, 0
+	for columns*columns < len(groups) {
+		columns++
+	}
 	gutter := max(rules.MinGroupGutter, kicadfiles.MM(25.4))
 	for _, group := range groups {
 		localRules := rules
@@ -58,7 +64,7 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 					copy.Endpoints = append(copy.Endpoints, e)
 				}
 			}
-			if len(copy.Endpoints) > 1 {
+			if len(copy.Endpoints) > 1 || request.FunctionalLocalWiring && len(copy.Endpoints) == 1 {
 				local.Nets = append(local.Nets, copy)
 			}
 		}
@@ -113,13 +119,25 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 				bounds = unionRect(bounds, b)
 			}
 		}
-		bounds = bounds.Inflate(kicadfiles.MM(12.7))
+		if !request.FunctionalLocalWiring {
+			bounds = bounds.Inflate(kicadfiles.MM(12.7))
+		}
+		// V5 already measures body/pin-label envelopes. The declared inter-group
+		// gutter below separates them; do not add another full gutter to each
+		// side of every block. Native text/wire collision checks are unchanged.
 		if request.FunctionalPinAware {
 			// Reserve a local annotation band without moving the actual symbols
 			// relative to their own functional block. The writer checks final text.
 			bounds.MinY -= kicadfiles.MM(40.64)
 		}
-		if x > 0 && x+bounds.Width() > width {
+		wrap := x > 0 && x+bounds.Width() > width
+		if request.FunctionalLocalWiring {
+			// A fixed paper-width guess can turn four modest blocks into three
+			// tall rows. Balance explicit groups without a paper-size guess;
+			// final sheet selection still checks their actual occupied bounds.
+			wrap = packed > 0 && packed%columns == 0
+		}
+		if wrap {
 			x = 0
 			y += rowHeight + gutter
 			rowHeight = 0
@@ -130,6 +148,7 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 		}
 		x += bounds.Width() + gutter
 		rowHeight = max(rowHeight, bounds.Height())
+		packed++
 	}
 	return positions
 }

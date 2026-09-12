@@ -17,7 +17,7 @@ import (
 // synthesis support-parent records. No component ID prefix is interpreted as
 // ownership. The naming operation matches Lower; the source payload is required.
 func applyFunctionalLayout(request *designworkflow.Request, candidate architecturesearch.CandidateResult, synthesis circuitgraph.SynthesisReport, profile string) error {
-	if (profile != schematiclayout.FunctionalOwnershipV1 && profile != schematiclayout.FunctionalOwnershipV2 && (profile != schematiclayout.FunctionalOwnershipV3 && profile != schematiclayout.FunctionalOwnershipV4)) || request.ExplicitCircuit == nil {
+	if (profile != schematiclayout.FunctionalOwnershipV1 && profile != schematiclayout.FunctionalOwnershipV2 && (profile != schematiclayout.FunctionalOwnershipV3 && profile != schematiclayout.FunctionalOwnershipV4 && profile != schematiclayout.FunctionalOwnershipV5)) || request.ExplicitCircuit == nil {
 		return fmt.Errorf("unsupported functional layout profile or absent explicit circuit")
 	}
 	document := request.ExplicitCircuit.Schematic

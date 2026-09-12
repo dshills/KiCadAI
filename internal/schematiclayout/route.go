@@ -19,6 +19,9 @@ func Route(request Request, result Result) Result {
 }
 
 func routePass(request Request, result Result) Result {
+	if request.FunctionalLocalWiring {
+		request.functionalLabelCorridors = functionalRouteLabelCorridors(request, result)
+	}
 	rules := normalizeRules(request.Rules)
 	anchors := pinAnchors(result.Components)
 	anchorIndex := newPinAnchorIndex(anchors)
@@ -45,6 +48,10 @@ func routePass(request Request, result Result) Result {
 			continue
 		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
+		if request.FunctionalLocalWiring && net.LocalWiring && rules.LabelFallbackEnabled {
+			routeFunctionalLocalTrees(&result, labeled, net, orderedEndpoints, request, rules, anchorIndex)
+			continue
+		}
 		if forceLabels && routeLocalTreeWithBoundaryLabels(&result, labeled, net, orderedEndpoints, request, rules, anchorIndex) {
 			continue
 		}
@@ -1134,6 +1141,12 @@ func scoreRouteIndexed(points []kicadfiles.Point, netName string, from, to Endpo
 	segments := segmentsForPoints(netName, points)
 	for _, segment := range segments {
 		score += int64(manhattan(segment.From, segment.To))
+		for _, corridor := range request.functionalLabelCorridors {
+			if corridor.net != netName && SegmentIntersectsRect(segment, corridor.box) {
+				score += routeHardPenalty
+				clean = false
+			}
+		}
 		if !usable.ContainsPoint(segment.From) || !usable.ContainsPoint(segment.To) {
 			score += routeHardPenalty
 			clean = false

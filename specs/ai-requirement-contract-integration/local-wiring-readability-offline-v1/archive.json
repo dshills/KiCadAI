@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.local-wiring-readability-archive.v1",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/local-wiring-readability-offline-v1-all-runs.tar.gz",
+  "bytes": 311024054,
+  "sha256": "afefb58edfe2ff75996b2a789d09ba6d103bf934b2523b82bf2cdcf54f67f2a5",
+  "manifest_sha256": "2d028f2f36ef7b95e17f108ade15883e2fe82ca4932f294b514389652f114ab1",
+  "streamed": {
+    "files_verified": 1571,
+    "bytes_verified": 6132061016,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

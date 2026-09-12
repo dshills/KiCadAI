@@ -34,16 +34,18 @@ type Sheet struct {
 }
 
 type Request struct {
-	FunctionalPinAware    bool
-	FunctionalJoint       bool
-	FunctionalLocality    bool
-	FunctionalGroups      bool
-	Sheet                 Sheet
-	Components            []Component
-	Nets                  []Net
-	Groups                []Group
-	Rules                 Rules
-	MaxComponentsPerSheet int
+	functionalLabelCorridors []functionalLabelCorridor
+	FunctionalLocalWiring    bool
+	FunctionalPinAware       bool
+	FunctionalJoint          bool
+	FunctionalLocality       bool
+	FunctionalGroups         bool
+	Sheet                    Sheet
+	Components               []Component
+	Nets                     []Net
+	Groups                   []Group
+	Rules                    Rules
+	MaxComponentsPerSheet    int
 }
 
 type Rules struct {
@@ -144,6 +146,9 @@ type Pin struct {
 }
 
 type Net struct {
+	// LocalWiring permits clean direct trees inside explicit functional groups.
+	// Set only after checking geometry and explicit caller routing intent.
+	LocalWiring     bool
 	Name            string
 	Role            string
 	Endpoints       []Endpoint
@@ -437,6 +442,7 @@ func mergeNetFragments(nets []Net) []Net {
 				}
 			}
 			target.PreferredLabels = target.PreferredLabels || source.PreferredLabels
+			target.LocalWiring = target.LocalWiring && source.LocalWiring
 			target.EndpointLabels = target.EndpointLabels || source.EndpointLabels
 			target.PreferDirect = target.PreferDirect || source.PreferDirect
 			if source.OriginalOrdinal < target.OriginalOrdinal {
