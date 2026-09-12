@@ -580,8 +580,8 @@ func TestSchematicLabelOptionsForStubFacesAwayFromComponent(t *testing.T) {
 	}{
 		{name: "left", label: kicadfiles.Point{X: anchor.X - kicadfiles.MM(1.27), Y: anchor.Y}, wantRotation: 180, wantRight: true},
 		{name: "right", label: kicadfiles.Point{X: anchor.X + kicadfiles.MM(1.27), Y: anchor.Y}},
-		{name: "above", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y - kicadfiles.MM(1.27)}, wantRotation: 270, wantRight: true},
-		{name: "below", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y + kicadfiles.MM(1.27)}, wantRotation: 90},
+		{name: "above", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y - kicadfiles.MM(1.27)}, wantRotation: 90},
+		{name: "below", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y + kicadfiles.MM(1.27)}, wantRotation: 270, wantRight: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -589,7 +589,10 @@ func TestSchematicLabelOptionsForStubFacesAwayFromComponent(t *testing.T) {
 			if got.Rotation != test.wantRotation {
 				t.Fatalf("rotation = %v, want %v", got.Rotation, test.wantRotation)
 			}
-			gotRight := len(got.Justify) == 1 && got.Justify[0] == "right"
+			if len(got.Justify) != 2 || got.Justify[1] != "bottom" {
+				t.Fatalf("native endpoint labels need explicit horizontal and bottom justification: %#v", got.Justify)
+			}
+			gotRight := got.Justify[0] == "right"
 			if gotRight != test.wantRight {
 				t.Fatalf("justification = %#v, want right=%t", got.Justify, test.wantRight)
 			}

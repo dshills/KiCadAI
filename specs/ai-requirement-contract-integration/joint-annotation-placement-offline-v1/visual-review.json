@@ -1,0 +1,105 @@
+{
+  "schema": "kicadai.joint-placement-visual-review.v1",
+  "root": "/tmp/kicadai-joint-annotation-placement-offline-v1-final",
+  "reviewer": "implementing agent; local review only",
+  "files": [
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/render/offline_regulated_output.png",
+      "bytes": 91256,
+      "sha256": "7caf6dc1e860dd365e70fa21b49f26ea9f9caf3fc42d87e8fbe7aec920947a53",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/render/review-functional_objective_regulate.png",
+      "bytes": 82652,
+      "sha256": "0cdd68f4090c67536fed49cb9e7c264d50ac89dd33a7c4f1777b3e3c8fac9ce2",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/render/review-functional_boundaries.png",
+      "bytes": 90575,
+      "sha256": "9ef503ec8a70dc127e9e7a09156caab611ce8a90abb49004afd54fa3dfd1f000",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/render/review-F.Cu.png",
+      "bytes": 19783,
+      "sha256": "8648d9b1e8741dd6f296da5d7da5aa3a83bd98afbaeb139eac0d993bc0e4cfd0",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/render/review-B.Cu.png",
+      "bytes": 15639,
+      "sha256": "029d87454dc7633e86c1f8af8a1ff2628570212b39abc3f395def0328a6a41af",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/offline_controller_adc.png",
+      "bytes": 201139,
+      "sha256": "be30c1901efad24ec2e449bdb675f48feb01629dbcc04f4be6e593a2a3d144ae",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-functional_objective_condition_adc.png",
+      "bytes": 131977,
+      "sha256": "4e873ed0ecf3b5ac0a29a66703139993c26f350cfc1007855a1915062e6d3de3",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-functional_participant_controller.png",
+      "bytes": 234123,
+      "sha256": "836ae85c8af30150d050a2bb8476e26118575fa1b60a1263a85c9c8bb37398f8",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-functional_objective_regulate.png",
+      "bytes": 84646,
+      "sha256": "e8a1cbf25834c073395aab32e9456074a727b7327686869899b3d1ccaff2cd34",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-functional_boundaries.png",
+      "bytes": 116645,
+      "sha256": "f949ec40ed4f57e636a57d038cd623ed42473a5466cbc6e866783700689d715e",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-F.Cu.png",
+      "bytes": 45999,
+      "sha256": "f192c716bd780a781525f6348cf1c6a86800355afda88db8f0bc1814ad6bf29d",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-In1.Cu.png",
+      "bytes": 34307,
+      "sha256": "80317f422e61f35a604884467a4b024be441b9421d09ec87dd6b926a701f783a",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-In2.Cu.png",
+      "bytes": 33563,
+      "sha256": "2e410d9931083080a0db58593379beea3845497c0392cd2a907ef4fc97817ea7",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/render/review-B.Cu.png",
+      "bytes": 33049,
+      "sha256": "98cf78158e136aa34156f67f37f8d349322e8bc306fa88074043847dc9c3cfda",
+      "inspected": true
+    }
+  ],
+  "full_schematics": 2,
+  "functional_crops": 6,
+  "copper_layer_images": 6,
+  "complete_readability_examples": 0,
+  "planned_examples": 2,
+  "technical_results": "verification.json",
+  "pin_side_and_panel_evidence": "pin-aware-audit.json",
+  "findings": "VISUAL_REVIEW.md",
+  "limitations": [
+    "Controller detail crop clips upper panel rows; full-sheet view and independent emitted-text audit used together.",
+    "No independent external review, fabrication, signal-integrity or assembly sign-off."
+  ],
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

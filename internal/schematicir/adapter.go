@@ -520,7 +520,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		routesByKey:         layoutRouteHints(layoutResult, labelConflicts),
 		labelsByKey:         layoutEndpointLabelHints(layoutResult, labelConflicts),
 		netLabelPreferences: netLabelPreferences,
-		textByID:            layoutTextPlacements(layoutResult),
+		textByID:            layoutTextPlacements(layoutResult, nativeAnnotationGeometry(document)),
 		issues:              preflightIssues,
 	}
 	state.indexSchematicCollisionAnchors()
@@ -709,10 +709,16 @@ func readableLayoutDiagnosticAllowed(result schematiclayout.Result, code string)
 
 func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
-		Op:            transactions.OpCreateProject,
-		Name:          state.document.Metadata.Name,
-		Paper:         state.paper,
-		PaperPortrait: state.paperPortrait,
+		NativeSchematicProfile: state.document.Layout.NativeProfile,
+		NativeSchematicNotes:   nativeSchematicNotes(state.document),
+		NativeSchematicBlocks:  nativeSchematicBlocks(state.document),
+		// The opt-in oriented schematic profile includes explicit native wire
+		// drawing defaults; an incomplete Default net class can plot invisibly.
+		SchematicNetClassDefaults: nativeAnnotationGeometry(state.document),
+		Op:                        transactions.OpCreateProject,
+		Name:                      state.document.Metadata.Name,
+		Paper:                     state.paper,
+		PaperPortrait:             state.paperPortrait,
 	}
 	state.appendOperation(tx, transactions.OpCreateProject, payload, "", "")
 }
@@ -955,27 +961,39 @@ type layoutTextPlacement struct {
 	value     *transactions.Point
 }
 
-func layoutTextPlacements(result schematiclayout.Result) map[string]layoutTextPlacement {
+func layoutTextPlacements(result schematiclayout.Result, nativeCentered bool) map[string]layoutTextPlacement {
 	placements := make(map[string]layoutTextPlacement, len(result.Components))
 	for _, component := range result.Components {
 		placement := layoutTextPlacement{}
 		if !component.ReferenceText.Box.Empty() {
+			at := component.ReferenceText.At
+			if nativeCentered {
+				at = textBoxCenter(component.ReferenceText.Box)
+			}
 			point := transactions.Point{
-				XMM: float64(component.PlacedAt.X+component.ReferenceText.At.X) / 1_000_000,
-				YMM: float64(component.PlacedAt.Y+component.ReferenceText.At.Y) / 1_000_000,
+				XMM: float64(component.PlacedAt.X+at.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+at.Y) / 1_000_000,
 			}
 			placement.reference = &point
 		}
 		if !component.ValueText.Box.Empty() {
+			at := component.ValueText.At
+			if nativeCentered {
+				at = textBoxCenter(component.ValueText.Box)
+			}
 			point := transactions.Point{
-				XMM: float64(component.PlacedAt.X+component.ValueText.At.X) / 1_000_000,
-				YMM: float64(component.PlacedAt.Y+component.ValueText.At.Y) / 1_000_000,
+				XMM: float64(component.PlacedAt.X+at.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+at.Y) / 1_000_000,
 			}
 			placement.value = &point
 		}
 		placements[component.Ref] = placement
 	}
 	return placements
+}
+
+func textBoxCenter(box schematiclayout.Rect) kicadfiles.Point {
+	return kicadfiles.Point{X: (box.MinX + box.MaxX) / 2, Y: (box.MinY + box.MaxY) / 2}
 }
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
@@ -1152,7 +1170,7 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				Waypoints:           waypoints,
 				FromLabelAt:         fromLabelAt,
 				ToLabelAt:           toLabelAt,
-				OrientLabelsOutward: state.document.Layout.Rules.OrientEndpointLabels,
+				OrientLabelsOutward: nativeAnnotationGeometry(state.document),
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
@@ -2263,20 +2281,30 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	}
 	rules.MaxAuxiliaryPerRank = document.Layout.Rules.MaxAuxiliaryPerRank
 	rules.ReserveTitleBlock = document.Layout.Rules.ReserveTitleBlock
-	rules.OrientEndpointLabels = document.Layout.Rules.OrientEndpointLabels
+	rules.OrientEndpointLabels = nativeAnnotationGeometry(document)
 	if document.Layout.Rules.PreferLabelsForLongNets != nil {
 		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
-		Rules:                 rules,
-		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
+		FunctionalPowerLocality: document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalLocalWiring:   document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalGroups:        document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6),
+		FunctionalLocality:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
+		FunctionalJoint:         document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalPinAware:      (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6),
+		Sheet:                   schematiclayout.SheetForPaper(document.Metadata.Paper),
+		Rules:                   rules,
+		MaxComponentsPerSheet:   document.Layout.MaxComponentsPerSheet,
 	}
 	if rules.ReserveTitleBlock {
 		request.Sheet = schematiclayout.SheetWithStandardTitleBlock(request.Sheet)
 	}
 	var invalidPlacementEndpointDiagnostics []schematiclayout.Diagnostic
+	functionalParents := map[string]string{}
+	for _, owner := range document.Layout.FunctionalOwners {
+		functionalParents[owner.Component] = owner.Parent
+	}
 	for _, component := range document.Circuit.Components {
 		placement := placementsByID[component.ID]
 		group := groupsByID[placement.Group]
@@ -2289,6 +2317,13 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			}
 		}
 		geometry := schematicLayoutGeometry(component, index)
+		pins := schematicLayoutPins(component, index)
+		if rules.OrientEndpointLabels {
+			// Reserve the external pin-number/name area as well as the drawn
+			// body. Body-only placement can put a neighboring amplifier across
+			// a controller's connection anchors even when bodies do not overlap.
+			geometry.Body = schematicAnnotationEnvelope(geometry.Body, pins)
+		}
 		flowRank := group.Rank
 		rankFixed := group.ID != "" && !group.Inferred
 		if schematicComponentIsPowerFlag(component) {
@@ -2309,6 +2344,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			invalidPlacementEndpointDiagnostics = append(invalidPlacementEndpointDiagnostics, schematiclayout.Diagnostic{Severity: schematiclayout.SeverityError, Code: "invalid_relative_endpoint", Ref: component.ID, Message: fmt.Sprintf("same_column_as_pin contains malformed endpoint %q", invalid), Repair: "use component.pin endpoint syntax"})
 		}
 		request.Components = append(request.Components, schematiclayout.Component{
+			SupportParent:   functionalParents[component.ID],
 			Ref:             component.ID,
 			DisplayRef:      component.Ref,
 			Value:           component.Value,
@@ -2331,7 +2367,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			Body:            geometry.Body,
 			BodyKnown:       geometry.known(),
 			GeometrySource:  geometry.Source,
-			Pins:            schematicLayoutPins(component, index),
+			Pins:            pins,
 			OriginalOrdinal: ordinalByID[component.ID],
 		})
 	}
@@ -2340,6 +2376,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			continue
 		}
 		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: netOrdinalByName[net.Name], PreferDirect: stateDocumentHasPortNet(document, net.Name)}
+		layoutNet.LocalWiring = request.FunctionalLocalWiring && functionalLocalWiringEligible(document, net, index, componentsByID)
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
 			layoutNet.EndpointLabels = *net.UseLabel
@@ -3068,6 +3105,16 @@ func stringSliceContains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func schematicAnnotationEnvelope(body schematiclayout.Rect, pins []schematiclayout.Pin) schematiclayout.Rect {
+	for _, pin := range pins {
+		body.MinX = min(body.MinX, pin.At.X)
+		body.MinY = min(body.MinY, pin.At.Y)
+		body.MaxX = max(body.MaxX, pin.At.X)
+		body.MaxY = max(body.MaxY, pin.At.Y)
+	}
+	return body.Inflate(kicadfiles.MM(2.54))
 }
 
 func layoutRotations(document Document) map[string]float64 {

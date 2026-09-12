@@ -134,6 +134,9 @@ func railOrderAnchor(requirement Requirement, token string) (string, bool) {
 		if canonicalIdentifier(domain.ID) != token {
 			continue
 		}
+		if source, valid := generatedSupplySource(requirement, domain); valid && source.Kind == "port" {
+			return externalAnchor(source.ID), true
+		}
 		for _, signal := range requirement.Requirements.Signals {
 			if canonicalIdentifier(signal.ID) == canonicalIdentifier(domain.Source) {
 				return signalAnchor(signal.ID), true

@@ -1,0 +1,607 @@
+{
+  "schema": "kicadai.emitted-pin-side-and-panel-audit.v1",
+  "root": "/tmp/kicadai-power-locality-offline-v1-dev2",
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "attachments": [
+        {
+          "reference": "C1",
+          "parent": "U1",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -33.02000000000001,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C2",
+          "parent": "U1",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            33.01999999999998,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C3",
+          "parent": "U1",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -58.420000000000016,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C4",
+          "parent": "U1",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            58.41999999999999,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        }
+      ],
+      "eligible_attachments": 4,
+      "side_passes": 4,
+      "ambiguous_attachments": [],
+      "blocks": [
+        {
+          "id": "functional_boundaries",
+          "references": [
+            "J1",
+            "J2",
+            "J3"
+          ],
+          "lines": 7,
+          "positions_mm": [
+            [
+              52.07,
+              36.83
+            ],
+            [
+              41.275,
+              39.37
+            ],
+            [
+              45.085,
+              41.91
+            ],
+            [
+              47.625,
+              44.45
+            ],
+            [
+              45.085,
+              46.99
+            ],
+            [
+              48.26,
+              49.53
+            ],
+            [
+              45.085,
+              52.07
+            ]
+          ],
+          "intact": true
+        },
+        {
+          "id": "functional_objective_regulate",
+          "references": [
+            "C1",
+            "C2",
+            "U1",
+            "C3",
+            "C4"
+          ],
+          "lines": 5,
+          "positions_mm": [
+            [
+              159.258,
+              48.895
+            ],
+            [
+              170.053,
+              51.435
+            ],
+            [
+              171.958,
+              53.975
+            ],
+            [
+              175.133,
+              56.515
+            ],
+            [
+              175.768,
+              59.055
+            ]
+          ],
+          "intact": true
+        }
+      ],
+      "notes_intact": true
+    },
+    {
+      "name": "controller_adc_100ma",
+      "attachments": [
+        {
+          "reference": "C3",
+          "parent": "U1",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "5",
+              "side": "top",
+              "priority": 0
+            }
+          ],
+          "attachment": "top",
+          "delta_mm": [
+            -17.78,
+            -71.12
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C4",
+          "parent": "U2",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -33.01999999999998,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C5",
+          "parent": "U2",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            33.01999999999998,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C6",
+          "parent": "U3",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "4",
+              "side": "top",
+              "priority": 0
+            }
+          ],
+          "attachment": "top",
+          "delta_mm": [
+            -33.02000000000004,
+            -63.5
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C7",
+          "parent": "U3",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "4",
+              "side": "top",
+              "priority": 0
+            }
+          ],
+          "attachment": "top",
+          "delta_mm": [
+            33.01999999999998,
+            -63.5
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C8",
+          "parent": "U2",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -58.420000000000016,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C9",
+          "parent": "U2",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            58.420000000000016,
+            2.5400000000000063
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C10",
+          "parent": "U3",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2",
+              "role": "bias",
+              "pin": "6",
+              "side": "left",
+              "priority": 1
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -45.72000000000003,
+            40.639999999999986
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "R3",
+          "parent": "U3",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2",
+              "role": "bias",
+              "pin": "6",
+              "side": "left",
+              "priority": 1
+            },
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "4",
+              "side": "top",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -38.10000000000002,
+            68.57999999999998
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "J5",
+          "parent": "U3",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13",
+              "role": "bias",
+              "pin": "24",
+              "side": "right",
+              "priority": 1
+            },
+            {
+              "net": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14",
+              "role": "bias",
+              "pin": "25",
+              "side": "right",
+              "priority": 1
+            },
+            {
+              "net": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2",
+              "role": "bias",
+              "pin": "6",
+              "side": "left",
+              "priority": 1
+            },
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "4",
+              "side": "top",
+              "priority": 0
+            }
+          ],
+          "attachment": "ambiguous",
+          "delta_mm": [
+            -43.18000000000001,
+            0
+          ],
+          "symbol_origin_on_pin_side": null
+        }
+      ],
+      "eligible_attachments": 9,
+      "side_passes": 9,
+      "ambiguous_attachments": [
+        "J5"
+      ],
+      "blocks": [
+        {
+          "id": "functional_boundaries",
+          "references": [
+            "J1",
+            "J2",
+            "J3",
+            "J4"
+          ],
+          "lines": 9,
+          "positions_mm": [
+            [
+              153.67,
+              8.89
+            ],
+            [
+              145.415,
+              11.43
+            ],
+            [
+              146.685,
+              13.97
+            ],
+            [
+              140.335,
+              16.51
+            ],
+            [
+              146.685,
+              19.05
+            ],
+            [
+              149.225,
+              21.59
+            ],
+            [
+              146.685,
+              24.13
+            ],
+            [
+              165.735,
+              26.67
+            ],
+            [
+              146.685,
+              29.21
+            ]
+          ],
+          "intact": true
+        },
+        {
+          "id": "functional_objective_condition_adc",
+          "references": [
+            "C1",
+            "C2",
+            "R1",
+            "R2",
+            "U1",
+            "C3"
+          ],
+          "lines": 7,
+          "positions_mm": [
+            [
+              115.443,
+              149.098
+            ],
+            [
+              125.603,
+              151.638
+            ],
+            [
+              126.873,
+              154.178
+            ],
+            [
+              127.508,
+              156.718
+            ],
+            [
+              137.668,
+              159.258
+            ],
+            [
+              137.668,
+              161.798
+            ],
+            [
+              137.033,
+              164.338
+            ]
+          ],
+          "intact": true
+        },
+        {
+          "id": "functional_objective_regulate",
+          "references": [
+            "C4",
+            "C5",
+            "U2",
+            "C8",
+            "C9"
+          ],
+          "lines": 5,
+          "positions_mm": [
+            [
+              250.698,
+              15.875
+            ],
+            [
+              261.493,
+              18.415
+            ],
+            [
+              263.398,
+              20.955
+            ],
+            [
+              266.573,
+              23.495
+            ],
+            [
+              275.463,
+              26.035
+            ]
+          ],
+          "intact": true
+        },
+        {
+          "id": "functional_participant_controller",
+          "references": [
+            "U3",
+            "C6",
+            "C7",
+            "C10",
+            "R3",
+            "J5"
+          ],
+          "lines": 13,
+          "positions_mm": [
+            [
+              398.018,
+              157.226
+            ],
+            [
+              410.718,
+              159.766
+            ],
+            [
+              421.513,
+              162.306
+            ],
+            [
+              409.448,
+              164.846
+            ],
+            [
+              413.258,
+              167.386
+            ],
+            [
+              422.148,
+              169.926
+            ],
+            [
+              402.463,
+              172.466
+            ],
+            [
+              402.463,
+              175.006
+            ],
+            [
+              425.323,
+              177.546
+            ],
+            [
+              410.083,
+              180.086
+            ],
+            [
+              406.273,
+              182.626
+            ],
+            [
+              410.083,
+              185.166
+            ],
+            [
+              408.813,
+              187.706
+            ]
+          ],
+          "intact": true
+        }
+      ],
+      "notes_intact": true
+    }
+  ],
+  "method": "Exact emitted library pin angle, mirror-then-rotation and native symbol origins; signal/bias outranks supply, ground excluded. Origin-side checks supplement whole-body clearance unit tests and visual inspection, not a complete-readability score. Native text paragraphs independently wrapped and matched in intact contiguous panels.",
+  "provider_calls": 0
+}

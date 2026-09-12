@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {join} from 'node:path';
+import {inventory,verifyInventory,sha,summarizeReadiness} from '../specs/practical-board-completion-v1/evidence.mjs';
+const repo=process.cwd(),phase=join(repo,'specs/practical-board-completion-v1'),raw=join(repo,'.cache/practical-board-completion-v1');
+const draft=join(raw,'publication-draft');fs.mkdirSync(draft,{recursive:true});
+const json=p=>JSON.parse(fs.readFileSync(p));
+const put=(name,value)=>fs.writeFileSync(join(draft,name),JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
+const secret=process.env.OPENAI_API_KEY;assert(secret,'approved existing key needed only for local exact scan');
+const env={...process.env};for(const key of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY'])delete env[key];
+const git=(...a)=>execFileSync('git',a,{cwd:repo,env,encoding:'utf8',maxBuffer:8*1024*1024}).trim();
+const frozen=json(join(repo,'specs/practical-sensor-controller-boards/freeze-v2.json'));
+for(const f of frozen.files){const b=fs.readFileSync(join(repo,f.path));assert.equal(b.length,f.bytes);assert.equal(sha(b),f.sha256);}
+const original=json(join(repo,'specs/practical-sensor-controller-boards/protocol-v2-evidence-inventory.json'));
+verifyInventory(original.evidence_root,original.files,{secret});
+const history={verified_utc:new Date().toISOString(),original_freeze_files:frozen.files.length,original_inventory_sha256:sha(fs.readFileSync(join(repo,'specs/practical-sensor-controller-boards/protocol-v2-evidence-inventory.json'))),original_raw_files:original.files.length,original_raw_bytes:original.files.reduce((n,f)=>n+f.bytes,0),original_raw_exact_match:true,exact_secret_scan:'absent',provider_calls:0};
+const latestDir=join(repo,'specs/ai-requirement-contract-integration/power-locality-offline-v1'),latest=json(join(latestDir,'verification.json'));
+const latestMap=new Map(inventory(latest.root,secret).map(f=>[f.path,f]));
+// The historical seal orders entries by locale-sorted depth-first traversal,
+// not a flat sort of full paths. Match the declared serialization exactly.
+const oldWalk=(dir,prefix='')=>fs.readdirSync(join(dir,prefix),{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name,'en')).flatMap(e=>{const p=join(prefix,e.name);return e.isDirectory()?oldWalk(dir,p):[p];});
+const latestFiles=oldWalk(latest.root).map(p=>latestMap.get(p));
+const latestIdentity={file_count:latestFiles.length,total_bytes:latestFiles.reduce((n,f)=>n+f.bytes,0),sha256:sha(JSON.stringify(latestFiles))};assert.deepEqual(latestIdentity,latest.inventory);
+assert.equal(git('diff','4d7e8c87a6bbd80de8e78b3271b1202ee13ee701','--name-only','--','specs/ai-requirement-contract-integration'),'');
+history.latest_closed_offline={root:latest.root,inventory:latestIdentity,prior_documents_unchanged:true,complete_practical_cases:0};put('history.json',history);
+const batch=join(raw,'development/batch-1'),batchInventory=json(join(batch,'inventory.json'));
+verifyInventory(batch,batchInventory,{exclude:['inventory.json'],secret});
+const end=json(join(batch,'end.json')),summary=summarizeReadiness(end.outcomes);
+const manifest=json(join(phase,'development-batch-1.json'));
+assert.equal(sha(fs.readFileSync(join(batch,'manifest.json'))),sha(fs.readFileSync(join(phase,'development-batch-1.json'))));
+for(const c of manifest.cases){
+ const input=fs.readFileSync(join(repo,c.input));
+ for(const run of ['baseline-1','candidate-1']){
+  const dir=join(batch,c.id,run);assert.equal(sha(fs.readFileSync(join(dir,'input.json'))),sha(input));
+  verifyInventory(dir,json(join(batch,c.id,run+'.inventory.json')),{secret});
+ }
+}
+put('development-summary.json',{...summary,batch_wall_seconds:end.wall_seconds,search_executions:end.outcomes.filter(r=>r.result?.first_failed_gate==='architecture_search').length,native_executions:end.outcomes.filter(r=>r.result?.native_executed).length,first_search_rejections:end.outcomes.filter(r=>r.run==='candidate-1').map(r=>{const s=json(join(batch,r.id,r.run,'search.json'));return{id:r.id,status:s.status,consumption:s.consumption,rejections:s.rejections};}),peak_sampled_process_tree_rss_bytes:Math.max(...end.outcomes.map(r=>r.peak_sampled_process_tree_rss_bytes)),samples_per_invocation:end.outcomes.map(r=>r.samples),batch_files:batchInventory.length,batch_bytes:batchInventory.reduce((n,f)=>n+f.bytes,0),batch_inventory_sha256:sha(fs.readFileSync(join(batch,'inventory.json'))),source:manifest.engines,manual_implementation_repairs:0,human_authored_probes:6,human_active_minutes:null});
+const preparations=[];
+for(const name of fs.readdirSync(join(raw,'preparation')).sort()){
+ const dir=join(raw,'preparation',name),source=json(join(dir,'source.json'));
+ for(const f of source.files){assert.equal(Buffer.byteLength(f.source),f.bytes);assert.equal(sha(Buffer.from(f.source)),f.sha256);}
+ assert.equal(sha(Buffer.from(source.runner_source)),source.runner_sha256);
+ if(!fs.existsSync(join(dir,'execution.json'))){assert.equal(name,'baseline-v2a-validate-p04');assert.deepEqual(fs.readdirSync(dir),['source.json']);preparations.push({name,status:'aborted_before_child_spawn',reason:'Preparation command referenced nonexistent baseline-v2a-build receipt; retained source snapshot only. Tool output reported ENOENT. No input validation, search or provider request ran.',source_sha256:sha(fs.readFileSync(join(dir,'source.json')))});continue;}
+ const r=json(join(dir,'execution.json'));assert.equal(r.source_unchanged,true);assert.equal(r.exit_code,0);assert.equal(r.signal,null);assert.equal(r.source_snapshot_sha256,sha(fs.readFileSync(join(dir,'source.json'))));
+ for(const stream of ['stdout','stderr'])assert.equal(r[stream+'_sha256'],sha(fs.readFileSync(join(dir,stream+'.log'))));
+ if(r.mode==='build')assert.equal(r.binary_sha256,sha(fs.readFileSync(join(dir,'engine'))));
+ const dataPath=join(dir,r.mode==='validate'?'validation':'snapshot','result.json');
+ preparations.push({name,mode:r.mode,source:r.source_revision,exit_code:r.exit_code,engine_result:fs.existsSync(dataPath)?json(dataPath):null});
+}
+put('preparation-summary.json',{completed_commands:preparations.filter(x=>x.exit_code===0).length,aborted_before_spawn:preparations.filter(x=>x.status==='aborted_before_child_spawn').length,commands:preparations,provider_calls:0,board_attempts:0});
+const files=git('diff','--name-only','origin/main...HEAD').split('\n').filter(Boolean),records=[];
+for(const path of files){const b=fs.readFileSync(join(repo,path));assert(!b.includes(Buffer.from(secret)),'secret in proposed PR');records.push({path,bytes:b.length,sha256:sha(b)});}
+put('branch-review-scope.json',{source:git('rev-parse','HEAD'),base:git('rev-parse','origin/main'),files:records,files_count:records.length,command_internal_files:records.filter(x=>/^(cmd|internal)\//.test(x.path)).length,production_changes_this_attempt:git('diff','--name-only','4d7e8c87a6bbd80de8e78b3271b1202ee13ee701','--','cmd','internal').split('\n'),provider_calls:0,exact_secret_scan:'absent'});
+console.log(JSON.stringify({history,development:summary,preparations:preparations.length,branch_files:records.length}));

@@ -1,0 +1,12 @@
+[
+  "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+  "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+  "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+  "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+  "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+  "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+  "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+  "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+  "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+  "No unrequested powered-off input operation or firmware/calibration claim."
+]

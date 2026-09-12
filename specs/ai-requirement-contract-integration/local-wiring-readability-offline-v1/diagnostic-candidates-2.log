@@ -1,0 +1,58 @@
+=== RUN   TestNativeLocalWiringFrozenCandidateDiagnostic
+    native_local_wiring_diagnostic_test.go:52: derived drawing-only diagnostic /Users/dshills/Development/projects/KiCadAI/specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-transaction-2.json sha256=09f16ec8ab983e798b4816123f7110e02f4432984260e5cca0f17d76e98f2634
+    native_local_wiring_diagnostic_test.go:54: immutable input library_index.json sha256=ede67fa472362962bf46a600cb2210a7a202acd313feee93a425bc89d3cc1257
+    native_local_wiring_diagnostic_test.go:90: labels=41 placement_error=native annotation placement exhausted for label composition_net_001 at 125730000,429260000: no wire/body-clear candidate
+    native_local_wiring_diagnostic_test.go:92: candidate_order=0 uuid=7eec17d7-0612-5526-a3db-7d2e3b595bda text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14" count=0 origin={125730000 431800000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"7eec17d7-0612-5526-a3db-7d2e3b595bda","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14","origin":{"X":125730000,"Y":431800000},"candidates":null}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=1 uuid=823d01fe-7ea1-5610-a344-1d467f6cee38 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13" count=0 origin={125730000 426720000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"823d01fe-7ea1-5610-a344-1d467f6cee38","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13","origin":{"X":125730000,"Y":426720000},"candidates":null}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=2 uuid=f53489f7-d286-5189-bf82-f0c89c99f0cf text="composition_net_001" count=0 origin={125730000 429260000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"f53489f7-d286-5189-bf82-f0c89c99f0cf","text":"composition_net_001","origin":{"X":125730000,"Y":429260000},"candidates":null}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=3 uuid=feff721d-e2db-523b-9115-4a8d1b1cf1f2 text="composition_net_003" count=2 origin={190500000 41910000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"feff721d-e2db-523b-9115-4a8d1b1cf1f2","text":"composition_net_003","origin":{"X":190500000,"Y":41910000},"candidates":[{"at":{"X":190500000,"Y":41910000},"box":{"MinX":189230000,"MinY":17780000,"MaxX":190500000,"MaxY":41910000},"rotation":90},{"at":{"X":190500000,"Y":41910000},"box":{"MinX":166370000,"MinY":40640000,"MaxX":190500000,"MaxY":41910000},"rotation":180}]}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=4 uuid=9c97854f-e761-54df-84b3-0d989d25166d text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13" count=3 origin={199390000 477520000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"9c97854f-e761-54df-84b3-0d989d25166d","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13","origin":{"X":199390000,"Y":477520000},"candidates":[{"at":{"X":199390000,"Y":477520000},"box":{"MinX":199390000,"MinY":476250000,"MaxX":250190000,"MaxY":477520000},"rotation":0},{"at":{"X":198120000,"Y":477520000},"box":{"MinX":198120000,"MinY":476250000,"MaxX":248920000,"MaxY":477520000},"rotation":0},{"at":{"X":196850000,"Y":477520000},"box":{"MinX":196850000,"MinY":476250000,"MaxX":247650000,"MaxY":477520000},"rotation":0}]}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=5 uuid=9d1e6d7f-b931-5bd9-a4ef-f3a9c0aac37b text="composition_net_004" count=3 origin={97790000 45720000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"9d1e6d7f-b931-5bd9-a4ef-f3a9c0aac37b","text":"composition_net_004","origin":{"X":97790000,"Y":45720000},"candidates":[{"at":{"X":97790000,"Y":45720000},"box":{"MinX":96520000,"MinY":45720000,"MaxX":97790000,"MaxY":69850000},"rotation":270},{"at":{"X":99060000,"Y":45720000},"box":{"MinX":97790000,"MinY":45720000,"MaxX":99060000,"MaxY":69850000},"rotation":270},{"at":{"X":100330000,"Y":45720000},"box":{"MinX":99060000,"MinY":45720000,"MaxX":100330000,"MaxY":69850000},"rotation":270}]}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=6 uuid=a6ce0137-dc7d-5c04-abd8-c09a329dc000 text="composition_net_002" count=3 origin={97790000 114300000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"a6ce0137-dc7d-5c04-abd8-c09a329dc000","text":"composition_net_002","origin":{"X":97790000,"Y":114300000},"candidates":[{"at":{"X":97790000,"Y":114300000},"box":{"MinX":96520000,"MinY":90170000,"MaxX":97790000,"MaxY":114300000},"rotation":90},{"at":{"X":99060000,"Y":114300000},"box":{"MinX":97790000,"MinY":90170000,"MaxX":99060000,"MaxY":114300000},"rotation":90},{"at":{"X":100330000,"Y":114300000},"box":{"MinX":99060000,"MinY":90170000,"MaxX":100330000,"MaxY":114300000},"rotation":90}]}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=7 uuid=168dc5c7-4632-570f-a4f9-bcefcf4c42bc text="composition_net_001" count=4 origin={135890000 474980000}
+    native_local_wiring_diagnostic_test.go:98: {"uuid":"168dc5c7-4632-570f-a4f9-bcefcf4c42bc","text":"composition_net_001","origin":{"X":135890000,"Y":474980000},"candidates":[{"at":{"X":135890000,"Y":474980000},"box":{"MinX":134620000,"MinY":474980000,"MaxX":135890000,"MaxY":499110000},"rotation":270},{"at":{"X":135890000,"Y":473710000},"box":{"MinX":134620000,"MinY":473710000,"MaxX":135890000,"MaxY":497840000},"rotation":270},{"at":{"X":135890000,"Y":472440000},"box":{"MinX":134620000,"MinY":472440000,"MaxX":135890000,"MaxY":496570000},"rotation":270},{"at":{"X":135890000,"Y":471170000},"box":{"MinX":134620000,"MinY":471170000,"MaxX":135890000,"MaxY":495300000},"rotation":270}]}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=8 uuid=060c4436-479d-5e23-ad01-b1c710075d52 text="composition_net_005" count=5 origin={199390000 449580000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=9 uuid=11feb024-593d-51c0-98e8-879da0805dda text="composition_net_002" count=5 origin={284480000 81280000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=10 uuid=488c9b10-a2c3-50ac-b149-583743d68e0b text="composition_net_005" count=5 origin={161290000 287020000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=11 uuid=567fbfeb-b7ed-5e3f-b156-3bdba6de3a41 text="composition_net_003" count=5 origin={299720000 81280000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=12 uuid=973b28d5-4227-5cc6-b7e3-dc9a526bbba1 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14" count=5 origin={199390000 480060000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=13 uuid=78084cec-b0e7-5552-b348-154394279a1f text="composition_net_007" count=6 origin={138430000 284480000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=14 uuid=783338c1-4e00-58c2-aeb7-4f682cf7d2b5 text="composition_net_001" count=7 origin={156210000 43180000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=15 uuid=8d32702c-1aeb-5f74-b83e-7ba0e4731b79 text="composition_net_001" count=7 origin={241300000 259080000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=16 uuid=c566685b-e792-554e-ba54-45673cd49e07 text="composition_net_004" count=8 origin={142240000 259080000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=17 uuid=08359d6a-b9f9-5ef5-bfee-24a6cc9d33d5 text="composition_net_001" count=9 origin={186690000 45720000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=18 uuid=1bbd92ff-178c-58f4-a0b6-493df62b9a6a text="composition_net_006" count=9 origin={99060000 259080000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=19 uuid=42d7136e-4e59-5d2d-80ed-19df2921fd79 text="composition_net_001" count=9 origin={154940000 232410000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=20 uuid=f278f624-32ab-522c-ad21-9537608fdb32 text="composition_net_003" count=13 origin={162560000 279400000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=21 uuid=627a2eb7-7061-5aa1-9d6f-41bca02c945d text="composition_net_001" count=16 origin={147320000 302260000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=22 uuid=71c58c73-8939-5643-a3e0-f38997ef355f text="composition_net_002" count=16 origin={152400000 86360000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=23 uuid=f52e9928-df34-5d2d-9153-42d01898adb7 text="composition_net_003" count=18 origin={149860000 217170000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=24 uuid=d8bbe983-7ec9-5bfc-93a3-2f9f893624d0 text="composition_net_001" count=22 origin={177800000 505460000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=25 uuid=1721a403-8f76-5e3a-af84-1f0348271338 text="composition_net_001" count=26 origin={167640000 417830000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=26 uuid=0993670c-b50d-5c0d-a85b-a3bac717085f text="composition_net_003" count=41 origin={208280000 441960000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=27 uuid=3347226b-d76c-57a0-a0ce-64f4d0992a82 text="composition_net_007" count=65 origin={229870000 256540000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=28 uuid=df7558fe-c7f5-568f-8325-bfb4d2b45212 text="composition_net_006" count=68 origin={153670000 256540000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=29 uuid=f2acadaa-9cb8-570d-b3f7-887e12addd07 text="composition_net_003" count=79 origin={172720000 410210000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=30 uuid=c08d06b9-2c7a-58a6-b581-9e6b4104abc4 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2" count=87 origin={139700000 505460000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=31 uuid=45890444-0cd4-51b0-9291-0a83132df758 text="composition_net_003" count=97 origin={330200000 82550000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=32 uuid=624cf281-f24a-5a4f-9826-fa7b0d870119 text="composition_net_003" count=98 origin={327660000 62865000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=33 uuid=b71d59a8-de30-5f71-ad93-8490cacd8e06 text="composition_net_002" count=110 origin={259080000 82550000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=34 uuid=fe5a8b34-0304-5f52-a033-252027a960f6 text="composition_net_002" count=110 origin={261620000 43180000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=35 uuid=00b77345-eebe-5ec8-bf62-59ccf8138c08 text="composition_net_005" count=139 origin={114300000 274320000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=36 uuid=efe01015-19b8-5cf3-8244-7fec522bb77b text="composition_net_005" count=139 origin={110490000 254000000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=37 uuid=8f6ebf3f-0317-552c-b400-bab52ea82ca9 text="composition_net_003" count=229 origin={128270000 508000000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=38 uuid=a31df299-bfee-580d-ba2f-41179251956b text="composition_net_001" count=244 origin={259080000 90170000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=39 uuid=9e480232-66d0-5732-996c-90991f0e0c8e text="composition_net_001" count=245 origin={96520000 60960000}
+    native_local_wiring_diagnostic_test.go:92: candidate_order=40 uuid=fbbbbcb1-ad57-5b52-8a66-b9ea2a7b4d30 text="composition_net_001" count=245 origin={101600000 40640000}
+    native_local_wiring_diagnostic_test.go:102: native annotation placement exhausted for label composition_net_001 at 125730000,429260000: no wire/body-clear candidate
+--- FAIL: TestNativeLocalWiringFrozenCandidateDiagnostic (7.94s)
+FAIL
+FAIL	kicadai/internal/transactions	8.212s
+FAIL

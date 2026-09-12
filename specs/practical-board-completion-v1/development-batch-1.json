@@ -1,0 +1,167 @@
+{
+  "schema": "kicadai.completion-development.v1",
+  "batch": 1,
+  "created_utc": "2026-09-12T18:13:49.153Z",
+  "status": "frozen_before_search",
+  "input_authorship": "human_requirement_probes_not_provider_outputs",
+  "provider_calls": 0,
+  "case_wall_ms": 1200000,
+  "batch_wall_ms": 7200000,
+  "rss_bytes": 17179869184,
+  "evidence_bytes": 10737418240,
+  "adapter_sha256": "a57a4677e751ff8a0ab6db24ebce6ae09f051be1d4872f7ed2d2f81d3ff044cc",
+  "runner_sha256": "d0c2ef52830e649b3e1dda58b6979229d620b15dbebfcacc7af1100944b44ac5",
+  "engines": {
+    "baseline": {
+      "cwd": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-completion-v1-baseline",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "build_receipt": ".cache/practical-board-completion-v1/preparation/baseline-v3-build/execution.json",
+      "binary": ".cache/practical-board-completion-v1/preparation/baseline-v3-build/engine"
+    },
+    "candidate": {
+      "cwd": "/Users/dshills/Development/projects/KiCadAI",
+      "source": "525896b2dcd2a0f4957c4868a77efae73414f0b8",
+      "build_receipt": ".cache/practical-board-completion-v1/preparation/candidate-v4-build/execution.json",
+      "binary": ".cache/practical-board-completion-v1/preparation/candidate-v4-build/engine"
+    }
+  },
+  "runs_per_case": [
+    {
+      "variant": "baseline",
+      "replay": 1
+    },
+    {
+      "variant": "candidate",
+      "replay": 1
+    }
+  ],
+  "replay_interpretation": "one attempt per engine, not a two-run determinism certificate",
+  "cases": [
+    {
+      "id": "P01",
+      "input": "specs/practical-board-completion-v1/probes/P01.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P01.json",
+          "bytes": 10032,
+          "sha256": "99723084089c1ea00ef488209b7d0db9d46c982c5a9afb6af01e15a41b325ac5"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P01.txt",
+          "bytes": 1970,
+          "sha256": "52f90d024452a8658e4e1482ae9c68bdf8279a9846b174c457f99c4f6454d508"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P01.acceptance.json",
+          "bytes": 1139,
+          "sha256": "ba717699662099bafc3de9f6c1f3734b0601c2e47bb100d2a8261f328073c102"
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "input": "specs/practical-board-completion-v1/probes/P02.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P02.json",
+          "bytes": 9288,
+          "sha256": "c12daf286d2544ade0b4d27c9a4bd5f38dbbf22258b0348507295575cc378930"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P02.txt",
+          "bytes": 2064,
+          "sha256": "9ec834d859ebfa79b2c52621c1cb9020174387e75f08e754da41cabf33f2d293"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P02.acceptance.json",
+          "bytes": 1197,
+          "sha256": "0b8e382fe36515f19d2f67d3cbd9f5bf57d3ffec3b48c11c8f9f3ef4c8f01110"
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "input": "specs/practical-board-completion-v1/probes/P03.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P03.json",
+          "bytes": 10929,
+          "sha256": "a8d7ed0015144f8cb7e9f1341cdcf797f39a94d4b02943c246932c163e2c94f3"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P03.txt",
+          "bytes": 1967,
+          "sha256": "ca2ab45b8f8f57cb12dd08c00662c6a700d1df6a58576687c8aabc5928f9c3bb"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P03.acceptance.json",
+          "bytes": 1174,
+          "sha256": "7d4486ca8a7f0134d3579477a9dc2d3b8d581433e002c33be633823c48157bb8"
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "input": "specs/practical-board-completion-v1/probes/P04.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P04.json",
+          "bytes": 9347,
+          "sha256": "c9638851494514f1e6a582a9ab8ebb36dce35b61ea0352e568845cd9ed27e9b6"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P04.txt",
+          "bytes": 1994,
+          "sha256": "3b564e3ac92a3740153c3c12289446f51b9d6e4a306d1d60723f8dab45cf9cec"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P04.acceptance.json",
+          "bytes": 1140,
+          "sha256": "5897ca01079d1b0b2b0d1e527e0fde7941f541283b03e080ed1317cb6ffacb44"
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "input": "specs/practical-board-completion-v1/probes/P05.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P05.json",
+          "bytes": 10945,
+          "sha256": "417c42588e8244e2771e833cf71a6240f22944cb020b5ca686dc699127a0b30b"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P05.txt",
+          "bytes": 2003,
+          "sha256": "27ac68b76483c12475a91c0e611d93103b2a4b14b28f0729fe50e0ffee591c06"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P05.acceptance.json",
+          "bytes": 1162,
+          "sha256": "a8b7aa2051464ebed026390bb3a9925432a5cf57f4f278c5b83c31d3b74dca01"
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "input": "specs/practical-board-completion-v1/probes/P06.json",
+      "files": [
+        {
+          "path": "specs/practical-board-completion-v1/probes/P06.json",
+          "bytes": 8965,
+          "sha256": "e609baddd92ea9cbcb066d765ea9af108010b09e603c75369480152081395910"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P06.txt",
+          "bytes": 1975,
+          "sha256": "c53ee9e45f047d968a2e7e5085bd296f38bae01e6f528189e22f785aa9d3eb6d"
+        },
+        {
+          "path": "specs/practical-board-completion-v1/probes/P06.acceptance.json",
+          "bytes": 1177,
+          "sha256": "482e8a70d2f8e687cd6424a021914b8a7ab8d83aed38d8f3709003faea856cab"
+        }
+      ]
+    }
+  ]
+}

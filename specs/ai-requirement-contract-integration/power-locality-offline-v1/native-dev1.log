@@ -1,0 +1,10 @@
+=== RUN   TestFunctionalPowerLocalitySerializedReplay
+=== RUN   TestFunctionalPowerLocalitySerializedReplay/standalone_regulator
+=== RUN   TestFunctionalPowerLocalitySerializedReplay/controller_adc_100ma
+    power_locality_replay_test.go:136: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestFunctionalPowerLocalitySerializedReplay (25.50s)
+    --- PASS: TestFunctionalPowerLocalitySerializedReplay/standalone_regulator (8.52s)
+    --- FAIL: TestFunctionalPowerLocalitySerializedReplay/controller_adc_100ma (6.70s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	25.966s
+FAIL

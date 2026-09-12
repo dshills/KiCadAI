@@ -1,0 +1,12 @@
+[
+  "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+  "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+  "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+  "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+  "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+  "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+  "Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.",
+  "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.",
+  "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.",
+  "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved."
+]

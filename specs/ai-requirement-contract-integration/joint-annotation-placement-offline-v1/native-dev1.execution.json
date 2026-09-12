@@ -1,0 +1,31 @@
+{
+  "base": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+  "mode": "native-dev1",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestFunctionalJointSerializedReplay$",
+    "-v",
+    "-count=1",
+    "-timeout=45m"
+  ],
+  "root": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1",
+  "started_utc": "2026-09-12T11:52:28.340Z",
+  "finished_utc": "2026-09-12T11:52:54.696Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-v1-sources/native-dev1.json",
+  "source_snapshot_sha256": "474544fa765ec1ea45d2137b308c8981bba04a5a81807d4498ccb9635d551fc5",
+  "source_unchanged": true,
+  "log_sha256": "f7edddab2a95a974c4f34af2ab7318b5a5a8ca93f02264ad7b94c0205480619e"
+}

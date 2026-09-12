@@ -1,0 +1,349 @@
+{
+  "schema": "kicadai.explicit-reference-offline-verification.v1",
+  "root": "/tmp/kicadai-explicit-reference-promotion-offline-v1-final",
+  "base": "44223a065e645f7abccf67d66988edea925ec9a9",
+  "source": [
+    {
+      "path": "internal/architecturesearch/endpoint_contracts.go",
+      "sha256": "b2fa5cd1edabec6d9970d152be70b85e65643cb5d49f03f0475911a5e9146bc7"
+    },
+    {
+      "path": "internal/architecturesearch/model.go",
+      "sha256": "6c6c627624e54e6a249d498cee643b0ac8aa9fb8e61f07b2c1a4812f8e2a06c8"
+    },
+    {
+      "path": "internal/architecturesearch/normalize.go",
+      "sha256": "6382bebe2477c64720db46ddd9aa3d68e45b80a422e0999940b04b3e1033644b"
+    },
+    {
+      "path": "internal/architecturesearch/reference_domains.go",
+      "sha256": "a1756552a0e8dd0f683b0c57f51f33671acb6f6d976fcd94aa106ccbec9feaf5"
+    },
+    {
+      "path": "internal/architecturesearch/reference_domains_test.go",
+      "sha256": "6605ac3462e3881def80ac8a7012137e42409084bca424e3fe13ca309549f69b"
+    },
+    {
+      "path": "internal/architecturesearch/search.go",
+      "sha256": "4809e6d5994b7321891d0f48c909c3191abc300d1bd0d3bacfe9040a3dbcc86c"
+    },
+    {
+      "path": "internal/architecturesearch/validate.go",
+      "sha256": "3b187365971a84d4dee4a45cc046365f5490fd47ff56e1b3a0425852a4926281"
+    },
+    {
+      "path": "internal/behavioralintent/endpoint_contracts_test.go",
+      "sha256": "978536385155d91ae8cec7afad71cce9768c0be0e032df2b34cd21211fa8a51c"
+    },
+    {
+      "path": "internal/behavioralintent/provider_context.go",
+      "sha256": "dd94d376211a241f3fd0d5bec65f564f39b2f86abcab14b967e4ff247db290ff"
+    },
+    {
+      "path": "internal/behavioralintent/semantic_schema.go",
+      "sha256": "9b52f555af41d029146f753b6d662811798e40d6fc07459c5b0a25c6d24a69c7"
+    },
+    {
+      "path": "internal/closedloopsynthesis/participant_endpoint_test.go",
+      "sha256": "6848c6fd8a2d807c15e2a7d4c6e45424137e8a959b460ddac234446cabab5a1e"
+    },
+    {
+      "path": "internal/closedloopsynthesis/resolved_simulation_contracts.go",
+      "sha256": "65a19b1312fe043e67649ece5a776501e5cd47939615172cb32c07516b3b6015"
+    },
+    {
+      "path": "internal/compositionlowering/closed_loop_simulation.go",
+      "sha256": "1ce2f39890c849a3b8a13138f55615da8c49547deb4df7e9649b03a7d0c02ab9"
+    },
+    {
+      "path": "internal/compositionlowering/lower.go",
+      "sha256": "9f87898d393f2a6a986c31ddcee29d7707ae845b7d522d6c8e757373f210dd92"
+    },
+    {
+      "path": "internal/compositionlowering/reference_domains.go",
+      "sha256": "a639a00a32715c737a28872cc481c7d952594fe581de82b6a73e5af545216798"
+    },
+    {
+      "path": "internal/compositionlowering/reference_domains_test.go",
+      "sha256": "0cfb4f105f344d57b5f5698ff8dd157c6367d53112f65a62f4400fa27f416b5a"
+    },
+    {
+      "path": "internal/compositionlowering/reference_promotion_test.go",
+      "sha256": "7518d406f9a428c8518786637827dd9c351fddded344135c649c5bf9045c5519"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "components": 8,
+      "runs": [
+        {
+          "run": "first",
+          "stages": 9,
+          "routed_nets": 3,
+          "failed_nets": 0,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skipped": 0,
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "stages": 9,
+          "routed_nets": 3,
+          "failed_nets": 0,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skipped": 0,
+          "fabrication_ready": false
+        }
+      ],
+      "project_files": [
+        {
+          "path": "footprints/Capacitor_SMD.pretty/C_0603_1608Metric.kicad_mod",
+          "bytes": 2510,
+          "sha256": "83001a95d6f59d05a6393869d65d3d74077bf67168746927c1112643373a8a6a"
+        },
+        {
+          "path": "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod",
+          "bytes": 2612,
+          "sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d"
+        },
+        {
+          "path": "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x01_P2.54mm_Vertical.kicad_mod",
+          "bytes": 3382,
+          "sha256": "65b14425fc4e1fdf668c706047d6028e23324704514e2795b4c74a302d91dda4"
+        },
+        {
+          "path": "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod",
+          "bytes": 3537,
+          "sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b"
+        },
+        {
+          "path": "footprints/Package_TO_SOT_SMD.pretty/SOT-89-3.kicad_mod",
+          "bytes": 4002,
+          "sha256": "a09e1c9f12d1129f79b5c53054237a45f5218b0fd2554cb407168c64d3bc91ce"
+        },
+        {
+          "path": "fp-lib-table",
+          "bytes": 633,
+          "sha256": "a926fea5d06764d5ba43299f90c9fbe0b4b6269daa924c767ee6d0d7e63720ad"
+        },
+        {
+          "path": "lib/kicadai_resolved_Connector_Generic.kicad_sym",
+          "bytes": 5848,
+          "sha256": "49582ac27bf7b987da89eb9954be24469d9337f7ed0809d73648d72c8ed26013"
+        },
+        {
+          "path": "lib/kicadai_resolved_Device.kicad_sym",
+          "bytes": 3089,
+          "sha256": "79b407ac14460327991829aaf7d6699cfe1b120512d65e6d7e9413c43d9c76dd"
+        },
+        {
+          "path": "lib/kicadai_resolved_power.kicad_sym",
+          "bytes": 2397,
+          "sha256": "2efebaf4a409267b87830c413c884b642c1f662eb5e66202cdf26c09c7bf0beb"
+        },
+        {
+          "path": "lib/kicadai_resolved_Regulator_Linear.kicad_sym",
+          "bytes": 3383,
+          "sha256": "238e046cde840ce94a5611b4fc5c5eeb9687d245a2ac16d5257d326c3ad88190"
+        },
+        {
+          "path": "offline_regulated_output.kicad_pcb",
+          "bytes": 45840,
+          "sha256": "ccbb8eb9826317bd3ad0d0d7329e10883640e52e38f3f70cf155d6677bcc69f4"
+        },
+        {
+          "path": "offline_regulated_output.kicad_pro",
+          "bytes": 631,
+          "sha256": "add7df2750578e8e0a3ffa86f4df78716f5d6c9016bd0ee981953db3be9a0c89"
+        },
+        {
+          "path": "offline_regulated_output.kicad_sch",
+          "bytes": 54346,
+          "sha256": "9cb8bd3d94e5ba1db5e2ae754e2f55209798ed534420744793d55e3126b969a0"
+        },
+        {
+          "path": "sym-lib-table",
+          "bytes": 803,
+          "sha256": "1a5a770fdaca04e6860c35b420ded3999c6ac2acb88906b3b155849d23fa8540"
+        }
+      ],
+      "replay": {
+        "common_files_byte_exact": true,
+        "normalization": "none",
+        "only_first": [
+          "offline_regulated_output.kicad_prl"
+        ],
+        "only_second": [],
+        "full_tree_identical": false,
+        "note": "Native SVG export subsequently created first-run .kicad_prl local-state files. They are retained; no strict whole-tree replay pass is claimed."
+      },
+      "diagnostic_subtrees": ".kicadai retained and hashed separately, not compared as generated project content",
+      "readability": "failed; separately recorded visual review"
+    },
+    {
+      "name": "controller_adc_100ma",
+      "components": 21,
+      "runs": [
+        {
+          "run": "first",
+          "stages": 9,
+          "routed_nets": 10,
+          "failed_nets": 0,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skipped": 0,
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "stages": 9,
+          "routed_nets": 10,
+          "failed_nets": 0,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skipped": 0,
+          "fabrication_ready": false
+        }
+      ],
+      "project_files": [
+        {
+          "path": "footprints/Capacitor_SMD.pretty/C_0603_1608Metric.kicad_mod",
+          "bytes": 2510,
+          "sha256": "83001a95d6f59d05a6393869d65d3d74077bf67168746927c1112643373a8a6a"
+        },
+        {
+          "path": "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod",
+          "bytes": 2612,
+          "sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d"
+        },
+        {
+          "path": "footprints/Capacitor_SMD.pretty/C_1210_3225Metric.kicad_mod",
+          "bytes": 2512,
+          "sha256": "08d1782ecaaf5d4f135c3b8bed63a024e1220c61691362a0514a2019e3e39c29"
+        },
+        {
+          "path": "footprints/Capacitor_Tantalum_SMD.pretty/CP_EIA-3528-12_Kemet-T.kicad_mod",
+          "bytes": 3137,
+          "sha256": "aceabe425c1326d59d4a7341daaa973a611679721165908549d277d4da287e70"
+        },
+        {
+          "path": "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x01_P2.54mm_Vertical.kicad_mod",
+          "bytes": 3382,
+          "sha256": "65b14425fc4e1fdf668c706047d6028e23324704514e2795b4c74a302d91dda4"
+        },
+        {
+          "path": "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod",
+          "bytes": 3537,
+          "sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b"
+        },
+        {
+          "path": "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x05_P2.54mm_Vertical.kicad_mod",
+          "bytes": 4003,
+          "sha256": "2a47398db3eb9a8e5fce0e7442d889f025363df41db52249729cacd42c38b0de"
+        },
+        {
+          "path": "footprints/Package_QFP.pretty/LQFP-32_7x7mm_P0.8mm.kicad_mod",
+          "bytes": 10421,
+          "sha256": "7dfd287631a0e77ed5999ea87410885eccaf45e877d8cd905a1b2819d6493584"
+        },
+        {
+          "path": "footprints/Package_TO_SOT_SMD.pretty/SOT-23-5.kicad_mod",
+          "bytes": 5797,
+          "sha256": "49cb6faa2478b95657b2ae3567b8297a20478299be775579533a81d48ff86884"
+        },
+        {
+          "path": "footprints/Package_TO_SOT_SMD.pretty/SOT-89-3.kicad_mod",
+          "bytes": 4002,
+          "sha256": "a09e1c9f12d1129f79b5c53054237a45f5218b0fd2554cb407168c64d3bc91ce"
+        },
+        {
+          "path": "footprints/Resistor_SMD.pretty/R_0603_1608Metric.kicad_mod",
+          "bytes": 2525,
+          "sha256": "c6d2578591e6f4e07474a74af8fdefc64a3ae802d3efa8e98587bdff3e93c25b"
+        },
+        {
+          "path": "footprints/Resistor_SMD.pretty/R_1206_3216Metric.kicad_mod",
+          "bytes": 2517,
+          "sha256": "65a52fd143702e322e6f1076a73d7000b0604cbfb3154ef2cb590c90321158ce"
+        },
+        {
+          "path": "fp-lib-table",
+          "bytes": 1200,
+          "sha256": "becb216481a6166dfa2483109a24eda6154a5d5568a2a67255ca07964727e184"
+        },
+        {
+          "path": "lib/kicadai_resolved_Amplifier_Operational.kicad_sym",
+          "bytes": 4098,
+          "sha256": "1bbb2937657bab0998803405d2aaee201795d2acf7975a86f0272fabfeab7130"
+        },
+        {
+          "path": "lib/kicadai_resolved_Connector_Generic.kicad_sym",
+          "bytes": 10700,
+          "sha256": "96fab945edd54c1e9595bbfc98274abe977773ac5d9fc9d4090d4af95cf2e7c0"
+        },
+        {
+          "path": "lib/kicadai_resolved_Device.kicad_sym",
+          "bytes": 9183,
+          "sha256": "abfac6feeb3edcd315ba4a6aecbfc17ac45331f4e53028680e5fddaaa9fa6164"
+        },
+        {
+          "path": "lib/kicadai_resolved_MCU_ST_STM32G0.kicad_sym",
+          "bytes": 23981,
+          "sha256": "16f4d248c5fcd655a72b00100698d1ecdeea16bc3955c217f00287be3b594dcb"
+        },
+        {
+          "path": "lib/kicadai_resolved_power.kicad_sym",
+          "bytes": 2397,
+          "sha256": "2efebaf4a409267b87830c413c884b642c1f662eb5e66202cdf26c09c7bf0beb"
+        },
+        {
+          "path": "lib/kicadai_resolved_Regulator_Linear.kicad_sym",
+          "bytes": 3383,
+          "sha256": "238e046cde840ce94a5611b4fc5c5eeb9687d245a2ac16d5257d326c3ad88190"
+        },
+        {
+          "path": "offline_controller_adc.kicad_pcb",
+          "bytes": 147352,
+          "sha256": "bb90f5ed12d85faf541f878cac27775d2e9688219ce87e7a2a203f420b13e467"
+        },
+        {
+          "path": "offline_controller_adc.kicad_pro",
+          "bytes": 706,
+          "sha256": "70300f38e7d263b2df980ccd63a24cbb0172b56385b83543748eb6a57838e6ec"
+        },
+        {
+          "path": "offline_controller_adc.kicad_sch",
+          "bytes": 163876,
+          "sha256": "52f1b665291b87e4b8c08594bcdb16ade186a4624382e68b0b80f31b87693315"
+        },
+        {
+          "path": "sym-lib-table",
+          "bytes": 1228,
+          "sha256": "ea521ee52b178cc9a0ecdf6a1929a684903f92d4035a135637cc7bf3d8ad2dd6"
+        }
+      ],
+      "replay": {
+        "common_files_byte_exact": true,
+        "normalization": "none",
+        "only_first": [
+          "offline_controller_adc.kicad_prl"
+        ],
+        "only_second": [],
+        "full_tree_identical": false,
+        "note": "Native SVG export subsequently created first-run .kicad_prl local-state files. They are retained; no strict whole-tree replay pass is claimed."
+      },
+      "diagnostic_subtrees": ".kicadai retained and hashed separately, not compared as generated project content",
+      "readability": "failed; separately recorded visual review"
+    }
+  ],
+  "inventory": {
+    "file_count": 316,
+    "total_bytes": 1527502860,
+    "sha256": "012c5386774cd31a2fdd5769fe6c0523c6646eecec94ea1459817f4f5cfdef85"
+  },
+  "provider_calls": 0,
+  "frozen_evaluation_cases_added": 0
+}

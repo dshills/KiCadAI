@@ -1,0 +1,296 @@
+{
+  "schema": "kicadai.emitted-power-rail-path-audit.v1",
+  "root": "/tmp/kicadai-power-locality-offline-v1-dev1",
+  "prior": "/tmp/kicadai-local-wiring-readability-offline-v1-final",
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "previous": {
+        "schematic": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/first/offline_regulated_output.kicad_sch",
+        "sha256": "f392f3024e9360d05ed10977e3842e9a95d9fd3cafb2b49708f662df639ff2e0",
+        "rails": [
+          {
+            "net": "composition_net_002",
+            "owner": "U1",
+            "pin": "2",
+            "at": [
+              208280000,
+              114300000
+            ],
+            "capacitors": [
+              {
+                "reference": "C1",
+                "pin": "1",
+                "at": [
+                  180340000,
+                  110490000
+                ],
+                "visible_conductor_path": false
+              },
+              {
+                "reference": "C3",
+                "pin": "1",
+                "at": [
+                  190500000,
+                  54610000
+                ],
+                "visible_conductor_path": false
+              }
+            ],
+            "all_capacitors_visibly_connected": false
+          },
+          {
+            "net": "composition_net_003",
+            "owner": "U1",
+            "pin": "3",
+            "at": [
+              223520000,
+              114300000
+            ],
+            "capacitors": [
+              {
+                "reference": "C2",
+                "pin": "1",
+                "at": [
+                  251460000,
+                  110490000
+                ],
+                "visible_conductor_path": false
+              },
+              {
+                "reference": "C4",
+                "pin": "1",
+                "at": [
+                  241300000,
+                  54610000
+                ],
+                "visible_conductor_path": false
+              }
+            ],
+            "all_capacitors_visibly_connected": false
+          }
+        ],
+        "eligible_supply_pins": 2,
+        "visibly_connected_supply_pins": 0,
+        "eligible_capacitor_paths": 4,
+        "visible_capacitor_paths": 0
+      },
+      "current": {
+        "schematic": "/tmp/kicadai-power-locality-offline-v1-dev1/standalone_regulator/first/offline_regulated_output.kicad_sch",
+        "sha256": "cdf7f7617d2fa566e3cf39a29bade77488e22c1b52d92d7ee5b77589410e362a",
+        "rails": [
+          {
+            "net": "composition_net_002",
+            "owner": "U1",
+            "pin": "2",
+            "at": [
+              271780000,
+              116840000
+            ],
+            "capacitors": [
+              {
+                "reference": "C1",
+                "pin": "1",
+                "at": [
+                  243840000,
+                  115570000
+                ],
+                "visible_conductor_path": true
+              },
+              {
+                "reference": "C3",
+                "pin": "1",
+                "at": [
+                  215900000,
+                  115570000
+                ],
+                "visible_conductor_path": true
+              }
+            ],
+            "all_capacitors_visibly_connected": true
+          },
+          {
+            "net": "composition_net_003",
+            "owner": "U1",
+            "pin": "3",
+            "at": [
+              287020000,
+              116840000
+            ],
+            "capacitors": [
+              {
+                "reference": "C2",
+                "pin": "1",
+                "at": [
+                  314960000,
+                  115570000
+                ],
+                "visible_conductor_path": true
+              },
+              {
+                "reference": "C4",
+                "pin": "1",
+                "at": [
+                  342900000,
+                  115570000
+                ],
+                "visible_conductor_path": true
+              }
+            ],
+            "all_capacitors_visibly_connected": true
+          }
+        ],
+        "eligible_supply_pins": 2,
+        "visibly_connected_supply_pins": 2,
+        "eligible_capacitor_paths": 4,
+        "visible_capacitor_paths": 4
+      }
+    },
+    {
+      "name": "controller_adc_100ma",
+      "previous": {
+        "schematic": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+        "sha256": "5b82036bc21b542efcdedc54b0c593aaa5e4485ea8d7418d4a8ee5b34e975aac",
+        "rails": [
+          {
+            "net": "composition_net_002",
+            "owner": "U2",
+            "pin": "2",
+            "at": [
+              287020000,
+              93980000
+            ],
+            "capacitors": [
+              {
+                "reference": "C4",
+                "pin": "1",
+                "at": [
+                  259080000,
+                  90170000
+                ],
+                "visible_conductor_path": false
+              },
+              {
+                "reference": "C8",
+                "pin": "1",
+                "at": [
+                  269240000,
+                  34290000
+                ],
+                "visible_conductor_path": false
+              }
+            ],
+            "all_capacitors_visibly_connected": false
+          },
+          {
+            "net": "composition_net_003",
+            "owner": "U2",
+            "pin": "3",
+            "at": [
+              302260000,
+              93980000
+            ],
+            "capacitors": [
+              {
+                "reference": "C5",
+                "pin": "1",
+                "at": [
+                  330200000,
+                  90170000
+                ],
+                "visible_conductor_path": false
+              },
+              {
+                "reference": "C9",
+                "pin": "1",
+                "at": [
+                  320040000,
+                  34290000
+                ],
+                "visible_conductor_path": false
+              }
+            ],
+            "all_capacitors_visibly_connected": false
+          }
+        ],
+        "eligible_supply_pins": 2,
+        "visibly_connected_supply_pins": 0,
+        "eligible_capacitor_paths": 4,
+        "visible_capacitor_paths": 0
+      },
+      "current": {
+        "schematic": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+        "sha256": "19e22ad99e2af82176224bca7551b15540471b812c450bfd5e27643d02e194b3",
+        "rails": [
+          {
+            "net": "composition_net_002",
+            "owner": "U2",
+            "pin": "2",
+            "at": [
+              314960000,
+              50800000
+            ],
+            "capacitors": [
+              {
+                "reference": "C4",
+                "pin": "1",
+                "at": [
+                  287020000,
+                  49530000
+                ],
+                "visible_conductor_path": true
+              },
+              {
+                "reference": "C8",
+                "pin": "1",
+                "at": [
+                  259080000,
+                  49530000
+                ],
+                "visible_conductor_path": true
+              }
+            ],
+            "all_capacitors_visibly_connected": true
+          },
+          {
+            "net": "composition_net_003",
+            "owner": "U2",
+            "pin": "3",
+            "at": [
+              330200000,
+              50800000
+            ],
+            "capacitors": [
+              {
+                "reference": "C5",
+                "pin": "1",
+                "at": [
+                  358140000,
+                  49530000
+                ],
+                "visible_conductor_path": true
+              },
+              {
+                "reference": "C9",
+                "pin": "1",
+                "at": [
+                  386080000,
+                  49530000
+                ],
+                "visible_conductor_path": true
+              }
+            ],
+            "all_capacitors_visibly_connected": true
+          }
+        ],
+        "eligible_supply_pins": 2,
+        "visibly_connected_supply_pins": 2,
+        "eligible_capacitor_paths": 4,
+        "visible_capacitor_paths": 4
+      }
+    }
+  ],
+  "method": "Emitted library pin coordinates, mirror and rotation; integer-micrometer wire endpoint/junction/pin graph. Capacitor pins are not shorted through their component, and equal net labels do not join islands. Regulator role and capacitor membership come from unchanged functional ownership. This is visible-path evidence, not a complete-readability or fabrication score.",
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

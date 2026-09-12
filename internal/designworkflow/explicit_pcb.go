@@ -30,13 +30,11 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityBlocked, Path: "explicit_circuit", Message: "explicit circuit is required"})
 		return PlacementStageResult{Stage: NewStageResult(StagePlacement, issues)}
 	}
+	issues = append(issues, validateExplicitPlacementSeed(*request.ExplicitCircuit)...)
 	if reports.HasBlockingIssue(issues) {
 		return PlacementStageResult{Stage: NewStageResult(StagePlacement, issues)}
 	}
-	seed := request.ExplicitCircuit.GenerationHash
-	if seed == "" {
-		seed = request.ExplicitCircuit.ResolutionHash
-	}
+	seed := explicitPlacementSeed(*request.ExplicitCircuit)
 	placementRequest := placement.Request{
 		Board: placement.BoardPlacementArea{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, MarginMM: request.Board.EdgeClearanceMM, Layers: request.Board.Layers},
 		Rules: mergePlacementRules(opts.Rules), Seed: seed,

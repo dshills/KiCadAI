@@ -1,0 +1,87 @@
+{
+  "schema": "kicadai.pcb-seed-rotated-fields-handoff-qa.v1",
+  "runs": [
+    {
+      "mode": "native-dev1",
+      "code": 0,
+      "started_utc": "2026-09-12T07:17:22.393Z",
+      "finished_utc": "2026-09-12T07:17:50.233Z"
+    },
+    {
+      "mode": "native-dev2",
+      "code": 0,
+      "started_utc": "2026-09-12T07:22:22.561Z",
+      "finished_utc": "2026-09-12T07:22:53.692Z"
+    },
+    {
+      "mode": "native-final",
+      "code": 0,
+      "started_utc": "2026-09-12T07:24:23.675Z",
+      "finished_utc": "2026-09-12T07:25:01.284Z"
+    },
+    {
+      "mode": "focused",
+      "code": 0,
+      "started_utc": "2026-09-12T07:19:12.638Z",
+      "finished_utc": "2026-09-12T07:19:13.660Z"
+    },
+    {
+      "mode": "focused-dev2",
+      "code": 1,
+      "started_utc": "2026-09-12T07:22:21.390Z",
+      "finished_utc": "2026-09-12T07:22:26.488Z"
+    },
+    {
+      "mode": "focused-final",
+      "code": 0,
+      "started_utc": "2026-09-12T07:23:59.083Z",
+      "finished_utc": "2026-09-12T07:24:00.042Z"
+    },
+    {
+      "mode": "lint",
+      "code": 0,
+      "started_utc": "2026-09-12T07:19:13.803Z",
+      "finished_utc": "2026-09-12T07:19:15.151Z"
+    },
+    {
+      "mode": "lint-final",
+      "code": 0,
+      "started_utc": "2026-09-12T07:24:26.063Z",
+      "finished_utc": "2026-09-12T07:24:27.891Z"
+    },
+    {
+      "mode": "vet",
+      "code": 0,
+      "started_utc": "2026-09-12T07:24:27.347Z",
+      "finished_utc": "2026-09-12T07:24:32.579Z"
+    },
+    {
+      "mode": "race",
+      "code": 0,
+      "started_utc": "2026-09-12T07:26:44.653Z",
+      "finished_utc": "2026-09-12T07:28:43.154Z"
+    },
+    {
+      "mode": "full",
+      "code": 0,
+      "started_utc": "2026-09-12T07:24:24.871Z",
+      "finished_utc": "2026-09-12T07:36:43.547Z"
+    }
+  ],
+  "source_files": 10,
+  "full_suite": {
+    "passed_packages": 151,
+    "no_test_packages": 14,
+    "longest": {
+      "package": "kicadai/internal/opentopologysynthesis",
+      "seconds": 670.049
+    }
+  },
+  "phase_files_scanned": 37,
+  "local_links_checked": 13,
+  "exact_secret_scan": "absent",
+  "native_targeted_examples_passed": 2,
+  "practical_benchmark_passes_added": 0,
+  "provider_calls": 0,
+  "assessment": "Ready to share scoped technical fixes with explicit readability and practical-milestone caveats"
+}

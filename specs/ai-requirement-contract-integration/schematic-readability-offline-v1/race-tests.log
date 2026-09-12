@@ -1,0 +1,6 @@
+ok  	kicadai/internal/circuitgraph	80.859s
+ok  	kicadai/internal/kicadfiles/designapi	2.747s
+ok  	kicadai/internal/kicadfiles/project	1.808s
+ok  	kicadai/internal/schematicir	195.081s
+ok  	kicadai/internal/schematiclayout	2.724s
+ok  	kicadai/internal/transactions	3.099s

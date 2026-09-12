@@ -1,0 +1,14 @@
+=== RUN   TestFunctionalPinAwareSerializedReplay
+=== RUN   TestFunctionalPinAwareSerializedReplay/standalone_regulator
+=== RUN   TestFunctionalPinAwareSerializedReplay/controller_adc_100ma
+    pin_aware_replay_test.go:136: project_write native stage did not pass; see retained receipt
+    pin_aware_replay_test.go:136: writer_correctness native stage did not pass; see retained receipt
+    pin_aware_replay_test.go:136: validation native stage did not pass; see retained receipt
+    pin_aware_replay_test.go:136: simulation native stage did not pass; see retained receipt
+    pin_aware_replay_test.go:136: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestFunctionalPinAwareSerializedReplay (17.62s)
+    --- PASS: TestFunctionalPinAwareSerializedReplay/standalone_regulator (6.89s)
+    --- FAIL: TestFunctionalPinAwareSerializedReplay/controller_adc_100ma (1.80s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	18.061s
+FAIL

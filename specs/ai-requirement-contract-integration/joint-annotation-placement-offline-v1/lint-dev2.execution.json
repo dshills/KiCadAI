@@ -1,0 +1,30 @@
+{
+  "base": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+  "mode": "lint-dev2",
+  "command": "/Users/dshills/Development/Go/bin/golangci-lint",
+  "args": [
+    "run",
+    "--timeout=12m",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout",
+    "./internal/kicadfiles/designapi",
+    "./internal/transactions"
+  ],
+  "started_utc": "2026-09-12T11:55:58.257Z",
+  "finished_utc": "2026-09-12T11:55:59.216Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-v1-sources/lint-dev2.json",
+  "source_snapshot_sha256": "9cdf06ee952bcab6baa66aa1e91a59a91afd78b81b416ba03fe8f40e51b4a1a0",
+  "source_unchanged": true,
+  "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+}

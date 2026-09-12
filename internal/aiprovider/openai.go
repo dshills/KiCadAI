@@ -340,32 +340,107 @@ func backgroundPollRetryableStatus(status int) bool {
 func finalOpenAISSEPayload(data []byte) ([]byte, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Buffer(make([]byte, 64*1024), len(data)+1)
-	event := ""
+	eventName := ""
+	var payloadLines []string
 	var terminal []byte
+	var output strings.Builder
+	sawOutput := false
+	sequenced := false
+	events := 0
+	done := false
+	malformed := func(message string) error { return newProviderError(ErrorMalformed, message, nil) }
+	dispatch := func() error {
+		payload := strings.Join(payloadLines, "\n")
+		if payload == "" {
+			return nil
+		}
+		if payload == "[DONE]" && len(terminal) > 0 && !done {
+			done = true
+			return nil
+		}
+		if len(terminal) > 0 || done {
+			return malformed("OpenAI stream contains data after its terminal response")
+		}
+		var event struct {
+			Type     string          `json:"type"`
+			Sequence *int            `json:"sequence_number"`
+			Delta    *string         `json:"delta"`
+			Response json.RawMessage `json:"response"`
+		}
+		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			return malformed("decode OpenAI stream event")
+		}
+		if eventName != "" && event.Type != "" && eventName != event.Type {
+			return malformed("OpenAI stream event type does not match its payload")
+		}
+		kind := event.Type
+		if kind == "" {
+			kind = eventName
+		}
+		if kind == "" {
+			return malformed("OpenAI stream event type is missing")
+		}
+		// Preserve legacy unsequenced fixtures, but never accept mixed, missing,
+		// reordered or duplicated sequence numbers when numbering is supplied.
+		if events == 0 {
+			sequenced = event.Sequence != nil
+		}
+		if sequenced != (event.Sequence != nil) || (event.Sequence != nil && *event.Sequence != events) {
+			return malformed("OpenAI stream event sequence is not contiguous")
+		}
+		events++
+		switch kind {
+		case "error":
+			return newProviderError(ErrorTransport, "OpenAI stream reported an error", nil)
+		case "response.output_text.delta":
+			if event.Delta == nil {
+				return malformed("OpenAI stream output delta is missing")
+			}
+			sawOutput = true
+			output.WriteString(*event.Delta)
+		case "response.completed", "response.incomplete", "response.failed":
+			var response openAIResponse
+			if err := json.Unmarshal(event.Response, &response); err != nil || response.Status != strings.TrimPrefix(kind, "response.") {
+				return malformed("OpenAI terminal stream status does not match its event")
+			}
+			if response.Status == "completed" && sawOutput {
+				var finalText strings.Builder
+				for _, item := range response.Output {
+					if item.Type == "message" {
+						for _, content := range item.Content {
+							if content.Type == "output_text" {
+								finalText.WriteString(content.Text)
+							}
+						}
+					}
+				}
+				if finalText.String() != output.String() {
+					return malformed("OpenAI terminal output differs from streamed text")
+				}
+			}
+			terminal = append([]byte(nil), event.Response...)
+		}
+		return nil
+	}
 	for scanner.Scan() {
 		line := strings.TrimSuffix(scanner.Text(), "\r")
 		switch {
+		case line == "":
+			if err := dispatch(); err != nil {
+				return nil, err
+			}
+			eventName, payloadLines = "", nil
 		case strings.HasPrefix(line, "event:"):
-			event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		case strings.HasPrefix(line, "data:"):
-			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload == "" || payload == "[DONE]" {
-				continue
-			}
-			switch event {
-			case "response.completed", "response.incomplete", "response.failed":
-				var wrapper struct {
-					Response json.RawMessage `json:"response"`
-				}
-				if err := json.Unmarshal([]byte(payload), &wrapper); err != nil || len(wrapper.Response) == 0 {
-					return nil, newProviderError(ErrorMalformed, "decode terminal OpenAI stream event", err)
-				}
-				terminal = append(terminal[:0], wrapper.Response...)
-			}
+			payloadLines = append(payloadLines, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, newProviderError(ErrorMalformed, "scan OpenAI stream", err)
+	}
+	if err := dispatch(); err != nil {
+		return nil, err
 	}
 	if len(terminal) == 0 {
 		return nil, newProviderError(ErrorIncomplete, "OpenAI stream ended without a terminal response", nil)
@@ -472,6 +547,11 @@ func decodeOpenAIResponse(data []byte, fallbackModel string, maxOutputTokens int
 			providerErr.Message = fmt.Sprintf("%s (limit=%d, output_tokens=%d, total_tokens=%d)", message, maxOutputTokens, response.Usage.OutputTokens, response.Usage.TotalTokens)
 		}
 		return GenerateResult{}, providerErr
+	}
+	if response.Usage.InputTokens < 0 || response.Usage.OutputTokens < 0 || response.Usage.TotalTokens < 0 ||
+		response.Usage.TotalTokens != response.Usage.InputTokens+response.Usage.OutputTokens ||
+		(maxOutputTokens > 0 && response.Usage.OutputTokens > maxOutputTokens) {
+		return GenerateResult{}, newProviderError(ErrorMalformed, "OpenAI response reported inconsistent or out-of-budget token usage", nil)
 	}
 	var outputTexts []string
 	for _, item := range response.Output {

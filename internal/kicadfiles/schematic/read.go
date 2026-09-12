@@ -81,6 +81,14 @@ func Read(data []byte) (SchematicFile, error) {
 			file.Labels = append(file.Labels, readLabel(child, LabelGlobal))
 		case "hierarchical_label":
 			file.Labels = append(file.Labels, readLabel(child, LabelHierarchical))
+		case "text":
+			if text, modeled := readNativeV10Text(child); modeled {
+				file.Texts = append(file.Texts, text)
+				file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{Path: fmt.Sprintf("texts[%d]", len(file.Texts)-1), Family: "text", Strategy: kicadfiles.PreservationFullyModeled, Reason: "native KiCad 10 default-font text fields are fully modeled"})
+			} else {
+				file.RawItems = append(file.RawItems, rawItem(child, i))
+				file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{Path: fmt.Sprintf("raw_items[%d]", len(file.RawItems)-1), Family: "text", Strategy: kicadfiles.PreservationRaw, Reason: "non-default or unmodeled text effects are retained verbatim"})
+			}
 		case "junction":
 			file.Junctions = append(file.Junctions, Junction{Raw: strings.TrimSpace(child.Raw), UUID: readUUID(child), Position: readAtPoint(child)})
 			file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
@@ -586,6 +594,11 @@ func rawItem(node sexpr.ParsedNode, order int) RawSchematicItem {
 	sortOrder := int64(order)
 	if ok {
 		sortOrder = int64(kind)*schematicItemOrderStride + int64(order)
+	}
+	// KiCad 10 free text with an explicit simulation flag precedes junctions,
+	// and is ordered by UUID. Older raw text retains its established order.
+	if _, nativeText := node.Child("exclude_from_sim"); node.Head() == "text" && nativeText {
+		sortOrder = 1
 	}
 	return RawSchematicItem{UUID: readUUID(node), Order: sortOrder, Kind: kindName, Body: sexpr.Raw(strings.TrimSpace(node.Raw))}
 }

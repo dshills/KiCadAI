@@ -1,0 +1,81 @@
+{
+  "schema": "kicadai.native-readability-replay-offline-results.v1",
+  "final_source_base": "ec2ececb4e52643f0767d0fcbb70213f1ec7209c",
+  "final_source_snapshot_sha256": "33a5702254063ea692be740661e7e99176bc8dc06cc6a0e62335105b4c4f0d9a",
+  "evidence_authenticated": true,
+  "phase_gate_passed": false,
+  "complete_phase_examples": 0,
+  "planned_examples": 2,
+  "complete_native_workflow_examples": 1,
+  "actual_serialized_replay_examples": 1,
+  "standalone": {
+    "required_native_stages_passed_each_run": 9,
+    "runs": 2,
+    "erc_findings": 0,
+    "drc_findings": 0,
+    "writer_skips": 0,
+    "primary_project_files_byte_identical": 14,
+    "physical_components": 8,
+    "nets": 3,
+    "physical_pin_pad_endpoints": 16,
+    "annotation_audit": {
+      "labels": 18,
+      "symbols": 10,
+      "note_lines": 25,
+      "issues": 0
+    },
+    "cross_phase_pcb_geometry_preserved": false,
+    "changed_footprint_poses": 8,
+    "previous_segments": 37,
+    "current_segments": 38,
+    "previous_vias": 3,
+    "current_vias": 5,
+    "annotation_legibility": "no collision observed in final full-sheet and dense-region views",
+    "functional_readability": "partial; long identifiers, remote labels and dispersed support remain"
+  },
+  "controller": {
+    "requirement": "unchanged separately recorded 100mA case",
+    "closed_loop_promotion": "pass",
+    "project_write": "blocked",
+    "reason": "native annotation profile does not support rotated field C1.property.7",
+    "property": {
+      "name": "Reference",
+      "value": "C1",
+      "rotation_degrees": 270
+    },
+    "writer_correctness": "skipped",
+    "validation": "skipped",
+    "kicad_checks": "skipped",
+    "workflow_simulation": "absent after write failure",
+    "native_project_count": 0,
+    "serialized_project_replay": "not reached"
+  },
+  "preservation": {
+    "prior_reports_raw_evidence_and_archives_unchanged": true,
+    "sealed_evaluator_binaries_unchanged": true,
+    "original_150ma_rejection_preserved": true,
+    "new_pcb_geometry_invariant_met": false
+  },
+  "historical_milestone": {
+    "practical_complete_primary_positives": 0,
+    "practical_primary_positive_denominator": 8,
+    "new_frozen_cases": 0,
+    "live_provider_calls": 0,
+    "complete_goal": false
+  },
+  "authorization": {
+    "external_review": false,
+    "push": false,
+    "pr": false,
+    "merge": false,
+    "release": false,
+    "fabrication": false
+  },
+  "limitations": [
+    "Development successes are not final passes.",
+    "Authentication success is separate from acceptance.",
+    "Native electrical checks are not human readability, bench measurement or fabrication approval.",
+    "Full-suite outcome is recorded in execution.json; no pass inferred from focused/race/lint/vet results.",
+    "Source frozen after final failure; no repair or evaluation rerun afterward."
+  ]
+}

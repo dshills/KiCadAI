@@ -1,0 +1,8 @@
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+--- PASS: TestNativeReadabilitySerializedReplay (26.36s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (7.29s)
+    --- PASS: TestNativeReadabilitySerializedReplay/controller_adc_100ma (9.36s)
+PASS
+ok  	kicadai/internal/compositionlowering	26.782s

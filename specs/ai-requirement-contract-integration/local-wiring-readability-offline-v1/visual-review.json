@@ -1,0 +1,105 @@
+{
+  "schema": "kicadai.local-wiring-visual-review.v1",
+  "root": "/tmp/kicadai-local-wiring-readability-offline-v1-final",
+  "reviewer": "implementing agent; local review only",
+  "files": [
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/render/offline_regulated_output.png",
+      "bytes": 124891,
+      "sha256": "bee6204c122833614c96aef87afb186b749eec1bb054ed4b9e42bdcda94d8967",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/render/review-functional_objective_regulate.png",
+      "bytes": 124241,
+      "sha256": "b356fb061e29b23c524fc4e56d442fb273fe250c0b132b5f604a56677087fd30",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/render/review-functional_boundaries.png",
+      "bytes": 158216,
+      "sha256": "47f68c23739191916ba698fea38ca4219fe84ae3ada7313a73748b70f1897140",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/render/review-F.Cu.png",
+      "bytes": 19783,
+      "sha256": "8648d9b1e8741dd6f296da5d7da5aa3a83bd98afbaeb139eac0d993bc0e4cfd0",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/render/review-B.Cu.png",
+      "bytes": 15639,
+      "sha256": "029d87454dc7633e86c1f8af8a1ff2628570212b39abc3f395def0328a6a41af",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/offline_controller_adc.png",
+      "bytes": 178657,
+      "sha256": "7973b23e476d5fea591607ceb3688cb8194a010f683d1235a602457556014ce2",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-functional_objective_condition_adc.png",
+      "bytes": 152809,
+      "sha256": "acdf1de182566bdfac7a30ed03cfa6200e3067c87df3d8c279dffbfb6cd5a1a9",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-functional_participant_controller.png",
+      "bytes": 269408,
+      "sha256": "1cad3dbdadbe7c71821142b9601e602a2a87008ef17261a2c0c0c5ae3acffa01",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-functional_objective_regulate.png",
+      "bytes": 132242,
+      "sha256": "6bee1dfd9b2be5fb7cf23c636c1693e44766959df24d4c16e6484198420f1a1f",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-functional_boundaries.png",
+      "bytes": 226910,
+      "sha256": "4403676c7ecc623fbed3c92c5aef31c13af5d70ef6d07a0c43ec942a813b2ca0",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-F.Cu.png",
+      "bytes": 45999,
+      "sha256": "f192c716bd780a781525f6348cf1c6a86800355afda88db8f0bc1814ad6bf29d",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-In1.Cu.png",
+      "bytes": 34307,
+      "sha256": "80317f422e61f35a604884467a4b024be441b9421d09ec87dd6b926a701f783a",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-In2.Cu.png",
+      "bytes": 33563,
+      "sha256": "2e410d9931083080a0db58593379beea3845497c0392cd2a907ef4fc97817ea7",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/render/review-B.Cu.png",
+      "bytes": 33049,
+      "sha256": "98cf78158e136aa34156f67f37f8d349322e8bc306fa88074043847dc9c3cfda",
+      "inspected": true
+    }
+  ],
+  "full_schematics": 2,
+  "functional_crops": 6,
+  "copper_layer_images": 6,
+  "complete_readability_examples": 0,
+  "planned_examples": 2,
+  "technical_results": "verification.json",
+  "pin_side_and_panel_evidence": "pin-aware-audit.json",
+  "findings": "VISUAL_REVIEW.md",
+  "limitations": [
+    "85 mm group crops include each target panel and may show clipped neighboring groups; complete sheets were also inspected.",
+    "No independent external review, fabrication, signal-integrity or assembly sign-off."
+  ],
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

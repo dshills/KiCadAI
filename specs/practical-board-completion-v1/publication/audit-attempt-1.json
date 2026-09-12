@@ -1,0 +1,12 @@
+{
+  "status": "failed_before_publication",
+  "operation": "read-only history inventory audit",
+  "reason": "The first audit helper sorted complete paths instead of reproducing the historical locale-sorted depth-first serialization.",
+  "observed_files": 387,
+  "observed_bytes": 1531267624,
+  "observed_flat_order_digest": "98a3555d4f76a668f7216fb246bb146e64fe35a35c913da450c546c9f05b7862",
+  "expected_historical_digest": "6b0a51eb3d51023ede5c9737ffc47cb7bdbfd16612da5e987856b22c9cc5ce79",
+  "historical_files_changed": false,
+  "native_executions": 0,
+  "provider_calls": 0
+}

@@ -788,6 +788,18 @@ func directionalInterfaceRole(port architecturesearch.Port, input bool) circuitg
 // anchors lets domain-level observations and load corners resolve to the same
 // generated net without introducing a second physical connection.
 func joinPowerSignalsToDomains(requirement architecturesearch.Requirement, union *disjointSet) {
+	for _, domain := range requirement.Requirements.Domains {
+		portID, explicit := strings.CutPrefix(domain.Source, "port:")
+		if !explicit {
+			continue
+		}
+		// Lower runs after requirement validation; keep the real public output
+		// and its generated rail identical, without inventing a signal sink.
+		union.join(anchorNode("external:"+portID, ""), anchorNode("domain:"+domain.ID, ""))
+		if reference := referenceDomainForPower(requirement, domain.ID); reference != "" {
+			union.join(anchorNode("external:"+portID, "return"), anchorNode("domain:"+reference, ""))
+		}
+	}
 	for _, signal := range requirement.Requirements.Signals {
 		if signal.Kind != "power" || signal.Domain == "" {
 			continue
@@ -974,6 +986,12 @@ func firstReferenceDomain(requirement architecturesearch.Requirement) string {
 }
 
 func referenceDomainForPower(requirement architecturesearch.Requirement, powerDomain string) string {
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == powerDomain && domain.ReferenceDomain != "" {
+			reference, _ := architecturesearch.ResolveReferenceDomain(requirement, powerDomain)
+			return reference
+		}
+	}
 	references := []string{}
 	for _, domain := range requirement.Requirements.Domains {
 		if domain.Kind == "reference" {

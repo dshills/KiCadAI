@@ -1,0 +1,196 @@
+{
+  "schema": "kicadai.offline-repair-verification.v1",
+  "starting_revision": "49953eaa599612aaf8e60f31ab3e786f32ddc722",
+  "branch": "codex/ai-requirement-offline-repair",
+  "provider_calls": 0,
+  "new_live_evaluation_performed": false,
+  "historical_goal_gate_passed": false,
+  "verification_kind": "local_offline_implementation_regression_and_self_review",
+  "environment": {
+    "go": "1.26.8 darwin/arm64 (pre-existing cached toolchain)",
+    "goenv": "off",
+    "gowork": "off",
+    "goproxy": "off",
+    "gosumdb": "off",
+    "gotoolchain": "local",
+    "gomaxprocs": 4,
+    "cgo_enabled": 1,
+    "provider_keys_and_live_switch_unset": [
+      "OPENAI_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "KICADAI_OPENAI_LIVE_TEST"
+    ],
+    "authenticator_key_use": "exact-secret scan of local files only",
+    "go_root": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64",
+    "go_build_cache": "/Users/dshills/Development/projects/KiCadAI/.cache/go/build",
+    "go_module_cache": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod",
+    "lint_cache": "/Users/dshills/Development/projects/KiCadAI/.cache/golangci-lint"
+  },
+  "source_files": [
+    {
+      "path": "internal/airequirementeval/eval_test.go",
+      "bytes": 24277,
+      "sha256": "e93c4e20ca97e9655331aed50360bee15fb3d3bff5f260599899737dabd15661"
+    },
+    {
+      "path": "internal/airequirementeval/replay.go",
+      "bytes": 7928,
+      "sha256": "7f44380b1b872bf3c76c6e5934735d3f1278b19e5d457d01cfcf7924c7401112"
+    },
+    {
+      "path": "internal/airequirementeval/replay_empty_issues_test.go",
+      "bytes": 1424,
+      "sha256": "7bf44f3024fb0c3284b36e79e6af5a4cc41a1cccfbabec4b1ed123f5b9cab32e"
+    },
+    {
+      "path": "internal/airequirementeval/request_bounds_test.go",
+      "bytes": 2312,
+      "sha256": "391acb0a2bb7efd0bbd1aec4a9fc9281783cd0474793446b1de8124874933c29"
+    },
+    {
+      "path": "internal/architecturesearch/regulation_sources.go",
+      "bytes": 2437,
+      "sha256": "e66af41ede4d60cfe575c7d419eb39f9773963f72794ee78fec2d650d03d8530"
+    },
+    {
+      "path": "internal/architecturesearch/regulation_sources_test.go",
+      "bytes": 2811,
+      "sha256": "0173ff0b2583e63c54ac199a0546526e28912f1d8f78591a8a9e5eadb9e8923e"
+    },
+    {
+      "path": "internal/architecturesearch/validate.go",
+      "bytes": 56792,
+      "sha256": "40064804b74827627b2760f8ac4a8f594cbfaa31cb153677e9675773f546bd01"
+    },
+    {
+      "path": "internal/behavioralintent/compile.go",
+      "bytes": 21013,
+      "sha256": "59443f84749a5e1ca45efdc3d3f712627054fd66c358d310e99e84dbfe1b87f1"
+    },
+    {
+      "path": "internal/behavioralintent/offline_repair_test.go",
+      "bytes": 6022,
+      "sha256": "1f46e700264ea21aa38320f06d7e8e0c5580133ffa2b973cd55f1a09aaca5baa"
+    },
+    {
+      "path": "internal/behavioralintent/provider_context.go",
+      "bytes": 10319,
+      "sha256": "d712a556bd0427763591453abf7babbadc344add044e0882accbc7f072d1544a"
+    },
+    {
+      "path": "internal/behavioralintent/semantic_schema.go",
+      "bytes": 12520,
+      "sha256": "b0247aaf00cac7e467ecb2540aa8a20dc32efb0c5af35879f6cfd314d7da44d9"
+    },
+    {
+      "path": "internal/behavioralintent/testdata/interface_v1_i04_counterexample.json",
+      "bytes": 7579,
+      "sha256": "1db54ac9e1953cb99682d0c7507705fb7c71c110fc0a34c6bede5aba2a21ebfb"
+    }
+  ],
+  "checks": [
+    {
+      "name": "new regressions before implementation",
+      "status": "expected_failures_observed",
+      "details": "Retained I04 accepted, wrong circuit identity schema accepted, diagnostics lacked identities, omitted issues replay failed."
+    },
+    {
+      "name": "affected packages uncached short",
+      "command": "go test -short -count=1 ./internal/architecturesearch ./internal/behavioralintent ./internal/airequirementeval ./internal/aiprovider ./cmd/ai-requirement-eval",
+      "status": "passed"
+    },
+    {
+      "name": "affected packages race",
+      "command": "go test -race -short ./internal/architecturesearch ./internal/behavioralintent ./internal/airequirementeval ./internal/aiprovider ./cmd/ai-requirement-eval -count=1",
+      "status": "passed",
+      "details": "Behavioralintent and airequirementeval rerun with race after the final counterexample-content hash assertion."
+    },
+    {
+      "name": "atomic approval publication stress",
+      "command": "go test -short ./internal/airequirementeval -run '^TestRunCaseRequiresBoundReviewBeforeFixedAnswer$' -count=100 -timeout 3m",
+      "status": "passed",
+      "seconds": 127.513
+    },
+    {
+      "name": "offline wire forms",
+      "command": "go test -short ./internal/airequirementeval -run TestOfflineRepairRequestFormsRemainWithinExistingWireBudget -count=1 -v",
+      "status": "passed",
+      "forms": 16,
+      "largest_bytes": 114651,
+      "unchanged_limit_bytes": 131072,
+      "network_delegate": false,
+      "scope": "initial and maximum-diagnostic correction forms only; not arbitrary follow-up state"
+    },
+    {
+      "name": "repository vet",
+      "command": "go vet ./...",
+      "status": "passed"
+    },
+    {
+      "name": "affected package lint",
+      "command": "golangci-lint run ./internal/architecturesearch/... ./internal/behavioralintent/... ./internal/airequirementeval/... ./internal/aiprovider/... ./cmd/ai-requirement-eval/...",
+      "status": "passed",
+      "issues": 0,
+      "version": "2.13.1"
+    },
+    {
+      "name": "first repository short run",
+      "command": "go test -short -p 4 -timeout 5m ./...",
+      "status": "failed",
+      "details": "Concurrent synthetic approval writer exposed EOF; fixed atomically in the test. Topology synthesis hit the 5-minute package timeout."
+    },
+    {
+      "name": "all packages except separately isolated topology synthesis",
+      "command": "go list ./...; go test -short -p 4 -timeout 5m <all listed packages except kicadai/internal/opentopologysynthesis>",
+      "status": "passed",
+      "packages_with_passing_tests": 150,
+      "packages_without_tests": 14
+    },
+    {
+      "name": "isolated complete topology synthesis package",
+      "command": "go test -short -timeout 12m ./internal/opentopologysynthesis",
+      "status": "passed",
+      "seconds": 686.761
+    },
+    {
+      "name": "final combined repository short suite",
+      "command": "go test -short -p 4 -timeout 12m ./...",
+      "status": "passed",
+      "packages_with_passing_tests": 151,
+      "packages_without_tests": 14,
+      "total_packages": 165,
+      "details": "Includes standard Go test cache reuse; affected package and race runs also executed uncached."
+    }
+  ],
+  "setup_attempts": [
+    {
+      "status": "failed_before_tests",
+      "details": "Initial toolchain verification failed with GOSUMDB disabled; a direct cached toolchain invocation then conflicted with ambient Go 1.27.1 GOROOT. Explicit cached Go 1.26.8 GOROOT and PATH resolved setup without a download."
+    },
+    {
+      "status": "resolved",
+      "details": "First lint pass returned 0 issues but warned that the sandbox blocked persistence to its default cache. Rerun with workspace-local GOLANGCI_LINT_CACHE passed cleanly."
+    }
+  ],
+  "review": {
+    "kind": "implementation_agent_self_review",
+    "document": "REVIEW.md",
+    "independent_review": false,
+    "gemini_requests": 0
+  },
+  "preservation_receipt": "preservation.json",
+  "unresolved_capability_gaps": [
+    "Participant-specific observation identity",
+    "Standalone regulated-output representation without a fictitious signal consumer"
+  ],
+  "remote_mutations": {
+    "push": false,
+    "pull_request": false,
+    "merge": false,
+    "release": false
+  },
+  "verified_utc": "2026-09-11 16:18:50 UTC",
+  "offline_repair_checks_passed": true
+}

@@ -1,0 +1,31 @@
+{
+  "base": "9ac563194a4a3b89d52d54b8ee38ce04a157ff58",
+  "mode": "focused-dev3",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout",
+    "-run",
+    "TestFunctional",
+    "-count=1",
+    "-timeout=3m"
+  ],
+  "started_utc": "2026-09-12T08:28:49.944Z",
+  "finished_utc": "2026-09-12T08:28:54.972Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/functional-readability-v1-sources/focused-dev3.json",
+  "source_snapshot_sha256": "b857b66225960adc1106999c616311326847ac4c34dbcd561dd266b0d43851a3",
+  "source_unchanged": true,
+  "log_sha256": "721adba096d8820529aaa404205864a1329d332e13ddef1fd64e013435b548ef"
+}

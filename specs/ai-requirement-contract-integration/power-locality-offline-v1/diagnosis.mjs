@@ -1,0 +1,14 @@
+// Bind every diagnostic and negative execution to its immutable source/log/input.
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {dirname,join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const phase=dirname(fileURLToPath(import.meta.url)),prior='/tmp/kicadai-local-wiring-readability-offline-v1-final',json=p=>JSON.parse(readFileSync(p)),sha=b=>createHash('sha256').update(b).digest('hex');
+const receipt=mode=>{const r=json(join(phase,mode+'.execution.json'));assert.equal(r.source_unchanged,true);assert.equal(r.source_snapshot_sha256,sha(readFileSync(r.source_snapshot)));assert.equal(r.log_sha256,sha(readFileSync(join(phase,mode+'.log'))));return {mode,exit_code:r.code,source_snapshot_sha256:r.source_snapshot_sha256,log_sha256:r.log_sha256};};
+const diagnostics=[1,2,3].map(i=>{const layout=receipt('diagnostic-layout-'+i),candidates=receipt('diagnostic-candidates-'+i),tx=join(phase,'diagnostic-transaction-'+i+'.json');assert.equal(layout.exit_code,0);assert.equal(candidates.exit_code,0);return {index:i,layout,candidates,transaction_sha256:sha(readFileSync(tx)),layout_projection_sha256:existsSync(tx+'.layout.json')?sha(readFileSync(tx+'.layout.json')):null};});
+const negatives=['focused','focused-dev3','native-dev1'].map(mode=>{const r=receipt(mode);assert.equal(r.exit_code,1);return r;});
+const workflow=json('/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first_workflow.json'),erc=workflow.stages.find(s=>s.name==='kicad_checks').summary.erc;
+assert.deepEqual(erc.findings.map(f=>f.rule).sort(),['label_multiple_wires','unconnected_wire_endpoint']);assert.equal(erc.command.includes('--severity-all'),true);assert.equal(erc.command.includes('--exit-code-violations'),true);
+const result={schema:'kicadai.power-locality-diagnosis.v1',inputs:['controller_adc_100ma/workflow_request.json','controller_adc_100ma/schematic_transaction.json','library_index.json'].map(p=>({path:join(prior,p),sha256:sha(readFileSync(join(prior,p)))})),diagnostics,negative_executions:negatives,development_one_controller:{status:'fail',strict_erc:erc.findings.map(f=>({rule:f.rule,severity:f.severity,message:f.message})),second_replay:'not attempted',report_path:erc.report_path,report_sha256:sha(readFileSync(erc.report_path))},interpretation:'Both early unit failures and the first native controller failure remain visible. Three diagnostic candidate passes establish neither native ERC nor readability. Production repair was narrowed to pure active-plus-capacitor blocks before development 2 and final.',provider_calls:0,benchmark_passes_added:0};
+const path=join(phase,'diagnosis.json');if(existsSync(path))assert.deepEqual(json(path),result);else writeFileSync(path,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({diagnostic_pairs:3,retained_negative_executions:3}));

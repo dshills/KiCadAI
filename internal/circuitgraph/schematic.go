@@ -427,7 +427,8 @@ func inferredSchematicBusLayouts(circuit schematicir.Circuit) []schematicir.BusL
 func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitKey]string, unitsByComponent map[string][]int) schematicir.Layout {
 	source := resolved.Source
 	layout := schematicir.Layout{
-		Flow: schematicir.FlowLeftToRight, Origin: schematicir.OriginCentered,
+		NativeProfile: source.Schematic.Rules.NativeProfile,
+		Flow:          schematicir.FlowLeftToRight, Origin: schematicir.OriginCentered,
 		MaxComponentsPerSheet: source.Schematic.Hierarchy.MaxComponentsPerSheet,
 		Lanes:                 schematicir.Lanes{Power: schematicir.LanePositionTop, Signals: schematicir.LanePositionMiddle, Ground: schematicir.LanePositionBottom},
 		Rules: schematicir.LayoutRules{

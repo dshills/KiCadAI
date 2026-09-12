@@ -1,0 +1,8 @@
+=== RUN   TestFunctionalPowerLocalitySerializedReplay
+=== RUN   TestFunctionalPowerLocalitySerializedReplay/standalone_regulator
+=== RUN   TestFunctionalPowerLocalitySerializedReplay/controller_adc_100ma
+--- PASS: TestFunctionalPowerLocalitySerializedReplay (29.26s)
+    --- PASS: TestFunctionalPowerLocalitySerializedReplay/standalone_regulator (8.43s)
+    --- PASS: TestFunctionalPowerLocalitySerializedReplay/controller_adc_100ma (10.61s)
+PASS
+ok  	kicadai/internal/compositionlowering	29.822s

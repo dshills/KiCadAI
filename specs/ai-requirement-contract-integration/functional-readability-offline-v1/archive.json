@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.functional-readability-archive.v1",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/functional-readability-offline-v1-all-runs.tar.gz",
+  "bytes": 306861937,
+  "sha256": "798f6087e1affd6f4c91d7ace58dbd36677ef47d20a955dd2ca771483ea42bdb",
+  "manifest_sha256": "f6df06beb4fb37f715a6e9ecf7b90bf27c1b40975882e9b9e60358f765dc9064",
+  "streamed": {
+    "files_verified": 1299,
+    "bytes_verified": 6118614922,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

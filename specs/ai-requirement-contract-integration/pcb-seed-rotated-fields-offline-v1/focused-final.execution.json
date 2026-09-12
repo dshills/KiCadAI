@@ -1,0 +1,31 @@
+{
+  "base": "446e19c9b934ad8026b4e9ec2996b47d9ef413f9",
+  "mode": "focused-final",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/circuitgraph",
+    "./internal/designworkflow",
+    "./internal/kicadfiles/designapi",
+    "-run",
+    "TestAnnotationProfilePreservesLegacyPlacementSeed|TestExplicitPlacementSeedPolicyAndLegacyFallback|TestNative(Cardinal|NonCardinal)",
+    "-count=1",
+    "-timeout=3m"
+  ],
+  "started_utc": "2026-09-12T07:23:59.083Z",
+  "finished_utc": "2026-09-12T07:24:00.042Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/pcb-seed-rotated-fields-v1-sources/focused-final.json",
+  "source_snapshot_sha256": "96190448b0455b2676de8dba08f14f0d73a561a570f1cf1f303dba18f4374ce0",
+  "source_unchanged": true,
+  "log_sha256": "2572f5496d607175d45ec06b9b9e1c25926fceec0cafff7afa7cb7e95538456c"
+}

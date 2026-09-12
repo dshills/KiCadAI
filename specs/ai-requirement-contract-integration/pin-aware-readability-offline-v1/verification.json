@@ -1,0 +1,456 @@
+{
+  "schema": "kicadai.pin-aware-readability-offline-verification.v1",
+  "base": "f8b29a9904dd02c38583cb4c15d72f55b5ee6b75",
+  "root": "/tmp/kicadai-pin-aware-readability-offline-v1-final",
+  "source": [
+    {
+      "path": "internal/compositionlowering/functional_layout.go",
+      "sha256": "cd217da342c1e477b78ebc33bc39e9e8c5bc44346e6ba93d95b6543be1de2945"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout_test.go",
+      "sha256": "10cb06f83cdee0e2e196203dc49aafa2e2c45a2b6d66a5afeb8c09a80dd749f6"
+    },
+    {
+      "path": "internal/compositionlowering/pin_aware_replay_test.go",
+      "sha256": "51098e8fbf840cc23c9c282e31313971f71c9a99e13e7b5153cb36fe5b97210d"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder.go",
+      "sha256": "01e9d72bd9fd5bf90af782eaad04aadceb3a740534addf9fc129009a2f34c7d6"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_blocks.go",
+      "sha256": "d8417e8f3837adfd5664ffc8047ef87b73e3f181f2dd95313467383f8b460cc7"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_blocks_test.go",
+      "sha256": "5d60eccd36c3f80aba2a04cfc681d8124d2d9802c43b4744f0d1f328256b3729"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotations.go",
+      "sha256": "68424bd252a2ca038229d26cd4d6e07d3f5a834311bf6820951154feed9dedd0"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_island_label.go",
+      "sha256": "29f56d8a4e7a3ccbc23fe518df2872fe60933873cbb00c615cbb59eb5f4261e5"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "sha256": "ae11fa9b028305805339d79ce67f41e29856ad64c525a397aaf5b81af777f374"
+    },
+    {
+      "path": "internal/schematicir/functional_layout.go",
+      "sha256": "11650861d3eb077863c4ad6ec4b15bf54a04e505af06c75a7d27b0828d2e29a7"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_blocks.go",
+      "sha256": "a3e4b67ace7c7a7bb4dfe38ec71d04830b6e608521abf002682e3b16a1167a0c"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_blocks_test.go",
+      "sha256": "727ba27cb2fea315dec37b2d65b1c07ac0d28c6df069a9046b53999a3d5d5f2f"
+    },
+    {
+      "path": "internal/schematicir/native_annotations.go",
+      "sha256": "3866dd7f9c1d59181385d0e965abd942681774b2d5bca7d7f1975a5c21d50e1a"
+    },
+    {
+      "path": "internal/schematiclayout/annotation_blocks.go",
+      "sha256": "168dff70770af6d1d8129e9da2ad75c34a4d4ffe537c0515f4bd2b66c32988f8"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups.go",
+      "sha256": "4fd880dd8a9dfaedd08693f77a9d7e02864f373439b95303679bd7fa540d55e3"
+    },
+    {
+      "path": "internal/schematiclayout/functional_support.go",
+      "sha256": "7c3f98ff53beed1c9e4d3277e14e699f968e0ed3201a720974e54d387c61d2d2"
+    },
+    {
+      "path": "internal/schematiclayout/model.go",
+      "sha256": "749a43b49b6f393c67c1c970d396996a0fea5c7fbbe8e6f6d93e9958df08a0df"
+    },
+    {
+      "path": "internal/schematiclayout/pin_aware_support.go",
+      "sha256": "31bed31084906867f2c6fec62299447df958bbe3cac8a08118fa85783227cc73"
+    },
+    {
+      "path": "internal/schematiclayout/pin_aware_support_test.go",
+      "sha256": "16ed838acf8a164fd86a13194b4e0d75d7e807aa16288fc27aaca33763be9696"
+    },
+    {
+      "path": "internal/transactions/apply.go",
+      "sha256": "73c6f4bb6cb9b09898c126373c8bcda0ed5a7e3ccd20572af9c990e117d3aee6"
+    },
+    {
+      "path": "internal/transactions/model.go",
+      "sha256": "37066696a277638ddd421c3c044df6a45ffa06a2a1ca5d51e16aec8264396dc7"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "technical_gate_passed": true,
+      "components": 8,
+      "requirements_unchanged": true,
+      "resolution_provenance": {
+        "previous": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "current": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "electrical_and_pcb_input_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 3,
+      "native_physical_endpoints": 16,
+      "pcb": {
+        "connected_pads": 16,
+        "unconnected_pads": 0,
+        "physical_connectivity_verified": true,
+        "geometry_unchanged": true,
+        "changed_placement_count": 0,
+        "previous_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "current_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "previous_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "current_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "previous_segments": 37,
+        "current_segments": 37,
+        "previous_vias": 3,
+        "current_vias": 3,
+        "previous_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_placement_seed": "aa9ea7fa25d049b93ae2a42043a898f1d5d9f9ee0086f3cbee325486c66664f6",
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all remaining board fields, including placements and routes, compared exactly",
+        "previous_paper": [
+          "paper",
+          "A4"
+        ],
+        "current_paper": [
+          "paper",
+          "A4"
+        ]
+      },
+      "project_files": 14,
+      "actual_json_serialized_request_replay": true,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 103.04950000000001,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.17560399999999993,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "name": "controller_adc_100ma",
+      "technical_gate_passed": false,
+      "requirements_unchanged": true,
+      "non_layout_request_unchanged": true,
+      "assertions": [
+        {
+          "requirement_id": "adc_cutoff",
+          "operating_case": "supply_load",
+          "analysis": "ac_sweep",
+          "metric": "cutoff_frequency",
+          "actual": 923.3612800239786,
+          "min": 900,
+          "max": 1100,
+          "critical": false,
+          "normalized_margin": 0.02123752729452597,
+          "pass": true
+        },
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 114.049500001452,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.08760399998838397,
+          "pass": true
+        }
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "stages": [
+            {
+              "name": "schematic",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "schematic_electrical",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "placement",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "routing",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "project_write",
+              "status": "blocked",
+              "issues": [
+                {
+                  "code": "VALIDATION_FAILED",
+                  "severity": "error",
+                  "path": "operations[237]",
+                  "message": "native annotation placement exhausted after 3 bounded candidate visits",
+                  "operation_id": "op-write-project-69201a3176"
+                }
+              ]
+            },
+            {
+              "name": "writer_correctness",
+              "status": "skipped",
+              "issues": []
+            },
+            {
+              "name": "validation",
+              "status": "skipped",
+              "issues": []
+            },
+            {
+              "name": "simulation",
+              "status": "absent",
+              "issues": []
+            },
+            {
+              "name": "kicad_checks",
+              "status": "skipped",
+              "issues": []
+            }
+          ],
+          "native_checks": {
+            "reason": "project write did not complete"
+          },
+          "acceptance": {
+            "requested": "erc-drc",
+            "achieved": "",
+            "fabrication_ready": false
+          }
+        }
+      ],
+      "project_files": [],
+      "actual_json_serialized_request_replay": false,
+      "byte_exact_generated_project_replay": false,
+      "emitted_pin_pad_and_geometry_audit": "not certified: full native project did not pass",
+      "reason": "A failed or absent required stage cannot be counted as a technical or readability pass"
+    }
+  ],
+  "inventory": {
+    "file_count": 170,
+    "total_bytes": 1519829973,
+    "sha256": "6eb57530693a8badf726b9136e416c81e8c44f64827dbdb90ab46ea0add8120a"
+  },
+  "provider_calls": 0,
+  "frozen_cases_added": 0,
+  "technical_gate_passed": false,
+  "technical_examples_passed": 1,
+  "complete_practical_benchmark_cases": 0,
+  "planned_examples": 2,
+  "readability": "separate visual review; native checks do not establish readability"
+}

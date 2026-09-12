@@ -38,6 +38,8 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.signals()
 	validator.participants()
 	validator.objectives()
+	validator.explicitObjectiveReferences()
+	validator.regulationSources()
 	validator.multiControlSafetyObjectives()
 	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
 	validator.operatingCases()
@@ -224,12 +226,19 @@ func (validator *requirementValidator) domains() {
 		if domain.Kind != "reference" && domain.Kind != "supply" {
 			validator.add(CodeDomainInvalid, path+".kind", "domain kind must be reference or supply")
 		}
+		if domain.ReferenceDomain != "" {
+			if !supportsBehavioralVerification(validator.requirement.Version) || domain.Kind != "supply" || !validSemanticID(domain.ReferenceDomain) {
+				validator.add(CodeDomainInvalid, path+".reference_domain", "explicit reference requires a v3+ supply domain and a declared reference-domain identity")
+			} else if _, ok := ResolveReferenceDomain(validator.requirement, domain.ID); !ok {
+				validator.add(CodeDomainInvalid, path+".reference_domain", "explicit reference must identify a reference domain, not a supply or an unknown identity")
+			}
+		}
 		if validator.requirement.Version == Version {
 			if domain.Source != "external" && domain.Source != "generated" {
 				validator.add(CodeDomainInvalid, path+".source", "v1 domain source must be external or generated")
 			}
-		} else if domain.Source != "external" && !validSemanticID(domain.Source) {
-			validator.add(CodeDomainInvalid, path+".source", "typed domain source must be external or a signal identity")
+		} else if _, portSource := generatedPortSourceID(domain.Source); domain.Source != "external" && !validSemanticID(domain.Source) && !(supportsBehavioralVerification(validator.requirement.Version) && portSource) {
+			validator.add(CodeDomainInvalid, path+".source", "typed domain source must be external, a signal identity, or (v3+) port:<generated_power_output_id>")
 		}
 		if !finiteInRange(domain.NominalVoltageV, -1000, 1000) {
 			validator.add(CodeDomainInvalid, path+".nominal_voltage_v", "nominal voltage must be finite and within policy bounds")
@@ -282,6 +291,15 @@ func (validator *requirementValidator) signals() {
 	}
 	for index, domain := range validator.requirement.Requirements.Domains {
 		if domain.Source == "external" {
+			continue
+		}
+		if _, explicit := generatedPortSourceID(domain.Source); explicit && supportsBehavioralVerification(validator.requirement.Version) {
+			if _, ok := ResolveReferenceDomain(validator.requirement, domain.ID); !ok {
+				validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "generated output-port sources require an explicit reference_domain or one unambiguous circuit reference")
+			}
+			if _, valid := generatedSupplySource(validator.requirement, domain); !valid {
+				validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "derived supply port source must identify a source-direction power output in the same supply domain")
+			}
 			continue
 		}
 		signal, exists := validator.signalsByID[domain.Source]
@@ -700,7 +718,7 @@ func (validator *requirementValidator) operatingCondition(path string, condition
 		return
 	}
 	if !validator.semanticTargetExists(condition.Target) {
-		validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic target")
+		validator.add(CodeBindingUnresolved, path+".target", fmt.Sprintf("operating target %q must be circuit or a declared domain, external port or signal ID; objective and participant IDs are not operating targets", condition.Target))
 	}
 	if condition.Selection != "" {
 		validator.add(CodeOperatingCaseInvalid, path+".selection", "numeric operating axes cannot declare a corner selection")
@@ -837,6 +855,15 @@ func (validator *requirementValidator) behavioralRequirements() {
 
 func (validator *requirementValidator) behaviorObservation(path string, observation Observation) {
 	switch observation.Kind {
+	case "participant_port":
+		participant, port, exists := ResolveParticipantPort(validator.requirement, observation.ID)
+		if !supportsBehavioralVerification(validator.requirement.Version) || !exists {
+			validator.add(CodeBindingUnresolved, path+".id", fmt.Sprintf("participant-port observation %q requires v3+ and a declared participant_id.port_id", observation.ID))
+		} else if !scalarParticipantPort(port) {
+			validator.add(CodeBehaviorInvalid, path+".id", "participant-port observation requires a scalar endpoint; bundled interfaces need an explicit lane and cannot select the first lane")
+		} else if _, ok := ResolveReferenceDomain(validator.requirement, participant.Domain); !ok {
+			validator.add(CodeBehaviorInvalid, path+".id", "participant-port observation requires an explicit supply reference_domain or one unambiguous circuit reference")
+		}
 	case "port":
 		if _, exists := validator.portsByID[observation.ID]; !exists {
 			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown port")
@@ -860,7 +887,7 @@ func (validator *requirementValidator) behaviorObservation(path string, observat
 			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown event")
 		}
 	default:
-		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, domain, circuit, or event")
+		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, participant_port, domain, circuit, or event")
 	}
 }
 
@@ -1024,7 +1051,7 @@ func (validator *requirementValidator) constraints(path string, constraints []Co
 		if !validSemanticID(constraint.Name) {
 			validator.add(CodeConstraintInvalid, constraintPath+".name", "constraint name must be a normalized semantic identifier")
 		} else if seen[constraint.Name] {
-			validator.add(CodeIdentityDuplicate, constraintPath+".name", "constraint name is duplicated")
+			validator.add(CodeIdentityDuplicate, constraintPath+".name", fmt.Sprintf("constraint name %q is duplicated; use one constraint per name and retain nominal/minimum/maximum voltage in domain or port fields where applicable", constraint.Name))
 		}
 		seen[constraint.Name] = true
 		if !allowedRelation(constraint.Relation) {

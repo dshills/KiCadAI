@@ -837,6 +837,14 @@ func behavioralObservationReferenceNode(requirement architecturesearch.Requireme
 	}
 	domainID := ""
 	switch observation.Kind {
+	case "participant_port":
+		participant, _, exists := architecturesearch.ResolveParticipantPort(requirement, observation.ID)
+		if exists {
+			domainID = participant.Domain
+		}
+		if _, ok := architecturesearch.ResolveReferenceDomain(requirement, domainID); !exists || !ok {
+			return "", true
+		}
 	case "port":
 		for _, port := range requirement.Requirements.Ports {
 			if port.ID == observation.ID {
@@ -872,6 +880,9 @@ func behavioralObservationReferenceNode(requirement architecturesearch.Requireme
 func behavioralReferenceDomain(requirement architecturesearch.Requirement, domainID string) (string, bool) {
 	var references []string
 	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == domainID && domain.ReferenceDomain != "" {
+			return architecturesearch.ResolveReferenceDomain(requirement, domainID)
+		}
 		if domain.ID == domainID && domain.Kind == "reference" {
 			return domain.ID, true
 		}

@@ -1,0 +1,5 @@
+=== RUN   TestOfflineRepairRequestFormsRemainWithinExistingWireBudget
+    request_bounds_test.go:65: captured 16 initial/correction forms; largest=126382 bytes; unchanged limit=131072 bytes; live requests=0
+--- PASS: TestOfflineRepairRequestFormsRemainWithinExistingWireBudget (0.13s)
+PASS
+ok  	kicadai/internal/airequirementeval	0.356s

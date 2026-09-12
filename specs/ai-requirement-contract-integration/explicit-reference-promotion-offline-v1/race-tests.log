@@ -1,0 +1,4 @@
+ok  	kicadai/internal/architecturesearch	57.892s
+ok  	kicadai/internal/behavioralintent	3.039s
+ok  	kicadai/internal/closedloopsynthesis	1.808s
+ok  	kicadai/internal/airequirementeval	9.739s

@@ -1,0 +1,30 @@
+{
+  "base": "c2ec8c88da11f8cf4aac498775e216ae2baaa34d",
+  "mode": "race-ownership",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "-race",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestFunctionalOwnership",
+    "-count=1",
+    "-timeout=12m"
+  ],
+  "started_utc": "2026-09-12T10:09:01.260Z",
+  "finished_utc": "2026-09-12T10:09:13.619Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/ownership-locality-v2-sources/race-ownership.json",
+  "source_snapshot_sha256": "fddde3ef9fe555720182db2c52f8e4f24a9707dfa181adbb35c27ab83740c474",
+  "source_unchanged": true,
+  "log_sha256": "a83b57e73806ce90c81742ab20017d8dffb357111bfdb2fc6c0b52427305dd96"
+}

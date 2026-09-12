@@ -306,7 +306,20 @@ func contractFromBinding(requirement Requirement, binding Binding, minimumEviden
 	binding.Participant = canonicalIdentifier(binding.Participant)
 	binding.ParticipantPort = canonicalIdentifier(binding.ParticipantPort)
 	if binding.Port != "" && binding.Signal == "" && binding.Direction == "" && binding.Participant == "" && binding.ParticipantPort == "" {
-		return contractFromRequirementPort(requirement, binding.Port, minimumEvidence)
+		contract, issues := contractFromRequirementPort(requirement, binding.Port, minimumEvidence)
+		if len(issues) != 0 {
+			return contract, issues
+		}
+		direction, supported := objectivePortDirection(requirement, binding)
+		if !supported {
+			return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "binding.role", "generated power-output port requires an explicit output or supported consumer role")}
+		}
+		if contract.Direction == "source" && direction == "sink" {
+			contract.MaximumCurrentDemandA = cloneFloat64(contract.RequiredCurrentCapacityA)
+			contract.RequiredCurrentCapacityA = nil
+		}
+		contract.Direction = direction
+		return NormalizePortContract(contract), nil
 	}
 	if binding.Signal != "" && binding.Direction != "" && binding.Port == "" && binding.Participant == "" && binding.ParticipantPort == "" {
 		return contractFromRequirementSignal(requirement, binding.Signal, binding.Direction, minimumEvidence)

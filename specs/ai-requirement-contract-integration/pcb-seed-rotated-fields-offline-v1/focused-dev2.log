@@ -1,0 +1,22 @@
+ok  	kicadai/internal/circuitgraph	0.680s
+ok  	kicadai/internal/designworkflow	0.333s
+--- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol (0.01s)
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-0/field-0 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-0/field-90 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-0/field-180 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-0/field-270 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-180/field-0 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-180/field-90 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-180/field-180 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+    --- FAIL: TestNativeCardinalFieldsBecomeUprightWithoutRotatingSymbol/symbol-180/field-270 (0.00s)
+        native_rotated_fields_test.go:45: native annotation readback audit: emitted annotation collision or page overflow: C1.property.0; emitted annotation collision or page overflow: C1.property.1; emitted annotation collision or page overflow: C1.property.5
+FAIL
+FAIL	kicadai/internal/kicadfiles/designapi	0.509s
+FAIL

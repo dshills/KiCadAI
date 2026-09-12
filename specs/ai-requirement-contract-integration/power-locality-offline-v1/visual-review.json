@@ -1,0 +1,105 @@
+{
+  "schema": "kicadai.power-locality-visual-review.v1",
+  "root": "/tmp/kicadai-power-locality-offline-v1-final",
+  "reviewer": "implementing agent; local review only",
+  "files": [
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/standalone_regulator/render/offline_regulated_output.png",
+      "bytes": 116145,
+      "sha256": "6d5030d41427c22b3e66fef9559715fed46a24ef2de05042af7272a9acc89a1c",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/standalone_regulator/render/review-functional_objective_regulate.png",
+      "bytes": 109140,
+      "sha256": "c61bba9d9876cdf986044864f52dc9e79d54993310279fcb7810c935ed50d11c",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/standalone_regulator/render/review-functional_boundaries.png",
+      "bytes": 130375,
+      "sha256": "f890af1e473b58d77a491aecd1a1faaeb20798fb31101256fab4c925ac8c3007",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/standalone_regulator/render/review-F.Cu.png",
+      "bytes": 19783,
+      "sha256": "8648d9b1e8741dd6f296da5d7da5aa3a83bd98afbaeb139eac0d993bc0e4cfd0",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/standalone_regulator/render/review-B.Cu.png",
+      "bytes": 15639,
+      "sha256": "029d87454dc7633e86c1f8af8a1ff2628570212b39abc3f395def0328a6a41af",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/offline_controller_adc.png",
+      "bytes": 174925,
+      "sha256": "94e4c0092783463aef6d9a2a5e56f432ef148860825b43ecf87aa371e5d1c254",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-functional_objective_condition_adc.png",
+      "bytes": 156849,
+      "sha256": "c32cefe2ac29faeef454cde650715cd5ac92eb735549d3855bc4ff350620b648",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-functional_participant_controller.png",
+      "bytes": 261474,
+      "sha256": "a026ac095d4c437ca986f10d9c11d82eba4b2b5e78ef0e02cad9ac064dea8e00",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-functional_objective_regulate.png",
+      "bytes": 113112,
+      "sha256": "33c9d1a3ecf9e582e524a19b471d1d5def200c1a28b138a0fbd0970c64e7de7c",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-functional_boundaries.png",
+      "bytes": 205877,
+      "sha256": "4e873d938210057d0c2a95c0600ab33dc0de5a0f18fb91a07ae49d87c25e1212",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-F.Cu.png",
+      "bytes": 45999,
+      "sha256": "f192c716bd780a781525f6348cf1c6a86800355afda88db8f0bc1814ad6bf29d",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-In1.Cu.png",
+      "bytes": 34307,
+      "sha256": "80317f422e61f35a604884467a4b024be441b9421d09ec87dd6b926a701f783a",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-In2.Cu.png",
+      "bytes": 33563,
+      "sha256": "2e410d9931083080a0db58593379beea3845497c0392cd2a907ef4fc97817ea7",
+      "inspected": true
+    },
+    {
+      "path": "/tmp/kicadai-power-locality-offline-v1-final/controller_adc_100ma/render/review-B.Cu.png",
+      "bytes": 33049,
+      "sha256": "98cf78158e136aa34156f67f37f8d349322e8bc306fa88074043847dc9c3cfda",
+      "inspected": true
+    }
+  ],
+  "full_schematics": 2,
+  "functional_crops": 6,
+  "copper_layer_images": 6,
+  "complete_readability_examples": 0,
+  "planned_examples": 2,
+  "technical_results": "verification.json",
+  "pin_side_and_panel_evidence": "pin-aware-audit.json",
+  "findings": "VISUAL_REVIEW.md",
+  "limitations": [
+    "85 mm group crops include each target panel and may show clipped neighboring groups; complete sheets were also inspected.",
+    "No independent external review, fabrication, signal-integrity or assembly sign-off."
+  ],
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

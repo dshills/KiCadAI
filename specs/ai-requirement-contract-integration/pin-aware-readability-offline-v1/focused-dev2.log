@@ -1,0 +1,5 @@
+ok  	kicadai/internal/compositionlowering	0.704s
+ok  	kicadai/internal/schematicir	0.274s
+ok  	kicadai/internal/schematiclayout	0.797s
+ok  	kicadai/internal/kicadfiles/designapi	0.932s
+ok  	kicadai/internal/transactions	0.824s [no tests to run]

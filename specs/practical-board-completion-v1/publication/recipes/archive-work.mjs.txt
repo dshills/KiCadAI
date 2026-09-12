@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {execFileSync,spawn} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {join} from 'node:path';
+import {inventory,sha} from '../specs/practical-board-completion-v1/evidence.mjs';
+const repo=process.cwd(),root=join(repo,'.cache/practical-board-completion-v1'),draft=join(root,'publication-draft');
+const json=p=>JSON.parse(fs.readFileSync(p)),put=(name,v)=>fs.writeFileSync(join(draft,name),JSON.stringify(v,null,2)+'\n',{flag:'wx',mode:0o600});
+const secret=process.env.OPENAI_API_KEY;assert(secret,'approved key is used only for a local exact-secret scan');
+const checks=[];for(const id of fs.readdirSync(join(root,'checks')).sort()){
+ const p=join(root,'checks',id),r=json(join(p,'execution.json')),snapshot=json(join(p,'source.json'));
+ assert.equal(r.source_unchanged,true);assert.equal(r.source_snapshot_sha256,sha(fs.readFileSync(join(p,'source.json'))));assert.equal(r.log_sha256,sha(fs.readFileSync(join(p,'output.log'))));
+ for(const f of snapshot.files){assert.equal(Buffer.byteLength(f.source),f.bytes);assert.equal(sha(Buffer.from(f.source)),f.sha256);}
+ assert.equal(r.provider_calls,0);assert.equal(r.signal,null);assert.equal(r.limit_failure,null);
+ checks.push({...r,raw_directory:'.cache/practical-board-completion-v1/checks/'+id});
+}
+assert.equal(checks.length,9);const full=checks.find(c=>c.mode==='full');assert(full);
+const fullText=fs.readFileSync(join(root,'checks',full.id,'output.log'),'utf8');
+const passing=[...fullText.matchAll(/^ok\s+(\S+)\s+([\d.]+)s$/gm)].map(m=>({package:m[1],seconds:Number(m[2])}));
+const failures=[...fullText.matchAll(/^FAIL\s+(kicadai\S*)[^\n]*$/gm)].map(m=>m[0]);
+put('verification.json',{schema:'kicadai.completion-verification.v1',checks,full_short_suite:{exit_code:full.code,passed_packages:passing.length,no_test_packages:[...fullText.matchAll(/^\?\s+\S+\s+\[no test files\]$/gm)].length,failed_packages:failures,longest:passing.toSorted((a,b)=>b.seconds-a.seconds)[0]},historical_full_composition_race:'not rerun; prior timeout remains uncertified',provider_calls:0});
+const entries=[];for(const name of ['preparation','checks','development'])for(const f of inventory(join(root,name),secret))entries.push({...f,path:name+'/'+f.path});
+put('archive-manifest.json',entries);
+const archive=join(repo,'.cache/practical-board-completion-v1-readiness.tar.gz'),fd=fs.openSync(archive,'wx',0o600);
+const env={...process.env,COPYFILE_DISABLE:'1'};for(const k of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY'])delete env[k];
+const started=new Date().toISOString(),child=spawn('/usr/bin/tar',['-czf','-','-C',root,'preparation','checks','development'],{env,stdio:['ignore',fd,'pipe']});
+const errors=[];child.stderr.on('data',b=>errors.push(b));
+const code=await new Promise(resolve=>child.on('close',resolve));fs.closeSync(fd);
+assert.equal(code,0,Buffer.concat(errors).toString());
+const python=`import sys,json,tarfile,hashlib,struct
+p=json.load(sys.stdin); expected={e['path']:e for e in p['entries']}; key=p['secret'].encode()
+seen=set(); metadata=[]; total=0; meta_seen=set()
+directories={n[:i] for n in expected for i,c in enumerate(n) if c=='/'}
+with tarfile.open(sys.argv[1], 'r|gz') as archive:
+ for m in archive:
+  if m.isdir():
+   assert m.name.rstrip('/') in directories, 'Unexpected directory'
+   continue
+  assert m.isfile(), 'Non-regular archive member'
+  if m.name not in expected:
+   parts=m.name.split('/'); assert parts[-1].startswith('._'), 'Unexpected metadata name'
+   parts[-1]=parts[-1][2:]; counterpart='/'.join(parts)
+   assert counterpart in expected or counterpart in directories, 'Orphan metadata'
+   assert m.name not in meta_seen and m.size<1024*1024, 'Invalid metadata extent'
+   b=archive.extractfile(m).read(); assert key not in b and len(b)>=26, 'Invalid metadata payload'
+   magic,version=struct.unpack('>II',b[:8]); assert magic==0x00051607 and version==0x00020000, 'Not AppleDouble v2'
+   count=struct.unpack('>H',b[24:26])[0]; assert 26+12*count<=len(b)
+   for i in range(count):
+    ident,offset,length=struct.unpack('>III',b[26+12*i:38+12*i]); assert offset>=26+12*count and offset+length<=len(b), 'Invalid AppleDouble entry'
+   metadata.append({'path':m.name,'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()}); meta_seen.add(m.name)
+   continue
+  assert m.name not in seen, 'Duplicate raw member'
+  e=expected[m.name]; h=hashlib.sha256(); size=0; tail=b''
+  with archive.extractfile(m) as f:
+   while True:
+    b=f.read(1024*1024)
+    if not b: break
+    data=tail+b; assert key not in data, 'Secret found in raw member'; tail=data[-max(0,len(key)-1):]
+    h.update(b); size+=len(b)
+  assert size==e['bytes'] and h.hexdigest()==e['sha256'], 'Raw member mismatch'
+  seen.add(m.name); total+=size
+assert seen==set(expected), 'Missing raw member'
+print(json.dumps({'files_verified':len(seen),'bytes_verified':total,'appledouble_metadata':metadata,'full_extraction_created':False,'exact_secret_scan':'absent'}))
+`;
+const streamed=JSON.parse(execFileSync('/usr/bin/python3',['-c',python,archive],{env,input:JSON.stringify({entries,secret}),encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024}));
+const hash=createHash('sha256');let bytes=0;for await(const b of fs.createReadStream(archive)){hash.update(b);bytes+=b.length;}
+const after=[];for(const name of ['preparation','checks','development'])for(const f of inventory(join(root,name),secret))after.push({...f,path:name+'/'+f.path});assert.deepEqual(after,entries);
+put('archive.json',{schema:'kicadai.completion-readiness-archive.v1',path:archive,bytes,sha256:hash.digest('hex'),manifest_sha256:sha(fs.readFileSync(join(draft,'archive-manifest.json'))),streamed,started_utc:started,finished_utc:new Date().toISOString(),all_original_raw_files_unchanged:true,provider_calls:0});
+console.log(JSON.stringify({archive,bytes,files:entries.length,streamed,full_short_suite_exit:full.code}));

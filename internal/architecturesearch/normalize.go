@@ -22,6 +22,7 @@ func Normalize(requirement Requirement) Requirement {
 		domain.ID = canonicalIdentifier(domain.ID)
 		domain.Kind = canonicalIdentifier(domain.Kind)
 		domain.Source = canonicalIdentifier(domain.Source)
+		domain.ReferenceDomain = canonicalIdentifier(domain.ReferenceDomain)
 	}
 	slices.SortStableFunc(normalized.Requirements.Domains, func(left, right Domain) int {
 		return strings.Compare(left.ID, right.ID)

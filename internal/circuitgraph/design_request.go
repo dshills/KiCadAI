@@ -36,7 +36,8 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 
 	explicit := designworkflow.ExplicitCircuitSpec{
 		ResolutionHash: resolved.ResolutionHash, GenerationHash: resolved.GenerationHash, CatalogID: resolved.CatalogID,
-		CatalogHash: resolved.CatalogHash, Schematic: schematic,
+		PlacementSeed: annotationIndependentPlacementSeed(resolved),
+		CatalogHash:   resolved.CatalogHash, Schematic: schematic,
 		AutoHierarchy: resolved.Source.Schematic.Hierarchy.Mode == "auto",
 		Components:    make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
 		Nets:          make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),

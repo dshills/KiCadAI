@@ -1,0 +1,275 @@
+
+## Red
+--- FAIL: TestNativeLayoutPreservesInferredRanksAcrossSerialization (0.00s)
+    serialized_native_layout_test.go:28: native layout lost inferred rank semantics during JSON round trip: before=[{ID:inputs Label:Inputs Role:input_stage Members:[vin] Rank:0 Side:left Inferred:true} {ID:signal Label:Signal Role:processing_stage Members:[led r_limit] Rank:2 Side: Inferred:true}] after=[{ID:inputs Label:Inputs Role:input_stage Members:[vin] Rank:0 Side:left Inferred:false} {ID:signal Label:Signal Role:processing_stage Members:[led r_limit] Rank:2 Side: Inferred:false}]
+FAIL
+FAIL	kicadai/internal/schematicir	0.481s
+--- FAIL: TestNativeStubDetectsExistingNetLabelGlyphs (0.00s)
+    native_collision_regression_test.go:12: invalid uuid: 
+FAIL
+FAIL	kicadai/internal/kicadfiles/designapi	0.300s
+FAIL
+
+## RedCorrected
+ok  	kicadai/internal/schematicir	0.353s
+--- FAIL: TestNativeStubDetectsExistingNetLabelGlyphs (0.00s)
+    native_collision_regression_test.go:15: native stub may cross an existing net-label glyph rectangle
+FAIL
+FAIL	kicadai/internal/kicadfiles/designapi	0.517s
+FAIL
+
+## Focused
+ok  	kicadai/internal/schematicir	0.478s
+ok  	kicadai/internal/kicadfiles/designapi	0.297s
+ok  	kicadai/internal/circuitgraph	0.355s
+
+## Focused2
+ok  	kicadai/internal/schematicir	0.307s
+ok  	kicadai/internal/kicadfiles/designapi	0.470s
+ok  	kicadai/internal/circuitgraph	0.357s
+
+## Focused3
+ok  	kicadai/internal/schematicir	0.443s
+--- FAIL: TestNativeDesignIsIdempotentAndAuditRejectsWireCrossing (0.00s)
+    native_collision_regression_test.go:31: native reading guide cannot place block at line 0
+FAIL
+FAIL	kicadai/internal/kicadfiles/designapi	0.248s
+ok  	kicadai/internal/circuitgraph	0.330s
+FAIL
+
+## Focused4
+# kicadai/internal/kicadfiles/designapi
+internal/kicadfiles/designapi/native_annotation_audit.go:58:40: item.Raw undefined (type schematic.RawSchematicItem has no field or method Raw)
+FAIL	kicadai/internal/schematicir [build failed]
+# kicadai/internal/kicadfiles/designapi [kicadai/internal/kicadfiles/designapi.test]
+internal/kicadfiles/designapi/native_annotation_audit.go:58:40: item.Raw undefined (type schematic.RawSchematicItem has no field or method Raw)
+FAIL	kicadai/internal/kicadfiles/designapi [build failed]
+FAIL	kicadai/internal/circuitgraph [build failed]
+FAIL
+
+## Focused5
+ok  	kicadai/internal/schematicir	0.495s
+--- FAIL: TestNativeDesignIsIdempotentAndAuditRejectsWireCrossing (0.00s)
+panic: runtime error: index out of range [0] with length 0 [recovered, repanicked]
+
+goroutine 20 [running]:
+testing.tRunner.func1.2({0x1011b09a0, 0x2c07628a4600})
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:1974 +0x1a0
+testing.tRunner.func1()
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:1977 +0x318
+panic({0x1011b09a0?, 0x2c07628a4600?})
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/runtime/panic.go:860 +0x12c
+kicadai/internal/kicadfiles/designapi.TestNativeDesignIsIdempotentAndAuditRejectsWireCrossing(0x2c0762946488)
+	/Users/dshills/Development/projects/KiCadAI/internal/kicadfiles/designapi/native_collision_regression_test.go:42 +0x514
+testing.tRunner(0x2c0762946488, 0x1011caf00)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2036 +0xc4
+created by testing.(*T).Run in goroutine 1
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2101 +0x3a8
+FAIL	kicadai/internal/kicadfiles/designapi	0.313s
+ok  	kicadai/internal/circuitgraph	0.338s
+FAIL
+
+## Focused6
+ok  	kicadai/internal/schematicir	0.437s
+--- FAIL: TestNativeDesignIsIdempotentAndAuditRejectsWireCrossing (0.00s)
+panic: runtime error: index out of range [0] with length 0 [recovered, repanicked]
+
+goroutine 36 [running]:
+testing.tRunner.func1.2({0x1030509a0, 0x324df44aa600})
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:1974 +0x1a0
+testing.tRunner.func1()
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:1977 +0x318
+panic({0x1030509a0?, 0x324df44aa600?})
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/runtime/panic.go:860 +0x12c
+kicadai/internal/kicadfiles/designapi.TestNativeDesignIsIdempotentAndAuditRejectsWireCrossing(0x324df454e488)
+	/Users/dshills/Development/projects/KiCadAI/internal/kicadfiles/designapi/native_collision_regression_test.go:42 +0x528
+testing.tRunner(0x324df454e488, 0x10306af20)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2036 +0xc4
+created by testing.(*T).Run in goroutine 1
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2101 +0x3a8
+FAIL	kicadai/internal/kicadfiles/designapi	0.258s
+ok  	kicadai/internal/circuitgraph	0.323s
+FAIL
+
+## Focused7
+ok  	kicadai/internal/schematicir	0.306s
+ok  	kicadai/internal/kicadfiles/designapi	0.490s
+ok  	kicadai/internal/circuitgraph	0.345s
+
+## Focused8
+ok  	kicadai/internal/kicadfiles/schematic	0.268s
+ok  	kicadai/internal/schematicir	0.331s
+ok  	kicadai/internal/kicadfiles/designapi	0.517s
+
+## dev1
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev1 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:133: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (20.27s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (7.76s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (1.82s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	20.841s
+FAIL
+
+## dev2
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev2 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:133: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (18.92s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (6.87s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (1.81s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	19.423s
+FAIL
+
+## dev3
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev3 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:133: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (18.76s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (6.77s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (1.80s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	19.284s
+FAIL
+
+## dev4
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev4 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:133: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:133: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (18.68s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (6.79s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (1.78s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	19.167s
+FAIL
+
+## dev5
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev5 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+--- PASS: TestNativeReadabilitySerializedReplay (26.51s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (6.76s)
+    --- PASS: TestNativeReadabilitySerializedReplay/controller_adc_100ma (9.49s)
+PASS
+ok  	kicadai/internal/compositionlowering	27.030s
+
+## dev6
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev6 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+    native_readability_replay_test.go:135: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:135: project_write native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (12.59s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/standalone_regulator (0.48s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (1.73s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	13.034s
+FAIL
+
+## dev7
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev7 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+# kicadai/internal/kicadfiles/designapi
+internal/kicadfiles/designapi/native_annotation_audit.go:58:40: item.Raw undefined (type schematic.RawSchematicItem has no field or method Raw)
+FAIL	kicadai/internal/compositionlowering [build failed]
+FAIL
+
+## dev8
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev8 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (14.80s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/standalone_regulator (1.42s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (2.92s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	15.326s
+FAIL
+
+## dev9
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev9 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:135: writer_correctness native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: simulation native stage did not pass; see retained receipt
+    native_readability_replay_test.go:135: kicad_checks native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (14.77s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/standalone_regulator (1.36s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (2.90s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	15.190s
+FAIL
+
+## dev10
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev10 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+    native_readability_replay_test.go:135: validation native stage did not pass; see retained receipt
+--- FAIL: TestNativeReadabilitySerializedReplay (25.60s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/standalone_regulator (4.49s)
+    --- FAIL: TestNativeReadabilitySerializedReplay/controller_adc_100ma (5.83s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	26.050s
+FAIL
+
+## dev11
+KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-dev11 KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m
+=== RUN   TestNativeReadabilitySerializedReplay
+=== RUN   TestNativeReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestNativeReadabilitySerializedReplay/controller_adc_100ma
+--- PASS: TestNativeReadabilitySerializedReplay (29.90s)
+    --- PASS: TestNativeReadabilitySerializedReplay/standalone_regulator (7.33s)
+    --- PASS: TestNativeReadabilitySerializedReplay/controller_adc_100ma (10.31s)
+PASS
+ok  	kicadai/internal/compositionlowering	30.347s

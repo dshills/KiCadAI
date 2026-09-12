@@ -1,0 +1,30 @@
+{
+  "base": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+  "mode": "diagnostic-layout-1",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestFunctionalJointRecordedLayoutDiagnostic$",
+    "-v",
+    "-count=1",
+    "-timeout=5m"
+  ],
+  "started_utc": "2026-09-12T11:51:37.977Z",
+  "finished_utc": "2026-09-12T11:51:45.962Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-v1-sources/diagnostic-layout-1.json",
+  "source_snapshot_sha256": "1a15adec669d54fee158a910357afc846008a2e3590edc2313b89dafcb81b179",
+  "source_unchanged": true,
+  "log_sha256": "bbdd2e886e019fe363fcbb5e597827c47b9dd6778c5c22e9bcba902f98d382ad"
+}
