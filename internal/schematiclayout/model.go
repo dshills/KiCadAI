@@ -34,6 +34,7 @@ type Sheet struct {
 }
 
 type Request struct {
+	FunctionalLocality    bool
 	FunctionalGroups      bool
 	Sheet                 Sheet
 	Components            []Component
@@ -69,14 +70,15 @@ type Rules struct {
 }
 
 type Component struct {
-	Ref        string
-	DisplayRef string
-	Value      string
-	LibraryID  string
-	Role       string
-	GroupID    string
-	Stage      Stage
-	Lane       Lane
+	SupportParent string
+	Ref           string
+	DisplayRef    string
+	Value         string
+	LibraryID     string
+	Role          string
+	GroupID       string
+	Stage         Stage
+	Lane          Lane
 	// FlowRank is an optional left-to-right graph rank. RankFixed distinguishes
 	// an explicit rank of zero from an inferred rank.
 	FlowRank        int

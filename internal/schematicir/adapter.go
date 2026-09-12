@@ -2286,7 +2286,8 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1,
+		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
+		FunctionalLocality:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
 		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
@@ -2295,6 +2296,10 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		request.Sheet = schematiclayout.SheetWithStandardTitleBlock(request.Sheet)
 	}
 	var invalidPlacementEndpointDiagnostics []schematiclayout.Diagnostic
+	functionalParents := map[string]string{}
+	for _, owner := range document.Layout.FunctionalOwners {
+		functionalParents[owner.Component] = owner.Parent
+	}
 	for _, component := range document.Circuit.Components {
 		placement := placementsByID[component.ID]
 		group := groupsByID[placement.Group]
@@ -2334,6 +2339,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			invalidPlacementEndpointDiagnostics = append(invalidPlacementEndpointDiagnostics, schematiclayout.Diagnostic{Severity: schematiclayout.SeverityError, Code: "invalid_relative_endpoint", Ref: component.ID, Message: fmt.Sprintf("same_column_as_pin contains malformed endpoint %q", invalid), Repair: "use component.pin endpoint syntax"})
 		}
 		request.Components = append(request.Components, schematiclayout.Component{
+			SupportParent:   functionalParents[component.ID],
 			Ref:             component.ID,
 			DisplayRef:      component.Ref,
 			Value:           component.Value,

@@ -19,7 +19,7 @@ func nativeSchematicNotes(document Document) []string {
 	}
 	lines := []string{"READING GUIDE - explicit circuit intent", "Source IDs identify functional provenance.", "Connections below are not signal-direction arrows."}
 	byID := indexComponentsByID(document.Circuit.Components)
-	functional := document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1
+	functional := document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2
 	if functional {
 		lines = []string{"FUNCTIONAL BLOCKS - explicit fragment provenance", "Connections are not signal-direction arrows."}
 		for _, group := range document.Layout.Groups {

@@ -15,6 +15,12 @@ import (
 )
 
 func TestFunctionalOwnershipPreservesPhysicalRequest(t *testing.T) {
+	for _, profile := range []string{schematiclayout.FunctionalOwnershipV1, schematiclayout.FunctionalOwnershipV2} {
+		t.Run(profile, func(t *testing.T) { testFunctionalOwnership(t, profile) })
+	}
+}
+
+func testFunctionalOwnership(t *testing.T, profile string) {
 	ctx := context.Background()
 	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{})
 	if err != nil {
@@ -42,10 +48,54 @@ func TestFunctionalOwnershipPreservesPhysicalRequest(t *testing.T) {
 		}
 		before, _ := json.Marshal(request)
 		oldLayout := schematicir.CloneLayout(request.ExplicitCircuit.Schematic.Layout)
-		if err := applyFunctionalLayout(&request, *search.Selected, resolved.SynthesisReport, schematiclayout.FunctionalOwnershipV1); err != nil {
+		if err := applyFunctionalLayout(&request, *search.Selected, resolved.SynthesisReport, profile); err != nil {
 			t.Fatal(err)
 		}
 		layout := request.ExplicitCircuit.Schematic.Layout
+		boundary, primary, connector := "", "", ""
+		for _, owner := range layout.FunctionalOwners {
+			if owner.Source == "explicit-boundary-role" {
+				boundary = owner.Component
+			}
+			if owner.Parent == "" && owner.Source != "explicit-boundary-role" {
+				primary = owner.Component
+			}
+		}
+		for _, c := range request.ExplicitCircuit.Schematic.Circuit.Components {
+			if c.Role == schematicir.ComponentRoleConnector || c.Role == schematicir.ComponentRoleInputConnector || c.Role == schematicir.ComponentRoleOutputConnector {
+				for _, owner := range layout.FunctionalOwners {
+					if owner.Component == c.ID && owner.Source == "explicit-boundary-role" {
+						connector = c.ID
+					}
+				}
+			}
+		}
+		if boundary == "" || primary == "" || connector == "" {
+			t.Fatal("missing ownership fixture roles")
+		}
+		for name, extra := range map[string][]circuitgraph.SynthesisSelection{
+			"connector missing parent": {{IntentID: connector, ParentID: "missing"}},
+			"connector cycle":          {{IntentID: connector, ParentID: connector}},
+			"unowned connector parent": {{IntentID: connector, ParentID: boundary}},
+			"missing parent":           {{IntentID: boundary, ParentID: "missing"}},
+			"missing child":            {{IntentID: "missing", ParentID: primary}},
+			"cyclic boundary":          {{IntentID: boundary, ParentID: boundary}},
+			"conflicting fragment":     {{IntentID: primary, ParentID: boundary}},
+			"duplicate support":        {{IntentID: boundary, ParentID: primary}, {IntentID: boundary, ParentID: primary}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				bad := resolved.SynthesisReport
+				bad.Selections = append(append([]circuitgraph.SynthesisSelection(nil), bad.Selections...), extra...)
+				before, _ := json.Marshal(request)
+				if err := applyFunctionalLayout(&request, *search.Selected, bad, profile); err == nil {
+					t.Fatal("malformed provenance accepted")
+				}
+				after, _ := json.Marshal(request)
+				if string(before) != string(after) {
+					t.Fatal("rejected provenance mutated caller request")
+				}
+			})
+		}
 		if len(layout.FunctionalOwners) != len(request.ExplicitCircuit.Schematic.Circuit.Components) || len(layout.Groups) < 2 {
 			t.Fatal("incomplete ownership")
 		}

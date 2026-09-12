@@ -17,7 +17,7 @@ import (
 // synthesis support-parent records. No component ID prefix is interpreted as
 // ownership. The naming operation matches Lower; the source payload is required.
 func applyFunctionalLayout(request *designworkflow.Request, candidate architecturesearch.CandidateResult, synthesis circuitgraph.SynthesisReport, profile string) error {
-	if profile != schematiclayout.FunctionalOwnershipV1 || request.ExplicitCircuit == nil {
+	if (profile != schematiclayout.FunctionalOwnershipV1 && profile != schematiclayout.FunctionalOwnershipV2) || request.ExplicitCircuit == nil {
 		return fmt.Errorf("unsupported functional layout profile or absent explicit circuit")
 	}
 	document := request.ExplicitCircuit.Schematic
@@ -45,8 +45,18 @@ func applyFunctionalLayout(request *designworkflow.Request, candidate architectu
 		}
 	}
 	parents := map[string]string{}
+	components := map[string]bool{}
+	for _, component := range document.Circuit.Components {
+		components[component.ID] = true
+	}
 	for _, selection := range synthesis.Selections {
 		if selection.ParentID != "" {
+			if !components[selection.IntentID] || !components[selection.ParentID] {
+				return fmt.Errorf("unknown component in support parent record")
+			}
+			if _, primary := owners[selection.IntentID]; primary {
+				return fmt.Errorf("conflicting fragment and support ownership for %s", selection.IntentID)
+			}
 			if _, exists := parents[selection.IntentID]; exists {
 				return fmt.Errorf("duplicate support parent")
 			}
@@ -74,6 +84,9 @@ func applyFunctionalLayout(request *designworkflow.Request, candidate architectu
 	for _, component := range document.Circuit.Components {
 		owner, ok := resolveOwner(component.ID, map[string]bool{})
 		if !ok {
+			if _, support := parents[component.ID]; support {
+				return fmt.Errorf("unresolvable explicit support parent for %s", component.ID)
+			}
 			switch component.Role {
 			case schematicir.ComponentRoleConnector, schematicir.ComponentRoleInputConnector, schematicir.ComponentRoleOutputConnector, schematicir.ComponentRolePowerSymbol, schematicir.ComponentRoleGroundSymbol:
 				owner = schematicir.FunctionalOwner{Component: component.ID, Group: "functional_boundaries", Source: "explicit-boundary-role"}
