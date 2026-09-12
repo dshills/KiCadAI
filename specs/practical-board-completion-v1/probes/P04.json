@@ -30,7 +30,7 @@
         "nominal_voltage_v": 3.3,
         "max_voltage_v": 3.45,
         "max_current_a": 0.02,
-        "source": "aux_power"
+        "source": "port:aux_power"
       }
     ],
     "ports": [
