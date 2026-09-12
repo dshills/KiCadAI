@@ -71,6 +71,8 @@ type ArchitectureSimulationPlanResolver struct {
 	BaseIntents        map[string]simmodel.Intent
 	ProvenanceRegistry modelprovenance.Registry
 	VariableBindings   []ArchitectureVariableBinding
+	// FunctionalLayoutProfile is an opt-in, drawing-only promotion policy.
+	FunctionalLayoutProfile string
 }
 
 type ClosedLoopCandidateVariables struct {
@@ -139,6 +141,12 @@ func SynthesizeClosedLoop(
 	report.SelectedCircuitHash = request.ExplicitCircuit.ResolutionHash
 	request.ExplicitCircuit.ClosedLoop = &report
 	request.ExplicitCircuit.RoutingPolicy = designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1
+	if resolver.FunctionalLayoutProfile != "" {
+		candidate, _ := retainedArchitectureCandidate(search, report.Selected.State.Fingerprint)
+		if err := applyFunctionalLayout(&request, candidate, resolvedCandidate.SynthesisReport, resolver.FunctionalLayoutProfile); err != nil {
+			return ClosedLoopPromotion{Report: report, Resolved: resolvedCandidate.Resolved, Request: request}, issues("functional_layout", err.Error())
+		}
+	}
 	if validationDiagnostics := closedloopsynthesis.ValidatePromotionReport(report, request.ExplicitCircuit.CatalogHash); len(validationDiagnostics) != 0 {
 		return ClosedLoopPromotion{Report: report, Resolved: resolvedCandidate.Resolved, Request: request}, closedLoopReportIssues("closed_loop.promotion", validationDiagnostics)
 	}

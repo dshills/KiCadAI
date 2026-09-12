@@ -529,6 +529,7 @@ func (ctx *validationContext) validateGroups(componentPins map[string]map[string
 }
 
 func validateLayout(document Document, componentPins map[string]map[string]struct{}, add func(string, string)) {
+	validateFunctionalLayout(document, add)
 	if profile := document.Layout.NativeProfile; profile != "" && profile != schematiclayout.NativeAnnotationV2 {
 		add("layout.native_profile", "unsupported native annotation profile")
 	}

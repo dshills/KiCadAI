@@ -212,15 +212,26 @@ const (
 )
 
 type Layout struct {
-	NativeProfile         string      `json:"native_profile,omitempty"`
-	Flow                  Flow        `json:"flow"`
-	Origin                Origin      `json:"origin"`
-	Groups                []Group     `json:"groups,omitempty"`
-	Lanes                 Lanes       `json:"lanes"`
-	Rules                 LayoutRules `json:"rules"`
-	MaxComponentsPerSheet int         `json:"max_components_per_sheet,omitempty"`
-	Placements            []Placement `json:"placements,omitempty"`
-	Buses                 []BusLayout `json:"buses,omitempty"`
+	NativeProfile         string            `json:"native_profile,omitempty"`
+	FunctionalProfile     string            `json:"functional_profile,omitempty"`
+	FunctionalOwners      []FunctionalOwner `json:"functional_owners,omitempty"`
+	Flow                  Flow              `json:"flow"`
+	Origin                Origin            `json:"origin"`
+	Groups                []Group           `json:"groups,omitempty"`
+	Lanes                 Lanes             `json:"lanes"`
+	Rules                 LayoutRules       `json:"rules"`
+	MaxComponentsPerSheet int               `json:"max_components_per_sheet,omitempty"`
+	Placements            []Placement       `json:"placements,omitempty"`
+	Buses                 []BusLayout       `json:"buses,omitempty"`
+}
+
+// FunctionalOwner preserves explicit fragment and synthesis-parent provenance.
+// It is drawing metadata, not an electrical or PCB placement constraint.
+type FunctionalOwner struct {
+	Component string `json:"component"`
+	Group     string `json:"group"`
+	Source    string `json:"source"`
+	Parent    string `json:"parent,omitempty"`
 }
 
 type Flow string

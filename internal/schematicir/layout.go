@@ -12,6 +12,7 @@ import (
 // across parser, planner, and workflow boundaries.
 func CloneLayout(layout Layout) Layout {
 	clone := layout
+	clone.FunctionalOwners = append([]FunctionalOwner(nil), layout.FunctionalOwners...)
 	clone.Groups = make([]Group, len(layout.Groups))
 	for index, group := range layout.Groups {
 		clone.Groups[index] = group

@@ -16,6 +16,9 @@ func Place(request Request) Result {
 	}
 	rankX := placementRankX(request.Components, cells, rules)
 	positions := placementPositions(request.Components, cells, rankX, rules)
+	if request.FunctionalGroups && !hasFixedComponent(request.Components) {
+		positions = functionalGroupPositions(request, rules)
+	}
 	relationsConverged := enforceRelativePlacement(request.Components, positions, rules)
 	overlapRepairs, overlapsConverged := repairPlacementOverlaps(request.Components, positions, rules)
 	result := Result{Sheet: request.Sheet, Components: make([]PlacedComponent, 0, len(request.Components))}

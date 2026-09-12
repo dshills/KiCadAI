@@ -34,6 +34,7 @@ type Sheet struct {
 }
 
 type Request struct {
+	FunctionalGroups      bool
 	Sheet                 Sheet
 	Components            []Component
 	Nets                  []Net
