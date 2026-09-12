@@ -14,6 +14,8 @@ const modes={
  evaluator_race:['test','-race','-count=1','-timeout=3m','./internal/practicalboardeval','./cmd/practical-board-eval'],
  full:['test','-short','-count=1','-timeout=12m','./...'],
  vet:['vet','./...'],
+ lint:['run','--timeout=10m','./cmd/...','./internal/...'],
+ node:['--test','specs/practical-sensor-controller-boards/evidence-utils.test.mjs','specs/practical-sensor-controller-boards/protocol-v2.test.mjs','specs/practical-board-completion-v1/evidence.test.mjs'],
 };
 assert(mode in modes);const args=modes[mode];
 const tc=join(repo,'.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64'),removed=['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY','KICADAI_OPENAI_LIVE_TEST'];
@@ -28,7 +30,8 @@ const snapshot=()=>{
 const before=snapshot(),parent=join(repo,'.cache/practical-board-completion-v1/checks');mkdirSync(parent,{recursive:true});const output=join(parent,id);mkdirSync(output,{mode:0o700});
 const write=(name,v)=>writeFileSync(join(output,name),JSON.stringify(v,null,2)+'\n',{flag:'wx',mode:0o600});write('source.json',{revision,files:before});
 const started=new Date().toISOString(),chunks=[];let limitFailure=null,error=null,bytes=0;
-const child=spawn(tc+'/bin/go',args,{cwd:repo,env,detached:true,stdio:['ignore','pipe','pipe']});
+const command=mode==='lint'?'/Users/dshills/Development/Go/bin/golangci-lint':mode==='node'?process.execPath:tc+'/bin/go';
+const child=spawn(command,args,{cwd:repo,env,detached:true,stdio:['ignore','pipe','pipe']});
 const kill=()=>{try{process.kill(-child.pid,'SIGKILL');}catch{}};
 const timeoutMs=mode==='full'?7200000:900000;
 const timer=setTimeout(()=>{limitFailure='overall_check_deadline';kill();},timeoutMs);
@@ -37,6 +40,6 @@ child.on('error',e=>{error=e.message;});
 const terminal=await new Promise(resolve=>child.on('close',(code,signal)=>resolve({code,signal})));clearTimeout(timer);
 const log=Buffer.concat(chunks);assert(!secret||!log.includes(Buffer.from(secret)));writeFileSync(join(output,'output.log'),log,{flag:'wx',mode:0o600});
 const unchanged=git('rev-parse','HEAD')===revision&&JSON.stringify(snapshot())===JSON.stringify(before);
-const receipt={schema:'kicadai.completion-check.v1',id,mode,revision,command:tc+'/bin/go',args,started_utc:started,finished_utc:new Date().toISOString(),...terminal,error,limit_failure:limitFailure,source_snapshot_sha256:sha(readFileSync(join(output,'source.json'))),source_unchanged:unchanged,log_sha256:sha(log),provider_calls:0,board_attempts:0,removed_provider_variables:removed,dependency_network:'disabled'};
+const receipt={schema:'kicadai.completion-check.v1',id,mode,revision,command,args,started_utc:started,finished_utc:new Date().toISOString(),...terminal,error,limit_failure:limitFailure,source_snapshot_sha256:sha(readFileSync(join(output,'source.json'))),source_unchanged:unchanged,log_sha256:sha(log),provider_calls:0,board_attempts:0,removed_provider_variables:removed,dependency_network:'disabled'};
 write('execution.json',receipt);console.log(JSON.stringify(receipt,null,2));console.log(log.toString().slice(-10000));
 assert(unchanged);assert(!limitFailure&&!error);process.exitCode=terminal.code??1;
