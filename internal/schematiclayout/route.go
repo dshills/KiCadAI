@@ -650,6 +650,13 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	routeAccessPoint := func(endpoint Endpoint, anchor kicadfiles.Point) (kicadfiles.Point, bool) {
 		if direction, ok := endpointLabelDirection(endpoint, result.Components, rules.Grid); ok {
+			if request.FunctionalPowerLocality && functionalPowerNet(netName, request.Nets) {
+				for _, component := range result.Components {
+					if component.Ref == endpoint.Ref {
+						return powerPinAccess(anchor, direction, componentBody(component), rules.Grid), true
+					}
+				}
+			}
 			return kicadfiles.Point{X: anchor.X + direction.X, Y: anchor.Y + direction.Y}, true
 		}
 		// Cross-component routes already score every candidate against symbol

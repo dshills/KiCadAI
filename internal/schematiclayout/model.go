@@ -36,6 +36,7 @@ type Sheet struct {
 type Request struct {
 	functionalLabelCorridors []functionalLabelCorridor
 	FunctionalLocalWiring    bool
+	FunctionalPowerLocality  bool
 	FunctionalPinAware       bool
 	FunctionalJoint          bool
 	FunctionalLocality       bool

@@ -14,7 +14,7 @@ func nativeAnnotationGeometry(document Document) bool {
 // explicit IR. Source IDs preserve functional provenance without guessing a
 // connector function from its reference, or renaming an electrical net.
 func nativeSchematicNotes(document Document) []string {
-	if document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 {
+	if document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6 {
 		return nil // Local, indivisible annotation panels replace the global guide.
 	}
 	if document.Layout.NativeProfile != schematiclayout.NativeAnnotationV2 {

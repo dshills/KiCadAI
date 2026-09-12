@@ -1,0 +1,72 @@
+{
+  "schema": "kicadai.local-wiring-measurements.v1",
+  "root": "/tmp/kicadai-power-locality-offline-v1-dev1",
+  "prior": "/tmp/kicadai-local-wiring-readability-offline-v1-final",
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "previous": {
+        "schematic": "/tmp/kicadai-local-wiring-readability-offline-v1-final/standalone_regulator/first/offline_regulated_output.kicad_sch",
+        "sha256": "f392f3024e9360d05ed10977e3842e9a95d9fd3cafb2b49708f662df639ff2e0",
+        "paper": "A4",
+        "paper_area_mm2": 62370,
+        "wire_segments": 26,
+        "wire_length_mm": 391.16,
+        "labels": 16,
+        "geometric_wire_islands": 13,
+        "labeled_islands": 13,
+        "repeated_labels_on_same_island": 3,
+        "direct_transaction_branches": 5,
+        "label_transaction_branches": 10
+      },
+      "current": {
+        "schematic": "/tmp/kicadai-power-locality-offline-v1-dev1/standalone_regulator/first/offline_regulated_output.kicad_sch",
+        "sha256": "cdf7f7617d2fa566e3cf39a29bade77488e22c1b52d92d7ee5b77589410e362a",
+        "paper": "A3",
+        "paper_area_mm2": 124740,
+        "wire_segments": 44,
+        "wire_length_mm": 576.58,
+        "labels": 10,
+        "geometric_wire_islands": 7,
+        "labeled_islands": 7,
+        "repeated_labels_on_same_island": 3,
+        "direct_transaction_branches": 11,
+        "label_transaction_branches": 4
+      }
+    },
+    {
+      "name": "controller_adc_100ma",
+      "previous": {
+        "schematic": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+        "sha256": "5b82036bc21b542efcdedc54b0c593aaa5e4485ea8d7418d4a8ee5b34e975aac",
+        "paper": "A2",
+        "paper_area_mm2": 249480,
+        "wire_segments": 71,
+        "wire_length_mm": 1073.15,
+        "labels": 46,
+        "geometric_wire_islands": 42,
+        "labeled_islands": 42,
+        "repeated_labels_on_same_island": 4,
+        "direct_transaction_branches": 12,
+        "label_transaction_branches": 32
+      },
+      "current": {
+        "schematic": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+        "sha256": "19e22ad99e2af82176224bca7551b15540471b812c450bfd5e27643d02e194b3",
+        "paper": "A2",
+        "paper_area_mm2": 249480,
+        "wire_segments": 125,
+        "wire_length_mm": 3427.73,
+        "labels": 31,
+        "geometric_wire_islands": 27,
+        "labeled_islands": 27,
+        "repeated_labels_on_same_island": 4,
+        "direct_transaction_branches": 26,
+        "label_transaction_branches": 18
+      }
+    }
+  ],
+  "method": "Integer-micrometer native wire endpoints, label anchors and explicit junctions; endpoint-on-segment union. Interior wire crossings without a junction/anchor are not joined. Equal label names on disconnected conductors remain separate physical drawing islands. Components never short their pins in this analysis. Counts are descriptive, not readability or electrical certification.",
+  "benchmark_passes_added": 0,
+  "provider_calls": 0
+}

@@ -22,6 +22,10 @@ func functionalSupportPositionsWithPins(components []Component, nets []Net, orig
 }
 
 func functionalSupportPositionsJoint(components []Component, nets []Net, original map[string]kicadfiles.Point, rules Rules, pinAware, joint bool) map[string]kicadfiles.Point {
+	return functionalSupportPositionsPower(components, nets, original, rules, pinAware, joint, false)
+}
+
+func functionalSupportPositionsPower(components []Component, nets []Net, original map[string]kicadfiles.Point, rules Rules, pinAware, joint, powerLocality bool) map[string]kicadfiles.Point {
 	byRef := map[string]Component{}
 	active, activeCount := "", 0
 	for _, c := range components {
@@ -69,6 +73,11 @@ func functionalSupportPositionsJoint(components []Component, nets []Net, origina
 		return cmp.Compare(a.X, b.X)
 	})
 	gap := max(rules.MinComponentSpacing, kicadfiles.MM(17.78)) / 2
+	if powerLocality {
+		// Honor the declared block spacing without V5's extra radial padding.
+		// Native label/field and body clearance checks remain mandatory.
+		gap = max(rules.MinComponentSpacing, kicadfiles.MM(15.24)) / 2
+	}
 	for remaining := len(refs); remaining > 0; {
 		progress := false
 		for _, ref := range refs {
@@ -85,13 +94,17 @@ func functionalSupportPositionsJoint(components []Component, nets []Net, origina
 			if pinAware {
 				pinCorridors = supportOwnerPinCorridors(byRef[parents[ref]], nets, origin)
 			}
-			for _, offset := range offsets {
+			candidates := offsets
+			if powerLocality {
+				candidates = powerSupportOffsets(byRef[ref], byRef[parents[ref]], nets, offsets)
+			}
+			for _, offset := range candidates {
 				p := SnapPoint(kicadfiles.Point{X: origin.X + offset.X, Y: origin.Y + offset.Y}, rules.Grid)
 				bounds := componentBoundsAt(byRef[ref], p).Inflate(gap)
 				if !supportOnAttachmentSide(bounds, ownerBounds, side) {
 					continue
 				}
-				if joint && !jointSupportClear(byRef[ref], p, byRef, positions, placed, nets, gap) {
+				if joint && !jointSupportClearPower(byRef[ref], p, byRef, positions, placed, nets, gap, powerLocality) {
 					continue
 				}
 				clear := true

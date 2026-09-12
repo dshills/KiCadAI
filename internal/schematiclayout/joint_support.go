@@ -26,26 +26,33 @@ func jointCanonicalNetRoles(nets []Net) []Net {
 // Reserve both component envelopes jointly, before routing. The native writer
 // still makes the final decision with actual wires and glyph bounds.
 func jointSupportClear(support Component, at kicadfiles.Point, byRef map[string]Component, positions map[string]kicadfiles.Point, placed map[string]bool, nets []Net, gap kicadfiles.IU) bool {
+	return jointSupportClearPower(support, at, byRef, positions, placed, nets, gap, false)
+}
+
+func jointSupportClearPower(support Component, at kicadfiles.Point, byRef map[string]Component, positions map[string]kicadfiles.Point, placed map[string]bool, nets []Net, gap kicadfiles.IU, powerLocality bool) bool {
 	body := componentBoundsAt(support, at).Inflate(gap)
-	corridors := supportOwnerPinCorridors(support, nets, at)
+	corridors := powerTaggedCorridors(support, nets, at)
 	for ref, done := range placed {
 		if !done {
 			continue
 		}
 		other := componentBoundsAt(byRef[ref], positions[ref]).Inflate(gap)
-		otherCorridors := supportOwnerPinCorridors(byRef[ref], nets, positions[ref])
+		otherCorridors := powerTaggedCorridors(byRef[ref], nets, positions[ref])
 		for _, a := range corridors {
-			if a.Intersects(other) {
+			if a.box.Intersects(other) {
 				return false
 			}
 			for _, b := range otherCorridors {
-				if a.Intersects(b) {
+				if powerLocality && a.net == b.net && a.shareable && b.shareable {
+					continue // A same-net power corridor can become a shared rail.
+				}
+				if a.box.Intersects(b.box) {
 					return false
 				}
 			}
 		}
 		for _, b := range otherCorridors {
-			if body.Intersects(b) {
+			if body.Intersects(b.box) {
 				return false
 			}
 		}

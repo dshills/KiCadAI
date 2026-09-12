@@ -2287,14 +2287,15 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		FunctionalLocalWiring: document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5,
-		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5),
-		FunctionalLocality:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
-		FunctionalJoint:       document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5,
-		FunctionalPinAware:    (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5),
-		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
-		Rules:                 rules,
-		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
+		FunctionalPowerLocality: document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalLocalWiring:   document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalGroups:        document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6),
+		FunctionalLocality:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
+		FunctionalJoint:         document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6,
+		FunctionalPinAware:      (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV5 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV6),
+		Sheet:                   schematiclayout.SheetForPaper(document.Metadata.Paper),
+		Rules:                   rules,
+		MaxComponentsPerSheet:   document.Layout.MaxComponentsPerSheet,
 	}
 	if rules.ReserveTitleBlock {
 		request.Sheet = schematiclayout.SheetWithStandardTitleBlock(request.Sheet)

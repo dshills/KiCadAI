@@ -53,8 +53,15 @@ func routeFunctionalLocalTrees(result *Result, labeled map[string]kicadfiles.Poi
 	var islands []routableEndpoint
 	for _, key := range keys {
 		local := groups[key]
+		localRequest := request
+		localRequest.FunctionalPowerLocality = request.FunctionalPowerLocality && powerLocalityGroup(key, request.Components)
 		// Stable endpoint order is independent of input order and coordinates.
 		slices.SortFunc(local, func(a, b routableEndpoint) int {
+			if localRequest.FunctionalPowerLocality && containsNormalizedRole(net.Role, "power", "power_pos", "power_neg", "ground", "return") {
+				if order := cmp.Compare(powerRootPriority(a.endpoint.Ref, request.Components), powerRootPriority(b.endpoint.Ref, request.Components)); order != 0 {
+					return order
+				}
+			}
 			if order := cmp.Compare(a.endpoint.Ref, b.endpoint.Ref); order != 0 {
 				return order
 			}
@@ -68,7 +75,7 @@ func routeFunctionalLocalTrees(result *Result, labeled map[string]kicadfiles.Poi
 			})
 			connected := false
 			for _, parent := range parents {
-				points, clean := routeConnectionPoints(net.Name, parent.endpoint, endpoint.endpoint, parent.anchor, endpoint.anchor, *result, request, rules, anchors, true)
+				points, clean := routeConnectionPoints(net.Name, parent.endpoint, endpoint.endpoint, parent.anchor, endpoint.anchor, *result, localRequest, rules, anchors, true)
 				if !clean {
 					continue
 				}

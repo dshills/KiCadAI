@@ -1,0 +1,9 @@
+ok  	kicadai/internal/compositionlowering	1.308s
+ok  	kicadai/internal/schematicir	0.787s
+--- FAIL: TestFunctionalPowerLocalityEscapesPaddedPinEnvelope (0.00s)
+    power_locality_test.go:136: padded-body power dogleg remains blocked [{47620000 40000000} {70000000 40000000} {70000000 50000000}] false
+FAIL
+FAIL	kicadai/internal/schematiclayout	0.677s
+ok  	kicadai/internal/kicadfiles/designapi	1.247s
+ok  	kicadai/internal/transactions	0.753s
+FAIL
