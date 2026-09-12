@@ -1,0 +1,67 @@
+=== RUN   TestNativeJointFrozenCandidateDiagnostic
+    native_joint_diagnostic_test.go:42: immutable input controller_adc_100ma/schematic_transaction.json sha256=ce07f78c2d98904cf989ee1c452399ee103d9c5e2d6f38bbf9d223b263d0a8f2
+    native_joint_diagnostic_test.go:43: immutable input library_index.json sha256=7ec33bdf90748cf42d19a603e8623f8c7c7269e5b33b56c1e477f7b476e1093d
+    native_joint_diagnostic_test.go:79: labels=52 placement_error=native annotation placement exhausted after 3 bounded candidate visits
+    native_joint_diagnostic_test.go:81: candidate_order=0 uuid=4c00e434-fd56-554b-b3a2-aff443d66202 text="composition_net_004" count=1 origin={111760000 350520000}
+    native_joint_diagnostic_test.go:87: {"uuid":"4c00e434-fd56-554b-b3a2-aff443d66202","text":"composition_net_004","origin":{"X":111760000,"Y":350520000},"candidates":[{"at":{"X":111760000,"Y":350520000},"box":{"MinX":110490000,"MinY":326390000,"MaxX":111760000,"MaxY":350520000},"rotation":90}]}
+    native_joint_diagnostic_test.go:81: candidate_order=1 uuid=626ee27c-c969-5a25-9823-f20e5b0216f5 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13" count=1 origin={331470000 386080000}
+    native_joint_diagnostic_test.go:87: {"uuid":"626ee27c-c969-5a25-9823-f20e5b0216f5","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13","origin":{"X":331470000,"Y":386080000},"candidates":[{"at":{"X":331470000,"Y":386080000},"box":{"MinX":330200000,"MinY":335280000,"MaxX":331470000,"MaxY":386080000},"rotation":90}]}
+    native_joint_diagnostic_test.go:81: candidate_order=2 uuid=e56c4540-f431-583a-a74b-e37842b68fac text="composition_net_003" count=1 origin={311150000 350520000}
+    native_joint_diagnostic_test.go:87: {"uuid":"e56c4540-f431-583a-a74b-e37842b68fac","text":"composition_net_003","origin":{"X":311150000,"Y":350520000},"candidates":[{"at":{"X":311150000,"Y":350520000},"box":{"MinX":311150000,"MinY":349250000,"MaxX":335280000,"MaxY":350520000},"rotation":0}]}
+    native_joint_diagnostic_test.go:81: candidate_order=3 uuid=ff06f42d-215b-5ce0-84b9-22d4a18f0eb5 text="composition_net_001" count=1 origin={267970000 379730000}
+    native_joint_diagnostic_test.go:87: {"uuid":"ff06f42d-215b-5ce0-84b9-22d4a18f0eb5","text":"composition_net_001","origin":{"X":267970000,"Y":379730000},"candidates":[{"at":{"X":267970000,"Y":379730000},"box":{"MinX":266700000,"MinY":379730000,"MaxX":267970000,"MaxY":403860000},"rotation":270}]}
+    native_joint_diagnostic_test.go:81: candidate_order=4 uuid=33560e60-1d1e-516f-81ee-9b603d093602 text="composition_net_003" count=2 origin={160020000 146050000}
+    native_joint_diagnostic_test.go:87: {"uuid":"33560e60-1d1e-516f-81ee-9b603d093602","text":"composition_net_003","origin":{"X":160020000,"Y":146050000},"candidates":[{"at":{"X":160020000,"Y":146050000},"box":{"MinX":158750000,"MinY":121920000,"MaxX":160020000,"MaxY":146050000},"rotation":90},{"at":{"X":160020000,"Y":146050000},"box":{"MinX":135890000,"MinY":144780000,"MaxX":160020000,"MaxY":146050000},"rotation":180}]}
+    native_joint_diagnostic_test.go:81: candidate_order=5 uuid=eb26f325-ae5d-559c-9c33-1fc3c312e3bf text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14" count=2 origin={331470000 388620000}
+    native_joint_diagnostic_test.go:87: {"uuid":"eb26f325-ae5d-559c-9c33-1fc3c312e3bf","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14","origin":{"X":331470000,"Y":388620000},"candidates":[{"at":{"X":331470000,"Y":388620000},"box":{"MinX":330200000,"MinY":388620000,"MaxX":331470000,"MaxY":439420000},"rotation":270},{"at":{"X":330200000,"Y":388620000},"box":{"MinX":328930000,"MinY":388620000,"MaxX":330200000,"MaxY":439420000},"rotation":270}]}
+    native_joint_diagnostic_test.go:81: candidate_order=6 uuid=bf781013-fad7-5c6f-ae5f-d256db02fda9 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14" count=3 origin={347980000 368300000}
+    native_joint_diagnostic_test.go:87: {"uuid":"bf781013-fad7-5c6f-ae5f-d256db02fda9","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14","origin":{"X":347980000,"Y":368300000},"candidates":[{"at":{"X":347980000,"Y":368300000},"box":{"MinX":346710000,"MinY":317500000,"MaxX":347980000,"MaxY":368300000},"rotation":90},{"at":{"X":347980000,"Y":368300000},"box":{"MinX":346710000,"MinY":368300000,"MaxX":347980000,"MaxY":419100000},"rotation":270},{"at":{"X":349250000,"Y":368300000},"box":{"MinX":347980000,"MinY":368300000,"MaxX":349250000,"MaxY":419100000},"rotation":270}]}
+    native_joint_diagnostic_test.go:81: candidate_order=7 uuid=d69aa954-76ce-5d19-8e4f-6283f8c02ad6 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13" count=3 origin={347980000 363220000}
+    native_joint_diagnostic_test.go:87: {"uuid":"d69aa954-76ce-5d19-8e4f-6283f8c02ad6","text":"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13","origin":{"X":347980000,"Y":363220000},"candidates":[{"at":{"X":347980000,"Y":363220000},"box":{"MinX":346710000,"MinY":312420000,"MaxX":347980000,"MaxY":363220000},"rotation":90},{"at":{"X":347980000,"Y":363220000},"box":{"MinX":346710000,"MinY":363220000,"MaxX":347980000,"MaxY":414020000},"rotation":270},{"at":{"X":349250000,"Y":363220000},"box":{"MinX":347980000,"MinY":312420000,"MaxX":349250000,"MaxY":363220000},"rotation":90}]}
+    native_joint_diagnostic_test.go:81: candidate_order=8 uuid=15dfc0d3-8c49-556b-b05d-d60f00088320 text="composition_net_005" count=4 origin={330200000 358140000}
+    native_joint_diagnostic_test.go:81: candidate_order=9 uuid=860c5815-b028-5440-a968-a0a0e6a7f0a3 text="composition_net_003" count=5 origin={360680000 360680000}
+    native_joint_diagnostic_test.go:81: candidate_order=10 uuid=99db1d46-fbe2-5c09-8880-1d35d3733730 text="composition_net_005" count=5 origin={128270000 378460000}
+    native_joint_diagnostic_test.go:81: candidate_order=11 uuid=9d1fce4e-532c-59c9-a9b0-054ba84bf5ee text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2" count=5 origin={267970000 410210000}
+    native_joint_diagnostic_test.go:81: candidate_order=12 uuid=ec00b2cb-3cb2-5826-b0ae-c98b390da0b2 text="composition_net_001" count=5 origin={360680000 365760000}
+    native_joint_diagnostic_test.go:81: candidate_order=13 uuid=1d27027a-8510-51ca-99bb-8e48bbecf25c text="composition_net_001" count=7 origin={67310000 220980000}
+    native_joint_diagnostic_test.go:81: candidate_order=14 uuid=314db375-579d-508f-a7dd-ca767086a563 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2" count=7 origin={256540000 378460000}
+    native_joint_diagnostic_test.go:81: candidate_order=15 uuid=425eeb04-26aa-59bf-86b9-3de8e681246a text="composition_net_001" count=7 origin={208280000 350520000}
+    native_joint_diagnostic_test.go:81: candidate_order=16 uuid=61fe7b1e-60be-5595-919f-2f8084a21ecc text="composition_net_001" count=7 origin={67310000 147320000}
+    native_joint_diagnostic_test.go:81: candidate_order=17 uuid=6286d31d-bbd7-5e2a-aacb-1d2339a38a39 text="composition_net_001" count=7 origin={125730000 147320000}
+    native_joint_diagnostic_test.go:81: candidate_order=18 uuid=676010ab-654d-5cee-a776-477d0a6be593 text="composition_net_002" count=7 origin={67310000 218440000}
+    native_joint_diagnostic_test.go:81: candidate_order=19 uuid=7c17970f-b2b4-51f3-af18-077991b92195 text="composition_net_003" count=7 origin={267970000 165100000}
+    native_joint_diagnostic_test.go:81: candidate_order=20 uuid=9376e9aa-4162-59b5-80f9-268bdb65c892 text="composition_net_004" count=7 origin={67310000 149860000}
+    native_joint_diagnostic_test.go:81: candidate_order=21 uuid=3327471d-55c1-5dae-bb9e-fc29bbdc0525 text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2" count=8 origin={288290000 358140000}
+    native_joint_diagnostic_test.go:81: candidate_order=22 uuid=016bbbc2-b15d-505e-9d2a-333c930040e4 text="composition_net_001" count=9 origin={332740000 326390000}
+    native_joint_diagnostic_test.go:81: candidate_order=23 uuid=0f046cf8-07f2-5cba-b03d-f81a19a96f3e text="composition_net_003" count=9 origin={256540000 406400000}
+    native_joint_diagnostic_test.go:81: candidate_order=24 uuid=1485578d-bcee-5913-ba97-4b31569f7a86 text="composition_net_001" count=9 origin={228600000 151130000}
+    native_joint_diagnostic_test.go:81: candidate_order=25 uuid=1b5f054d-878f-5226-9382-62ba9b7f911a text="composition_net_003" count=9 origin={294640000 179070000}
+    native_joint_diagnostic_test.go:81: candidate_order=26 uuid=28c46c47-522a-5327-ae9b-a1891c3fd8b3 text="composition_net_002" count=9 origin={245110000 165100000}
+    native_joint_diagnostic_test.go:81: candidate_order=27 uuid=3725ae7d-8121-5cd8-8887-51457cc13fa4 text="composition_net_006" count=9 origin={66040000 350520000}
+    native_joint_diagnostic_test.go:81: candidate_order=28 uuid=79f4ce56-4287-5770-a826-a7e0e2bc1330 text="composition_net_001" count=9 origin={156210000 149860000}
+    native_joint_diagnostic_test.go:81: candidate_order=29 uuid=8133541b-404e-5aa6-b3f7-bd563051705d text="composition_net_001" count=9 origin={294640000 151130000}
+    native_joint_diagnostic_test.go:81: candidate_order=30 uuid=85b89f44-5176-50af-a810-9703a9744ff7 text="composition_net_001" count=9 origin={67310000 182880000}
+    native_joint_diagnostic_test.go:81: candidate_order=31 uuid=999f9e52-9748-52e9-a688-6423cb1707a5 text="composition_net_001" count=9 origin={297180000 326390000}
+    native_joint_diagnostic_test.go:81: candidate_order=32 uuid=ea606f41-ee46-5cdc-8a3d-3b474ce0c720 text="composition_net_001" count=10 origin={132080000 334010000}
+    native_joint_diagnostic_test.go:81: candidate_order=33 uuid=f2a0d607-a0b7-596d-887f-91dbad772eee text="composition_net_002" count=11 origin={218440000 179070000}
+    native_joint_diagnostic_test.go:81: candidate_order=34 uuid=d669876d-925b-5227-8851-6dd0d99b449e text="composition_net_003" count=13 origin={129540000 370840000}
+    native_joint_diagnostic_test.go:81: candidate_order=35 uuid=92a774d0-1fa8-516f-93df-f84460de718a text="composition_net_001" count=16 origin={289560000 194310000}
+    native_joint_diagnostic_test.go:81: candidate_order=36 uuid=95925678-9bc6-56e2-82e2-0c5ff8acb5a6 text="composition_net_001" count=16 origin={223520000 194310000}
+    native_joint_diagnostic_test.go:81: candidate_order=37 uuid=a5e7bf67-14fb-5cf5-b6c1-8989f9b9febd text="composition_net_001" count=16 origin={256540000 180340000}
+    native_joint_diagnostic_test.go:81: candidate_order=38 uuid=d975d153-0d43-59f8-b318-8a7003bbef01 text="composition_net_001" count=16 origin={114300000 393700000}
+    native_joint_diagnostic_test.go:81: candidate_order=39 uuid=daf70e8f-10fc-5ccd-8b00-29640fa424f6 text="composition_net_002" count=16 origin={121920000 190500000}
+    native_joint_diagnostic_test.go:81: candidate_order=40 uuid=e8bfd4cf-a43a-56ef-a70e-20854a8926ed text="composition_net_001" count=16 origin={309880000 411480000}
+    native_joint_diagnostic_test.go:81: candidate_order=41 uuid=6581c205-c8d7-5a52-9bfe-42a5bc9760f2 text="composition_net_003" count=18 origin={132080000 311150000}
+    native_joint_diagnostic_test.go:81: candidate_order=42 uuid=664d4422-c1fa-5f35-96e8-f461daca785d text="composition_net_002" count=18 origin={223520000 135890000}
+    native_joint_diagnostic_test.go:81: candidate_order=43 uuid=938ab011-6a05-5a54-9903-b734a2e5210d text="composition_net_003" count=18 origin={289560000 135890000}
+    native_joint_diagnostic_test.go:81: candidate_order=44 uuid=9dbd2a03-661e-51bf-b6d3-d94425ae9cc8 text="composition_net_003" count=18 origin={292100000 311150000}
+    native_joint_diagnostic_test.go:81: candidate_order=45 uuid=c71b83d0-496a-5e63-9fd1-dea6cd510f88 text="composition_net_003" count=18 origin={327660000 311150000}
+    native_joint_diagnostic_test.go:81: candidate_order=46 uuid=edebaddc-19a5-5fc2-ba67-c319cc11e56c text="SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2" count=30 origin={350520000 391160000}
+    native_joint_diagnostic_test.go:81: candidate_order=47 uuid=d997ecf2-3853-591c-98ff-3a305b3f6396 text="composition_net_007" count=66 origin={163830000 347980000}
+    native_joint_diagnostic_test.go:81: candidate_order=48 uuid=f0c3c3d5-edfd-5c97-96c1-4d961ee0c9a8 text="composition_net_006" count=66 origin={120650000 346710000}
+    native_joint_diagnostic_test.go:81: candidate_order=49 uuid=2c151bf7-0603-5822-b7c0-20b9ed44732b text="composition_net_007" count=69 origin={109220000 345440000}
+    native_joint_diagnostic_test.go:81: candidate_order=50 uuid=7596a75a-c33a-523c-b983-e4e83f7604c7 text="composition_net_005" count=132 origin={109220000 378460000}
+    native_joint_diagnostic_test.go:81: candidate_order=51 uuid=7d8e7a2d-d17d-50cd-9830-078a2fb85d7a text="composition_net_005" count=132 origin={81280000 365760000}
+--- PASS: TestNativeJointFrozenCandidateDiagnostic (7.67s)
+PASS
+ok  	kicadai/internal/transactions	8.013s

@@ -1,0 +1,22 @@
+// Authenticate the offline reproduction independently of the native attempts.
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {dirname,join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const phase=dirname(fileURLToPath(import.meta.url)),sha=b=>createHash('sha256').update(b).digest('hex'),json=p=>JSON.parse(readFileSync(p));
+const modes=['diagnostic-frozen','diagnostic-frozen-2','diagnostic-frozen-3','diagnostic-layout-1','diagnostic-candidates-1'];
+const executions=modes.map(mode=>{const r=json(join(phase,mode+'.execution.json'));assert.equal(r.log_sha256,sha(readFileSync(join(phase,mode+'.log'))));assert.equal(r.source_snapshot_sha256,sha(readFileSync(r.source_snapshot)));assert(r.source_unchanged);assert.equal(r.code,mode==='diagnostic-frozen'?1:0);return {mode,exit_code:r.code,log_sha256:r.log_sha256,source_snapshot_sha256:r.source_snapshot_sha256};});
+const frozen=readFileSync(join(phase,'diagnostic-frozen-3.log'),'utf8');
+assert(frozen.includes('labels=52 placement_error=native annotation placement exhausted after 3 bounded candidate visits'));
+const labels=frozen.split('\n').filter(l=>l.includes('{"uuid":')).map(l=>JSON.parse(l.slice(l.indexOf('{"uuid":'))));
+const intersection=(a,b)=>Math.min(a.MaxX,b.MaxX)>Math.max(a.MinX,b.MinX)&&Math.min(a.MaxY,b.MaxY)>Math.max(a.MinY,b.MinY);
+const conflicts=[];
+for(let i=0;i<labels.length;i++)for(let j=i+1;j<labels.length;j++)if(labels[i].candidates.length===1&&labels[j].candidates.length===1&&intersection(labels[i].candidates[0].box,labels[j].candidates[0].box))conflicts.push({first:labels[i],second:labels[j]});
+assert.equal(conflicts.length,1);
+const positive=readFileSync(join(phase,'diagnostic-candidates-1.log'),'utf8');assert(positive.includes('labels=51 placement_error=<nil>'));
+const transaction=json(join(phase,'diagnostic-transaction-1.json'));
+assert.deepEqual(transaction,json('/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/schematic_transaction.json'),'Native final did not use the diagnosed drawing projection');
+const result={schema:'kicadai.joint-annotation-diagnosis.v1',executions,original_transaction_sha256:'ce07f78c2d98904cf989ee1c452399ee103d9c5e2d6f38bbf9d223b263d0a8f2',recorded_library_sha256:'7ec33bdf90748cf42d19a603e8623f8c7c7269e5b33b56c1e477f7b476e1093d',frozen_profile:'ownership-v3',frozen_label_count:52,frozen_solver_visits:3,single_candidate_conflicts:conflicts,repair_profile:'ownership-v4',repair_label_count:51,repair_solver_error:null,repair_diagnostic_transaction_sha256:sha(readFileSync(join(phase,'diagnostic-transaction-1.json'))),native_final_projection_matches_diagnostic:true,interpretation:'A hard rectangle intersection between two single-candidate labels, not the 50000-visit search bound. Joint component-and-label-corridor reservation supplies a feasible alternate drawing. Label count changes with routing islands; emitted physical connectivity must still be independently verified.',initial_failed_diagnostic:'The first reconstruction omitted the workflow resolver-hydration flag and stopped at waypoint-anchor validation. Retained as a harness failure, not native evidence. Later diagnostics use a local operation copy with the identical workflow hydration flag; frozen source bytes remain unchanged.',scope:'In-memory recorded-metadata replay only; no KiCad CLI, generated-project writes or provider requests. One separately named derived JSON transaction is retained.',provider_calls:0,native_evaluations_added:0,benchmark_passes_added:0};
+const path=join(phase,'diagnosis.json');if(existsSync(path))assert.deepEqual(json(path),result);else writeFileSync(path,JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({authenticated:true,frozen_conflicts:conflicts.length,repair_solver_passed:true,native_final_projection_matches_diagnostic:true}));

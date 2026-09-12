@@ -11,7 +11,7 @@ import (
 // come from the explicit circuit. No component-ID substring is interpreted as a
 // voltage, ADC assignment, reset function or programming protocol.
 func nativeSchematicBlocks(document Document) []schematiclayout.NativeAnnotationBlock {
-	if document.Layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV3 || document.Layout.NativeProfile != schematiclayout.NativeAnnotationV2 {
+	if (document.Layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV3 && document.Layout.FunctionalProfile != schematiclayout.FunctionalOwnershipV4) || document.Layout.NativeProfile != schematiclayout.NativeAnnotationV2 {
 		return nil
 	}
 	components := indexComponentsByID(document.Circuit.Components)

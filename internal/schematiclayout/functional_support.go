@@ -18,6 +18,10 @@ func functionalSupportPositions(components []Component, original map[string]kica
 }
 
 func functionalSupportPositionsWithPins(components []Component, nets []Net, original map[string]kicadfiles.Point, rules Rules, pinAware bool) map[string]kicadfiles.Point {
+	return functionalSupportPositionsJoint(components, nets, original, rules, pinAware, false)
+}
+
+func functionalSupportPositionsJoint(components []Component, nets []Net, original map[string]kicadfiles.Point, rules Rules, pinAware, joint bool) map[string]kicadfiles.Point {
 	byRef := map[string]Component{}
 	active, activeCount := "", 0
 	for _, c := range components {
@@ -85,6 +89,9 @@ func functionalSupportPositionsWithPins(components []Component, nets []Net, orig
 				p := SnapPoint(kicadfiles.Point{X: origin.X + offset.X, Y: origin.Y + offset.Y}, rules.Grid)
 				bounds := componentBoundsAt(byRef[ref], p).Inflate(gap)
 				if !supportOnAttachmentSide(bounds, ownerBounds, side) {
+					continue
+				}
+				if joint && !jointSupportClear(byRef[ref], p, byRef, positions, placed, nets, gap) {
 					continue
 				}
 				clear := true

@@ -1,0 +1,8 @@
+=== RUN   TestFunctionalJointSerializedReplay
+=== RUN   TestFunctionalJointSerializedReplay/standalone_regulator
+=== RUN   TestFunctionalJointSerializedReplay/controller_adc_100ma
+--- PASS: TestFunctionalJointSerializedReplay (25.66s)
+    --- PASS: TestFunctionalJointSerializedReplay/standalone_regulator (7.08s)
+    --- PASS: TestFunctionalJointSerializedReplay/controller_adc_100ma (9.69s)
+PASS
+ok  	kicadai/internal/compositionlowering	26.097s

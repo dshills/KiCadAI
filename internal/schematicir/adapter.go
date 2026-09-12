@@ -2287,9 +2287,10 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3,
+		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4),
 		FunctionalLocality:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
-		FunctionalPinAware:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3,
+		FunctionalJoint:       document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4,
+		FunctionalPinAware:    (document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV4),
 		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,

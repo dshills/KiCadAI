@@ -13,6 +13,8 @@ const FunctionalOwnershipV2 = "ownership-v2"
 
 const FunctionalOwnershipV3 = "ownership-v3"
 
+const FunctionalOwnershipV4 = "ownership-v4"
+
 // functionalGroupPositions lays out each explicitly owned circuit block using
 // the existing topology/role engine, then packs whole blocks into stable rows.
 // Global power rails no longer create one remote capacitor bank. No electrical
@@ -89,7 +91,10 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 			p.X = SnapPoint(kicadfiles.Point{X: (left + right) / 2}, rules.Grid).X
 			points[active] = p
 		}
-		if request.FunctionalPinAware {
+		if request.FunctionalJoint {
+			local.Nets = jointCanonicalNetRoles(local.Nets)
+			points = functionalSupportPositionsJoint(local.Components, local.Nets, points, localRules, true, true)
+		} else if request.FunctionalPinAware {
 			points = functionalSupportPositionsWithPins(local.Components, local.Nets, points, localRules, true)
 		} else if request.FunctionalLocality {
 			points = functionalSupportPositions(local.Components, points, localRules)
@@ -97,6 +102,11 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 		var bounds Rect
 		for i, c := range local.Components {
 			b := componentBoundsAt(c, points[c.Ref])
+			if request.FunctionalJoint {
+				for _, corridor := range supportOwnerPinCorridors(c, local.Nets, points[c.Ref]) {
+					b = unionRect(b, corridor)
+				}
+			}
 			if i == 0 {
 				bounds = b
 			} else {

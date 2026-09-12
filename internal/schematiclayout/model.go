@@ -35,6 +35,7 @@ type Sheet struct {
 
 type Request struct {
 	FunctionalPinAware    bool
+	FunctionalJoint       bool
 	FunctionalLocality    bool
 	FunctionalGroups      bool
 	Sheet                 Sheet

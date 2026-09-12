@@ -1,0 +1,33 @@
+{
+  "base": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+  "mode": "focused-dev2",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout",
+    "./internal/kicadfiles/designapi",
+    "./internal/transactions",
+    "-run",
+    "Test(Functional|NativeBlock|NativeJoint)",
+    "-count=1",
+    "-timeout=3m"
+  ],
+  "started_utc": "2026-09-12T11:55:54.271Z",
+  "finished_utc": "2026-09-12T11:55:58.195Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-v1-sources/focused-dev2.json",
+  "source_snapshot_sha256": "0c1de851dcf4dabee7cc169da7df99d00d3035c63c984d72bd09b68c196b72b5",
+  "source_unchanged": true,
+  "log_sha256": "bb451935ed233af02a36407f0b3baf957c9927bcae5e3a8af9219b6c56a53913"
+}
