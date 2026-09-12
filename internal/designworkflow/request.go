@@ -61,6 +61,7 @@ type Request struct {
 type ExplicitCircuitSpec struct {
 	ResolutionHash   string                         `json:"resolution_hash"`
 	GenerationHash   string                         `json:"generation_hash,omitempty"`
+	PlacementSeed    *ExplicitPlacementSeedSpec     `json:"placement_seed,omitempty"`
 	CatalogID        string                         `json:"catalog_id"`
 	CatalogHash      string                         `json:"catalog_hash"`
 	Schematic        schematicir.Document           `json:"schematic"`
@@ -621,6 +622,10 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 		return nil
 	}
 	clone := *source
+	if source.PlacementSeed != nil {
+		seed := *source.PlacementSeed
+		clone.PlacementSeed = &seed
+	}
 	clone.Schematic = schematicir.Normalize(source.Schematic)
 	clone.SchematicSupport = append([]ExplicitSchematicSupportSpec(nil), source.SchematicSupport...)
 	if source.Simulation != nil {
@@ -655,6 +660,7 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 
 func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	var issues []reports.Issue
+	issues = append(issues, validateExplicitPlacementSeed(circuit)...)
 	if !validSHA256(circuit.ResolutionHash) {
 		issues = append(issues, issue("explicit_circuit.resolution_hash", "resolution hash must be a lowercase SHA-256 digest"))
 	}

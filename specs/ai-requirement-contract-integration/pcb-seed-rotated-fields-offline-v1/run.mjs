@@ -1,0 +1,47 @@
+// Bounded, key-free execution with create-exclusive logs and exact source.
+import assert from 'node:assert/strict';
+import {spawn,execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {readFileSync,writeFileSync,mkdirSync,existsSync,statfsSync,openSync,writeSync,closeSync} from 'node:fs';
+import {join,resolve,dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const phase=dirname(fileURLToPath(import.meta.url)),repo=resolve(phase,'../../..'),mode=process.argv[2];
+const base='446e19c9b934ad8026b4e9ec2996b47d9ef413f9',prefix='kicadai-pcb-seed-rotated-fields-offline-v1';
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const write=(path,obj)=>writeFileSync(path,JSON.stringify(obj,null,2)+'\n',{flag:'wx'});
+const git=(...a)=>execFileSync('git',a,{cwd:repo,encoding:'utf8'}).trim().split('\n').filter(Boolean);
+const paths=[...new Set([...git('diff',base,'--name-only','--','internal'),...git('ls-files','--others','--exclude-standard','--','internal')])].filter(p=>p.endsWith('.go')).sort();
+const files=paths.map(path=>{const b=readFileSync(join(repo,path));return {path,bytes:b.length,sha256:hash(b),source:b.toString('utf8')};});
+const sourceRoot=join(repo,'.cache/pcb-seed-rotated-fields-v1-sources');
+const toolchain=join(repo,'.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64');
+const env={...process.env,PATH:join(toolchain,'bin')+':'+process.env.PATH,GOROOT:toolchain,GOTOOLCHAIN:'local',GOENV:'off',GOWORK:'off',GOFLAGS:'',GOEXPERIMENT:'',CGO_ENABLED:'1',GOMAXPROCS:'4',GOCACHE:join(repo,'.cache/go/build'),GOMODCACHE:join(repo,'.cache/go/mod'),GOPROXY:'off',GOSUMDB:'off',GOLANGCI_LINT_CACHE:join(repo,'.cache/golangci-lint')};
+const removed=['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY','KICADAI_OPENAI_LIVE_TEST'];for(const k of removed)delete env[k];
+let command=join(toolchain,'bin/go'),args,timeout=30*60*1000,root;
+const packages=['./internal/circuitgraph','./internal/designworkflow','./internal/kicadfiles/designapi'];
+if(/^native-(dev[12]|final)$/.test(mode)){
+  const label=mode.slice(7);root=join('/tmp',prefix+'-'+label);assert(!existsSync(root));
+  assert(!existsSync(join(phase,'native-final.execution.json')),'No native execution after final');
+  const fs=statfsSync(repo);assert(fs.bavail*fs.bsize>12*1024**3,'Insufficient free space with evidence reserve');
+  env.KICADAI_NATIVE_REPLAY_ARTIFACTS=root;
+  env.KICADAI_KICAD_CLI='/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli';
+  env.KICADAI_SYMBOLS_ROOT='/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols';
+  env.KICADAI_FOOTPRINTS_ROOT='/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints';
+  args=['test','./internal/compositionlowering','-run','^TestNativeReadabilitySerializedReplay$','-v','-count=1','-timeout=45m'];timeout=46*60*1000;
+}else if(mode==='full')args=['test','./...','-short','-count=1','-timeout=12m'];
+else if(mode==='race')args=['test','-race',...packages,'-short','-count=1','-timeout=12m'];
+else if(/^focused(?:-dev2|-final)?$/.test(mode))args=['test',...packages,'-run','TestAnnotationProfilePreservesLegacyPlacementSeed|TestExplicitPlacementSeedPolicyAndLegacyFallback|TestNative(Cardinal|NonCardinal)','-count=1','-timeout=3m'];
+else if(mode==='vet')args=['vet','./...'];
+else if(/^lint(?:-final)?$/.test(mode)){command='/Users/dshills/Development/Go/bin/golangci-lint';args=['run','--timeout=12m',...packages];}
+else throw new Error('Unknown bounded execution mode');
+mkdirSync(sourceRoot,{recursive:true});
+const snapshot=join(sourceRoot,mode+'.json');write(snapshot,{base,mode,recorded_utc:new Date().toISOString(),files});
+const log=join(phase,mode+'.log'),fd=openSync(log,'wx');
+const start=new Date().toISOString();
+const child=spawn(command,args,{cwd:repo,env,stdio:['ignore','pipe','pipe'],timeout});
+for(const stream of [child.stdout,child.stderr])stream.on('data',b=>{writeSync(fd,b);process.stdout.write(b);});
+const result=await new Promise(resolve=>{let error;child.on('error',e=>{error=e.message;});child.on('close',(code,signal)=>resolve({code,signal,error}));});
+closeSync(fd);
+const source_unchanged=files.every(f=>hash(readFileSync(join(repo,f.path)))===f.sha256);
+const receipt={base,mode,command,args,root,started_utc:start,finished_utc:new Date().toISOString(),...result,removed_provider_variables:removed,dependency_network:'disabled',source_snapshot:snapshot,source_snapshot_sha256:hash(readFileSync(snapshot)),source_unchanged,log_sha256:hash(readFileSync(log))};
+write(join(phase,mode+'.execution.json'),receipt);console.log(JSON.stringify(receipt));
+process.exitCode=result.code??1;

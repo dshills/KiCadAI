@@ -11,11 +11,12 @@ import (
 )
 
 type nativeAnnotationField struct {
-	key       string
-	text      string
-	preferred kicadfiles.Point
-	rotation  kicadfiles.Angle
-	set       func(kicadfiles.Point)
+	key            string
+	text           string
+	preferred      kicadfiles.Point
+	rotation       kicadfiles.Angle
+	symbolRotation kicadfiles.Angle
+	set            func(kicadfiles.Point)
 }
 
 // finalizeNativeAnnotations runs after routing, when all wire obstacles exist.
@@ -85,13 +86,16 @@ func (builder *Builder) finalizeNativeAnnotations() error {
 	// Electrical labels are constrained to their original wire segment, while
 	// fields may move freely. Reserve the constrained annotations first.
 	for _, field := range fields {
-		if field.rotation != 0 {
+		if !nativeCardinalAngle(field.rotation) || !nativeCardinalAngle(field.symbolRotation) {
 			return fmt.Errorf("native annotation profile does not support rotated field %s", field.key)
 		}
 		at, ok := builder.nativeFieldPosition(field.text, field.preferred, occupied)
 		if !ok {
 			return fmt.Errorf("native annotation placement exhausted for field %s", field.key)
 		}
+		// KiCad field angles are interpreted with the parent symbol transform.
+		// Cancel that cardinal orientation before using horizontal glyph bounds;
+		// symbol and pin rotations remain untouched.
 		field.set(at)
 		occupied = append(occupied, schematiclayout.NativeFieldBounds(field.text, at).Inflate(kicadfiles.MM(0.635)))
 	}
@@ -107,17 +111,37 @@ func (builder *Builder) nativeAnnotationFields() []nativeAnnotationField {
 			if p.Hidden || strings.TrimSpace(p.Value) == "" {
 				continue
 			}
-			fields = append(fields, nativeAnnotationField{key: fmt.Sprintf("%s.property.%d", s.Reference, pi), text: p.Value, preferred: p.Position, rotation: p.Rotation, set: func(at kicadfiles.Point) { p.Position = at }})
+			fields = append(fields, nativeAnnotationField{key: fmt.Sprintf("%s.property.%d", s.Reference, pi), text: p.Value, preferred: p.Position, rotation: p.Rotation, symbolRotation: s.Rotation, set: func(at kicadfiles.Point) { p.Position, p.Rotation = at, nativeUprightFieldAngle(s.Rotation) }})
 		}
 		for fi := range s.Fields {
 			f := &s.Fields[fi]
 			if f.Hidden || (!f.Visible && f.Name != "Reference" && f.Name != "Value") || strings.TrimSpace(f.Value) == "" {
 				continue
 			}
-			fields = append(fields, nativeAnnotationField{key: fmt.Sprintf("%s.field.%d", s.Reference, fi), text: f.Value, preferred: f.Position, rotation: f.Rotation, set: func(at kicadfiles.Point) { f.Position = at }})
+			fields = append(fields, nativeAnnotationField{key: fmt.Sprintf("%s.field.%d", s.Reference, fi), text: f.Value, preferred: f.Position, rotation: f.Rotation, symbolRotation: s.Rotation, set: func(at kicadfiles.Point) { f.Position, f.Rotation = at, nativeUprightFieldAngle(s.Rotation) }})
 		}
 	}
 	return fields
+}
+
+func nativeCardinalAngle(angle kicadfiles.Angle) bool {
+	return angle == 0 || angle == 90 || angle == 180 || angle == 270
+}
+
+func nativeUprightFieldAngle(symbolRotation kicadfiles.Angle) kicadfiles.Angle {
+	if symbolRotation == 0 {
+		return 0
+	}
+	return 360 - symbolRotation
+}
+
+func nativeFieldIsUpright(field nativeAnnotationField) bool {
+	if !nativeCardinalAngle(field.rotation) || !nativeCardinalAngle(field.symbolRotation) {
+		return false
+	}
+	// The native renderer auto-flips text for readability; 0/180 share a
+	// horizontal glyph rectangle, while 90/270 share a vertical rectangle.
+	return (int(field.rotation)+int(field.symbolRotation))%180 == 0
 }
 
 func (builder *Builder) nativeAnnotationBodies() []schematiclayout.Rect {

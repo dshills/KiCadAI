@@ -46,7 +46,7 @@ func AuditNativeAnnotations(file schematic.SchematicFile) []string {
 		check("label "+label.Text, schematiclayout.NativeLabelBounds(label.Text, label.Position, label.Rotation, containsFold(label.Justify, "right")))
 	}
 	for _, field := range b.nativeAnnotationFields() {
-		if field.rotation != 0 {
+		if !nativeFieldIsUpright(field) {
 			issues = append(issues, "unsupported native field angle: "+field.key)
 		}
 		check(field.key, schematiclayout.NativeFieldBounds(field.text, field.preferred))
