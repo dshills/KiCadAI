@@ -1,13 +1,71 @@
 package architecturesearch
 
 import (
+	"bytes"
 	"encoding/json"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
 )
+
+func TestExplicitReferenceCommonAndSideSpecificBindings(t *testing.T) {
+	b, err := os.ReadFile("testdata/power_interface_synthesis_corpus/regulated_mcu_sensor_subsystem.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, issues := DecodeStrict(bytes.NewReader(b))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatal(issues)
+	}
+	for _, mode := range []string{"common", "side_override", "side_mismatch", "side_nonreference", "common_mismatch", "missing"} {
+		t.Run(mode, func(t *testing.T) {
+			r := Normalize(original)
+			for i := range r.Requirements.Domains {
+				if r.Requirements.Domains[i].Kind == "supply" {
+					r.Requirements.Domains[i].ReferenceDomain = "ground"
+				}
+			}
+			r.Requirements.Domains = append(r.Requirements.Domains, Domain{ID: "isolated_return", Kind: "reference", Source: "external"})
+			r.Requirements.Ports = append(r.Requirements.Ports, Port{ID: "isolated_return_port", Kind: "reference", Direction: "bidirectional", Domain: "isolated_return"})
+			for i := range r.Requirements.Objectives {
+				o := &r.Requirements.Objectives[i]
+				if o.Capability != "logic_level_translation" {
+					continue
+				}
+				if mode == "side_override" || mode == "side_mismatch" || mode == "side_nonreference" {
+					p := "ground"
+					if mode == "side_mismatch" {
+						p = "isolated_return_port"
+					}
+					if mode == "side_nonreference" {
+						p = "power"
+					}
+					o.Bindings = append(o.Bindings, Binding{Role: "reference_a", Port: p})
+				}
+				if mode == "common_mismatch" || mode == "missing" {
+					for j := range o.Bindings {
+						if o.Bindings[j].Role == "reference" {
+							if mode == "missing" {
+								o.Bindings = append(o.Bindings[:j], o.Bindings[j+1:]...)
+							} else {
+								o.Bindings[j].Port = "isolated_return_port"
+							}
+							break
+						}
+					}
+				}
+			}
+			blocked := reports.HasBlockingIssue(Validate(Normalize(r)))
+			wantBlocked := mode == "side_mismatch" || mode == "side_nonreference" || mode == "common_mismatch" || mode == "missing"
+			if blocked != wantBlocked {
+				t.Fatalf("blocked=%t want=%t: %v", blocked, wantBlocked, Validate(Normalize(r)))
+			}
+		})
+	}
+}
 
 func TestExplicitReferenceDomainIdentityAndValidation(t *testing.T) {
 	r := standaloneOutputRequirement(t)

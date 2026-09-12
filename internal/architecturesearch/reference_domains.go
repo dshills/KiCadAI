@@ -40,6 +40,9 @@ func (validator *requirementValidator) explicitObjectiveReferences() {
 		references := map[string]string{}
 		for _, binding := range objective.Bindings {
 			if binding.Role == "reference" || strings.HasPrefix(binding.Role, "reference_") {
+				// Presence matters: an invalid explicit side return must not fall
+				// back to an otherwise valid common return.
+				references[binding.Role] = ""
 				domain := validator.domainsByID[validator.portsByID[binding.Port].Domain]
 				if domain.Kind == "reference" {
 					references[binding.Role] = domain.ID
@@ -61,7 +64,9 @@ func (validator *requirementValidator) explicitObjectiveReferences() {
 			reference := references["reference"]
 			for _, side := range []string{"a", "b"} {
 				if strings.HasSuffix(binding.Role, "_"+side) {
-					reference = references["reference_"+side]
+					if sideReference, explicit := references["reference_"+side]; explicit {
+						reference = sideReference
+					}
 				}
 			}
 			if reference != domain.ReferenceDomain {
