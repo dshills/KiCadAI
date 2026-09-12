@@ -541,6 +541,7 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 		return designapi.New(designapi.Options{
 			NativeSchematicProfile:     payload.NativeSchematicProfile,
 			NativeSchematicNotes:       payload.NativeSchematicNotes,
+			NativeSchematicBlocks:      payload.NativeSchematicBlocks,
 			SchematicNetClassDefaults:  payload.SchematicNetClassDefaults,
 			Name:                       payload.Name,
 			Seed:                       firstNonEmpty(opts.Seed, payload.Name),

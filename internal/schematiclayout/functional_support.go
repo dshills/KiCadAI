@@ -14,6 +14,10 @@ import (
 // Body envelopes include pin-label clearance supplied by the IR adapter. The
 // native writer remains responsible for final wire/label/field collision checks.
 func functionalSupportPositions(components []Component, original map[string]kicadfiles.Point, rules Rules) map[string]kicadfiles.Point {
+	return functionalSupportPositionsWithPins(components, nil, original, rules, false)
+}
+
+func functionalSupportPositionsWithPins(components []Component, nets []Net, original map[string]kicadfiles.Point, rules Rules, pinAware bool) map[string]kicadfiles.Point {
 	byRef := map[string]Component{}
 	active, activeCount := "", 0
 	for _, c := range components {
@@ -68,10 +72,28 @@ func functionalSupportPositions(components []Component, original map[string]kica
 				continue
 			}
 			origin, found := positions[parents[ref]], false
+			side := ""
+			if pinAware {
+				side = supportAttachmentSide(ref, byRef[parents[ref]], nets)
+			}
+			ownerBounds := componentBoundsAt(byRef[parents[ref]], origin)
+			var pinCorridors []Rect
+			if pinAware {
+				pinCorridors = supportOwnerPinCorridors(byRef[parents[ref]], nets, origin)
+			}
 			for _, offset := range offsets {
 				p := SnapPoint(kicadfiles.Point{X: origin.X + offset.X, Y: origin.Y + offset.Y}, rules.Grid)
 				bounds := componentBoundsAt(byRef[ref], p).Inflate(gap)
+				if !supportOnAttachmentSide(bounds, ownerBounds, side) {
+					continue
+				}
 				clear := true
+				for _, corridor := range pinCorridors {
+					if bounds.Intersects(corridor) {
+						clear = false
+						break
+					}
+				}
 				for other, done := range placed {
 					if done && bounds.Intersects(componentBoundsAt(byRef[other], positions[other]).Inflate(gap)) {
 						clear = false

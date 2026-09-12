@@ -11,6 +11,8 @@ const FunctionalOwnershipV1 = "ownership-v1"
 
 const FunctionalOwnershipV2 = "ownership-v2"
 
+const FunctionalOwnershipV3 = "ownership-v3"
+
 // functionalGroupPositions lays out each explicitly owned circuit block using
 // the existing topology/role engine, then packs whole blocks into stable rows.
 // Global power rails no longer create one remote capacitor bank. No electrical
@@ -87,7 +89,9 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 			p.X = SnapPoint(kicadfiles.Point{X: (left + right) / 2}, rules.Grid).X
 			points[active] = p
 		}
-		if request.FunctionalLocality {
+		if request.FunctionalPinAware {
+			points = functionalSupportPositionsWithPins(local.Components, local.Nets, points, localRules, true)
+		} else if request.FunctionalLocality {
 			points = functionalSupportPositions(local.Components, points, localRules)
 		}
 		var bounds Rect
@@ -100,6 +104,11 @@ func functionalGroupPositions(request Request, rules Rules) map[string]kicadfile
 			}
 		}
 		bounds = bounds.Inflate(kicadfiles.MM(12.7))
+		if request.FunctionalPinAware {
+			// Reserve a local annotation band without moving the actual symbols
+			// relative to their own functional block. The writer checks final text.
+			bounds.MinY -= kicadfiles.MM(40.64)
+		}
 		if x > 0 && x+bounds.Width() > width {
 			x = 0
 			y += rowHeight + gutter

@@ -711,6 +711,7 @@ func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
 		NativeSchematicProfile: state.document.Layout.NativeProfile,
 		NativeSchematicNotes:   nativeSchematicNotes(state.document),
+		NativeSchematicBlocks:  nativeSchematicBlocks(state.document),
 		// The opt-in oriented schematic profile includes explicit native wire
 		// drawing defaults; an incomplete Default net class can plot invisibly.
 		SchematicNetClassDefaults: nativeAnnotationGeometry(state.document),
@@ -2286,8 +2287,9 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
+		FunctionalGroups:      document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV1 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2 || document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3,
 		FunctionalLocality:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV2,
+		FunctionalPinAware:    document.Layout.FunctionalProfile == schematiclayout.FunctionalOwnershipV3,
 		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,

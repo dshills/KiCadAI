@@ -99,6 +99,9 @@ func (builder *Builder) finalizeNativeAnnotations() error {
 		field.set(at)
 		occupied = append(occupied, schematiclayout.NativeFieldBounds(field.text, at).Inflate(kicadfiles.MM(0.635)))
 	}
+	if len(builder.nativeSchematicBlocks) != 0 {
+		return builder.placeNativeAnnotationBlocks(occupied)
+	}
 	return builder.placeNativeReadingGuide(occupied)
 }
 

@@ -28,6 +28,7 @@ import (
 type Builder struct {
 	nativeSchematicProfile string
 	nativeSchematicNotes   []string
+	nativeSchematicBlocks  []schematiclayout.NativeAnnotationBlock
 	nativeAnnotationError  error
 	nativeSchematicLabels  bool
 	name                   string
@@ -67,6 +68,7 @@ type Options struct {
 	// Empty preserves legacy behavior independently of drawing defaults.
 	NativeSchematicProfile     string
 	NativeSchematicNotes       []string
+	NativeSchematicBlocks      []schematiclayout.NativeAnnotationBlock
 	SchematicNetClassDefaults  bool
 	Name                       string
 	DesignID                   kicadfiles.UUID
@@ -304,6 +306,9 @@ func New(options Options) (*Builder, error) {
 	if len(options.NativeSchematicNotes) != 0 && options.NativeSchematicProfile != schematiclayout.NativeAnnotationV2 {
 		return nil, fmt.Errorf("native schematic notes require annotation-v2")
 	}
+	if err := validateNativeAnnotationBlocks(options); err != nil {
+		return nil, err
+	}
 	if options.NativeSchematicProfile == schematiclayout.NativeAnnotationV2 {
 		options.SchematicNetClassDefaults = true
 	}
@@ -341,6 +346,7 @@ func New(options Options) (*Builder, error) {
 	builder := &Builder{
 		nativeSchematicProfile: options.NativeSchematicProfile,
 		nativeSchematicNotes:   append([]string(nil), options.NativeSchematicNotes...),
+		nativeSchematicBlocks:  schematiclayout.CloneNativeAnnotationBlocks(options.NativeSchematicBlocks),
 		nativeSchematicLabels:  options.SchematicNetClassDefaults,
 		name:                   name,
 		generator:              generator,
@@ -1295,6 +1301,9 @@ func (builder *Builder) addSchematicLabelStubWithOrientation(netName string, end
 		return
 	}
 	if builder.schematicWireEndpointExists(anchor) {
+		if len(builder.nativeSchematicBlocks) != 0 {
+			builder.labelNativeConnectedIsland(netName, anchor)
+		}
 		return
 	}
 	if offset.X == 0 && offset.Y == 0 {

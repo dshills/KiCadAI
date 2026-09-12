@@ -1,0 +1,181 @@
+{
+  "schema": "kicadai.emitted-pin-side-and-panel-audit.v1",
+  "root": "/tmp/kicadai-pin-aware-readability-offline-v1-final",
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "attachments": [
+        {
+          "reference": "C1",
+          "parent": "U1",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -33.01999999999998,
+            -17.779999999999987
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C2",
+          "parent": "U1",
+          "basis": "unique active in owned group",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            33.02000000000001,
+            -17.779999999999987
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C3",
+          "parent": "U1",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_002",
+              "role": "power",
+              "pin": "2",
+              "side": "left",
+              "priority": 0
+            }
+          ],
+          "attachment": "left",
+          "delta_mm": [
+            -33.01999999999998,
+            17.78
+          ],
+          "symbol_origin_on_pin_side": true
+        },
+        {
+          "reference": "C4",
+          "parent": "U1",
+          "basis": "explicit support parent",
+          "shared": [
+            {
+              "net": "composition_net_003",
+              "role": "power",
+              "pin": "3",
+              "side": "right",
+              "priority": 0
+            }
+          ],
+          "attachment": "right",
+          "delta_mm": [
+            33.02000000000001,
+            17.78
+          ],
+          "symbol_origin_on_pin_side": true
+        }
+      ],
+      "eligible_attachments": 4,
+      "side_passes": 4,
+      "ambiguous_attachments": [],
+      "blocks": [
+        {
+          "id": "functional_boundaries",
+          "references": [
+            "J1",
+            "J2",
+            "J3"
+          ],
+          "lines": 7,
+          "positions_mm": [
+            [
+              67.31,
+              36.83
+            ],
+            [
+              56.515,
+              39.37
+            ],
+            [
+              60.325,
+              41.91
+            ],
+            [
+              62.865,
+              44.45
+            ],
+            [
+              60.325,
+              46.99
+            ],
+            [
+              63.5,
+              49.53
+            ],
+            [
+              60.325,
+              52.07
+            ]
+          ],
+          "intact": true
+        },
+        {
+          "id": "functional_objective_regulate",
+          "references": [
+            "C1",
+            "C2",
+            "U1",
+            "C3",
+            "C4"
+          ],
+          "lines": 5,
+          "positions_mm": [
+            [
+              202.438,
+              37.338
+            ],
+            [
+              213.233,
+              39.878
+            ],
+            [
+              215.138,
+              42.418
+            ],
+            [
+              218.313,
+              44.958
+            ],
+            [
+              218.948,
+              47.498
+            ]
+          ],
+          "intact": true
+        }
+      ],
+      "notes_intact": true
+    },
+    {
+      "name": "controller_adc_100ma",
+      "status": "not_evaluable",
+      "reason": "No emitted native project; writer gate failed",
+      "eligible_attachments": 0,
+      "side_passes": 0,
+      "notes_intact": false
+    }
+  ],
+  "method": "Exact emitted library pin angle, mirror-then-rotation and native symbol origins; signal/bias outranks supply, ground excluded. Origin-side checks supplement whole-body clearance unit tests and visual inspection, not a complete-readability score. Native text paragraphs independently wrapped and matched in intact contiguous panels.",
+  "provider_calls": 0
+}

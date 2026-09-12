@@ -15,7 +15,7 @@ import (
 )
 
 func TestFunctionalOwnershipPreservesPhysicalRequest(t *testing.T) {
-	for _, profile := range []string{schematiclayout.FunctionalOwnershipV1, schematiclayout.FunctionalOwnershipV2} {
+	for _, profile := range []string{schematiclayout.FunctionalOwnershipV1, schematiclayout.FunctionalOwnershipV2, schematiclayout.FunctionalOwnershipV3} {
 		t.Run(profile, func(t *testing.T) { testFunctionalOwnership(t, profile) })
 	}
 }
