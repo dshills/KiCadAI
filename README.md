@@ -153,6 +153,16 @@ but the capability-improvement criterion was not met. V23 remains experimental
 and does not expand v1. See the [final results](specs/electrical-repair-followup-v23/publication-v23/RESULTS.md)
 and [validation](specs/electrical-repair-followup-v23/publication-v23/LOCAL_VALIDATION.md).
 
+The subsequent practical sensor/controller-board goal remains unachieved.
+Its original live baseline produced 0/8 complete boards. The renewed completion
+attempt stopped before paid evaluation: six human-authored development probes
+failed before electrical synthesis or native generation, with unresolved
+requirement/provider qualification and interface-encoding gaps. No new API
+requests or complete-board passes were claimed. The full short software suite
+passed, but that does not establish practical board readiness. See the
+[negative readiness publication](specs/practical-board-completion-v1/README.md)
+for retained clauses, evidence, source-bound checks and local-review limits.
+
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.

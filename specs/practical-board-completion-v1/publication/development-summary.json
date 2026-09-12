@@ -1,0 +1,208 @@
+{
+  "authored_probes": 6,
+  "engine_invocations": 12,
+  "candidate_native_candidates": 0,
+  "baseline_protocol_incompatibilities": 1,
+  "resource_monitor_failures": 0,
+  "complete_positive_passes": null,
+  "live_final_run": false,
+  "qualifying_uplifts": null,
+  "admission": false,
+  "reason": "No independent clause, complete native, visual and deterministic-replay admission certificate; development statuses cannot substitute.",
+  "provider_calls": 0,
+  "batch_wall_seconds": 1.765,
+  "search_executions": 11,
+  "native_executions": 0,
+  "first_search_rejections": [
+    {
+      "id": "P01",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "count": 1,
+          "samples": [
+            {
+              "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+              "path": "objective:input_survival",
+              "message": "no registered provider supplies capability reverse_input_protection"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "INTERFACE_ADC_DRIVE_UNPROVEN",
+          "count": 1,
+          "samples": [
+            {
+              "code": "INTERFACE_ADC_DRIVE_UNPROVEN",
+              "path": "objective:analog_acquisition",
+              "provider_id": "catalog_function_fragments",
+              "message": "provider expansion failed: ADC drive requires source impedance, input capacitance, acquisition time, and fractional settling accuracy evidence"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "ARCHITECTURE_PROVIDER_EXPANSION_INVALID",
+          "count": 1,
+          "samples": [
+            {
+              "code": "ARCHITECTURE_PROVIDER_EXPANSION_INVALID",
+              "path": "objective:regulate_logic",
+              "provider_id": "catalog_function_fragments",
+              "message": "provider expansion failed: voltage regulation requires an output-current bound"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "INTERFACE_TRANSLATION_UNAVAILABLE",
+          "count": 1,
+          "samples": [
+            {
+              "code": "INTERFACE_TRANSLATION_UNAVAILABLE",
+              "path": "objective:interface_uart",
+              "provider_id": "catalog_function_fragments",
+              "message": "provider expansion failed: direction-controlled translation requires direction changes only while outputs are disabled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "ARCHITECTURE_PROVIDER_EXPANSION_INVALID",
+          "count": 1,
+          "samples": [
+            {
+              "code": "ARCHITECTURE_PROVIDER_EXPANSION_INVALID",
+              "path": "objective:regulate_logic",
+              "provider_id": "catalog_function_fragments",
+              "message": "provider expansion failed: voltage regulation requires an output-current bound"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "status": "unsupported",
+      "consumption": {
+        "expanded_states": 1,
+        "generated_states": 0,
+        "complete_candidates": 0,
+        "rejected_expansions": 1,
+        "maximum_frontier": 1,
+        "maximum_depth_reached": 0
+      },
+      "rejections": [
+        {
+          "code": "INTERFACE_TRANSLATION_UNAVAILABLE",
+          "count": 1,
+          "samples": [
+            {
+              "code": "INTERFACE_TRANSLATION_UNAVAILABLE",
+              "path": "objective:interface_event",
+              "provider_id": "catalog_function_fragments",
+              "message": "provider expansion failed: logic translation requires explicit protocol and signaling-mode evidence"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "peak_sampled_process_tree_rss_bytes": 3719168,
+  "samples_per_invocation": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "batch_files": 165,
+  "batch_bytes": 376005,
+  "batch_inventory_sha256": "4aff8e47877a59f8e7e90d94b2b56668d1d308a15e940ec6d0902a517b6de612",
+  "source": {
+    "baseline": {
+      "cwd": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-completion-v1-baseline",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "build_receipt": ".cache/practical-board-completion-v1/preparation/baseline-v3-build/execution.json",
+      "binary": ".cache/practical-board-completion-v1/preparation/baseline-v3-build/engine"
+    },
+    "candidate": {
+      "cwd": "/Users/dshills/Development/projects/KiCadAI",
+      "source": "525896b2dcd2a0f4957c4868a77efae73414f0b8",
+      "build_receipt": ".cache/practical-board-completion-v1/preparation/candidate-v4-build/execution.json",
+      "binary": ".cache/practical-board-completion-v1/preparation/candidate-v4-build/engine"
+    }
+  },
+  "manual_implementation_repairs": 0,
+  "human_authored_probes": 6,
+  "human_active_minutes": null
+}
