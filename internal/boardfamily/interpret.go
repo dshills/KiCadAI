@@ -135,8 +135,14 @@ func DecodeDecision(prompt string, b []byte) (Decision, error) {
 			d.Clauses = []Clause{{prompt, "clarify", "The requested scope does not explicitly authorize the low_current pull-up profile."}}
 		}
 	case "unsupported":
-		if !hasUnsupported || d.Configuration != nil {
+		if d.Configuration != nil {
 			return d, errors.New("invalid unsupported disposition")
+		}
+		if !hasUnsupported {
+			// Preserve a fail-closed overall refusal even if individual tags
+			// contradict it. This can never authorize generation. Keep the raw
+			// annotations separately, and describe the refusal at request level.
+			d.Clauses = []Clause{{prompt, "unsupported", "Overall request refused; inconsistent per-clause tags were conservatively collapsed. " + d.Message}}
 		}
 	case "clarify":
 		if !hasClarify || hasUnsupported || d.Configuration != nil {

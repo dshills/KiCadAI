@@ -175,6 +175,45 @@ func TestRecordedLanguageResponsesAfterLocalCorrections(t *testing.T) {
 	}
 }
 
+func TestConservativeOverallRefusal(t *testing.T) {
+	for _, tag := range []string{"supported", "clarify"} {
+		d := Decision{"unsupported", "This requested voltage is unsupported.", []Clause{{"Use 5 V.", tag, "Inconsistent model tag."}}, nil}
+		b, _ := json.Marshal(d)
+		got, err := DecodeDecision("Use 5 V.", b)
+		if err != nil || got.Disposition != "unsupported" || got.Configuration != nil || len(got.Clauses) != 1 || got.Clauses[0].Text != "Use 5 V." || got.Clauses[0].Disposition != "unsupported" {
+			t.Fatalf("refusal lost: %+v %v", got, err)
+		}
+		cfg := testConfig()
+		d.Configuration = &cfg
+		b, _ = json.Marshal(d)
+		if _, err = DecodeDecision("Use 5 V.", b); err == nil {
+			t.Fatal("refusal with a configuration must still fail")
+		}
+	}
+}
+
+func TestRecordedHoldoutRefusalCorrection(t *testing.T) {
+	prompt, err := os.ReadFile("testdata/refusal-protocol.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile("testdata/refusal-protocol.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s Selection
+	if err = json.Unmarshal(b, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.ResponseID != "resp_07f89e667ecef197016aa6b731ee7487d19c31d0b811580e2e" || s.LedgerIndex != 31 {
+		t.Fatal("unexpected recorded response")
+	}
+	d, err := DecodeDecision(string(prompt), s.RawDecision)
+	if err != nil || d.Disposition != "unsupported" || d.Configuration != nil || len(d.Clauses) != 1 || d.Clauses[0].Text != string(prompt) {
+		t.Fatalf("recorded refusal failed: %+v %v", d, err)
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
