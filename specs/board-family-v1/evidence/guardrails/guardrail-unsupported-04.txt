@@ -1,0 +1,1 @@
+Use the standard pressure board, but its outline must be 90 x 50 mm with two copper layers.

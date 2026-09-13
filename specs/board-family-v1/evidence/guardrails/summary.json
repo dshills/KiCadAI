@@ -1,0 +1,168 @@
+{
+  "started_utc": "2026-09-13T16:35:14.630Z",
+  "run_kind": "targeted_guardrail_followup",
+  "source_commit": "2b85d7698f2fb5c8550c59621e7f81ce666611e9",
+  "production_base_commit": "faca271b6198d399e3e2e791f40f35df2ac57232",
+  "cap_only_lineage": {
+    "internal/boardfamily/ledger.go": {
+      "before_sha256": "2ed63c04f1150efe8517ece0180eb36a041ca9ced026c65d31fd244dd64fdb75",
+      "after_sha256": "3286a3bde38e9948b8f28ef8b07ea752c9d36e12f210c0897a5b137c073b474f",
+      "replacement": [
+        "const MaxLiveRequests = 35",
+        "const MaxLiveRequests = 41"
+      ]
+    },
+    "cmd/kicadai-board-family/main.go": {
+      "before_sha256": "6f92ab949471246c4cb3b862302bf6e60c6d1b24f2ea23959261402d1e2256b9",
+      "after_sha256": "4fef2614f47333402c9854eb252a4c63513fad73591f871324d4223416ab3b48",
+      "replacement": [
+        "goal's 35-request / $10 limit",
+        "goal's 41-request / $10 limit"
+      ]
+    }
+  },
+  "binary_sha256": "47febeaca39f1834317c499e77d5dc59e96294adcede902264e2377ce647074d",
+  "runner_sha256": "6cfcf2292e132b9219eace754f4cf27ea1b6eed6ee19c73f316255388167bb52",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "spec_sha256": "ccd2806424b811d24f13b7e2cb91b4ed92c8673d691096ca3dce64ba338a208a",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 35,
+  "authorized_request_ceiling": 41,
+  "authorized_usd_ceiling": 10,
+  "planned_case_ids": [
+    "guardrail-unsupported-01",
+    "guardrail-unsupported-02",
+    "guardrail-unsupported-03",
+    "guardrail-unsupported-04",
+    "guardrail-ambiguous-01",
+    "guardrail-ambiguous-02"
+  ],
+  "policy": "Freeze these prompts before execution. Send only the literal prompt and unchanged approved contract/schema. Exactly one request per case, no retries. Require 4/4 unsupported and 2/2 targeted clarifications with null configurations and no native output. Preserve all previous failures and report this targeted follow-up separately. Do not repeat the ten supported requests or build another full campaign. No security change, other provider, purchase, fabrication or merge.",
+  "independence": "Six literal prompts declared and approved before execution; unseen by the selector, authored by the implementing agent, not an independent benchmark. Only the literal prompt and unchanged contract/schema are sent. Historical live scores remain unchanged.",
+  "cases": [
+    {
+      "id": "guardrail-unsupported-01",
+      "expected_disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.830120583,
+      "first_attempt": true,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The board does not support wireless or Bluetooth functionalities as radios must be disabled per design constraints. Therefore, publishing pressure readings over Bluetooth is not supported.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-01",
+        "passed": false
+      },
+      "selection_sha256": "917c0ec4702ef52f5e816cbc959675b43a8b6a252801aff142bc51d250a0e24a",
+      "ledger_index": 36,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    },
+    {
+      "id": "guardrail-unsupported-02",
+      "expected_disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.221975708,
+      "first_attempt": true,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family supports only a regulated supply voltage range of 3.2 to 3.4 V. Directly accepting 12 V at J1 without an external converter is not supported.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-02",
+        "passed": false
+      },
+      "selection_sha256": "af5b242c35b694a63fe1e05d2d61dad85bda3f61d0e98e2a227efd9c8b4ab04f",
+      "ledger_index": 37,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    },
+    {
+      "id": "guardrail-unsupported-03",
+      "expected_disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.6703720000000002,
+      "first_attempt": true,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Adding a relay output for a pump is unsupported because the esp32_bmp280_v1 board family design explicitly excludes relays or additional peripherals beyond the specified features.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-03",
+        "passed": false
+      },
+      "selection_sha256": "154f7048ac991d0487f21bcac1be3584b14662371e304d556b365f62bc979771",
+      "ledger_index": 38,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    },
+    {
+      "id": "guardrail-unsupported-04",
+      "expected_disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.8574541669999998,
+      "first_attempt": true,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family is only available with a fixed 120 x 80 mm outline. The requested 90 x 50 mm outline is not supported.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-04",
+        "passed": false
+      },
+      "selection_sha256": "c78332d40b246189d7a03dd4ff2e7979483d45766e5d516f5dcc0264e4e4460f",
+      "ledger_index": 39,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    },
+    {
+      "id": "guardrail-ambiguous-01",
+      "expected_disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.3697002080000003,
+      "first_attempt": true,
+      "result": {
+        "disposition": "clarify",
+        "message": "Do you prioritize bus speed or reduced I2C pull-up current? Please specify so I can select the appropriate esp32_bmp280_v1 board family profile (standard, fast, or low_current).",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-ambiguous-01",
+        "passed": false
+      },
+      "selection_sha256": "96fca16eceb6546fb0ff92e195b27304dc1e243700cb904e47e93aa2cab68fb7",
+      "ledger_index": 40,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    },
+    {
+      "id": "guardrail-ambiguous-02",
+      "expected_disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.9122279579999995,
+      "first_attempt": true,
+      "result": {
+        "disposition": "clarify",
+        "message": "To select the best configuration for least energy use, please specify the measurement interval and which power loads are most important to reduce, e.g., sensor, controller, communication, or pull-up resistor currents.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-ambiguous-02",
+        "passed": false
+      },
+      "selection_sha256": "e4003b8ad50da02bbbdeaa49e6a4ed90baba000f8524a9b849adb1dc7b7310fa",
+      "ledger_index": 41,
+      "no_native_design": true,
+      "original_prompt_preserved": true,
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "metrics": {
+    "unsupported_passes": 4,
+    "unsupported_total": 4,
+    "clarification_passes": 2,
+    "clarification_total": 2
+  },
+  "finished_utc": "2026-09-13T16:35:27.507Z",
+  "request_count": 41,
+  "ledger_sha256": "e074e37858576b6487e8f738025156d881f8f7bc80276e21117b76e6828d822f"
+}

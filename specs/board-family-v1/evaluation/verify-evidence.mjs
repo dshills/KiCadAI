@@ -131,3 +131,30 @@ console.log(JSON.stringify({verified_file_hashes:checked,physical_requests:physi
  const reg=read(dir+'/bounded-regression.json');assert.equal(reg.exit_code,0);assert.equal(reg.provider_keys_removed,true);assert.equal(reg.seconds,a.bounded_regression_seconds);
  console.log(JSON.stringify({verified_file_hashes:checked,post_ci_configuration_passes:10,post_ci_replays:3,post_ci_api_requests:0,unchanged_generated_artifacts:true}));
 }
+
+{
+ const dir=base+'/evidence/guardrails',s=read(dir+'/summary.json'),a=read(dir+'/assessment.json'),sp=read(base+'/evaluation/guardrail-followup-proposed.json'),before=read(dir+'/ledger-before.json'),after=read(dir+'/ledger-after.json');
+ for(const [f,sha] of Object.entries(read(dir+'/manifest.json').files)){assert.equal(hash(f),sha,f);checked++}
+ assert.deepEqual(before,read(base+'/evidence/acceptance/ledger.json'));assert.deepEqual(after.entries.slice(0,35),before.entries);assert.equal(after.entries.length,41);assert(!after.halt_reason);
+ assert.equal(hash(dir+'/ledger-after.json'),s.ledger_sha256);assert.equal(s.source_commit,a.source_commit);assert.equal(s.binary_sha256,a.binary_sha256);
+ assert.equal(s.spec_sha256,hash(base+'/evaluation/guardrail-followup-proposed.json'));assert.equal(s.contract_sha256,hash(base+'/evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json'));assert.equal(s.contract_sha256,hash(dir+'/executed-contract.json'));
+ assert.equal(s.runner_sha256,hash(base+'/evaluation/run-guardrails.mjs'));assert.equal(s.passed,true);assert.equal(s.cases.length,6);assert.equal(new Set(s.cases.map(c=>c.id)).size,6);
+ let refused=0,clarified=0;
+ for(const [i,c] of s.cases.entries()){
+  const w=sp.cases.find(x=>x.id===c.id),p=dir+'/'+c.id,d=read(p+'/selection.json'),e=after.entries[i+35];assert(w);
+  assert.equal(fs.readFileSync(p+'.txt','utf8'),w.prompt);assert.equal(hash(p+'/selection.json'),c.selection_sha256);assert.deepEqual(read(p+'.stdout.log'),c.result);assert.deepEqual(fs.readdirSync(p),['selection.json']);
+  assert.equal(c.exit_code,0);assert.equal(c.first_attempt,true);assert.equal(c.passed,true);assert.equal(c.no_native_design,true);assert.equal(c.original_prompt_preserved,true);
+  assert.equal(c.result.passed,false);assert.equal(c.result.disposition,w.expected_disposition);assert.equal(d.decision.disposition,w.expected_disposition);assert.equal(d.decision.configuration,null);assert(d.decision.message.trim());assert.equal(d.decision.clauses.map(x=>x.text).join(''),w.prompt);
+  assert.equal(d.ledger_index,i+36);assert.equal(e.index,d.ledger_index);assert.equal(e.status,'completed');assert.equal(e.response_id,d.response_id);assert.equal(e.model,d.model);assert.equal(e.input_tokens,d.usage.input_tokens);assert.equal(e.output_tokens,d.usage.output_tokens);
+  if(w.expected_disposition==='unsupported')refused++;else if(w.expected_disposition==='clarify')clarified++;else assert.fail('unexpected case kind');
+ }
+ assert.equal(refused,4);assert.equal(clarified,2);assert.equal(a.unsupported_passes,refused);assert.equal(a.clarification_passes,clarified);
+ for(const [f,lineage] of Object.entries(s.cap_only_lineage)){
+  assert.equal(hash(f),lineage.after_sha256);const old=fs.readFileSync(f,'utf8').replace(lineage.replacement[1],lineage.replacement[0]);assert.equal(crypto.createHash('sha256').update(old).digest('hex'),lineage.before_sha256);
+  assert.equal(lineage.before_sha256,read(base+'/evidence/integration/assessment.json').source_sha256[f]);
+ }
+ let known=0,unknown=0,input=0,output=0;for(const [i,e] of after.entries.entries()){assert.equal(e.index,i+1);if(e.status==='completed'){const cost=Math.ceil((e.input_tokens*2+e.output_tokens*8)/5);assert.equal(e.estimated_micro_usd,cost);known+=cost;input+=e.input_tokens;output+=e.output_tokens}else{assert.equal(e.status,'failed_or_unknown');unknown+=e.reserve_micro_usd}}
+ assert.equal(known,a.known_estimated_micro_usd);assert.equal(unknown,a.unknown_reserved_micro_usd);assert.equal(known+unknown,a.conservative_total_micro_usd);assert.equal(input,a.known_input_tokens);assert.equal(output,a.known_output_tokens);assert(known+unknown<=10_000_000);
+ assert.equal(a.original_live_acceptance_passed,false);assert.equal(a.earlier_holdout_strict_passed,false);assert.equal(a.targeted_guardrail_followup_passed,true);assert.equal(read(dir+'/bounded-regression.json').exit_code,0);
+ console.log(JSON.stringify({verified_file_hashes:checked,targeted_live_unsupported:refused,targeted_live_clarify:clarified,total_requests:after.entries.length,conservative_micro_usd:known+unknown,historical_live_scores_preserved:true}));
+}

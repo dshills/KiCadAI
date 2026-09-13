@@ -1,0 +1,1 @@
+{"disposition":"clarify","message":"Do you prioritize bus speed or reduced I2C pull-up current? Please specify so I can select the appropriate esp32_bmp280_v1 board family profile (standard, fast, or low_current).","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-ambiguous-01","passed":false}
