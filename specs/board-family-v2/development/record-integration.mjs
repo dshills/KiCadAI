@@ -36,7 +36,8 @@ const source = {};
 for (const directory of ['internal/boardfamily', 'cmd/kicadai-board-family']) {
   for (const entry of fs.readdirSync(directory)) if (entry.endsWith('.go')) source[`${directory}/${entry}`] = hash(`${directory}/${entry}`);
 }
-const imported = read('specs/board-family-v2/development/reference-import.json');
+const importPath = 'specs/board-family-v2/development/reference-assembly-canonical-import.json';
+const imported = read(importPath);
 for (const [file, expected] of Object.entries(imported.files_sha256)) if (hash(`${imported.destination}/${file}`) !== expected) throw new Error(`SHT31 reference changed: ${file}`);
 fs.mkdirSync(path.dirname(output), { recursive: true });
 const result = {
@@ -45,7 +46,8 @@ const result = {
   notices: ['All cases used explicit --config mode; no live model evaluation is represented.', 'Historical publication bytes remain unchanged; historical current-production-source identity assertions are version-bound and do not qualify successor code.', 'Export checks do not replace visual/manufacturing review or physical bring-up.'],
   source_sha256: source,
   binary_sha256: hash('.cache/board-family-v2/kicadai-board-family'),
-  reference_import_sha256: hash('specs/board-family-v2/development/reference-import.json'),
+  reference_import_path: importPath,
+  reference_import_sha256: hash(importPath),
   prior_live_ledger_sha256: hash('.cache/board-family-v1/live-ledger.json'),
   historical_publication_files_verified: historical.size,
   cases,
