@@ -26,9 +26,16 @@ func run() error {
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
 	ledger := flag.String("ledger", "", "persistent ledger for the approved goal's 41-request / $10 limit; required with a prompt")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
+	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
+	if *listFamilies {
+		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *ledger != "" || *exportContract != "" || flag.NArg() != 0 {
+			return fmt.Errorf("--list-families cannot be combined with generation or export flags")
+		}
+		return json.NewEncoder(os.Stdout).Encode(boardfamily.Catalog())
+	}
 	if *exportContract != "" {
 		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || flag.NArg() != 0 {
 			return fmt.Errorf("--export-live-contract cannot be combined with generation")
