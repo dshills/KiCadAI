@@ -24,7 +24,7 @@ func run() error {
 	config := flag.String("config", "", "explicit board-family configuration JSON")
 	prompt := flag.String("prompt", "", "ordinary-language board request (one approved OpenAI request)")
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
-	ledger := flag.String("ledger", "", "persistent ledger for the approved goal's 35-request / $10 limit; required with a prompt")
+	ledger := flag.String("ledger", "", "persistent ledger for the approved goal's 41-request / $10 limit; required with a prompt")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")

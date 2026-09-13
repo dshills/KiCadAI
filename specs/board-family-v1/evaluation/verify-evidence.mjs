@@ -110,7 +110,15 @@ console.log(JSON.stringify({verified_file_hashes:checked,physical_requests:physi
  assert.equal(a.source_commit,s.base_commit);assert.equal(a.binary_sha256,s.binary_sha256);assert.equal(a.prior_validate_sha256,old.source_sha256['internal/boardfamily/validate.go']);
  assert.equal(a.api_requests,0);assert.equal(s.api_requests,0);assert.equal(s.passed,true);assert.equal(s.cases.length,10);assert.equal(s.replays.length,3);
  assert.equal(s.spec_sha256,old.spec_sha256);assert.equal(s.runner_sha256,old.runner_sha256);
- for(const [f,sha] of Object.entries(a.source_sha256)){assert.equal(hash(f),sha,f);assert.equal(s.source_sha256[f],sha)}
+ for(const [f,sha] of Object.entries(a.source_sha256)){
+  // The only later production changes authorized for the six-call follow-up
+  // are the 35 -> 41 request literal and its CLI help text. Reverse exactly
+  // those substitutions to verify the original integration source bytes.
+  let bytes=fs.readFileSync(f);
+  if(f==='internal/boardfamily/ledger.go')bytes=Buffer.from(bytes.toString().replace('const MaxLiveRequests = 41','const MaxLiveRequests = 35'));
+  if(f==='cmd/kicadai-board-family/main.go')bytes=Buffer.from(bytes.toString().replace("goal's 41-request / $10 limit","goal's 35-request / $10 limit"));
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),sha,f);assert.equal(s.source_sha256[f],sha);
+ }
  for(const c of [...s.cases,...s.replays]){
   const before=[...old.cases,...old.replays].find(x=>x.id===c.id);assert(before);assert.deepEqual(c.artifacts,before.artifacts);assert.equal(c.exit_code,0);assert.equal(c.result.passed,true);
   if(c.matches_original!==undefined)assert.equal(c.matches_original,true);
