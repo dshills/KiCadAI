@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -85,6 +86,13 @@ func DecodeDecision(prompt string, b []byte) (Decision, error) {
 	if strings.TrimSpace(d.Message) == "" || len(d.Clauses) == 0 || len(d.Clauses) > 32 {
 		return d, errors.New("decision lacks explanation or complete clauses")
 	}
+	if (d.Disposition == "unsupported" || d.Disposition == "clarify") && d.Configuration == nil {
+		// A non-design response cannot authorize a board. Preserve the original
+		// request in code instead of trusting the model to copy every sentence.
+		// RawDecision retains its original annotations, including omissions.
+		d.Clauses = []Clause{{prompt, d.Disposition, "Whole original request retained; no design is authorized. " + d.Message}}
+		return d, nil
+	}
 	remaining := prompt
 	hasUnsupported, hasClarify := false, false
 	for i := range d.Clauses {
@@ -125,6 +133,11 @@ func DecodeDecision(prompt string, b []byte) (Decision, error) {
 		if _, e := Check(*d.Configuration); e != nil {
 			return d, e
 		}
+		if reason := fixedGeometryConflict(prompt); reason != "" {
+			d.Disposition, d.Message, d.Configuration = "unsupported", reason, nil
+			d.Clauses = []Clause{{prompt, "unsupported", reason}}
+			return d, nil
+		}
 		if d.Configuration.Profile == "low_current" && !explicitLowCurrentScope(prompt) {
 			// A disclaimer cannot turn an unspecified whole-board energy goal
 			// into permission to optimize just two resistors. Fail closed with
@@ -138,12 +151,6 @@ func DecodeDecision(prompt string, b []byte) (Decision, error) {
 		if d.Configuration != nil {
 			return d, errors.New("invalid unsupported disposition")
 		}
-		if !hasUnsupported {
-			// Preserve a fail-closed overall refusal even if individual tags
-			// contradict it. This can never authorize generation. Keep the raw
-			// annotations separately, and describe the refusal at request level.
-			d.Clauses = []Clause{{prompt, "unsupported", "Overall request refused; inconsistent per-clause tags were conservatively collapsed. " + d.Message}}
-		}
 	case "clarify":
 		if !hasClarify || hasUnsupported || d.Configuration != nil {
 			return d, errors.New("invalid clarification disposition")
@@ -152,6 +159,28 @@ func DecodeDecision(prompt string, b []byte) (Decision, error) {
 		return d, errors.New("invalid decision disposition")
 	}
 	return d, nil
+}
+
+var requestedDimensions = regexp.MustCompile(`(?i)\b([0-9]+(?:\.[0-9]+)?)\s*(?:mm\s*)?(?:x|×|by)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters?|millimetres?)\b`)
+var requestedLayers = regexp.MustCompile(`(?i)\b([0-9]+|one|two|three|four|six|eight)\s*[- ]*(?:copper\s+)?layers?\b`)
+
+// These mechanical requirements are fixed, not AI-configurable. A literal
+// contradictory size/layer request must never become the unchanged board.
+// This recognizes common explicit forms, not every possible paraphrase.
+func fixedGeometryConflict(prompt string) string {
+	for _, m := range requestedDimensions.FindAllStringSubmatch(prompt, -1) {
+		x, ex := strconv.ParseFloat(m[1], 64)
+		y, ey := strconv.ParseFloat(m[2], 64)
+		if ex != nil || ey != nil || x != 120 || y != 80 {
+			return "This family has a fixed 120 by 80 mm outline; the requested dimensions are not supported. No resized board was generated."
+		}
+	}
+	for _, m := range requestedLayers.FindAllStringSubmatch(prompt, -1) {
+		if m[1] != "2" && !strings.EqualFold(m[1], "two") {
+			return "This family supports exactly two copper layers; the requested layer count is unsupported."
+		}
+	}
+	return ""
 }
 
 var lowCurrentName = regexp.MustCompile(`\blow_current\b`)

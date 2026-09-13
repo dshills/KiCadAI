@@ -214,6 +214,49 @@ func TestRecordedHoldoutRefusalCorrection(t *testing.T) {
 	}
 }
 
+func TestExplicitMechanicalRequirementsCannotBeDropped(t *testing.T) {
+	for _, tc := range []struct {
+		prompt    string
+		supported bool
+	}{
+		{"Use the fixed 120x80 mm two-layer board.", true},
+		{"Keep two copper layers and 120 by 80 millimeters.", true},
+		{"Make it 80 by 60 millimeters.", false},
+		{"A 60mm x 40 mm board.", false},
+		{"Use 120 × 80 mm and four copper layers.", false},
+		{"A 4-layer pressure board.", false},
+		{"Use a 120.0 by 80.0 millimetre board.", true},
+	} {
+		t.Run(tc.prompt, func(t *testing.T) {
+			c := testConfig()
+			d := Decision{"supported", "Model claimed support.", []Clause{{tc.prompt, "supported", "Model claimed support."}}, &c}
+			b, _ := json.Marshal(d)
+			got, err := DecodeDecision(tc.prompt, b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (got.Disposition == "supported") != tc.supported {
+				t.Fatalf("unexpected result: %+v", got)
+			}
+			if !tc.supported && (got.Configuration != nil || got.Disposition != "unsupported") {
+				t.Fatal("conflicting geometry escaped")
+			}
+		})
+	}
+}
+
+func TestNonDesignResponseRetainsUncopiedRequest(t *testing.T) {
+	const prompt = "I have not chosen between two profiles. Ask me which one."
+	for _, kind := range []string{"clarify", "unsupported"} {
+		d := Decision{kind, "Please resolve the unsupported or undecided requirement.", []Clause{{"I have not chosen between two profiles.", kind, "Incomplete model transcription."}}, nil}
+		b, _ := json.Marshal(d)
+		got, err := DecodeDecision(prompt, b)
+		if err != nil || got.Disposition != kind || got.Configuration != nil || len(got.Clauses) != 1 || got.Clauses[0].Text != prompt {
+			t.Fatalf("lost original request: %+v %v", got, err)
+		}
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
