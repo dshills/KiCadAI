@@ -3,14 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-if(process.argv[2]!=='--live'||![4,6].includes(process.argv.length)||(process.argv.length===6&&process.argv[4]!=='--prior-run'))throw Error('usage AFTER APPROVAL ONLY: node run-language.mjs --live NEW_OUTPUT [--prior-run PREVIOUS_OUTPUT]');
+if(process.argv[2]!=='--live'||process.argv.length<4||(process.argv.length-4)%2)throw Error('usage AFTER APPROVAL ONLY: node run-language.mjs --live NEW_OUTPUT [--prior-run PREVIOUS_OUTPUT] [--spec FILE] [--development-cases nl-03,ambiguous-02]');
+const options=new Map();for(let i=4;i<process.argv.length;i+=2){const k=process.argv[i];if(!['--prior-run','--spec','--development-cases'].includes(k)||options.has(k))throw Error('unknown or repeated option');options.set(k,process.argv[i+1])}
 const root=process.cwd(),out=path.resolve(process.argv[3]);
 const ledger=path.join(root,'.cache/board-family-v1/live-ledger.json');
-const file=path.join(root,'specs/board-family-v1/evaluation/language.json');
+const file=path.resolve(options.get('--spec')??'specs/board-family-v1/evaluation/language.json');
 const spec=JSON.parse(fs.readFileSync(file));
 const binary=path.join(root,'.cache/board-family-v1/kicadai-board-family');
 const hash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
-const priorSummaryPath=process.argv[5]?path.join(path.resolve(process.argv[5]),'summary.json'):null;
+const priorSummaryPath=options.has('--prior-run')?path.join(path.resolve(options.get('--prior-run')),'summary.json'):null;
+const development=options.has('--development-cases');
+if(development&&(options.get('--development-cases')!=='nl-03,ambiguous-02'||!priorSummaryPath||options.has('--spec')))throw Error('only the two explicitly approved development checks are permitted');
+const contract=path.join(root,'specs/board-family-v1/evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json');
+if(hash(contract)!=='76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c')throw Error('approved revised contract changed');
+if(!development&&hash(file)!=='1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4')throw Error('fresh acceptance must use the unchanged approved holdout');
 const firstAttempts=new Map(),latestAttempts=new Map(),visited=new Set();
 function readHistory(summaryPath,expectedHash){
  if(visited.has(summaryPath))throw Error('cyclic prior-run history');visited.add(summaryPath);
@@ -23,15 +29,20 @@ function readHistory(summaryPath,expectedHash){
 if(priorSummaryPath)readHistory(priorSummaryPath);
 // Continue only cases never attempted. Recovery needs an explicit separate run;
 // it cannot replace the earliest observation in the first-shot denominator.
-const pending=spec.cases.filter(c=>!firstAttempts.has(c.id));
+const pending=spec.cases.filter(c=>development?['nl-03','ambiguous-02'].includes(c.id):!firstAttempts.has(c.id));
 if(fs.existsSync(out))throw Error('output must be new');
 const prior=fs.existsSync(ledger)?JSON.parse(fs.readFileSync(ledger)):null;
 if(!pending.length)throw Error('no unseen cases remain; do not silently repeat evaluation');
-if(prior?.halt_reason||(prior?.entries?.length??0)+pending.length>20)throw Error('insufficient remaining request allowance or halted ledger');
+if(prior?.halt_reason||(prior?.entries?.length??0)+pending.length>35)throw Error('insufficient remaining request allowance or halted ledger');
 if(!process.env.OPENAI_API_KEY)throw Error('existing key unavailable; do not provision a new key automatically');
 fs.mkdirSync(out,{recursive:true});
 const env={...process.env};for(const k of ['ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY'])delete env[k];
-const summary={started_utc:new Date().toISOString(),spec_sha256:hash(file),binary_sha256:hash(binary),runner_sha256:hash(new URL(import.meta.url)),ledger_path:ledger,prior_request_count:prior?.entries?.length??0,planned_case_ids:pending.map(c=>c.id),independence:spec.independence,cases:[]};
+const offlineEnv={...env};delete offlineEnv.OPENAI_API_KEY;
+const exported=path.join(out,'executed-contract.json'),exportResult=spawnSync(binary,['--export-live-contract',exported],{env:offlineEnv,encoding:'utf8',timeout:10000});
+if(exportResult.status!==0||hash(exported)!==hash(contract))throw Error('binary payload differs from approved contract; no request sent');
+const sourceCommit=spawnSync('git',['rev-parse','HEAD'],{env:offlineEnv,encoding:'utf8'});
+if(sourceCommit.status!==0)throw Error('cannot record source commit');
+const summary={started_utc:new Date().toISOString(),source_commit:sourceCommit.stdout.trim(),run_kind:development?'recorded_development_recovery':'corrected_version_holdout',contract_sha256:hash(contract),spec_sha256:hash(file),binary_sha256:hash(binary),runner_sha256:hash(new URL(import.meta.url)),ledger_path:ledger,prior_request_count:prior?.entries?.length??0,planned_case_ids:pending.map(c=>c.id),independence:spec.independence,acceptance_policy:'At least 9/10 correct complete first-attempt supported cases, 4/4 refusals, 2/2 clarifications. Timing covers all ten supported attempts. Failed cases are never delivered as successes. Development retries cannot establish acceptance.',cases:[]};
 if(priorSummaryPath)summary.prior_run={summary_path:priorSummaryPath,sha256:hash(priorSummaryPath),notice:'Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes.'};
 const save=()=>fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify(summary,null,2)+'\n');save();
 for(const c of pending){
@@ -47,7 +58,7 @@ for(const c of pending){
   const got=selection?.decision?.configuration;
   record.configuration_matches=!!got&&Object.entries(expected).every(([k,v])=>got[k]===v);
   let validation;try{validation=JSON.parse(fs.readFileSync(path.join(dir,'validation.json')))}catch{}
-  record.native_validation_passed=validation?.passed===true&&validation?.checks?.every(c=>c.passed===true);
+  record.native_validation_passed=validation?.passed===true&&validation?.checks?.length===13&&validation?.checks?.every(c=>c.passed===true);
   record.passed=r.status===0&&disposition==='supported'&&result?.passed===true&&record.configuration_matches&&record.native_validation_passed&&record.wall_seconds<600;
  }else{
   record.no_native_design=['board.kicad_sch','board.kicad_pcb','board.kicad_pro'].every(f=>!fs.existsSync(path.join(dir,f)));
@@ -64,6 +75,10 @@ const group=(map,name)=>[...map.values()].filter(c=>c.expected_disposition===nam
 const supported=group(latestAttempts,'supported'),times=supported.filter(c=>c.passed).map(c=>c.wall_seconds).sort((a,b)=>a-b);
 const median=times.length?(times[Math.floor((times.length-1)/2)]+times[Math.floor(times.length/2)])/2:null;
 summary.metrics={supported_first_shot_passes:group(firstAttempts,'supported').filter(c=>c.passed).length,supported_first_selection_matches:group(firstAttempts,'supported').filter(c=>c.disposition==='supported'&&c.configuration_matches).length,supported_latest_passes:supported.filter(c=>c.passed).length,supported_expected_total:10,unsupported_passes:group(firstAttempts,'unsupported').filter(c=>c.passed).length,unsupported_expected_total:4,clarification_passes:group(firstAttempts,'clarify').filter(c=>c.passed).length,clarification_expected_total:2,completed_supported_timing_count:times.length,median_completed_supported_seconds:median,max_completed_supported_seconds:times.length?Math.max(...times):null};
-summary.passed=firstAttempts.size===16&&summary.metrics.supported_first_shot_passes>=9&&summary.metrics.unsupported_passes===4&&summary.metrics.clarification_passes===2&&times.length===10&&median<300&&Math.max(...times)<600&&supported.every(c=>c.native_validation_passed);
+const allTimes=group(firstAttempts,'supported').map(c=>c.wall_seconds).sort((a,b)=>a-b);
+summary.metrics.median_all_supported_attempt_seconds=allTimes.length===10?(allTimes[4]+allTimes[5])/2:null;
+summary.metrics.max_all_supported_attempt_seconds=allTimes.length?Math.max(...allTimes):null;
+summary.passed=!development&&firstAttempts.size===16&&summary.metrics.supported_first_shot_passes>=9&&summary.metrics.unsupported_passes===4&&summary.metrics.clarification_passes===2&&allTimes.length===10&&summary.metrics.median_all_supported_attempt_seconds<300&&Math.max(...allTimes)<600;
+if(development)summary.development_checks_passed=summary.cases.length===2&&summary.cases.every(c=>c.passed);
 summary.finished_utc=new Date().toISOString();if(fs.existsSync(ledger)){summary.ledger_sha256=hash(ledger);summary.request_count=JSON.parse(fs.readFileSync(ledger)).entries.length}
-save();console.log(JSON.stringify(summary.metrics));process.exitCode=summary.passed?0:1;
+save();console.log(JSON.stringify(summary.metrics));process.exitCode=(development?summary.development_checks_passed:summary.passed)?0:1;

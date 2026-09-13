@@ -11,7 +11,9 @@ import (
 )
 
 const SelectionModel = "gpt-4.1-mini-2025-04-14"
-const MaxLiveRequests = 20
+// Increased from 20 to 35 by explicit user approval on September 13, 2026.
+// The same ledger and every prior reservation remain in force; USD cap unchanged.
+const MaxLiveRequests = 35
 const MaxLiveMicroUSD = 10_000_000
 const RequestReserveMicroUSD = 50_000
 
