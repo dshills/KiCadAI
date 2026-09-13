@@ -222,15 +222,25 @@ func explicitLowCurrentScope(prompt string) bool {
 // Interpret performs one provider request, never retries, never sends source
 // files, and cannot generate a native board. The caller gates on the decision.
 func Interpret(ctx context.Context, prompt, ledgerPath string) (Selection, error) {
+	return InterpretWithPolicy(ctx, prompt, ledgerPath, legacyLedgerPolicy())
+}
+
+// InterpretWithPolicy uses a separate immutable goal budget without changing
+// the model payload, transport restrictions or native generation behavior.
+func InterpretWithPolicy(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy) (Selection, error) {
 	start := time.Now()
 	var result Selection
+	policy = policy.effective()
+	if err := policy.validate(); err != nil {
+		return result, err
+	}
 	if strings.TrimSpace(prompt) == "" || len(prompt) > 2000 {
 		return result, errors.New("prompt must contain 1–2000 bytes")
 	}
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	base.Proxy = nil
 	defer base.CloseIdleConnections()
-	transport := &reservedTransport{Path: ledgerPath, Base: base}
+	transport := &reservedTransport{Path: ledgerPath, Policy: policy, Base: base}
 	client := &http.Client{Transport: transport, Timeout: 45 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirects forbidden") }}
 	p, e := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: os.Getenv("OPENAI_API_KEY"), Model: SelectionModel, HTTPClient: client, Background: false, MaxOutputTokens: 1600})
 	if e != nil {
@@ -245,7 +255,7 @@ func Interpret(ctx context.Context, prompt, ledgerPath string) (Selection, error
 			result.ResponseID = pe.ResponseID
 		}
 		if transport.Index != 0 {
-			if le := finishReservation(ledgerPath, transport.Index, "failed_or_unknown", result.ResponseID, result.Usage.InputTokens, result.Usage.OutputTokens); le != nil {
+			if le := finishReservationWithPolicy(ledgerPath, policy, transport.Index, "failed_or_unknown", result.ResponseID, result.Usage.InputTokens, result.Usage.OutputTokens); le != nil {
 				return result, fmt.Errorf("provider failed and ledger settlement failed: %w", le)
 			}
 		}
@@ -254,7 +264,7 @@ func Interpret(ctx context.Context, prompt, ledgerPath string) (Selection, error
 	if transport.Index == 0 {
 		return result, errors.New("provider completed without accounted request")
 	}
-	if e = finishReservation(ledgerPath, transport.Index, "completed", r.ResponseID, r.Usage.InputTokens, r.Usage.OutputTokens); e != nil {
+	if e = finishReservationWithPolicy(ledgerPath, policy, transport.Index, "completed", r.ResponseID, r.Usage.InputTokens, r.Usage.OutputTokens); e != nil {
 		return result, e
 	}
 	result.RawDecision = append(json.RawMessage(nil), r.IntentJSON...)

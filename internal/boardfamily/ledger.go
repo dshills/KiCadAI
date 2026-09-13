@@ -12,8 +12,8 @@ import (
 
 const SelectionModel = "gpt-4.1-mini-2025-04-14"
 
-// Increased from 20 to 35 by explicit user approval on September 13, 2026.
-// The same ledger and every prior reservation remain in force; USD cap unchanged.
+// Legacy v1 allowance, including separately approved extensions on September 13,
+// 2026. Its exhausted ledger remains unchanged; these constants grant no new spend.
 const MaxLiveRequests = 41
 const MaxLiveMicroUSD = 10_000_000
 const RequestReserveMicroUSD = 50_000
@@ -30,15 +30,25 @@ type LedgerEntry struct {
 	EstimatedMicroUSD int64  `json:"estimated_micro_usd,omitempty"`
 }
 type Ledger struct {
-	Version    int           `json:"version"`
-	Goal       string        `json:"goal"`
-	HaltReason string        `json:"halt_reason,omitempty"`
-	Entries    []LedgerEntry `json:"entries"`
+	Version     int           `json:"version"`
+	Goal        string        `json:"goal"`
+	MaxRequests int           `json:"max_requests,omitempty"`
+	MaxMicroUSD int64         `json:"max_micro_usd,omitempty"`
+	HaltReason  string        `json:"halt_reason,omitempty"`
+	Entries     []LedgerEntry `json:"entries"`
 }
 
 const ledgerGoal = "board-family-v1-2026-09-13"
 
 func ledgerChange(path string, f func(*Ledger) error) (err error) {
+	return ledgerChangeWithPolicy(path, legacyLedgerPolicy(), f)
+}
+
+func ledgerChangeWithPolicy(path string, policy LedgerPolicy, f func(*Ledger) error) (err error) {
+	policy = policy.effective()
+	if err = policy.validate(); err != nil {
+		return err
+	}
 	if path == "" {
 		return errors.New("a persistent --ledger path is required for live requests")
 	}
@@ -50,17 +60,30 @@ func ledgerChange(path string, f func(*Ledger) error) (err error) {
 		return errors.New("ledger locked; no request sent (inspect previous process before recovery)")
 	}
 	defer func() { err = errors.Join(err, os.Remove(lock)) }()
-	l := Ledger{Version: 1, Goal: ledgerGoal, Entries: []LedgerEntry{}}
+	l := Ledger{Version: 1, Goal: policy.Goal, Entries: []LedgerEntry{}}
+	if policy != legacyLedgerPolicy() {
+		l.Version, l.MaxRequests, l.MaxMicroUSD = 2, policy.MaxRequests, policy.MaxMicroUSD
+	}
+	if info, e := os.Lstat(path); e == nil && !info.Mode().IsRegular() {
+		return errors.New("ledger must be a regular file, not a symlink")
+	} else if e != nil && !os.IsNotExist(e) {
+		return e
+	}
 	b, e := os.ReadFile(path)
 	if e == nil {
+		// Missing metadata must not inherit expected values from a new ledger.
+		l = Ledger{}
 		if e = json.Unmarshal(b, &l); e != nil {
 			return errors.New("invalid ledger; refusing to reset history")
 		}
 	} else if !os.IsNotExist(e) {
 		return e
 	}
-	if l.Version != 1 || l.Goal != ledgerGoal {
-		return errors.New("ledger belongs to a different goal/version")
+	if l.Goal != policy.Goal || policy == legacyLedgerPolicy() && (l.Version != 1 || l.MaxRequests != 0 || l.MaxMicroUSD != 0) || policy != legacyLedgerPolicy() && (l.Version != 2 || l.MaxRequests != policy.MaxRequests || l.MaxMicroUSD != policy.MaxMicroUSD) {
+		return errors.New("ledger belongs to a different goal/version/budget; refusing to reset or expand it")
+	}
+	if l.Entries == nil || len(l.Entries) > policy.MaxRequests {
+		return errors.New("ledger history is absent or exceeds its immutable budget")
 	}
 	for i, x := range l.Entries {
 		if x.Index != i+1 || x.Model != SelectionModel || x.ReserveMicroUSD != RequestReserveMicroUSD {
@@ -94,12 +117,24 @@ func ledgerChange(path string, f func(*Ledger) error) (err error) {
 	if e = tmp.Close(); e != nil {
 		return e
 	}
-	return os.Rename(name, path)
+	if e = os.Rename(name, path); e != nil {
+		return e
+	}
+	directory, e := os.Open(filepath.Dir(path))
+	if e != nil {
+		return e
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
 
 func reserve(path string) (int, error) {
+	return reserveWithPolicy(path, legacyLedgerPolicy())
+}
+
+func reserveWithPolicy(path string, policy LedgerPolicy) (int, error) {
+	policy = policy.effective()
 	index := 0
-	e := ledgerChange(path, func(l *Ledger) error {
+	e := ledgerChangeWithPolicy(path, policy, func(l *Ledger) error {
 		if l.HaltReason != "" {
 			return fmt.Errorf("goal API ledger halted: %s; no request sent", l.HaltReason)
 		}
@@ -107,7 +142,7 @@ func reserve(path string) (int, error) {
 		for _, e := range l.Entries {
 			spent += e.ReserveMicroUSD
 		}
-		if len(l.Entries) >= MaxLiveRequests || spent+RequestReserveMicroUSD > MaxLiveMicroUSD {
+		if len(l.Entries) >= policy.MaxRequests || spent+RequestReserveMicroUSD > policy.MaxMicroUSD {
 			return errors.New("goal API request/cost limit reached; no request sent")
 		}
 		index = len(l.Entries) + 1
@@ -118,8 +153,12 @@ func reserve(path string) (int, error) {
 }
 
 func finishReservation(path string, index int, status, id string, input, output int) error {
+	return finishReservationWithPolicy(path, legacyLedgerPolicy(), index, status, id, input, output)
+}
+
+func finishReservationWithPolicy(path string, policy LedgerPolicy, index int, status, id string, input, output int) error {
 	var settlementErr error
-	err := ledgerChange(path, func(l *Ledger) error {
+	err := ledgerChangeWithPolicy(path, policy, func(l *Ledger) error {
 		if index < 1 || index > len(l.Entries) {
 			return errors.New("reservation absent")
 		}
@@ -153,9 +192,10 @@ func finishReservation(path string, index int, status, id string, input, output 
 }
 
 type reservedTransport struct {
-	Path  string
-	Index int
-	Base  http.RoundTripper
+	Path   string
+	Policy LedgerPolicy
+	Index  int
+	Base   http.RoundTripper
 }
 
 func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -170,7 +210,7 @@ func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.ContentLength <= 0 || r.ContentLength > 24000 {
 		return nil, fmt.Errorf("request size %d is outside the accounted bound", r.ContentLength)
 	}
-	index, e := reserve(t.Path)
+	index, e := reserveWithPolicy(t.Path, t.Policy)
 	if e != nil {
 		return nil, e
 	}

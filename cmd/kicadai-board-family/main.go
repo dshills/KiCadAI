@@ -24,20 +24,21 @@ func run() error {
 	config := flag.String("config", "", "explicit board-family configuration JSON")
 	prompt := flag.String("prompt", "", "ordinary-language board request (one approved OpenAI request)")
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
-	ledger := flag.String("ledger", "", "persistent ledger for the approved goal's 41-request / $10 limit; required with a prompt")
+	ledger := flag.String("ledger", "", "persistent ledger required with a prompt; legacy limits unless --live-budget supplies a separate approved goal")
+	budgetFile := flag.String("live-budget", "", "JSON goal/request/microdollar policy for a separately approved new goal; not spending authorization")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
 	if *listFamilies {
-		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *ledger != "" || *exportContract != "" || flag.NArg() != 0 {
+		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *ledger != "" || *budgetFile != "" || *exportContract != "" || flag.NArg() != 0 {
 			return fmt.Errorf("--list-families cannot be combined with generation or export flags")
 		}
 		return json.NewEncoder(os.Stdout).Encode(boardfamily.Catalog())
 	}
 	if *exportContract != "" {
-		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || flag.NArg() != 0 {
+		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *budgetFile != "" || flag.NArg() != 0 {
 			return fmt.Errorf("--export-live-contract cannot be combined with generation")
 		}
 		return save(*exportContract, map[string]any{"destination": "https://api.openai.com/v1/responses", "model": boardfamily.SelectionModel, "capability_context": boardfamily.LanguageContext, "schema": boardfamily.SelectionSchema(), "max_output_tokens": 1600, "other_payload": "The original request text, attempt=1, no diagnostics, and the existing KiCadAI provider's generic JSON-only system instructions. No source files, native geometry, keys or environment variables are included as model input. The existing key is sent only in the HTTPS Authorization header."})
@@ -49,7 +50,10 @@ func run() error {
 		}
 	}
 	if flag.NArg() != 0 || modes != 1 || *out == "" {
-		return fmt.Errorf("usage: kicadai-board-family (--config FILE | --prompt TEXT | --prompt-file FILE) --output NEW_DIRECTORY [--ledger FILE] [--kicad-cli PATH]")
+		return fmt.Errorf("usage: kicadai-board-family (--config FILE | --prompt TEXT | --prompt-file FILE) --output NEW_DIRECTORY [--ledger FILE --live-budget FILE] [--kicad-cli PATH]")
+	}
+	if *budgetFile != "" && (*config != "" || *ledger == "") {
+		return errors.New("--live-budget requires a prompt and a separate --ledger")
 	}
 	if _, e := os.Stat(*out); !os.IsNotExist(e) {
 		return fmt.Errorf("output must not exist before work starts")
@@ -75,6 +79,17 @@ func run() error {
 		if *ledger == "" {
 			return fmt.Errorf("--ledger is required for a live request")
 		}
+		var policy boardfamily.LedgerPolicy
+		if *budgetFile != "" {
+			f, err := os.Open(*budgetFile)
+			if err != nil {
+				return err
+			}
+			policy, err = boardfamily.DecodeLedgerPolicy(f)
+			if err = errors.Join(err, f.Close()); err != nil {
+				return err
+			}
+		}
 		if *promptFile != "" {
 			b, e := readPrompt(*promptFile)
 			if e != nil {
@@ -83,7 +98,7 @@ func run() error {
 			*prompt = string(b)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-		s, e := boardfamily.Interpret(ctx, *prompt, *ledger)
+		s, e := boardfamily.InterpretWithPolicy(ctx, *prompt, *ledger, policy)
 		cancel()
 		if ce := clearProviderCredentials(); ce != nil {
 			return ce

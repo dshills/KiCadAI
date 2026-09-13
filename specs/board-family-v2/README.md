@@ -35,3 +35,11 @@ No live requests are authorized for this milestone yet. The old 41-request budge
 See [work log](WORK.md), [SHT31 restrictions](SHT31.md), [consolidated electrical/assembly-data review](ELECTRICAL_ASSEMBLY_REVIEW.md), [published examples](../../examples/board-family-v2/README.md) and [current deterministic replay](evidence/deterministic-replay-02.json). All five configurations pass two fresh rounds of native/export validation after the SHT31 mask/paste correction. The five example bundles contain 256 byte-identical copied files; 201 deliverables pass repeat-generation comparison. Earlier manufacturing-review records remain historical checkpoints, not qualification of the revised footprint. Final live acceptance and updated PR CI remain incomplete; physical assembly/bench qualification is a separate milestone.
 
 The schema uses closed objects and family-specific nested alternatives following [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs). The existing pinned GPT-4.1-mini model, transport and retry/accounting policy were not migrated. Export options were checked against the installed executable and [KiCad 10 CLI documentation](https://docs.kicad.org/10.0/en/cli/cli.html).
+
+The separate v2 budget controls and fixed-batch runner are now offline-qualified. [Runtime 01](evaluation/runtime-01.json) binds the budget-enabled binary, selected Go/assembly/embedded dependencies, tests and generated artifacts. Five fresh explicit-configuration builds still match all 201 previously reviewed deliverables; the frozen model payload is unchanged. This is not live language acceptance. Read [execution safeguards and review](evaluation/RUNNER-REVIEW-01.md) before running the offline preflight:
+
+```sh
+node specs/board-family-v2/evaluation/run-language.mjs --check
+```
+
+The proposed [budget policy](evaluation/budget-01.json) is **not spending authorization**. `--live` requires a separate approval record quoting the user's new 14-request/USD 1.00 approval and binding it to this runtime and frozen evaluation. No such record or v2 live ledger has been created.
