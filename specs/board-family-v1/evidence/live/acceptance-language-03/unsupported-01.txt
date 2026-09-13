@@ -1,0 +1,1 @@
+Power this pressure controller directly from a 5 V USB port and provide a USB data connection.

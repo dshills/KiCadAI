@@ -1,0 +1,1 @@
+I want a pressure controller at 100 kHz with a declared total bus capacitance of 150 pF; retain the fixed family power and connectors.

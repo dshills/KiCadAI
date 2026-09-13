@@ -2,7 +2,7 @@
 
 Authority: user-supplied goal, September 13, 2026. Build one reviewed low-voltage sensor/controller board family with three meaningful configurations, deterministic generation before AI, 10 configuration passes, >=9/10 unseen language selections, 4 refusals, 2 clarifications, native/electrical/readability checks and three representative deterministic replays. Runtime target: median <5 minutes, each supported case <10 minutes. One reviewed PR; no merge or fabrication. Existing-key reuse: at most 20 live requests and USD 10 total for this new goal, recorded conservatively. No paid calls until deterministic readiness.
 
-Base: `7076c6529e978477d73e2c22c81ef930b2f35036`; PR #12 remains open. Branch `codex/board-family-v1` is a separate continuation; historical files and results remain unchanged.
+Base: `7076c6529e978477d73e2c22c81ef930b2f35036`. PR #12 was open at the initial checkpoint; it is now verified merged into main (`b5565763`, September 13). Branch `codex/board-family-v1` is a separate continuation; historical files and results remain unchanged.
 
 Implementation sequence:
 
@@ -47,8 +47,25 @@ One intended live ledger for this entire goal: `.cache/board-family-v1/live-ledg
 - Readability reviewer: implementing Codex agent. Actual three profile schematics inspected, along with the revised copper preview. Grouped ESP32 ground-pin labels are crowded; assembly silkscreen labeling is incomplete. These limitations are disclosed in FAMILY.md.
 - Public Murata C2 reference sheet initially failed web extraction but was successfully downloaded from the manufacturer's original URL and read locally. Its publication date is March 7, 2016; current ordering/approval status is not inferred from this old sheet.
 
-## Exact remaining permission barrier
+## Historical payload-permission checkpoint
 
 Automatic review rejected the live smoke command before process creation twice, including after auditing the goal's explicit OpenAI-key/budget approval. The rejection requires permission for this concrete board-family capability contract and language request text to leave the machine. No executable/client/indirect-execution workaround was used. The exact non-secret material is in `evaluation/LIVE_CONTRACT.json` and `evaluation/language.json`; expected answers are **not** sent to the model. The live runner is authored and syntax-checked but has not been executed.
 
 **API requests executed: 0; API spend incurred by this goal: $0; live ledger: not created.** Live accuracy/refusal/clarification results, final acceptance review and the one final PR remain pending. Do not mark the goal complete or publish a negative result as success.
+
+## Approved live evaluation and corrective checkpoint
+
+The user explicitly approved the concrete original contract and sixteen literal requests. No alternative provider or firewall change was used.
+
+- Run `acceptance-language-01`: one request; wrong legacy-envelope decoder rejected the root decision object. Response usage was lost and the $0.05 reserve remains. Historical first-shot failure retained.
+- Fixed the provider decoder offline, with tests proving identical outbound request bytes and preserving the old envelope API. Rebuilt the binary and byte-compared the exported contract to the approved file.
+- Run `acceptance-language-02`: five requests. `nl-01` explicit recovery passed; `nl-02` and `nl-04` passed; `nl-03` incorrectly refused a negative/excluded requirement; `nl-05` selected the correct profile but failed whitespace-boundary checking. Stopped on the execution failure. Six total requests.
+- Fixed only boundary whitespace restoration offline; retained raw decisions and added rejection tests. Continued only eleven never-attempted cases, following complete prior-run hashes.
+- Run `acceptance-language-03`: five supported requests passed, four unsupported requests correctly refused, one ambiguous request clarified, and the other incorrectly generated a low-current board. **17 total requests**, **8/10 first selections**, **7/10 first complete boards**, **4/4 refusals**, **1/2 clarifications**. No prompts or expected values were changed.
+- All eight accepted supported completions passed native checks and match reviewed examples byte-for-byte; the ninth generated board belongs to the rejected ambiguous request. Conditional accepted latency: median 6.105 s, max 7.315 s; median generation 0.017 s / validation 3.256 s.
+- Added an explicit low-current scope gate and strengthened instructions for negation/ambiguous power and the existing 10 A source-capability ceiling. Offline recorded-response replay fixes whitespace/clarification behavior but intentionally leaves the old false refusal unchanged. The revised outgoing contract is **proposed, not live-tested or approved**.
+- Preserved all raw runs and ledger. Copied compact original evidence plus representative language selection/validation records, verified 382 hashes, reconciled seventeen indices, and independently recomputed counts and costs. Known estimated usage $0.011711 + unknown reserve $0.05 = $0.061711; no provider invoice inspected.
+- Corrected the overly broad no-disabled-checks documentation after inspecting KiCad's default-ignored categories. No raw native report was altered. No project-specific rule weakening was introduced.
+- Complete bounded regression after shared provider changes passed in 74.174 s; final post-correction integration passed in 6.820 s with unchanged packages cached. Focused tests, recorded-response regression and vet pass.
+
+Remaining barrier: the original first-attempt targets cannot be repaired by retries, and only three requests remain. Proposed up to two development checks plus one new sixteen-case holdout would require **35 total requests**, keeping **$10 total** and the same ledger/key. Proposed files are `evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json` and `evaluation/language-holdout-proposed.json`. No revised request has executed, the ceiling remains 20, and the goal/final PR are not complete.

@@ -1,0 +1,38 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Configured esp32_bmp280_v1 standard profile with total bus capacitance set to 150 pF as requested, and operating limits per family specification. The bus capacitance is within the 50-200 pF range supported by the standard profile at 100 kHz.",
+    "clauses": [
+      {
+        "text": "I want a pressure controller at 100 kHz with a declared total bus capacitance of 150 pF;",
+        "disposition": "supported",
+        "reason": "The request for a pressure controller at 100 kHz with total bus capacitance of 150 pF is supported except the bus capacitance exceeds the profile maximum for standard mode, which allows up to 200 pF. The user fixed family power and connectors are compatible."
+      },
+      {
+        "text": " retain the fixed family power and connectors.",
+        "disposition": "supported",
+        "reason": "Fixed family power and connectors imply using the esp32_bmp280_v1 family and do not alter the electrical profile requirements."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 150
+    }
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_044dc2593ce5bb50016aa6a7f10c9c87d19291a2254d5ace42",
+  "usage": {
+    "input_tokens": 1058,
+    "output_tokens": 270,
+    "total_tokens": 1328
+  },
+  "ledger_index": 5,
+  "seconds": 2.544131584
+}

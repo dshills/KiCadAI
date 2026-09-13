@@ -1,0 +1,35 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality.",
+    "clauses": [
+      {
+        "text": "Power this pressure controller directly from a 5 V USB port and provide a USB data connection.",
+        "disposition": "unsupported",
+        "reason": "The board family esp32_bmp280_v1 does not have or support a USB interface or USB data connection."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "The board family esp32_bmp280_v1 does not have or support a USB interface or USB data connection.",
+        "text": "Power this pressure controller directly from a 5 V USB port and provide a USB data connection."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_05d8a7e8fb77e660016aa6a9f42f7c87d18281a647fe69b897",
+  "usage": {
+    "input_tokens": 1046,
+    "output_tokens": 118,
+    "total_tokens": 1164
+  },
+  "ledger_index": 12,
+  "seconds": 1.5773419579999999
+}

@@ -1,0 +1,44 @@
+{
+  "started_utc": "2026-09-13T13:36:30.798Z",
+  "spec_sha256": "80236e0e24f61779f78bcc8e54b711dfdfd2765951ea8574ac645c5a83cee63c",
+  "binary_sha256": "3c72f434da47d289010151fa53f459a1e949ff7e80bb67c1c7dea066261ab081",
+  "runner_sha256": "fc46bbc103eb976f34c301709fe2dfb1dcadfdce9a3fa45e1103a69e7fdb4a78",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 0,
+  "independence": "Prompts declared after implementation, before live evaluation, authored by the implementing agent. Unseen by the selector, not an independent human benchmark. Only each prompt is sent; expected answers and other cases are never included in the API payload.",
+  "cases": [
+    {
+      "id": "nl-01",
+      "expected_disposition": "supported",
+      "disposition": "",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 12.327998917,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 1,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-01/nl-01",
+        "passed": false
+      },
+      "selection_sha256": "3151361603cd9c0cc2d24a56029dbe1d175d241b8760913287faedd2efdba44f",
+      "passed": false,
+      "configuration_matches": false,
+      "native_validation_passed": false
+    }
+  ],
+  "stopped_reason": "execution failure; inspect retained evidence before any further paid work",
+  "metrics": {
+    "supported_first_shot_passes": 0,
+    "supported_expected_total": 10,
+    "unsupported_passes": 0,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 0,
+    "clarification_expected_total": 2,
+    "median_supported_seconds": null,
+    "max_supported_seconds": 12.327998917
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T13:36:43.135Z",
+  "ledger_sha256": "19d4bdf02dbdbdd78628edebcdf9c3760dd5741ea7d8b63e8c3df84a9a09caeb",
+  "request_count": 1
+}

@@ -1,6 +1,6 @@
 # ESP32/BMP280 wired pressure-controller family
 
-Review owner: the implementing Codex agent, September 13, 2026. Reference engineering is disclosed assistance. This is a bounded **software-validated design**, not an independently certified or bench-validated product. Live-language acceptance remains pending.
+Review owner: the implementing Codex agent, September 13, 2026. Reference engineering is disclosed assistance. This is a bounded **software-validated design**, not an independently certified or bench-validated product. Original live-language acceptance failed; offline-tested corrections still need fresh acceptance evidence.
 
 ## Fixed integrated design
 
@@ -61,6 +61,8 @@ I²C speed, resistor/current margins, pin roles, same-rail supply compatibility 
 
 ## Validation and readability boundary
 
-Every delivered example must pass its configuration calculation, exact approved-reference/BOM match, native parser/writer/connectivity checks, actual KiCad 10.0.3 ERC, strict DRC including schematic parity, native schematic/PCB round trips, preview exports and unchanged-input hash gate. No allowlist or disabled check is used.
+Every delivered example must pass its configuration calculation, exact approved-reference/BOM match, native parser/writer/connectivity checks, actual KiCad 10.0.3 ERC, strict DRC including schematic parity, native schematic/PCB round trips, preview exports and unchanged-input hash gate. No per-finding exclusion or project-specific disabling was added. The CLI uses `--severity-all`, `--all-track-errors` and `--schematic-parity`; this is not a claim that every optional KiCad rule is enabled.
+
+Actual reports list default-ignored ERC categories `single_global_label`, `four_way_junction`, `simulation_model_issue`, `footprint_filter`; and DRC categories `missing_courtyard`, `track_not_centered_on_via`, `tuning_profile_track_geometries`, `footprint_filters_mismatch`, `footprint_type_mismatch`. These defaults remain visible in the evidence. Connectivity, exact reference/footprint identity and placement/clearance checks provide separate coverage, but do not turn omitted native categories into executed checks. SPICE simulation and impedance/tuning qualification are outside this family.
 
 The implementing agent inspected the actual rendered A3 schematic for all three profiles: groups are on-sheet, labels and resistor values are readable, and power, reset, programming and sensor sections are separated. The native ESP32 grouped-ground pin numbers are crowded beneath the symbol; net identity is visible and checked but this is a disclosed drawing limitation. The PCB is routed, spacious and inspectable in KiCad; visible assembly-reference silkscreen labeling is incomplete. No independent reviewer, assembly drawing approval, fabricated board, firmware boot or pressure measurement is claimed.

@@ -1,0 +1,1 @@
+Make the ESP32 pressure board with 10-kilohm SDA and SCL pull-ups at 100 kHz. All other requirements are the published family defaults.

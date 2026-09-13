@@ -1,0 +1,1 @@
+Select the version that reduces I2C pull-up current. I do not mean reducing whole-board power or running on a battery.

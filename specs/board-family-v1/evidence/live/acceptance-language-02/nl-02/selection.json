@@ -1,0 +1,38 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected 'fast' profile for 400 kHz I2C bus with usual family operating limits. Limits are not measurements but family specifications.",
+    "clauses": [
+      {
+        "text": "For my BMP280 controller I need a 400 kHz I2C bus,",
+        "disposition": "supported",
+        "reason": "Request specifies 400 kHz I2C bus, matching 'fast' profile of the family."
+      },
+      {
+        "text": " with the usual family operating limits.",
+        "disposition": "supported",
+        "reason": "Request uses usual family operating limits, corresponding to published supply and ambient conditions."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0685b30cdafd4273016aa6a7e90a7887d19a85175b3c070a2b",
+  "usage": {
+    "input_tokens": 1051,
+    "output_tokens": 190,
+    "total_tokens": 1241
+  },
+  "ledger_index": 3,
+  "seconds": 2.952943666
+}

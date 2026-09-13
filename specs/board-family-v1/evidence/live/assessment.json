@@ -1,0 +1,1147 @@
+{
+  "as_of_utc": "2026-09-13T13:57:32.371Z",
+  "overall_passed": false,
+  "request_count": 17,
+  "known_estimated_micro_usd": 11711,
+  "unknown_reserved_micro_usd": 50000,
+  "conservative_total_micro_usd": 61711,
+  "actual_provider_invoice_checked": false,
+  "supported_first_selection_matches": 8,
+  "supported_first_completed_boards": 7,
+  "supported_denominator": 10,
+  "supported_latest_completed_boards": 8,
+  "unsupported_first_passes": 4,
+  "unsupported_denominator": 4,
+  "clarification_first_passes": 1,
+  "clarification_denominator": 2,
+  "timing_population": "Eight completed supported cases, including the explicit nl-01 recovery; failures and the incorrectly accepted ambiguous board are excluded from these conditional completion timings, not from reliability denominators.",
+  "timing_count": 8,
+  "median_completed_wall_seconds": 6.105401708,
+  "max_completed_wall_seconds": 7.315477417,
+  "median_generation_seconds": 0.017009771,
+  "median_validation_seconds": 3.2556473335,
+  "native_runs": [
+    {
+      "id": "nl-01",
+      "run": "acceptance-language-02",
+      "accepted_request": true,
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-02",
+      "run": "acceptance-language-02",
+      "accepted_request": true,
+      "profile": "fast",
+      "native_sha256": {
+        "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-04",
+      "run": "acceptance-language-02",
+      "accepted_request": true,
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-06",
+      "run": "acceptance-language-03",
+      "accepted_request": true,
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-07",
+      "run": "acceptance-language-03",
+      "accepted_request": true,
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-08",
+      "run": "acceptance-language-03",
+      "accepted_request": true,
+      "profile": "fast",
+      "native_sha256": {
+        "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-09",
+      "run": "acceptance-language-03",
+      "accepted_request": true,
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "nl-10",
+      "run": "acceptance-language-03",
+      "accepted_request": true,
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    },
+    {
+      "id": "ambiguous-02",
+      "run": "acceptance-language-03",
+      "accepted_request": false,
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "erc_ignored_checks": [
+        {
+          "description": "Global label only appears once in the schematic",
+          "key": "single_global_label"
+        },
+        {
+          "description": "Four connection points are joined together",
+          "key": "four_way_junction"
+        },
+        {
+          "description": "SPICE model issue",
+          "key": "simulation_model_issue"
+        },
+        {
+          "description": "Assigned footprint doesn't match footprint filters",
+          "key": "footprint_filter"
+        }
+      ],
+      "drc_ignored_checks": [
+        {
+          "description": "Footprint has no courtyard defined",
+          "key": "missing_courtyard"
+        },
+        {
+          "description": "Track endpoint not centered on via",
+          "key": "track_not_centered_on_via"
+        },
+        {
+          "description": "Tuning profile track geometries",
+          "key": "tuning_profile_track_geometries"
+        },
+        {
+          "description": "Footprint doesn't match symbol's footprint filters",
+          "key": "footprint_filters_mismatch"
+        },
+        {
+          "description": "Footprint component type doesn't match footprint pads",
+          "key": "footprint_type_mismatch"
+        }
+      ]
+    }
+  ],
+  "first_attempts": [
+    {
+      "id": "nl-01",
+      "expected_disposition": "supported",
+      "disposition": "",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 12.327998917,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 1,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-01/nl-01",
+        "passed": false
+      },
+      "selection_sha256": "3151361603cd9c0cc2d24a56029dbe1d175d241b8760913287faedd2efdba44f",
+      "passed": false,
+      "configuration_matches": false,
+      "native_validation_passed": false,
+      "run": "acceptance-language-01"
+    },
+    {
+      "id": "nl-02",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.1482118329999995,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-02",
+        "generation_seconds": 0.020160666,
+        "validation_seconds": 3.159058916,
+        "total_seconds": 6.14146275
+      },
+      "selection_sha256": "39b1d2bf36e3b96c7474af8bcb8499018ed5b613a73b8938e0e3d59c11c7b35e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-03",
+      "expected_disposition": "supported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.918831458999999,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Request excludes whole-board power reduction and battery operation explicitly, but these are not part of the configurable profiles. Please clarify if you want a profile with lower I2C pull-up current only, ignoring whole-board power or battery operation considerations.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-03",
+        "passed": false
+      },
+      "selection_sha256": "f6f4142c5538f6af62b7c545b6dcc9473e4cc95860ca9d34feaab13b8c1f614b",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": false,
+      "native_validation_passed": false,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-04",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.802300375000001,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-04",
+        "generation_seconds": 0.019857375,
+        "validation_seconds": 3.21652725,
+        "total_seconds": 5.789652917
+      },
+      "selection_sha256": "5e164a9eac5915e097b554f0bec7c4717d95993469d190fa8f92d92f64a581ed",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-05",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 3.2382506250000005,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 6,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-05",
+        "passed": false
+      },
+      "selection_sha256": "082080f197fae9d861fa446d73280f89cff52f9ef11295fb5dd7280b02b4c153",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": false,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-06",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 7.315477417,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-06",
+        "generation_seconds": 0.014162167,
+        "validation_seconds": 3.245997917,
+        "total_seconds": 7.308856208
+      },
+      "selection_sha256": "99d452870bdf26523bafeed2ede76d4a925588e29c2a0888004afc5a5c928b4c",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-07",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.576437124999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-07",
+        "generation_seconds": 0.027151875,
+        "validation_seconds": 3.337657916,
+        "total_seconds": 5.5658741670000005
+      },
+      "selection_sha256": "d2e558cefe94a10093c637f934aed696613aaa7bd6c7926335e9cacffa179b01",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-08",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.3025308340000015,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-08",
+        "generation_seconds": 0.009907583,
+        "validation_seconds": 3.26529675,
+        "total_seconds": 6.295972625
+      },
+      "selection_sha256": "781a1b339c17fe6e57ada3d659a3b8ca96fbd935392a1677b7fc37def534d60e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-09",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.199198874999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-09",
+        "generation_seconds": 0.010990834,
+        "validation_seconds": 3.398178916,
+        "total_seconds": 6.191828291
+      },
+      "selection_sha256": "6fa906779bf4e3d47b656b2d35a45b227e7cd5014b797438f3a52350073ad544",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-10",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.983923540999997,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-10",
+        "generation_seconds": 0.010084375,
+        "validation_seconds": 3.4770425,
+        "total_seconds": 5.977002167
+      },
+      "selection_sha256": "a279ccef0042aa4813ad3ddd4d1112285572edf45574230bb214cce7fd69228d",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-01",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5939575000000004,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-01",
+        "passed": false
+      },
+      "selection_sha256": "9c5c17c67bfe8597808971c52685ecaa9911be550348ad08186eff050aa02243",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-02",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.477144500000002,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 family board does not support a dedicated humidity sensor on the PCB. It only includes the BMP280 sensor for pressure and die temperature measurement, not ambient temperature or humidity.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-02",
+        "passed": false
+      },
+      "selection_sha256": "0f02fabd0f5f4445f74555f001c06dac3735921fac5ac5bceda2c23c66d63682",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-03",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.3169029169999993,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Wireless capabilities including Wi-Fi and Bluetooth transmission are not supported on the esp32_bmp280_v1 board family; radios must be disabled per capability context.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-03",
+        "passed": false
+      },
+      "selection_sha256": "bd4c41d01fe905e8757a5994fea00eb84476b7cdf03c907e4cfab13895dc0d01",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-04",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5026921660000008,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The existing esp32_bmp280_v1 board family supports only a 120x80 mm two-layer board; it does not support a 60x40 mm four-layer board or an output relay for a motor as requested.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-04",
+        "passed": false
+      },
+      "selection_sha256": "25c405e7c42171cac55ccc7db166d5c6dbedf9e96c6318bcef16aff0f2e3ba76",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "ambiguous-01",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.7336206669999956,
+      "result": {
+        "disposition": "clarify",
+        "message": "You mentioned choosing between 'fast' and 'low_current' profiles for the esp32_bmp280_v1 board family but did not specify which to prioritize. Please clarify which profile should be selected or if further guidance is needed.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-01",
+        "passed": false
+      },
+      "selection_sha256": "bfd5d80ab198d7799f62b5a47174f74f4837a75477f6ddbf24bf6844f537e92c",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "ambiguous-02",
+      "expected_disposition": "clarify",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.060243417000005,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-02",
+        "generation_seconds": 0.010375459,
+        "validation_seconds": 3.2910100829999998,
+        "total_seconds": 6.053895042
+      },
+      "selection_sha256": "f324c7024981bba78fbb18df624943cd249404056830ea21bb98dd6426bad405",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": false,
+      "run": "acceptance-language-03"
+    }
+  ],
+  "latest_attempts": [
+    {
+      "id": "nl-01",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.062591583,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-01",
+        "generation_seconds": 0.021962041,
+        "validation_seconds": 3.157898875,
+        "total_seconds": 6.055161625
+      },
+      "selection_sha256": "3e2256f8ef758d267c3a0034c7363f36a8c575aab506d428a76a5855cfc171c3",
+      "passed": true,
+      "first_attempt": false,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-02",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.1482118329999995,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-02",
+        "generation_seconds": 0.020160666,
+        "validation_seconds": 3.159058916,
+        "total_seconds": 6.14146275
+      },
+      "selection_sha256": "39b1d2bf36e3b96c7474af8bcb8499018ed5b613a73b8938e0e3d59c11c7b35e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-03",
+      "expected_disposition": "supported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.918831458999999,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Request excludes whole-board power reduction and battery operation explicitly, but these are not part of the configurable profiles. Please clarify if you want a profile with lower I2C pull-up current only, ignoring whole-board power or battery operation considerations.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-03",
+        "passed": false
+      },
+      "selection_sha256": "f6f4142c5538f6af62b7c545b6dcc9473e4cc95860ca9d34feaab13b8c1f614b",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": false,
+      "native_validation_passed": false,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-04",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.802300375000001,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-04",
+        "generation_seconds": 0.019857375,
+        "validation_seconds": 3.21652725,
+        "total_seconds": 5.789652917
+      },
+      "selection_sha256": "5e164a9eac5915e097b554f0bec7c4717d95993469d190fa8f92d92f64a581ed",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-05",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 3.2382506250000005,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 6,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-05",
+        "passed": false
+      },
+      "selection_sha256": "082080f197fae9d861fa446d73280f89cff52f9ef11295fb5dd7280b02b4c153",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": false,
+      "run": "acceptance-language-02"
+    },
+    {
+      "id": "nl-06",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 7.315477417,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-06",
+        "generation_seconds": 0.014162167,
+        "validation_seconds": 3.245997917,
+        "total_seconds": 7.308856208
+      },
+      "selection_sha256": "99d452870bdf26523bafeed2ede76d4a925588e29c2a0888004afc5a5c928b4c",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-07",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.576437124999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-07",
+        "generation_seconds": 0.027151875,
+        "validation_seconds": 3.337657916,
+        "total_seconds": 5.5658741670000005
+      },
+      "selection_sha256": "d2e558cefe94a10093c637f934aed696613aaa7bd6c7926335e9cacffa179b01",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-08",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.3025308340000015,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-08",
+        "generation_seconds": 0.009907583,
+        "validation_seconds": 3.26529675,
+        "total_seconds": 6.295972625
+      },
+      "selection_sha256": "781a1b339c17fe6e57ada3d659a3b8ca96fbd935392a1677b7fc37def534d60e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-09",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.199198874999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-09",
+        "generation_seconds": 0.010990834,
+        "validation_seconds": 3.398178916,
+        "total_seconds": 6.191828291
+      },
+      "selection_sha256": "6fa906779bf4e3d47b656b2d35a45b227e7cd5014b797438f3a52350073ad544",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "nl-10",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.983923540999997,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-10",
+        "generation_seconds": 0.010084375,
+        "validation_seconds": 3.4770425,
+        "total_seconds": 5.977002167
+      },
+      "selection_sha256": "a279ccef0042aa4813ad3ddd4d1112285572edf45574230bb214cce7fd69228d",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-01",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5939575000000004,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-01",
+        "passed": false
+      },
+      "selection_sha256": "9c5c17c67bfe8597808971c52685ecaa9911be550348ad08186eff050aa02243",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-02",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.477144500000002,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 family board does not support a dedicated humidity sensor on the PCB. It only includes the BMP280 sensor for pressure and die temperature measurement, not ambient temperature or humidity.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-02",
+        "passed": false
+      },
+      "selection_sha256": "0f02fabd0f5f4445f74555f001c06dac3735921fac5ac5bceda2c23c66d63682",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-03",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.3169029169999993,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Wireless capabilities including Wi-Fi and Bluetooth transmission are not supported on the esp32_bmp280_v1 board family; radios must be disabled per capability context.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-03",
+        "passed": false
+      },
+      "selection_sha256": "bd4c41d01fe905e8757a5994fea00eb84476b7cdf03c907e4cfab13895dc0d01",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "unsupported-04",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5026921660000008,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The existing esp32_bmp280_v1 board family supports only a 120x80 mm two-layer board; it does not support a 60x40 mm four-layer board or an output relay for a motor as requested.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-04",
+        "passed": false
+      },
+      "selection_sha256": "25c405e7c42171cac55ccc7db166d5c6dbedf9e96c6318bcef16aff0f2e3ba76",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "ambiguous-01",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.7336206669999956,
+      "result": {
+        "disposition": "clarify",
+        "message": "You mentioned choosing between 'fast' and 'low_current' profiles for the esp32_bmp280_v1 board family but did not specify which to prioritize. Please clarify which profile should be selected or if further guidance is needed.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-01",
+        "passed": false
+      },
+      "selection_sha256": "bfd5d80ab198d7799f62b5a47174f74f4837a75477f6ddbf24bf6844f537e92c",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true,
+      "run": "acceptance-language-03"
+    },
+    {
+      "id": "ambiguous-02",
+      "expected_disposition": "clarify",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.060243417000005,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-02",
+        "generation_seconds": 0.010375459,
+        "validation_seconds": 3.2910100829999998,
+        "total_seconds": 6.053895042
+      },
+      "selection_sha256": "f324c7024981bba78fbb18df624943cd249404056830ea21bb98dd6426bad405",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": false,
+      "run": "acceptance-language-03"
+    }
+  ],
+  "limitations": [
+    "The initial nl-01 response could not be decoded; its selection and actual usage are unknown. Retain its full $0.05 reserve.",
+    "nl-03 incorrectly refused an explicit exclusion; nl-05 selected correctly but failed text-boundary decoding; ambiguous-02 wrongly generated a board. None is erased by a later fix.",
+    "Binary hashes identify each recorded run. Later decoder/prompt/safety-gate changes are not represented as live-tested results.",
+    "Local hashes and response IDs establish retained provenance, not independent authentication or hardware proof."
+  ]
+}

@@ -1,0 +1,1 @@
+Use 4.7k pull-ups for the wired BMP280 design. It will operate from 10 to 35 degrees C within the standard family electrical envelope.

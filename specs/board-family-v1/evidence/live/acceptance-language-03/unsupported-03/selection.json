@@ -1,0 +1,35 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "Wireless capabilities including Wi-Fi and Bluetooth transmission are not supported on the esp32_bmp280_v1 board family; radios must be disabled per capability context.",
+    "clauses": [
+      {
+        "text": "I need a qualified wireless pressure node that transmits readings over Wi-Fi and Bluetooth.",
+        "disposition": "unsupported",
+        "reason": "The esp32_bmp280_v1 board radios must be disabled; wireless transmission over Wi-Fi and Bluetooth is unsupported."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "The esp32_bmp280_v1 board radios must be disabled; wireless transmission over Wi-Fi and Bluetooth is unsupported.",
+        "text": "I need a qualified wireless pressure node that transmits readings over Wi-Fi and Bluetooth."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "Wireless capabilities including Wi-Fi and Bluetooth transmission are not supported on the esp32_bmp280_v1 board family; radios must be disabled per capability context."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_09c4f8db8f1b653a016aa6a9f7388087d18cc7503287618fc8",
+  "usage": {
+    "input_tokens": 1044,
+    "output_tokens": 101,
+    "total_tokens": 1145
+  },
+  "ledger_index": 14,
+  "seconds": 2.303193125
+}

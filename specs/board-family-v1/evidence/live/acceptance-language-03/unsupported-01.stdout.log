@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-01","passed":false}

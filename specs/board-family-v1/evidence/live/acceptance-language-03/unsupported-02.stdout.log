@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The esp32_bmp280_v1 family board does not support a dedicated humidity sensor on the PCB. It only includes the BMP280 sensor for pressure and die temperature measurement, not ambient temperature or humidity.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-02","passed":false}
