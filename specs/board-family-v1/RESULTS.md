@@ -7,7 +7,7 @@ September 13, 2026. The deterministic-family strategy produced ten correct compl
 | Supported numerical configurations | **10/10** complete projects; no manual output repair |
 | Meaningful electrical profiles | **3**: 4.7 kΩ/100 kHz, 2.2 kΩ/400 kHz, 10 kΩ/100 kHz |
 | Clean deterministic replays | **3/3 byte-identical** native/config/BOM outputs |
-| Offline end-to-end runtime | Median **3.273 s**, maximum **3.564 s** |
+| Current offline end-to-end runtime | Median **3.304 s**, maximum **3.581 s** after CI error-handling fixes |
 | Fresh supported first selections / completed boards | **10/10 / 10/10** |
 | Fresh unsupported / ambiguous clean command passes | **2/4 / 1/2** — acceptance failed |
 | Strict fresh live suite | **13/16**; failures remain in their denominators |
@@ -15,16 +15,16 @@ September 13, 2026. The deterministic-family strategy produced ten correct compl
 | Fresh supported end-to-end runtime | All ten: median **5.816 s**, maximum **8.476 s** |
 | Fresh supported generation / validation | Median **0.021554 s / 3.113777 s**, measured separately |
 | Native validation | Electrical/reference/BOM, writers, connectivity, KiCad 10.0.3 ERC, strict DRC/parity, round trips, previews and unchanged-input checks passed for every accepted project |
-| Full bounded repository regression | Passed in **33.535 s** after final decision-code corrections; unchanged packages may use Go test cache |
+| Full bounded repository regression | Passed in **36.760 s** after CI error-handling fixes; unchanged packages may use Go test cache |
 | Goal-wide physical API requests | **35/35** approved requests; no slots remain |
 | Conservative API accounting | **$0.026006** known estimate + **$0.05** unknown reserve = **$0.076006** |
 | Review identity | Implementing Codex agent; no independent engineer, external provider review or bench testing |
 
 ## Evidence and reproducibility
 
-The [offline summary](evidence/offline/summary.json) identifies the Apple M4 Pro / ARM64 machine, base/binary/runner/source hashes, ten configuration cases and three clean replays. Offline timing includes generation, installed-KiCad validation and process startup, but not AI inference. The current generator, reference assets, electrical calculations and native validator match the relevant original source hashes; reused qualification is identified explicitly in the [final assessment](evidence/acceptance/assessment.json).
+The [original offline summary](evidence/offline/summary.json) identifies the Apple M4 Pro / ARM64 machine, base/binary/runner/source hashes, ten configuration cases and three clean replays. Offline timing includes generation, installed-KiCad validation and process startup, but not AI inference. Generator, reference assets and electrical calculations retain their original hashes. After CI found unchecked cleanup errors, command/ledger/validator error handling was corrected without changing decision or design behavior. [Current offline revalidation](evidence/integration/summary.json) repeats all ten cases and three clean replays; **every native/configuration/electrical/BOM/library hash is identical to its original counterpart**. Its 43-file [integration manifest](evidence/integration/manifest.json) preserves actual reports, current source identities and the new full regression. Original qualification and live evidence remain unchanged.
 
-The [final manifest](evidence/acceptance/manifest.json) contains **221 file hashes**, supplementing the unchanged **382** original offline/live hashes. It retains all eighteen new calls, source/binary identities per run, stdout/stderr, raw decisions, response IDs, native reports, the complete 35-entry ledger, corrected offline replay and final regression. Three [delivered examples](../../examples/board-family-v1/README.md) include byte-identical representative language and holdout records. Every newly generated supported project's native files and BOM match the reviewed profile example; its numerical configuration and electrical calculation are separately retained.
+The [live/correction manifest](evidence/acceptance/manifest.json) contains **221 file hashes**, supplementing the unchanged **382** original offline/live hashes. It retains all eighteen new calls, source/binary identities per run, stdout/stderr, raw decisions, response IDs, native reports, the complete 35-entry ledger, corrected offline replay and its regression. Including 43 later offline integration records, the audit checks **646 hashes**. Three [delivered examples](../../examples/board-family-v1/README.md) include byte-identical representative language and holdout records. Every newly generated supported project's native files and BOM match the reviewed profile example; its numerical configuration and electrical calculation are separately retained.
 
 Hashes establish local integrity and provenance, **not third-party authentication**. Original execution paths in native reports are preserved. The incorrectly generated resize is recorded as rejected, not offered as a successful request. No evaluated native output was manually repaired.
 
@@ -54,7 +54,7 @@ The final unseen ambiguous request passed under source `0e791b14`. Replaying all
 
 Known usage across 34 responses is **37,443 input / 6,883 output tokens**. Estimates use full input price, ignore cache discounts and round each call upward to a micro-dollar at [published model pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini). One response remains unknown with a $0.05 reserve. **$0.076006 is conservative goal accounting, not an invoice or account-wide spend.** The request ceiling, not the dollar ceiling, is exhausted. No further call or replacement ledger is authorized.
 
-The complete bounded integration tier (`go test -short -p=1 -timeout 20m ./...`) passed; this matches `make test` / `make test-bounded`, not the exhaustive release tier. [Review](REVIEW.md) records source review, focused tests, recorded-response regression and actual schematic/PCB readability review. [Family limits](FAMILY.md) disclose four default-ignored ERC and five default-ignored DRC categories, crowded grouped-ground labels, incomplete assembly silkscreen, electrical assumptions and missing firmware/hardware measurements.
+The complete bounded integration tier (`go test -short -p=1 -timeout 20m ./...`) passed; this matches `make test` / `make test-bounded`, not the exhaustive release tier. New/affected-scope lint passes. Repository-wide lint still reports two unchecked-close findings in unchanged historical files, independently verified in the already-failed [main-branch CI run](https://github.com/dshills/KiCadAI/actions/runs/34755942929). Their bytes and lint rules were not changed or waived. [Review](REVIEW.md) records source review, focused tests, recorded-response regression and actual schematic/PCB readability review. [Family limits](FAMILY.md) disclose four default-ignored ERC and five default-ignored DRC categories, crowded grouped-ground labels, incomplete assembly silkscreen, electrical assumptions and missing firmware/hardware measurements.
 
 Unaffected implementation, documentation, examples and review are ready in the draft PR. Completion still needs a passing live rejection/clarification check under the repaired implementation or an **explicit user decision** to accept the disclosed mixed live/offline evidence. Neither is silently assumed. Original failures remain permanently recorded; the goal is not complete merely because this report or the PR exists.
 

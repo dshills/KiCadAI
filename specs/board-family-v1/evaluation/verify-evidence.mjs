@@ -96,7 +96,30 @@ console.log(JSON.stringify({verified_file_hashes:checked,physical_requests:physi
  }
  let k=0,u=0,it=0,ot=0;for(const [i,e] of l.entries.entries()){assert.equal(e.index,i+1);if(e.status==='completed'){const n=Math.ceil((2*e.input_tokens+8*e.output_tokens)/5);assert.equal(n,e.estimated_micro_usd);k+=n;it+=e.input_tokens;ot+=e.output_tokens}else{assert.equal(e.status,'failed_or_unknown');u+=e.reserve_micro_usd}}
  assert.equal(k,a.known_estimated_micro_usd);assert.equal(u,a.unknown_reserved_micro_usd);assert.equal(k+u,a.conservative_total_micro_usd);assert.equal(it,a.known_input_tokens);assert.equal(ot,a.known_output_tokens);
- for(const [f,sha] of Object.entries({...a.reused_unchanged_qualification_source_sha256,...a.corrected_source_sha256}))assert.equal(hash(f),sha,f);
+ for(const [f,sha] of Object.entries({...a.reused_unchanged_qualification_source_sha256,...a.corrected_source_sha256})){
+  // Validator cleanup handling was subsequently changed and revalidated below.
+  if(f!=='internal/boardfamily/validate.go')assert.equal(hash(f),sha,f);
+ }
  assert.equal(read(dir+'/bounded-regression.json').exit_code,0);
  console.log(JSON.stringify({verified_file_hashes:checked,goal_physical_requests:l.entries.length,strict_live_passes:a.strict_live_passes,strict_live_total:16,corrected_offline_replays:16,conservative_micro_usd:k+u,goal_complete:false}));
+}
+
+{
+ const dir=base+'/evidence/integration',a=read(dir+'/assessment.json'),s=read(dir+'/summary.json'),old=read(base+'/evidence/offline/summary.json');
+ for(const [f,sha] of Object.entries(read(dir+'/manifest.json').files)){assert.equal(hash(f),sha,f);checked++}
+ assert.equal(a.source_commit,s.base_commit);assert.equal(a.binary_sha256,s.binary_sha256);assert.equal(a.prior_validate_sha256,old.source_sha256['internal/boardfamily/validate.go']);
+ assert.equal(a.api_requests,0);assert.equal(s.api_requests,0);assert.equal(s.passed,true);assert.equal(s.cases.length,10);assert.equal(s.replays.length,3);
+ assert.equal(s.spec_sha256,old.spec_sha256);assert.equal(s.runner_sha256,old.runner_sha256);
+ for(const [f,sha] of Object.entries(a.source_sha256)){assert.equal(hash(f),sha,f);assert.equal(s.source_sha256[f],sha)}
+ for(const c of [...s.cases,...s.replays]){
+  const before=[...old.cases,...old.replays].find(x=>x.id===c.id);assert(before);assert.deepEqual(c.artifacts,before.artifacts);assert.equal(c.exit_code,0);assert.equal(c.result.passed,true);
+  if(c.matches_original!==undefined)assert.equal(c.matches_original,true);
+  const v=read(dir+'/'+c.id+'/validation.json'),erc=read(dir+'/'+c.id+'/erc.json'),drc=read(dir+'/'+c.id+'/drc.json');
+  assert.equal(v.passed,true);assert.equal(v.kicad_version,'10.0.3');assert.equal(v.checks.length,13);assert(v.checks.every(x=>x.passed));
+  assert(erc.sheets.length>0&&erc.sheets.every(x=>x.violations.length===0));for(const k of ['violations','unconnected_items','schematic_parity'])assert.deepEqual(drc[k],[]);
+  for(const [f,sha] of Object.entries(v.native_sha256))assert.equal(sha,c.artifacts[f]);
+ }
+ const times=s.cases.map(x=>x.wall_seconds).sort((x,y)=>x-y);assert.equal((times[4]+times[5])/2,a.median_seconds);assert.equal(Math.max(...times),a.max_seconds);
+ const reg=read(dir+'/bounded-regression.json');assert.equal(reg.exit_code,0);assert.equal(reg.provider_keys_removed,true);assert.equal(reg.seconds,a.bounded_regression_seconds);
+ console.log(JSON.stringify({verified_file_hashes:checked,post_ci_configuration_passes:10,post_ci_replays:3,post_ci_api_requests:0,unchanged_generated_artifacts:true}));
 }

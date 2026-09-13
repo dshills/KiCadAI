@@ -1,0 +1,77 @@
+{
+  "passed": true,
+  "kicad_version": "10.0.3",
+  "seconds": 3.234458375,
+  "checks": [
+    {
+      "name": "electrical_contract",
+      "passed": true,
+      "seconds": 0.000022875
+    },
+    {
+      "name": "reference_and_bom_integrity",
+      "passed": true,
+      "seconds": 0.011676625
+    },
+    {
+      "name": "pcb_writer_and_connectivity",
+      "passed": true,
+      "seconds": 0.005450708
+    },
+    {
+      "name": "schematic_writer",
+      "passed": true,
+      "seconds": 0.002663959
+    },
+    {
+      "name": "native_parse_render",
+      "passed": true,
+      "seconds": 0.009185208
+    },
+    {
+      "name": "kicad_version",
+      "passed": true,
+      "seconds": 0.117950959
+    },
+    {
+      "name": "kicad_erc",
+      "passed": true,
+      "seconds": 0.765609125
+    },
+    {
+      "name": "kicad_strict_drc_and_parity",
+      "passed": true,
+      "seconds": 1.084752125
+    },
+    {
+      "name": "kicad_roundtrip_kicad_sch",
+      "passed": true,
+      "seconds": 0.361501041
+    },
+    {
+      "name": "kicad_roundtrip_kicad_pcb",
+      "passed": true,
+      "seconds": 0.350031416
+    },
+    {
+      "name": "schematic_preview",
+      "passed": true,
+      "seconds": 0.2928635
+    },
+    {
+      "name": "pcb_preview",
+      "passed": true,
+      "seconds": 0.231946208
+    },
+    {
+      "name": "input_immutability",
+      "passed": true,
+      "seconds": 0.000455834
+    }
+  ],
+  "native_sha256": {
+    "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+    "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+    "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+  }
+}

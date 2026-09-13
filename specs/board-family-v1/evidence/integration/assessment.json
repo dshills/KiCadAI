@@ -1,0 +1,46 @@
+{
+  "source_commit": "fca793acf6254afe93d2ba3eacd8f8aafbf4c119",
+  "binary_sha256": "abb419e79573ac6924204473d3e8155695a3d119fbd841db944078a3ff69bb80",
+  "api_requests": 0,
+  "passed": true,
+  "configuration_passes": 10,
+  "deterministic_replays": 3,
+  "unchanged_artifact_cases": [
+    "standard-boundaries",
+    "standard-min-bus",
+    "standard-cool",
+    "standard-warm-high-supply",
+    "fast-boundaries",
+    "fast-min-bus",
+    "fast-narrow-supply",
+    "low-current-boundaries",
+    "low-current-min-bus",
+    "low-current-nominal",
+    "standard-boundaries-replay",
+    "fast-boundaries-replay",
+    "low-current-boundaries-replay"
+  ],
+  "source_sha256": {
+    "cmd/kicadai-board-family/main.go": "6f92ab949471246c4cb3b862302bf6e60c6d1b24f2ea23959261402d1e2256b9",
+    "internal/boardfamily/ledger.go": "2ed63c04f1150efe8517ece0180eb36a041ca9ced026c65d31fd244dd64fdb75",
+    "internal/boardfamily/ledger_test.go": "eba37f6e35b42c14e66748224c45fb790bcb9dcd23933030061c377e46e9d62d",
+    "internal/boardfamily/validate.go": "4453c84fc00b85547eb5926f7cfda1a333775f1cf5544ad8bd586a6907aaaae0"
+  },
+  "prior_validate_sha256": "20c2ac9d62654ba58b7a80fe9e5fe65e36a0d46684c40f4a64204bbf9e58b085",
+  "median_seconds": 3.3035751455000004,
+  "max_seconds": 3.581002958,
+  "bounded_regression_seconds": 36.76,
+  "change_scope": "Propagate command encoding/read-close and validator temporary-cleanup errors; preserve ledger errors/state on cleanup failure. No configuration, decision, reference, generation, native-check selection or acceptance-policy change.",
+  "local_lint": {
+    "version": "2.13.1",
+    "new_scope_issues": 0,
+    "repository_issues": 2,
+    "baseline_verified": true,
+    "baseline_ci": "https://github.com/dshills/KiCadAI/actions/runs/34755942929",
+    "baseline_files": [
+      "specs/ai-requirement-contract-integration/publication-live-v1/replay-audit/main.go:258",
+      "specs/practical-board-completion-v1/engine/main.go:61"
+    ]
+  },
+  "notice": "This offline revalidation does not change any live outcome or consume another API request. Historical evidence remains unchanged."
+}
