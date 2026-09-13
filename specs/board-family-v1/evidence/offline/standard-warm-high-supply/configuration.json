@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "family": "esp32_bmp280_v1",
+  "profile": "standard",
+  "supply_min_v": 3.4,
+  "supply_max_v": 3.4,
+  "supply_capacity_ma": 1000,
+  "ambient_min_c": 35,
+  "ambient_max_c": 35,
+  "total_bus_capacitance_pf": 200
+}

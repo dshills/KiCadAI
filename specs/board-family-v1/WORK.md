@@ -1,0 +1,54 @@
+# Board-family v1 — autonomous implementation
+
+Authority: user-supplied goal, September 13, 2026. Build one reviewed low-voltage sensor/controller board family with three meaningful configurations, deterministic generation before AI, 10 configuration passes, >=9/10 unseen language selections, 4 refusals, 2 clarifications, native/electrical/readability checks and three representative deterministic replays. Runtime target: median <5 minutes, each supported case <10 minutes. One reviewed PR; no merge or fabrication. Existing-key reuse: at most 20 live requests and USD 10 total for this new goal, recorded conservatively. No paid calls until deterministic readiness.
+
+Base: `7076c6529e978477d73e2c22c81ef930b2f35036`; PR #12 remains open. Branch `codex/board-family-v1` is a separate continuation; historical files and results remain unchanged.
+
+Implementation sequence:
+
+1. Qualify a complete existing-controller/reference sensor board and produce native output.
+2. Reuse its schematic, placement and local routes through a small validated family configuration contract; add meaningful supported variants.
+3. Add constrained language selection and a single persistent request/cost ledger.
+4. Run the separately declared acceptance set, inspect rendered drawings, record timings and replay results.
+5. Run integration regression/review and publish usable commands, examples, BOMs and one PR.
+
+Development inputs may be edited and implementation failures repaired. Keep compact logs under `.cache/board-family-v1/`; do not turn each edit into a new frozen campaign. Generated evaluation artifacts must never be manually repaired. Reference engineering and implementing-agent review are disclosed assistance, not independent hardware certification.
+
+## Implementation checkpoint (September 13)
+
+Selected family: ESP32-WROOM-32E-N4 + BMP280 wired pressure controller, external regulated 3.3 V, 120x80 mm / two copper layers. Three electrical profiles use 4.7k / 2.2k / 10k bus pull-ups with distinct speed/current/capacitance envelopes. This uses one sensor type, not three unrelated PCB architectures. Radios, batteries and additional active loads are outside the qualified scope.
+
+Development engineering (all historical evidence unchanged):
+
+- ESP32-only native pass: 11.535 s. SHT31 integration probe had incomplete routing; not pursued for this first family.
+- BMP280 integration routed completely. Sandbox KiCad crashed during macOS UI initialization; ordinary offline DRC revealed one real copper crossing.
+- Added an explicit two-via VCC bridge; aligned schematic/PCB net names after verifying the electrical partition; shortened references.
+- Visual review found inherited off-sheet/crowded schematic geometry. Rebuilt drawing layout from the netlist, retained installed pin definitions, fixed grid and grouped-pin handling.
+- Bosch Figure 17 required separate VDD/VDDIO bypasses. Added C5/C6 and explicit local routes. Engineered reference 06 passed ERC, strict DRC, routing and schematic parity.
+- Native writer/round-trip checks caught missing property UUIDs, duplicate empty metadata, and stale schematic instance values. Fixed serialization and saved a separate development copy with KiCad to establish native canonical ordering. No validation allowlist or disabled checks.
+- New deterministic command reuses repository parsers, writer validators, complete connectivity, KiCad round-trip checks and existing OpenAI provider. Geometry is embedded reference data; no runtime placement/routing search.
+- Complete DEVELOPMENT runs: standard 3.081 s; fast 3.444 s; low_current 3.445 s. All checks passed; the latter two also include the new approved-reference/BOM integrity gate. These are not final acceptance results.
+- Focused tests pass for margins, unsupported/malformed limits, deterministic native outputs, writer/connectivity, BOM completeness, non-overwrite, preserved language clauses, refusal/clarification gates and ledger bounds/corruption/locking.
+
+Live testing attempted only after deterministic readiness. Automatic review rejected the command before execution over concrete-payload authorization; no API call was sent and no live ledger exists yet. Remaining scope continues offline while this authority is checked.
+
+One intended live ledger for this entire goal: `.cache/board-family-v1/live-ledger.json`. Pinned model `gpt-4.1-mini-2025-04-14`; official price checked at $0.40/M input and $1.60/M output. Each physical HTTP attempt reserves $0.05 conservatively, keeps its request count permanently, disallows other endpoints/redirects/retries, and records usage without credentials.
+
+## Offline integration checkpoint
+
+- Declared ten numerical acceptance cases and sixteen language requests before any live request. Numeric language expectations were made explicit before live execution; no prompts were changed in response to model results because there are no model results yet. The implementing agent authored the set; this is not an independently authored benchmark.
+- Initial offline acceptance: 10/10, three byte-identical replays, median 3.331 s. Preserved in `.cache/board-family-v1/acceptance-configurations-01`.
+- Reference review moved C1/C2 close to the controller. Development placement 01 overlapped the module's extended courtyard; 02 cleared that but failed enable-track clearance; 03 passed all native checks. Development 04 additionally recorded the nominal two-layer stackup. Canonical native copy 03 became the embedded PCB; schematic connectivity and BOM did not change. Acceptance outputs were never edited.
+- Second offline acceptance: 10/10, three replays, median 3.301 s. Cross-checking calculated values then found the internal 70 kΩ pull-up term was lost to integer constant division. Replaced it with floating-point division and added a separate current-contribution regression assertion. Earlier calculated current allocations are historical, not the final accepted values.
+- Corrected-current offline acceptance (`acceptance-configurations-03`): **10/10**, **3/3** identical replays; median **3.254 s**, maximum **3.684 s**. All electrical/native/writer/ERC/strict DRC/parity/connectivity/round-trip checks passed.
+- Final input-hardening review rejected oversized configuration JSON explicitly instead of allowing a bounded reader to conceal trailing content. Final source-matched offline run `acceptance-configurations-04` again passed **10/10** and **3/3** replays, median **3.273 s**, maximum **3.564 s**. Its hash-verified evidence and three unchanged example projects are the current publication. The prior publication copy is preserved under `.cache/board-family-v1/publication-checkpoint-03` with its original run. Final bounded regression passed in 7.455 s (unchanged packages cached).
+- Safeguard review: accounting anomalies now persist a halt before returning an error; prompt-file reading is bounded; non-supported output directories are exclusively created; native children receive no provider credentials. Focused tests and vet pass.
+- Repository-wide bounded regression (`go test -short -p=1 -timeout 20m ./...`) passed in 996.634 s initially. Post-change runs passed in 13.683 s and 7.738 s using the Go test cache for unchanged packages. This matches `make test` / `make test-bounded`; it is not the separate exhaustive release tier.
+- Readability reviewer: implementing Codex agent. Actual three profile schematics inspected, along with the revised copper preview. Grouped ESP32 ground-pin labels are crowded; assembly silkscreen labeling is incomplete. These limitations are disclosed in FAMILY.md.
+- Public Murata C2 reference sheet initially failed web extraction but was successfully downloaded from the manufacturer's original URL and read locally. Its publication date is March 7, 2016; current ordering/approval status is not inferred from this old sheet.
+
+## Exact remaining permission barrier
+
+Automatic review rejected the live smoke command before process creation twice, including after auditing the goal's explicit OpenAI-key/budget approval. The rejection requires permission for this concrete board-family capability contract and language request text to leave the machine. No executable/client/indirect-execution workaround was used. The exact non-secret material is in `evaluation/LIVE_CONTRACT.json` and `evaluation/language.json`; expected answers are **not** sent to the model. The live runner is authored and syntax-checked but has not been executed.
+
+**API requests executed: 0; API spend incurred by this goal: $0; live ledger: not created.** Live accuracy/refusal/clarification results, final acceptance review and the one final PR remain pending. Do not mark the goal complete or publish a negative result as success.

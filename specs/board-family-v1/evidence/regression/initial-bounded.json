@@ -1,0 +1,17 @@
+{
+  "started_utc": "2026-09-13T12:49:16.297Z",
+  "finished_utc": "2026-09-13T13:05:52.931Z",
+  "seconds": 996.634,
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "-short",
+    "-p=1",
+    "-timeout",
+    "20m",
+    "./..."
+  ],
+  "provider_keys_removed": true,
+  "exit_code": 0,
+  "signal": null
+}

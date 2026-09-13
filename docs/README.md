@@ -38,6 +38,8 @@ This directory holds the detailed reference material that used to live in the pr
 
 ## Libraries And Internals
 
+- [Deterministic Board Family](../specs/board-family-v1/README.md): bounded ESP32/BMP280 reference, electrical profiles, offline results and pending live-language acceptance.
+
 - [Detailed Capability Record](capability-record.md): the preserved chronological implementation and evidence inventory formerly shown at the top of the root README.
 - [Libraries And Components](libraries-and-components.md): component intelligence, pinmaps, and library resolver details.
 - [Development Reference](development.md): examples, Go packages, testing, protobuf maintenance, limitations, troubleshooting, and design direction.

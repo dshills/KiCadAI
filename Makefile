@@ -72,6 +72,7 @@ help:
 	@printf "KiCadAI targets:\n"
 	@printf "  make security-check  Check reachable vulnerabilities (requires network)\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
+	@printf "  make board-family    Build bounded ESP32/BMP280 family CLI\n"
 	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
 	@printf "  make release         Build versioned macOS/Linux release artifacts\n"
 	@printf "  make release-smoke   Smoke-test one host-compatible release binary\n"
@@ -107,6 +108,11 @@ help:
 build:
 	mkdir -p "$(BIN_DIR)"
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
+
+.PHONY: board-family
+board-family:
+	mkdir -p "$(BIN_DIR)"
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN_DIR)/kicadai-board-family" ./cmd/kicadai-board-family
 
 install: build
 	mkdir -p "$(INSTALL_DIR)"

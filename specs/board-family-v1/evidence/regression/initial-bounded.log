@@ -1,0 +1,169 @@
+?   	kicadai	[no test files]
+ok  	kicadai/cmd/ai-requirement-eval	0.321s
+ok  	kicadai/cmd/kicadai	32.628s
+ok  	kicadai/cmd/kicadai-baseline-publish-v10	0.271s
+?   	kicadai/cmd/kicadai-board-family	[no test files]
+ok  	kicadai/cmd/kicadai-capability-advance-v10	0.186s
+ok  	kicadai/cmd/kicadai-capability-eval	0.223s
+ok  	kicadai/cmd/kicadai-capability-rank-v10	0.184s
+ok  	kicadai/cmd/kicadai-corpus-publish	0.197s
+ok  	kicadai/cmd/kicadai-corpus-publish-v10	0.187s
+ok  	kicadai/cmd/kicadai-corpus-publish-v6	0.182s
+ok  	kicadai/cmd/kicadai-corpus-publish-v7	0.184s
+ok  	kicadai/cmd/kicadai-corpus-publish-v8	0.166s
+ok  	kicadai/cmd/kicadai-corpus-validate	0.168s
+ok  	kicadai/cmd/kicadai-corpus-validate-v10	0.168s
+ok  	kicadai/cmd/kicadai-corpus-validate-v6	0.167s
+ok  	kicadai/cmd/kicadai-corpus-validate-v7	0.173s
+ok  	kicadai/cmd/kicadai-corpus-validate-v8	0.173s
+ok  	kicadai/cmd/kicadai-corpus-validate-v9	0.168s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v10	0.374s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v11	0.380s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v12	0.370s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v13	0.385s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v14	0.403s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v15	0.385s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v16	0.419s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v17	0.373s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v18	0.381s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v19	0.379s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v20	0.372s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v21	0.364s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v22	0.382s
+ok  	kicadai/cmd/kicadai-discovery-baseline-v23	0.385s
+ok  	kicadai/cmd/kicadai-electrical-diagnostics	0.299s
+ok  	kicadai/cmd/kicadai-promotion	0.235s
+ok  	kicadai/cmd/kicadai-v9-history-custodian	0.386s
+?   	kicadai/cmd/practical-board-eval	[no test files]
+ok  	kicadai/internal/aiprovider	0.374s
+ok  	kicadai/internal/aireadiness	0.197s
+ok  	kicadai/internal/airequirementeval	2.506s
+ok  	kicadai/internal/amplifiers	0.501s
+ok  	kicadai/internal/architecturesearch	4.640s
+ok  	kicadai/internal/atomicdir	0.214s
+ok  	kicadai/internal/atomicfile	1.285s
+ok  	kicadai/internal/behavioralintent	0.377s
+ok  	kicadai/internal/blindbaseline	0.459s
+ok  	kicadai/internal/blocks	1.393s
+ok  	kicadai/internal/blocks/verification	2.070s
+ok  	kicadai/internal/boardfamily	0.419s
+ok  	kicadai/internal/boardvalidation	0.209s
+ok  	kicadai/internal/buildinfo	0.868s
+ok  	kicadai/internal/canonicaljsonstream	0.177s
+ok  	kicadai/internal/capabilityadvancementv10	0.352s
+ok  	kicadai/internal/capabilitybaselinepublicationv10	0.308s
+ok  	kicadai/internal/capabilitybaselinepublicationv9	0.304s
+ok  	kicadai/internal/capabilitybaselinev10	0.200s
+ok  	kicadai/internal/capabilitybaselinev9	0.175s
+ok  	kicadai/internal/capabilitybundles	0.167s
+ok  	kicadai/internal/capabilityevaluation	0.177s
+ok  	kicadai/internal/capabilityexecutorv10	19.239s
+ok  	kicadai/internal/capabilityexpansion	0.250s
+ok  	kicadai/internal/capabilityfeedback	27.551s
+ok  	kicadai/internal/capabilitygate	0.187s
+ok  	kicadai/internal/capabilitypackages	0.166s
+ok  	kicadai/internal/capabilityrounds	0.159s
+ok  	kicadai/internal/capabilityroundsv10	0.185s
+ok  	kicadai/internal/capabilityroundsv8	0.216s
+ok  	kicadai/internal/capabilityroundsv9	5.586s
+ok  	kicadai/internal/capabilityselectionv10	0.227s
+ok  	kicadai/internal/circuitgraph	18.417s
+ok  	kicadai/internal/closedloopsynthesis	0.252s
+ok  	kicadai/internal/componentonboarding	3.880s
+ok  	kicadai/internal/componentprops	0.181s
+ok  	kicadai/internal/components	1.481s
+ok  	kicadai/internal/compositionlowering	77.515s
+ok  	kicadai/internal/config	0.300s
+ok  	kicadai/internal/corpusassignment	0.167s
+ok  	kicadai/internal/corpusfreeze	0.222s
+ok  	kicadai/internal/corpusfreezev10	0.209s
+ok  	kicadai/internal/corpusfreezev6	0.185s
+ok  	kicadai/internal/corpusfreezev7	0.168s
+ok  	kicadai/internal/corpusfreezev8	0.170s
+ok  	kicadai/internal/corpusfreezev9	0.168s
+ok  	kicadai/internal/corpushistoryv9	0.165s
+ok  	kicadai/internal/corpuspublication	2.656s
+ok  	kicadai/internal/creationevidence	0.452s
+ok  	kicadai/internal/designworkflow	21.686s
+ok  	kicadai/internal/domain	0.193s
+ok  	kicadai/internal/electricaldiagnostics	0.260s
+ok  	kicadai/internal/evaluate	0.235s
+ok  	kicadai/internal/externalkey	0.190s
+ok  	kicadai/internal/fabrication	0.314s
+ok  	kicadai/internal/fabrication/physicalrules	0.212s
+ok  	kicadai/internal/fabrication/profiles	0.177s
+ok  	kicadai/internal/generate	0.278s
+ok  	kicadai/internal/generationcapability	0.272s
+ok  	kicadai/internal/inspect	0.223s
+ok  	kicadai/internal/intentdraft	0.211s
+ok  	kicadai/internal/intentplanner	0.688s
+ok  	kicadai/internal/ipc	0.230s
+ok  	kicadai/internal/kiapi	0.227s
+?   	kicadai/internal/kiapi/gen/board	[no test files]
+?   	kicadai/internal/kiapi/gen/board/commands	[no test files]
+?   	kicadai/internal/kiapi/gen/board/jobs	[no test files]
+?   	kicadai/internal/kiapi/gen/board/types	[no test files]
+?   	kicadai/internal/kiapi/gen/common	[no test files]
+?   	kicadai/internal/kiapi/gen/common/commands	[no test files]
+?   	kicadai/internal/kiapi/gen/common/project	[no test files]
+?   	kicadai/internal/kiapi/gen/common/types	[no test files]
+?   	kicadai/internal/kiapi/gen/schematic/jobs	[no test files]
+?   	kicadai/internal/kiapi/gen/schematic/types	[no test files]
+ok  	kicadai/internal/kicadfiles	0.169s
+ok  	kicadai/internal/kicadfiles/checks	0.180s
+ok  	kicadai/internal/kicadfiles/design	0.538s
+ok  	kicadai/internal/kicadfiles/designapi	0.717s
+ok  	kicadai/internal/kicadfiles/library	0.197s
+ok  	kicadai/internal/kicadfiles/pcb	0.197s
+ok  	kicadai/internal/kicadfiles/project	0.173s
+ok  	kicadai/internal/kicadfiles/roundtrip	1.104s
+ok  	kicadai/internal/kicadfiles/schematic	0.171s
+ok  	kicadai/internal/kicadfiles/sexpr	0.156s
+ok  	kicadai/internal/libraryresolver	0.310s
+ok  	kicadai/internal/manifest	0.244s
+ok  	kicadai/internal/modelprovenance	0.211s
+ok  	kicadai/internal/obligationanchor	0.160s
+ok  	kicadai/internal/opentopologysynthesis	668.370s
+ok  	kicadai/internal/pcbrules	0.266s
+ok  	kicadai/internal/pinmap	0.182s
+ok  	kicadai/internal/placement	0.881s
+ok  	kicadai/internal/practicalboardeval	0.690s
+ok  	kicadai/internal/preservation	0.186s
+ok  	kicadai/internal/promotionrunner	1.752s
+ok  	kicadai/internal/promotiontoolchain	0.607s
+ok  	kicadai/internal/provenance	0.218s
+ok  	kicadai/internal/rationale	0.196s
+ok  	kicadai/internal/repair	4.872s
+ok  	kicadai/internal/repairloop	0.220s
+ok  	kicadai/internal/reportartifacts	0.184s
+ok  	kicadai/internal/reports	0.162s
+ok  	kicadai/internal/routing	0.182s
+ok  	kicadai/internal/routingadapters	0.163s
+ok  	kicadai/internal/runtimebudget	0.157s
+ok  	kicadai/internal/schematic	0.262s
+ok  	kicadai/internal/schematicir	36.053s
+ok  	kicadai/internal/schematiclayout	0.570s
+ok  	kicadai/internal/schematicpcb	0.183s
+ok  	kicadai/internal/schematicrules	0.167s
+ok  	kicadai/internal/simmodel	0.369s
+ok  	kicadai/internal/simulationadmission	0.272s
+?   	kicadai/internal/testsupport/tolerancecorpus	[no test files]
+ok  	kicadai/internal/transactions	1.779s
+ok  	kicadai/internal/workflows	0.223s
+ok  	kicadai/internal/writercorrectness	0.201s
+ok  	kicadai/specs/ai-requirement-contract-integration/publication-live-v1/replay-audit	0.207s
+ok  	kicadai/specs/behavioral-contract-feasibility-realizability	0.169s
+?   	kicadai/specs/board-family-v1/development	[no test files]
+ok  	kicadai/specs/closed-loop-open-set-capability-expansion	0.335s
+ok  	kicadai/specs/electrical-repair-followup-v23	0.306s
+ok  	kicadai/specs/electrical-repair-followup-v23/public-evaluation-v23	0.279s
+ok  	kicadai/specs/electrical-repair-followup-v23/publication-v23	0.219s
+ok  	kicadai/specs/fable-code-review-remediation	0.162s
+ok  	kicadai/specs/generic-analysis-model-solver-admission	0.160s
+ok  	kicadai/specs/generic-causal-topology-repair	0.166s
+ok  	kicadai/specs/generic-causal-topology-repair/maintenance-evaluation-1	0.240s
+ok  	kicadai/specs/post-topology-electrical-blockers	0.184s
+ok  	kicadai/specs/post-topology-electrical-blockers/public-evaluation-v22	0.239s
+ok  	kicadai/specs/post-topology-electrical-blockers/publication-v22	0.211s
+ok  	kicadai/specs/practical-board-completion-v1/engine	0.335s
+?   	kicadai/specs/tolerance-sensitivity	[no test files]
