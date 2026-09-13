@@ -1,0 +1,87 @@
+{
+  "verified_utc": "2026-09-11T19:53:19.612Z",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/native-readability-replay-offline-v1-all-runs.tar.gz",
+  "archive_bytes": 828583049,
+  "archive_sha256": "7e0207678095c5fd7326456122f269e3de02ae23f4947692f2abcb8245d72704",
+  "extracted": "/Users/dshills/Development/projects/KiCadAI/.cache/native-readability-replay-offline-v1-archive-verification",
+  "archive_creation_and_fresh_extraction": "archive-evidence.mjs completed with exit 0; all extracted content independently rechecked here",
+  "all_development_and_final_runs_retained": true,
+  "compile_only_attempts_without_raw_directory": [
+    "dev7"
+  ],
+  "source_snapshots": {
+    "file_count": 12,
+    "total_bytes": 7738704,
+    "sha256": "602f98641f28a971c1f32b99a7fcca29dac7c1c66aad89bfdab332b69257dad7"
+  },
+  "source_content_hashes_verified": true,
+  "inventories": [
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev1",
+      "file_count": 161,
+      "total_bytes": 1519468029,
+      "sha256": "534ab0a4b3fb1674459babcf6490cee411aac33e22ec5490ecfc82ec4a344f6c"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev10",
+      "file_count": 215,
+      "total_bytes": 1525689259,
+      "sha256": "fd47414fadc898167007ec5b6ec62199b4842244ade666e45b8f4d11c78eee4d"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev11",
+      "file_count": 316,
+      "total_bytes": 1527311059,
+      "sha256": "c3fb5ea142ab58c70bdc2233e9f0b590338b379f05249862c1c9c0e334ac8ac2"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev2",
+      "file_count": 138,
+      "total_bytes": 1518850368,
+      "sha256": "fabfebf0d167f4162a191525d877d54df2396a93670543ecc427745379fdde78"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev3",
+      "file_count": 138,
+      "total_bytes": 1518850436,
+      "sha256": "c7c55cecd41c0cecd4f22aee961ca7fae360ff15da0376c79ea3cb586c19e745"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev4",
+      "file_count": 138,
+      "total_bytes": 1518850437,
+      "sha256": "9891f67eb9fb9bd1e5b0a03b71c6adbf779b5955ce97f43c3172b58bc8ae07b3"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev5",
+      "file_count": 364,
+      "total_bytes": 1529419046,
+      "sha256": "4c07e3a1ff711e19a83bfe691877abcf6589d2917b568dfef1f532424352d4be"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev6",
+      "file_count": 18,
+      "total_bytes": 1516873338,
+      "sha256": "cdda69e78574eccff2908df3203369f6ab86a19f5a291fba4ad748e4002e28ba"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev8",
+      "file_count": 77,
+      "total_bytes": 1518911770,
+      "sha256": "aa13d229ea2e7338d5ad189a7ddb3b3435d9288e4b0069ae76c97d4f61f7633f"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-dev9",
+      "file_count": 77,
+      "total_bytes": 1518876158,
+      "sha256": "b76a3dea83fdfed8895294de85e3db9c84d1eb9daa2d80e490411684a8a84790"
+    },
+    {
+      "name": "kicadai-native-readability-replay-offline-v1-final",
+      "file_count": 170,
+      "total_bytes": 1520345919,
+      "sha256": "03a8607120794aa86323a68970137aa085d1b727984d94140d61d49437e9c036"
+    }
+  ],
+  "provider_calls": 0
+}

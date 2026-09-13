@@ -1,0 +1,31 @@
+{
+  "base": "3c1572f7cd9a8120b45e16c42c67500a5fb1097b",
+  "mode": "native-dev2",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestFunctionalLocalWiringSerializedReplay$",
+    "-v",
+    "-count=1",
+    "-timeout=45m"
+  ],
+  "root": "/tmp/kicadai-local-wiring-readability-offline-v1-dev2",
+  "started_utc": "2026-09-12T13:57:33.242Z",
+  "finished_utc": "2026-09-12T13:58:00.895Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/local-wiring-readability-v1-sources/native-dev2.json",
+  "source_snapshot_sha256": "14a5e7cefbad62d090a6bd2cf709c2e3db9d8ce23a6f0eb74610e51b7d3f6bf6",
+  "source_unchanged": true,
+  "log_sha256": "33943b30d3886d11962414869cc7a930aedbeba99c4d893b15dfa1260c0b8ec6"
+}

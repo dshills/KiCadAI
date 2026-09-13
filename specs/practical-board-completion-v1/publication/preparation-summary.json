@@ -1,0 +1,421 @@
+{
+  "completed_commands": 33,
+  "aborted_before_spawn": 1,
+  "commands": [
+    {
+      "name": "baseline-build",
+      "mode": "build",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "baseline-snapshot",
+      "mode": "snapshot",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "snapshot",
+        "wall_seconds": 0.021223166
+      }
+    },
+    {
+      "name": "baseline-test-1",
+      "mode": "test",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "baseline-v2-build",
+      "mode": "build",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "baseline-v2-test",
+      "mode": "test",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "baseline-v2-validate-p01",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.001819125
+      }
+    },
+    {
+      "name": "baseline-v2-validate-p02",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.000836042
+      }
+    },
+    {
+      "name": "baseline-v2-validate-p03",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.000883417
+      }
+    },
+    {
+      "name": "baseline-v2-validate-p04",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000691
+      }
+    },
+    {
+      "name": "baseline-v2-validate-p05",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.000906917
+      }
+    },
+    {
+      "name": "baseline-v2-validate-p06",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.001047459
+      }
+    },
+    {
+      "name": "baseline-v2a-validate-p04",
+      "status": "aborted_before_child_spawn",
+      "reason": "Preparation command referenced nonexistent baseline-v2a-build receipt; retained source snapshot only. Tool output reported ENOENT. No input validation, search or provider request ran.",
+      "source_sha256": "df3183bbb7bb646280cd242bc581186adc760d4b7d7b8c22db1a935e5d24d839"
+    },
+    {
+      "name": "baseline-v3-build",
+      "mode": "build",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "baseline-v3-validate-p04",
+      "mode": "validate",
+      "source": "87c411b7a13bdeb0efc6ff36b35e9a69c4e2706d",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.001215375
+      }
+    },
+    {
+      "name": "candidate-build",
+      "mode": "build",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-snapshot",
+      "mode": "snapshot",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "snapshot",
+        "wall_seconds": 0.0184585
+      }
+    },
+    {
+      "name": "candidate-test-1",
+      "mode": "test",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-test-2",
+      "mode": "test",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-v2-build",
+      "mode": "build",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-v2-validate-p01",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.001738292
+      }
+    },
+    {
+      "name": "candidate-v2-validate-p02",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.00127625
+      }
+    },
+    {
+      "name": "candidate-v2-validate-p03",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000798417
+      }
+    },
+    {
+      "name": "candidate-v2-validate-p04",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000809458
+      }
+    },
+    {
+      "name": "candidate-v2-validate-p05",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000822708
+      }
+    },
+    {
+      "name": "candidate-v2-validate-p06",
+      "mode": "validate",
+      "source": "4d7e8c87a6bbd80de8e78b3271b1202ee13ee701",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000714542
+      }
+    },
+    {
+      "name": "candidate-v3-build",
+      "mode": "build",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-v3-validate-p01",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.001203875
+      }
+    },
+    {
+      "name": "candidate-v3-validate-p02",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.000910666
+      }
+    },
+    {
+      "name": "candidate-v3-validate-p03",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.00087
+      }
+    },
+    {
+      "name": "candidate-v3-validate-p04",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "requirement_decode_or_validation",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "rejected",
+        "wall_seconds": 0.000849583
+      }
+    },
+    {
+      "name": "candidate-v3-validate-p05",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.001411375
+      }
+    },
+    {
+      "name": "candidate-v3-validate-p06",
+      "mode": "validate",
+      "source": "f1cbfd026c37a7916410efddf5fddf87486c5ce1",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.0008535
+      }
+    },
+    {
+      "name": "candidate-v4-build",
+      "mode": "build",
+      "source": "525896b2dcd2a0f4957c4868a77efae73414f0b8",
+      "exit_code": 0,
+      "engine_result": null
+    },
+    {
+      "name": "candidate-v4-validate-p04",
+      "mode": "validate",
+      "source": "525896b2dcd2a0f4957c4868a77efae73414f0b8",
+      "exit_code": 0,
+      "engine_result": {
+        "complete_board_pass": false,
+        "first_failed_gate": "",
+        "native_executed": false,
+        "provider_calls": 0,
+        "schema": "kicadai.completion-engine-result.v1",
+        "status": "validated",
+        "wall_seconds": 0.002264041
+      }
+    }
+  ],
+  "provider_calls": 0,
+  "board_attempts": 0
+}

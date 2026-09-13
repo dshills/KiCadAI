@@ -1,0 +1,9 @@
+{
+  "schema": "kicadai.interface-frozen-replay-failure.v1",
+  "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST /tmp/kicadai-ai-requirement-eval-v1 replay --evidence /tmp/kicadai-ai-requirement-interface-v1 --output /tmp/kicadai-interface-v1-offline-replay.json",
+  "exit_code": 1,
+  "stderr": "unexpected end of JSON input\n",
+  "report_created": false,
+  "provider_calls": 0,
+  "diagnosis": "canonicalCompilation unconditionally unmarshals fields[\"issues\"], but behavioralintent.Result omits this JSON member for zero issues. Nil RawMessage yields unexpected end of JSON input. Frozen evaluator and raw evidence remain unchanged."
+}

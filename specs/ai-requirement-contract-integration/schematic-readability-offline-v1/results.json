@@ -1,0 +1,30 @@
+{
+  "schema": "kicadai.schematic-readability-offline-results.v1",
+  "base": "b9d48213aa0431d5cf19824287c6403a4aea5529",
+  "scope": "two synthetic development examples; not the frozen AI evaluation",
+  "native_cases": 2,
+  "native_runs": 4,
+  "native_required_stage_count_per_run": 9,
+  "native_stage_passes": 36,
+  "complete_development_design_passes": 0,
+  "readability_passes": 0,
+  "readability_failures": 2,
+  "same_in_memory_request_byte_exact_project_replay_passes": 2,
+  "serialized_workflow_request_replay": "not certified; inferred-group runtime state omitted",
+  "frozen_positive_passes_added": 0,
+  "frozen_practical_campaign_complete_primary_positives": {
+    "passes": 0,
+    "total": 8,
+    "rerun": false
+  },
+  "fabrication_ready_designs": 0,
+  "provider_calls": 0,
+  "open_findings": [
+    "R1 native label/wire/body collisions",
+    "R2 serialized layout-policy loss",
+    "R3 functional/connector intent readability",
+    "R4 internal drawing-default/geometry option coupling"
+  ],
+  "final_source_receipt": "verification.json",
+  "review": "REVIEW.md"
+}

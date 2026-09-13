@@ -19,6 +19,9 @@ func Route(request Request, result Result) Result {
 }
 
 func routePass(request Request, result Result) Result {
+	if request.FunctionalLocalWiring {
+		request.functionalLabelCorridors = functionalRouteLabelCorridors(request, result)
+	}
 	rules := normalizeRules(request.Rules)
 	anchors := pinAnchors(result.Components)
 	anchorIndex := newPinAnchorIndex(anchors)
@@ -45,6 +48,10 @@ func routePass(request Request, result Result) Result {
 			continue
 		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
+		if request.FunctionalLocalWiring && net.LocalWiring && rules.LabelFallbackEnabled {
+			routeFunctionalLocalTrees(&result, labeled, net, orderedEndpoints, request, rules, anchorIndex)
+			continue
+		}
 		if forceLabels && routeLocalTreeWithBoundaryLabels(&result, labeled, net, orderedEndpoints, request, rules, anchorIndex) {
 			continue
 		}
@@ -643,6 +650,13 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	routeAccessPoint := func(endpoint Endpoint, anchor kicadfiles.Point) (kicadfiles.Point, bool) {
 		if direction, ok := endpointLabelDirection(endpoint, result.Components, rules.Grid); ok {
+			if request.FunctionalPowerLocality && functionalPowerNet(netName, request.Nets) {
+				for _, component := range result.Components {
+					if component.Ref == endpoint.Ref {
+						return powerPinAccess(anchor, direction, componentBody(component), rules.Grid), true
+					}
+				}
+			}
 			return kicadfiles.Point{X: anchor.X + direction.X, Y: anchor.Y + direction.Y}, true
 		}
 		// Cross-component routes already score every candidate against symbol
@@ -1134,6 +1148,12 @@ func scoreRouteIndexed(points []kicadfiles.Point, netName string, from, to Endpo
 	segments := segmentsForPoints(netName, points)
 	for _, segment := range segments {
 		score += int64(manhattan(segment.From, segment.To))
+		for _, corridor := range request.functionalLabelCorridors {
+			if corridor.net != netName && SegmentIntersectsRect(segment, corridor.box) {
+				score += routeHardPenalty
+				clean = false
+			}
+		}
 		if !usable.ContainsPoint(segment.From) || !usable.ContainsPoint(segment.To) {
 			score += routeHardPenalty
 			clean = false

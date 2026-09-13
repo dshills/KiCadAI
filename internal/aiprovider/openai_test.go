@@ -137,7 +137,7 @@ func TestOpenAIProviderPollsBackgroundResponse(t *testing.T) {
 
 func TestOpenAIProviderStreamingLimitScalesWithTokenLimit(t *testing.T) {
 	client := clientWithRoundTrip(func(_ *http.Request) (*http.Response, error) {
-		padding := strings.Repeat("event: response.output_text.delta\ndata: {\"delta\":\"x\"}\n\n", 40000)
+		padding := strings.Repeat("event: response.reasoning_summary_text.delta\ndata: {\"delta\":\"x\"}\n\n", 40000)
 		event := padding + "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + openAIResponseJSON(t, validEnvelope) + "}\n\n"
 		if len(event) <= MaxResponseBytes {
 			t.Fatalf("stream fixture = %d bytes, want above fixed envelope limit", len(event))

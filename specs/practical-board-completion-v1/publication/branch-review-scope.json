@@ -1,0 +1,3749 @@
+{
+  "source": "75cfcc978f37ef751aab58dfc1fb2cdfc16ecef7",
+  "base": "11e48031c95d3cf2751a55f39c6cefe18523950c",
+  "files": [
+    {
+      "path": "cmd/ai-requirement-eval/main.go",
+      "bytes": 2152,
+      "sha256": "bbc1e9f6a57267a060b1d778996397e2fd531b37171cf6a5445bf6494fa6a962"
+    },
+    {
+      "path": "cmd/ai-requirement-eval/main_test.go",
+      "bytes": 414,
+      "sha256": "30afd3261ff769743f6b607733ce3c3b6fdbfb4717e61a6237a79ecd4a80327d"
+    },
+    {
+      "path": "internal/aiprovider/openai.go",
+      "bytes": 21555,
+      "sha256": "9be7410f621743b03e1e9c380aa034dd1ab122cff08f0b09aa85310b855a662e"
+    },
+    {
+      "path": "internal/aiprovider/openai_test.go",
+      "bytes": 17641,
+      "sha256": "7ab58607de3d5d0c596c6a256630207ec38c4711d78a0eb10f3e003a11808878"
+    },
+    {
+      "path": "internal/aiprovider/stream_integrity_test.go",
+      "bytes": 7353,
+      "sha256": "8e41984e15a2eee03050577e61a1c65c96cddfad3ea88475684defd96b093f16"
+    },
+    {
+      "path": "internal/airequirementeval/campaign.go",
+      "bytes": 16530,
+      "sha256": "b7ebcfced8cf5ca29738edf68533af3fcbd0e5f764d0f59a2582035616f10442"
+    },
+    {
+      "path": "internal/airequirementeval/eval_test.go",
+      "bytes": 24277,
+      "sha256": "e93c4e20ca97e9655331aed50360bee15fb3d3bff5f260599899737dabd15661"
+    },
+    {
+      "path": "internal/airequirementeval/model.go",
+      "bytes": 10288,
+      "sha256": "b986b4a51afc7a752aad345f772ab9fee032236cda349b76bad20eb8407c78f2"
+    },
+    {
+      "path": "internal/airequirementeval/prepare.go",
+      "bytes": 4762,
+      "sha256": "bd993a8e1fb01a53d336dee4fd8d9ebd25c45349ac58ac152d01ef5963dff0e2"
+    },
+    {
+      "path": "internal/airequirementeval/replay.go",
+      "bytes": 7928,
+      "sha256": "7f44380b1b872bf3c76c6e5934735d3f1278b19e5d457d01cfcf7924c7401112"
+    },
+    {
+      "path": "internal/airequirementeval/replay_empty_issues_test.go",
+      "bytes": 1424,
+      "sha256": "7bf44f3024fb0c3284b36e79e6af5a4cc41a1cccfbabec4b1ed123f5b9cab32e"
+    },
+    {
+      "path": "internal/airequirementeval/request_bounds_test.go",
+      "bytes": 2312,
+      "sha256": "391acb0a2bb7efd0bbd1aec4a9fc9281783cd0474793446b1de8124874933c29"
+    },
+    {
+      "path": "internal/airequirementeval/resources.go",
+      "bytes": 3678,
+      "sha256": "9e47f70c93e7a76f90a298df9a866088de81193bd7d2a2c401a3c7f7a29314f7"
+    },
+    {
+      "path": "internal/airequirementeval/transport.go",
+      "bytes": 11720,
+      "sha256": "e556c2f6fad41f86b0e61b9b9538902e08d7134ffeedb3225c969ce8dbbc2c16"
+    },
+    {
+      "path": "internal/architecturesearch/behavioral_projection.go",
+      "bytes": 35710,
+      "sha256": "eb49c560f6647609c1667cb12f571369304bf4af42d3ec4021d3c35e58e1f48c"
+    },
+    {
+      "path": "internal/architecturesearch/contracts.go",
+      "bytes": 42903,
+      "sha256": "55908eedf0d0488d104bbd41bd21603967b3c01d60e73e57866c83153c5e1807"
+    },
+    {
+      "path": "internal/architecturesearch/endpoint_contracts.go",
+      "bytes": 4340,
+      "sha256": "b2fa5cd1edabec6d9970d152be70b85e65643cb5d49f03f0475911a5e9146bc7"
+    },
+    {
+      "path": "internal/architecturesearch/endpoint_contracts_test.go",
+      "bytes": 11193,
+      "sha256": "1f548e18ef4f9ad70ce747fd21d5bba7bdfff23edc3c8dedebd88a45c4104a0e"
+    },
+    {
+      "path": "internal/architecturesearch/hierarchy.go",
+      "bytes": 48443,
+      "sha256": "74300931558990b18c3c64ab87db38af766705e50ad3c1d1baa1551b519660bb"
+    },
+    {
+      "path": "internal/architecturesearch/model.go",
+      "bytes": 12690,
+      "sha256": "6c6c627624e54e6a249d498cee643b0ac8aa9fb8e61f07b2c1a4812f8e2a06c8"
+    },
+    {
+      "path": "internal/architecturesearch/normalize.go",
+      "bytes": 14342,
+      "sha256": "6382bebe2477c64720db46ddd9aa3d68e45b80a422e0999940b04b3e1033644b"
+    },
+    {
+      "path": "internal/architecturesearch/power_sequence.go",
+      "bytes": 10293,
+      "sha256": "21f3640569803c1973883da0860d1b13a10cb6e2fc14600e29701aa26ef26093"
+    },
+    {
+      "path": "internal/architecturesearch/power_tree.go",
+      "bytes": 6538,
+      "sha256": "56027f9ffd5ec6047190852da165a986364d3f8ac2fe5b4469e0a62c42a0998a"
+    },
+    {
+      "path": "internal/architecturesearch/provider_vocabulary.go",
+      "bytes": 1123,
+      "sha256": "5f285601c5836a4870bfec104bcc47b0e7549560e401a6b4f0856c364b2bad9a"
+    },
+    {
+      "path": "internal/architecturesearch/provider_vocabulary_test.go",
+      "bytes": 959,
+      "sha256": "f746a508761fb41a06359422d4567a9a661487d79c5ef1eaea12f2441e899f68"
+    },
+    {
+      "path": "internal/architecturesearch/reference_domains.go",
+      "bytes": 2838,
+      "sha256": "20f9023f99b1cad2c2095276e6782dabc9ab319340cc3d6a25db0efd9318592c"
+    },
+    {
+      "path": "internal/architecturesearch/reference_domains_test.go",
+      "bytes": 4717,
+      "sha256": "ef06bfaee3c3db5645d6011673cc24e718a2df024f1b9653272dc9a80ddcf47c"
+    },
+    {
+      "path": "internal/architecturesearch/regulation_sources.go",
+      "bytes": 3400,
+      "sha256": "eab6621c07da48c903b4e978813a64baecfc81e55f76cf5568992dcf29305d09"
+    },
+    {
+      "path": "internal/architecturesearch/regulation_sources_test.go",
+      "bytes": 2811,
+      "sha256": "0173ff0b2583e63c54ac199a0546526e28912f1d8f78591a8a9e5eadb9e8923e"
+    },
+    {
+      "path": "internal/architecturesearch/search.go",
+      "bytes": 78629,
+      "sha256": "4809e6d5994b7321891d0f48c909c3191abc300d1bd0d3bacfe9040a3dbcc86c"
+    },
+    {
+      "path": "internal/architecturesearch/validate.go",
+      "bytes": 59181,
+      "sha256": "3b187365971a84d4dee4a45cc046365f5490fd47ff56e1b3a0425852a4926281"
+    },
+    {
+      "path": "internal/behavioralintent/compile.go",
+      "bytes": 21013,
+      "sha256": "59443f84749a5e1ca45efdc3d3f712627054fd66c358d310e99e84dbfe1b87f1"
+    },
+    {
+      "path": "internal/behavioralintent/contract_conformance_test.go",
+      "bytes": 15567,
+      "sha256": "9cf90a603cc25a116b41d3b3988e832855d02c4e90c17994130c3bee36d5b8b2"
+    },
+    {
+      "path": "internal/behavioralintent/endpoint_contracts_test.go",
+      "bytes": 3349,
+      "sha256": "978536385155d91ae8cec7afad71cce9768c0be0e032df2b34cd21211fa8a51c"
+    },
+    {
+      "path": "internal/behavioralintent/offline_repair_test.go",
+      "bytes": 6022,
+      "sha256": "1f46e700264ea21aa38320f06d7e8e0c5580133ffa2b973cd55f1a09aaca5baa"
+    },
+    {
+      "path": "internal/behavioralintent/provider_context.go",
+      "bytes": 10971,
+      "sha256": "dd94d376211a241f3fd0d5bec65f564f39b2f86abcab14b967e4ff247db290ff"
+    },
+    {
+      "path": "internal/behavioralintent/schema.go",
+      "bytes": 3510,
+      "sha256": "44a5f28871dbcec05160518342b6a4a225661d2b8ff92fbe0666573dec53a8ad"
+    },
+    {
+      "path": "internal/behavioralintent/schema_subset_test.go",
+      "bytes": 3389,
+      "sha256": "c0b3e27c5b12d275c17f26517c735a63f0b15e9ec54fa6bf2a5e5a0954f8b5eb"
+    },
+    {
+      "path": "internal/behavioralintent/schema_test.go",
+      "bytes": 4646,
+      "sha256": "f5a3a04c9b644d055d97fe51cfa3e54e90ee1898fe8f2ce2dc52315e4429734c"
+    },
+    {
+      "path": "internal/behavioralintent/semantic_schema.go",
+      "bytes": 13156,
+      "sha256": "9b52f555af41d029146f753b6d662811798e40d6fc07459c5b0a25c6d24a69c7"
+    },
+    {
+      "path": "internal/behavioralintent/testdata/interface_v1_i04_counterexample.json",
+      "bytes": 7579,
+      "sha256": "1db54ac9e1953cb99682d0c7507705fb7c71c110fc0a34c6bede5aba2a21ebfb"
+    },
+    {
+      "path": "internal/circuitgraph/design_request.go",
+      "bytes": 8258,
+      "sha256": "a2304f2ff3b4f2316f5e1e3a94036c1bb71084b4d23ba5448c953a0cf37b5004"
+    },
+    {
+      "path": "internal/circuitgraph/model.go",
+      "bytes": 14020,
+      "sha256": "bc3b2c8763fb90799e4531c697a9a4b2895e1c3f1d505d08ed3fad634d587ce7"
+    },
+    {
+      "path": "internal/circuitgraph/placement_seed.go",
+      "bytes": 993,
+      "sha256": "6e0fdf148cb5309eea62395ca47edeb9f1d8d4bba7ae0ee9c7b14c03464dc10f"
+    },
+    {
+      "path": "internal/circuitgraph/placement_seed_test.go",
+      "bytes": 2408,
+      "sha256": "bd097b9c5a22ce21f5660bc730be805adb71197e7770181af441a362c0777d48"
+    },
+    {
+      "path": "internal/circuitgraph/resolved.go",
+      "bytes": 5001,
+      "sha256": "38e5692af0e81b63adfa8ea1cbad0f6d2a84d9ed6ba98e796413b6d30576db08"
+    },
+    {
+      "path": "internal/circuitgraph/schematic.go",
+      "bytes": 31693,
+      "sha256": "ff9a7cc0214075653eb4170f696a0f4a3146c312cbae19912d866e758e7e10ab"
+    },
+    {
+      "path": "internal/circuitgraph/synthesis.go",
+      "bytes": 65051,
+      "sha256": "989265c3fc165fe1009611317d70718b1847a3a8df380990b48018dee2a90ca0"
+    },
+    {
+      "path": "internal/circuitgraph/synthesized_readability_test.go",
+      "bytes": 3386,
+      "sha256": "6616d4ae598c6633f669cf206cd56acedcad8e4a6696472772c1f3400e9dba1a"
+    },
+    {
+      "path": "internal/circuitgraph/validate.go",
+      "bytes": 35084,
+      "sha256": "b4558b598f93e0bc37170b194b279a163c5c4f91f0fd56474a220c001d5f48a4"
+    },
+    {
+      "path": "internal/closedloopsynthesis/participant_endpoint_test.go",
+      "bytes": 3818,
+      "sha256": "6848c6fd8a2d807c15e2a7d4c6e45424137e8a959b460ddac234446cabab5a1e"
+    },
+    {
+      "path": "internal/closedloopsynthesis/resolved_simulation_contracts.go",
+      "bytes": 66451,
+      "sha256": "65a19b1312fe043e67649ece5a776501e5cd47939615172cb32c07516b3b6015"
+    },
+    {
+      "path": "internal/compositionlowering/closed_loop_simulation.go",
+      "bytes": 141541,
+      "sha256": "bbe82bb2be4f9cefad5b87d43a5540dc3765185f747778a55e8d8a86d337a1b9"
+    },
+    {
+      "path": "internal/compositionlowering/endpoint_contracts_test.go",
+      "bytes": 11140,
+      "sha256": "0c6d27fbf28bf2f3d9c5daccd377a93380c392b1501a73392edfb6a36e0d0f4d"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout.go",
+      "bytes": 6289,
+      "sha256": "3c268ae9d015c6eeaeb76678f7b4506daf6e858e6f3e5b4f317b8f9fdf459d8c"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout_test.go",
+      "bytes": 6340,
+      "sha256": "f79ce229b6968c3806d49d5d8d62c7ef01b34966df8fbb424f37b26c93b9c060"
+    },
+    {
+      "path": "internal/compositionlowering/functional_locality_replay_test.go",
+      "bytes": 7222,
+      "sha256": "a58519a4e9e5ec53785f0fb8a23a7268e7d737770fd109ae69c9466de5d9d085"
+    },
+    {
+      "path": "internal/compositionlowering/functional_readability_replay_test.go",
+      "bytes": 7227,
+      "sha256": "44aff067dde5b4766c1c121d2271b91dc4037cab5cbda2e491bab83999801796"
+    },
+    {
+      "path": "internal/compositionlowering/joint_layout_diagnostic_test.go",
+      "bytes": 1672,
+      "sha256": "78e594839622b39b7942abf5d8ccacd25214c84c2cd87fb1112473417e5e778f"
+    },
+    {
+      "path": "internal/compositionlowering/joint_replay_test.go",
+      "bytes": 7216,
+      "sha256": "3ff9b763d9b8a247a3c8b521e0611e6d0585788cd2c91e8bfa0673687e7c58a7"
+    },
+    {
+      "path": "internal/compositionlowering/local_wiring_diagnostic_test.go",
+      "bytes": 1692,
+      "sha256": "1df173a928e6969cb0d8147093f9d0aea469f34dc00a7bdfc6e37bc386cc5928"
+    },
+    {
+      "path": "internal/compositionlowering/local_wiring_replay_test.go",
+      "bytes": 7229,
+      "sha256": "aa6cde4512e4abdedc52dc8024ff71415e03aaa52cdfa2b282d3624fd0a433fc"
+    },
+    {
+      "path": "internal/compositionlowering/lower.go",
+      "bytes": 45990,
+      "sha256": "9f87898d393f2a6a986c31ddcee29d7707ae845b7d522d6c8e757373f210dd92"
+    },
+    {
+      "path": "internal/compositionlowering/native_readability_replay_test.go",
+      "bytes": 7119,
+      "sha256": "35bc8a27d95927783217b9ff8b2ab051c440e73f11452b15b1a237a9bcfe1f68"
+    },
+    {
+      "path": "internal/compositionlowering/pin_aware_replay_test.go",
+      "bytes": 7223,
+      "sha256": "51098e8fbf840cc23c9c282e31313971f71c9a99e13e7b5153cb36fe5b97210d"
+    },
+    {
+      "path": "internal/compositionlowering/power_locality_diagnostic_test.go",
+      "bytes": 2089,
+      "sha256": "2d58bb772e487721e9d0c3c84e046d31cc9331badb53c0cd9f4f3bc9e2200183"
+    },
+    {
+      "path": "internal/compositionlowering/power_locality_replay_test.go",
+      "bytes": 7233,
+      "sha256": "789ae3a09acf4d9a5890daa92afb60b2098e656019d2f6d9e7fd7525eae54be8"
+    },
+    {
+      "path": "internal/compositionlowering/readability_promotion_test.go",
+      "bytes": 6013,
+      "sha256": "dd7305c9d96ab12d65b77fb03a54baf62c1cfda77c7acc5faff92db3fec5ed72"
+    },
+    {
+      "path": "internal/compositionlowering/reference_domains.go",
+      "bytes": 1104,
+      "sha256": "a639a00a32715c737a28872cc481c7d952594fe581de82b6a73e5af545216798"
+    },
+    {
+      "path": "internal/compositionlowering/reference_domains_test.go",
+      "bytes": 4759,
+      "sha256": "0cfb4f105f344d57b5f5698ff8dd157c6367d53112f65a62f4400fa27f416b5a"
+    },
+    {
+      "path": "internal/compositionlowering/reference_promotion_test.go",
+      "bytes": 6250,
+      "sha256": "7518d406f9a428c8518786637827dd9c351fddded344135c649c5bf9045c5519"
+    },
+    {
+      "path": "internal/designworkflow/explicit_pcb.go",
+      "bytes": 85299,
+      "sha256": "8e826086db6a1dfe0bd6f6640780ec6dbb56f9765592b78c372e87877b843017"
+    },
+    {
+      "path": "internal/designworkflow/placement_seed.go",
+      "bytes": 1211,
+      "sha256": "46601e2e963e778893ce59ab94a663d069fc57f14ed22f718776ed39c6aec370"
+    },
+    {
+      "path": "internal/designworkflow/placement_seed_test.go",
+      "bytes": 2118,
+      "sha256": "8ed78313b69422e1ccb28f0f145c7e10b39e5f0abd26377fa171715012406691"
+    },
+    {
+      "path": "internal/designworkflow/request.go",
+      "bytes": 59635,
+      "sha256": "581a320a77126f156570c9a6740f5e8bfacb5a887fe8cb68bce741ac94201490"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder.go",
+      "bytes": 139957,
+      "sha256": "01e9d72bd9fd5bf90af782eaad04aadceb3a740534addf9fc129009a2f34c7d6"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder_test.go",
+      "bytes": 122868,
+      "sha256": "03619f23a14d68416f9c1556aec4cf73e646f133a6bf5c4b4ca81c31523c8bc9"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_audit.go",
+      "bytes": 4346,
+      "sha256": "2cbb48775c3bc041793c85c74ab4f71d45d0991838f331da0bb8ac89e4b65b69"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_blocks.go",
+      "bytes": 4827,
+      "sha256": "d8417e8f3837adfd5664ffc8047ef87b73e3f181f2dd95313467383f8b460cc7"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_blocks_test.go",
+      "bytes": 4721,
+      "sha256": "5d60eccd36c3f80aba2a04cfc681d8124d2d9802c43b4744f0d1f328256b3729"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_diagnostics.go",
+      "bytes": 2753,
+      "sha256": "8751f42eed15fc60f0d88328d4a84bc22c9ef8a06a2a256419e389c1f495eba8"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotation_diagnostics_test.go",
+      "bytes": 1955,
+      "sha256": "200c9820b8d53138444aa287955608eb82acb95344649b7ae37e8b0ec2aa4b53"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_annotations.go",
+      "bytes": 12382,
+      "sha256": "68424bd252a2ca038229d26cd4d6e07d3f5a834311bf6820951154feed9dedd0"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_collision_regression_test.go",
+      "bytes": 2618,
+      "sha256": "249325aa476126f499a1201d46cef898b7bfa05ac1a273c4974a62371e36e084"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_island_label.go",
+      "bytes": 1277,
+      "sha256": "29f56d8a4e7a3ccbc23fe518df2872fe60933873cbb00c615cbb59eb5f4261e5"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_label_readability_test.go",
+      "bytes": 1497,
+      "sha256": "1a5edc3857c9849888cc204cc385213044ec9bbb848d6e91680d5dbffbe45fe4"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_reading_guide.go",
+      "bytes": 2361,
+      "sha256": "41a477c9fb07b21a8f6bd443f0d7efa23c3b443ea8ad66ccc26a6e40153dbb57"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_rotated_fields_test.go",
+      "bytes": 3275,
+      "sha256": "541ecc6e25ede01ed59dcb0552f77e42548e1fdde470084cf4bec7fd5cfaab7f"
+    },
+    {
+      "path": "internal/kicadfiles/project/project.go",
+      "bytes": 11851,
+      "sha256": "935453f0a95061464f24fd0a6e368e3c2c1bb5d9fa52e13296ca400fb576bf63"
+    },
+    {
+      "path": "internal/kicadfiles/project/read.go",
+      "bytes": 3334,
+      "sha256": "80ba57163856b7316dcd2ec02cf081912a66417aa723cc7dca5f439f1584587e"
+    },
+    {
+      "path": "internal/kicadfiles/project/schematic_defaults_test.go",
+      "bytes": 1137,
+      "sha256": "582d871cb7c1a6b334013c8083c14b609e703a7daced240f55a236c2006b5400"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read.go",
+      "bytes": 23207,
+      "sha256": "7c386864c7eefa73fcc77b5fb2b83032e87c16d3de249195d6b80fd274cf4670"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read_native_text.go",
+      "bytes": 1816,
+      "sha256": "a3845bf724e4b9fde2f133e132026b854164e6a778ed43d7176cc1de9b361e3d"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/read_native_text_test.go",
+      "bytes": 970,
+      "sha256": "83d7309a2535d617fb50c01c7e817f83f6fc12583fc47e3516917bc5e9367015"
+    },
+    {
+      "path": "internal/kicadfiles/schematic/schematic.go",
+      "bytes": 80609,
+      "sha256": "149ef5dfc75d4b07a5003bcd9f6c3521df03b7559c8801cb82b8c4b5ee7d0901"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "bytes": 119089,
+      "sha256": "51a9a4848d1278eb03ffd048aac568bac10a05feaa7d6af252174b1baef22459"
+    },
+    {
+      "path": "internal/schematicir/functional_layout.go",
+      "bytes": 3326,
+      "sha256": "e9e4a36edc3b31cbe8ec55929a376bd20990d9de6a5fed1093733c32d903e689"
+    },
+    {
+      "path": "internal/schematicir/functional_layout_test.go",
+      "bytes": 3034,
+      "sha256": "48b6df31106ddeb6fce59fd0aa97b0ab716966f70123f02fd0f72dc89b88cca4"
+    },
+    {
+      "path": "internal/schematicir/layout.go",
+      "bytes": 12781,
+      "sha256": "0419b779f11f24867f09caff2e321d188ff58bd5c5d1a1c54a449b67820fb1fc"
+    },
+    {
+      "path": "internal/schematicir/local_wiring.go",
+      "bytes": 1252,
+      "sha256": "dc1e2591299107907dbab8d8ce7e1f85619e00aa1779977f8ac8165616edf010"
+    },
+    {
+      "path": "internal/schematicir/local_wiring_test.go",
+      "bytes": 1638,
+      "sha256": "18d6ed82cb93205e0031d26f6a86a172bd867f8bb1c5dafacaf8ad0abcdbc0a8"
+    },
+    {
+      "path": "internal/schematicir/model.go",
+      "bytes": 15875,
+      "sha256": "ea1863d478d3a3177358032790fbc3a3706fd56971a1194378baa8cb56a8a6c1"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_blocks.go",
+      "bytes": 3518,
+      "sha256": "b32bfdfe3eb99665d3096cc4797d04877072c632da91dd66d2cf1bf9ca3ac4c5"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_blocks_test.go",
+      "bytes": 2387,
+      "sha256": "727ba27cb2fea315dec37b2d65b1c07ac0d28c6df069a9046b53999a3d5d5f2f"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_test.go",
+      "bytes": 1251,
+      "sha256": "a1770a455c69ac40d1f2c5c31bdcb8dbfa1c84f76d7aa728701d4af38d0a0af9"
+    },
+    {
+      "path": "internal/schematicir/native_annotations.go",
+      "bytes": 3080,
+      "sha256": "d4c455e932e55e2998d779f168b480475d3dc8705b233175b115031d02755ffc"
+    },
+    {
+      "path": "internal/schematicir/readability_diagnostics_test.go",
+      "bytes": 1803,
+      "sha256": "9a2982c3b0a664c13b996d67d5adc78f6b30049406544d133120ca93984f0d16"
+    },
+    {
+      "path": "internal/schematicir/serialized_native_layout_test.go",
+      "bytes": 2686,
+      "sha256": "3ac206f8ef6c9dd9396c9c49b7148cdfce9b24f86fafaf61d4eb2a8f4a87b453"
+    },
+    {
+      "path": "internal/schematicir/validate.go",
+      "bytes": 32555,
+      "sha256": "0285a43f4cacbd6af9208415b3b4efdf34a13f1271503f95787357aea0b32686"
+    },
+    {
+      "path": "internal/schematiclayout/annotation_blocks.go",
+      "bytes": 650,
+      "sha256": "168dff70770af6d1d8129e9da2ad75c34a4d4ffe537c0515f4bd2b66c32988f8"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups.go",
+      "bytes": 5638,
+      "sha256": "7211b40ded2bccb7df63ccd559e8bf8ee5f8984227339cc464cff489743dc479"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups_test.go",
+      "bytes": 1301,
+      "sha256": "68dedefdd6b1f4b71c6292ad7724fbc28675d5589cef8f6ac11ea5d283743a91"
+    },
+    {
+      "path": "internal/schematiclayout/functional_support.go",
+      "bytes": 5029,
+      "sha256": "fc30f1522766f12ef9767746d5139f600ced0172268ef1c15e6b84f1c1cedb84"
+    },
+    {
+      "path": "internal/schematiclayout/functional_support_test.go",
+      "bytes": 3777,
+      "sha256": "209f829b7ef55afd25a277256871ec0503196ef98b96663478386b15ec749f49"
+    },
+    {
+      "path": "internal/schematiclayout/joint_support.go",
+      "bytes": 2058,
+      "sha256": "92ab626e7a533e13376c73ceab24caeafe1dfba8a3a03050e5ebda9b6eab430d"
+    },
+    {
+      "path": "internal/schematiclayout/joint_support_test.go",
+      "bytes": 4129,
+      "sha256": "8f640312224b1a1a7e0c113f1deab43acbf4d74b5ea595f8d535b504e427f034"
+    },
+    {
+      "path": "internal/schematiclayout/local_wiring.go",
+      "bytes": 4400,
+      "sha256": "e4b5bd67c0baf9b92c7000a2cb9d10ad0b664d756fff4eab33dce34f0f953a41"
+    },
+    {
+      "path": "internal/schematiclayout/local_wiring_test.go",
+      "bytes": 6738,
+      "sha256": "6b5675923632205d560789493bef60127f75695bfd3d54608885785c95504f3d"
+    },
+    {
+      "path": "internal/schematiclayout/model.go",
+      "bytes": 32488,
+      "sha256": "70dc04e84c51024748d905a3611f9e64986e07ffebd2eb35a9b18ea827a0adc1"
+    },
+    {
+      "path": "internal/schematiclayout/native_text.go",
+      "bytes": 1395,
+      "sha256": "67e0231def0bb5c87ef9a957cc94c171a3eb1e8be552e17f21319994f777b157"
+    },
+    {
+      "path": "internal/schematiclayout/pin_aware_support.go",
+      "bytes": 3798,
+      "sha256": "1484d82c04bb08049b7e06a4f49c81d2cb44a5a113bebfb7cf4a45c4a7e1a5c5"
+    },
+    {
+      "path": "internal/schematiclayout/pin_aware_support_test.go",
+      "bytes": 5067,
+      "sha256": "16ed838acf8a164fd86a13194b4e0d75d7e807aa16288fc27aaca33763be9696"
+    },
+    {
+      "path": "internal/schematiclayout/place.go",
+      "bytes": 31592,
+      "sha256": "3fb50ea113d6d7eacb5bc85d24d45b32c35aa4124054d7c7305767f63d51797a"
+    },
+    {
+      "path": "internal/schematiclayout/power_locality.go",
+      "bytes": 4459,
+      "sha256": "03b80194c0e575bd52be89f4c0d2a124b777fb4be89f2ab72d1e954109a3fcae"
+    },
+    {
+      "path": "internal/schematiclayout/power_locality_test.go",
+      "bytes": 8500,
+      "sha256": "c0efd882de97c5418c31a23dbcb33c429c1bfad1690306cc9962f31bc9534847"
+    },
+    {
+      "path": "internal/schematiclayout/route.go",
+      "bytes": 63657,
+      "sha256": "85cf16ce188a63a252414ed2584e66b38dec558e6b8236ff1007d3b2bc0d369b"
+    },
+    {
+      "path": "internal/schematiclayout/text.go",
+      "bytes": 9380,
+      "sha256": "27d9ec04451ce3f2e713262a76681d339b8bc840d86fe77eb8233120c8369ba2"
+    },
+    {
+      "path": "internal/transactions/apply.go",
+      "bytes": 54910,
+      "sha256": "73c6f4bb6cb9b09898c126373c8bcda0ed5a7e3ccd20572af9c990e117d3aee6"
+    },
+    {
+      "path": "internal/transactions/model.go",
+      "bytes": 14419,
+      "sha256": "37066696a277638ddd421c3c044df6a45ffa06a2a1ca5d51e16aec8264396dc7"
+    },
+    {
+      "path": "internal/transactions/native_joint_diagnostic_test.go",
+      "bytes": 3331,
+      "sha256": "4e9d8a96ed350cacab80b909b557c9799758065e91d4f60eb1ead5e06506b281"
+    },
+    {
+      "path": "internal/transactions/native_local_wiring_diagnostic_test.go",
+      "bytes": 3139,
+      "sha256": "a26a8a85b6ce19230b1ac5aa324f9cb166754f5b8c5a367072c8f68d4127f199"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/LIVE-PROTOCOL-PROPOSAL.md",
+      "bytes": 8086,
+      "sha256": "b49cce009e1e272c42df3fb6b4d3e4d50e0f8f6c526157f4cb7e7008ed6b7909"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/PLAN.md",
+      "bytes": 4110,
+      "sha256": "2bba38786b5a763384ca7ac353af4e3da780fc7bd3d1c2fcde74b3dbf3b9e91d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/RESULTS.md",
+      "bytes": 8754,
+      "sha256": "7a2dc91f77e7bfed029558f0309bdf2f60bd3a227c0afe4605c2f3d5dd07fe7e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/REVIEW.md",
+      "bytes": 4609,
+      "sha256": "e614dc6dc14ce83bbe6b53c2ce4e53dd73f6686193e683078f36e9e1cdbc971f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/PLAN.md",
+      "bytes": 3607,
+      "sha256": "8ddab57f2f1e0128ea21ac1736ff375319a17551976ac4d5715443e8fda0c2af"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/README.md",
+      "bytes": 6207,
+      "sha256": "c3f6074a4173317e0d4630c939835d8161117a1463095c55fbb480bbe120a3d2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/REVIEW.md",
+      "bytes": 5092,
+      "sha256": "d367816e25556d838e8be49d53b9e521b9b28818d6636e0bf0dab4e52dda0a2e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/composition-race-tests.log",
+      "bytes": 3178,
+      "sha256": "08626aad85c8cc738f9865577c7abd63c3b6730f98f6432c926c4918a0bd7eae"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/focused-tests.log",
+      "bytes": 7642,
+      "sha256": "7447ed2560869a814f2403f36370de8ebb136a9c97cc12df61feccaf7ba186c7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/preservation.json",
+      "bytes": 3152,
+      "sha256": "cff6048b055e0bd48eb1bcbee5b980a634dcd44628008a3014889416e1c25a9a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/race-tests.log",
+      "bytes": 191,
+      "sha256": "f1c24a48e2d098daf31f49b0c228594551dc86e7c10c44a7eb13685306a976da"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/repository-tests.log",
+      "bytes": 8128,
+      "sha256": "6e22cc7a037630295ebe26abc894da0dc1ab484c899dd29fc5c68c5a2b4ddf8a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/request-bounds.log",
+      "bytes": 337,
+      "sha256": "f1a7bf08b111f6ab79540ec8cf7498b17dc0b57de7e1f3b759b9ff66c3ef8c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/results.json",
+      "bytes": 2892,
+      "sha256": "ecc0b7497884d28ad749e3c01b8900a039557539679c9b5e961580400a034a5b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/superseded-race-tests.log",
+      "bytes": 191,
+      "sha256": "0897fb700b81288df7d24c3ab8628deca36102d6d97b7af0acf55efa8d22d851"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/superseded-repository-tests.log",
+      "bytes": 6390,
+      "sha256": "7596e1051edccd36b6393cca370c878918cd271855d83624d165ba0d7b26782a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/verification.json",
+      "bytes": 13799,
+      "sha256": "0bb175ac9e8c575a972d382aac35a740424a9f495b5db674e3b03882fd0b9662"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/verify.mjs",
+      "bytes": 2919,
+      "sha256": "4f01d9205857d53a9b1cbe66b4ef04c6854d1682cdbbbbd51e3ea1cbbfa1c208"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/PLAN.md",
+      "bytes": 2442,
+      "sha256": "0694b7efd07a1c8484ee6f45ca46cc36a768a09e6fc59f0c7c824a39b79c0541"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/README.md",
+      "bytes": 7734,
+      "sha256": "a66f9069e4309db936b63d22a0b351190a995dafc5a160a65f8e1c1ff1da191f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/REVIEW.md",
+      "bytes": 3523,
+      "sha256": "5b89467908c0903cbbb278eac58f2ac7eba4ffcd17a3b0d6512bef6795e0c449"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/archive-verification.json",
+      "bytes": 363,
+      "sha256": "fc2b9dab95ee460e3be634ab212e55e45398a82532454af4fcf30cb6cd6ecd47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/archive.json",
+      "bytes": 285,
+      "sha256": "8cdc29b0d7e94db29147bb73b687ff07cba5bf5d280b4f9a9a73c276434b55d8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/composition-race-tests.log",
+      "bytes": 3755,
+      "sha256": "288c4f223cf9d6c56e91988d5be276128bc550408f7e09e53407176e8b609977"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/execution.json",
+      "bytes": 8502,
+      "sha256": "b695dc4dde1ba5f90a97ab94e54797db9e5fe8e0a95958e9ef144dcddd23d26d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/focused-tests.log",
+      "bytes": 5972,
+      "sha256": "2bc05598163ef9c24fc402ce0f7977cae2842297774638e3acbd7e17f33c215d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/native-before-compatibility-review.log",
+      "bytes": 454,
+      "sha256": "12c9e7a1743e075515d711bed070371da92196cbc564a2fa7229740f18126050"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/native-inventory-preflight-truncated.log",
+      "bytes": 8154,
+      "sha256": "ddaa9dfde07a7cb2c27e51adaf56d58626f37722004c2bff187951891739e685"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/native-missing-roots-preflight.log",
+      "bytes": 582,
+      "sha256": "579e1b7efe418982748a4d4c8d3012f04d8ce071126fa90dd1185818dc951408"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/native-tests.log",
+      "bytes": 455,
+      "sha256": "646866a550321f4149cd1afa9df84d4a09deaaf6aa5b2c1291d603d18acaac28"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/preservation.json",
+      "bytes": 3152,
+      "sha256": "8854c20ac1bf74c1d08b7ac05b1c2525c0d17cf9acb562be78aea93b3d887588"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/race-tests.log",
+      "bytes": 191,
+      "sha256": "67787954d955ab926a99d6edc53511d3cd5c84ae455e710a5b2d03a1ce12bad2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/repository-tests.log",
+      "bytes": 8128,
+      "sha256": "a5b113afc48d6140f23f9ef48fb8b2bb79318a8f1e007e1f665f682504c5b8f0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/results.json",
+      "bytes": 2553,
+      "sha256": "a298491ea6e7a34546f2d0dda1899cb4ec09d3f5f6757771c30dfb99613b1154"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/secret-scan.json",
+      "bytes": 172,
+      "sha256": "4752adc777d6cc1c42a7f00abb2fe6d85b50e0f3fefca051e37c491bac44e1c5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/superseded-repository-tests.log",
+      "bytes": 3527,
+      "sha256": "6677a350e8d8fa2b7baa37f6c066f984b2d8cf1599af83d6cdb00558a8603495"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/verification.json",
+      "bytes": 13208,
+      "sha256": "1abfa45f918018c8db5de5b62e12c9fd2e2513d65ec83b3d0b6711d290965074"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/verify-archive.mjs",
+      "bytes": 1913,
+      "sha256": "7679fc41b415942ac64aba3f48dc031d57fc8b05ccecc5c25f99f926e00416ba"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/verify.mjs",
+      "bytes": 6875,
+      "sha256": "447f7169bdf72a47a8e931a28fc24851a3c9ec07e00c03f9969e04db998c2ef0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/vet.log",
+      "bytes": 50,
+      "sha256": "ccd45d9a1d491b730faff09424aa9e59ff5b343c0340d0ac95b3993ae1b0e24a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/DEVELOPMENT.md",
+      "bytes": 3907,
+      "sha256": "2748a907cecff11a3f08f6a304077a1eece32988b291da01f69b16d8d055b18d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/PLAN.md",
+      "bytes": 3462,
+      "sha256": "f2897f5cedf92544cb011c93ab811e4ed81d673b04d1df2741334f6a46d101ec"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/README.md",
+      "bytes": 8626,
+      "sha256": "e67ee56cb541f2bf07a48461e078ca070985e26f93a35495cd788949a932035d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/REVIEW.md",
+      "bytes": 5183,
+      "sha256": "ae8807e9959383e2fc16a0dc1da49c09e2431db1f184af13a17552780d447a40"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/archive-manifest.json",
+      "bytes": 344221,
+      "sha256": "f6df06beb4fb37f715a6e9ecf7b90bf27c1b40975882e9b9e60358f765dc9064"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/archive.json",
+      "bytes": 808,
+      "sha256": "7e144a294b4a17de5700aaac4761bd2928802fafe9d5e9ff76724c7980a7b570"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/archive.mjs",
+      "bytes": 2853,
+      "sha256": "7fc4c17c1295dc826df307a2c5859c0080865ffc686bef9a9290034ff72b28f5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/authenticate-history.mjs",
+      "bytes": 2869,
+      "sha256": "41c68440057723f9dfa24877a3c30e8f4a8c22532e28057f4d91a068d8ca169d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-dev2.execution.json",
+      "bytes": 1067,
+      "sha256": "2488a227815809744af2063229379dd6ed0c11a6cf8da00f9330df129a68edd3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-dev2.log",
+      "bytes": 135,
+      "sha256": "f6f482b8737e0b973d7f1234155290296a2306526e5ecf1677563b7c43bf50bc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-dev3.execution.json",
+      "bytes": 1067,
+      "sha256": "2107b8627eb6b50ed868ef18de91c90a99243352004764eceb4e4452f48f43e5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-dev3.log",
+      "bytes": 135,
+      "sha256": "721adba096d8820529aaa404205864a1329d332e13ddef1fd64e013435b548ef"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-final.execution.json",
+      "bytes": 1069,
+      "sha256": "2d2bfd34b31896d86695c5856bbd5e2e55b888ec0f58b27cc63a59ba35ef307e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused-final.log",
+      "bytes": 135,
+      "sha256": "e752d9dd947171f2dc06c68318f4abdf345ec1b1664c435299a152c84e6acc43"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused.execution.json",
+      "bytes": 1057,
+      "sha256": "0249c313ed637e565ae2d3dde7c5315a2e33ac1c9723c4f52055805d742475e7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/focused.log",
+      "bytes": 271,
+      "sha256": "75651e1b958081bb709aac52dd4e73d0e199c5587b51691e5cf571733ccd1253"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/full.execution.json",
+      "bytes": 943,
+      "sha256": "fdd1806cf8d1afda071a206d952e5ef9256893438348b7614a5f721bb2708413"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "022308a92a3254fba6580b79d5493cf167a72c827a670907f0f2f6fb6951e8ad"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/history-authentication.json",
+      "bytes": 5145,
+      "sha256": "22169de8e65f313250d78309a97dac2611344ce774a2a836b29ad848aa8d91e3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/lint-final.execution.json",
+      "bytes": 947,
+      "sha256": "8ee8327019ebf6e6758f28796ce4e87f4d4abf5576b815426954fa487a0f9946"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/lint.execution.json",
+      "bytes": 935,
+      "sha256": "cf6932417c70008c2607a570450332aef9d01aa2355a8da491b3289d04f7e945"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev1.execution.json",
+      "bytes": 1106,
+      "sha256": "c148c0107bc6e1a7a642b7d56b6c42b729c412bd556770637668869830250142"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev1.log",
+      "bytes": 1032,
+      "sha256": "7f4f455ca5a46103c92baa38bf569e023ffbedc61c4969faa45ccae5e6408e4a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev2.execution.json",
+      "bytes": 1106,
+      "sha256": "36ad151939828d75f7ac829b948d1f3d78a8e57a47d902e4f210bb2a71818d08"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev2.log",
+      "bytes": 484,
+      "sha256": "13b890c9740df0ab4478f734c06b69db1517706ea321a87d76310aaf99c574c1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev3.execution.json",
+      "bytes": 1106,
+      "sha256": "e67a9c3a364ac607fea92a989cd7062a123c1dbf730781d61ce9c66be27c555c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-dev3.log",
+      "bytes": 484,
+      "sha256": "782a822012d0b646f8bf6697a8937d60d089c1be7b6978c7c94236e903ae3bcf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-final.execution.json",
+      "bytes": 1109,
+      "sha256": "4937dc35e83a91e0dd07238555f5461fe3db17e6c489c871230b73bc5756ea34"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/native-final.log",
+      "bytes": 485,
+      "sha256": "3a2c5a57a8cb3e0726365b92aec13799e86d3e7119caf54c139d7366bd1f038f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/qa.json",
+      "bytes": 2980,
+      "sha256": "b60cb8dcd321f575ec73d1d98fffce90032ed862ee7bfbad2a629df6ed6fc51c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/qa.mjs",
+      "bytes": 4477,
+      "sha256": "13eea1d2cb750020a9cdfb12c3319d75f72fd727cd0a8013f58e3f55b9a5fdcf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/race.execution.json",
+      "bytes": 1045,
+      "sha256": "26025573010b1e7095f5708fe4f28817a59652603bbdf66ac8801bc959bcd848"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/race.log",
+      "bytes": 6154,
+      "sha256": "f591ce9d4d03c08117ae6b844f6033a7e24b41d5f8b86d7b07d3c8d56d43b0a9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/readability-metrics.json",
+      "bytes": 10059,
+      "sha256": "198c6c1e0f783ce1317d3e0648df7087e70fe2bd2fa082ed0173e52dd3010f10"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/readability-metrics.mjs",
+      "bytes": 3396,
+      "sha256": "83ce68c14959ac68b992f2c0cc76bfec3be04ed98a63c6e515c7770baa4d58fc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "5b4721410df39495a2c3200820e99c62bda40603e5c3942deaaac9ba90c78a24"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/run.mjs",
+      "bytes": 4551,
+      "sha256": "b18962c1421fd9df427112f7dc70cf369592c2e6f6960a297c929de884562083"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/verification.json",
+      "bytes": 19389,
+      "sha256": "5c1684651b84e5cf6f47cee5ab28b41096856782d726a40999ca49571fa0ba76"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/verify-archive.mjs",
+      "bytes": 4478,
+      "sha256": "4657f3d468c2bbb9febae45029d4b9439cfbefa24d898948d85ff7d98b9d3984"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/verify.mjs",
+      "bytes": 15957,
+      "sha256": "0fe02743d44663ab0f568cde730bd6725a0fc1d166d5503717bf52e8afab76f9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/vet.execution.json",
+      "bytes": 890,
+      "sha256": "48a1b7de20236c4d9cbe4f65c9d879a81ccdd27a25da70a8142f108b6e35476f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/functional-readability-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/DEVELOPMENT.md",
+      "bytes": 4101,
+      "sha256": "753a34049ab3083c6a236f3d634044f5cdb014001ad153cbbd0d9843c369f043"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/PLAN.md",
+      "bytes": 5130,
+      "sha256": "f168386207ee62a590b83d1e8a5453beae6a88eea42e1611a25ab3cc51970c22"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/README.md",
+      "bytes": 9327,
+      "sha256": "a19d625e5bec44ff97488e44dd229280868e9d7954d546d27206e52c6170ca2e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/REVIEW.md",
+      "bytes": 4531,
+      "sha256": "34c8030fc85320607d599fca53751ab37d7526a047e3e1bb5186cc3382161cfb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/VISUAL_REVIEW.md",
+      "bytes": 6139,
+      "sha256": "83f1aa573dca3a5c0af42ff801f00fa4a3514f89b6e17f475fb6f026b8abfe9e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/archive-manifest.json",
+      "bytes": 316238,
+      "sha256": "3e5e3a6805d7a60d693f71b3a268f01aa5df2550abe2d2d6979e2c5b26a3fbe7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/archive.json",
+      "bytes": 816,
+      "sha256": "78475f5393d4ad483c6665d7a5199ee161e0ca595d6dabb7f6a234e3be858cac"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/archive.mjs",
+      "bytes": 2903,
+      "sha256": "a8fc8012adbf65668b2fdcf4bb6a366d10668df5a31f6332e5feedd51b4e8606"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/attempts.json",
+      "bytes": 54347,
+      "sha256": "ce9400185f1ebbf23a17756502188f12fa498afa07cead7899adf3af4b0074c6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/attempts.mjs",
+      "bytes": 3299,
+      "sha256": "237b4a4443cf2db39ae209a6e6608eb0aec731e2801487e09d65c0caa3dbddbc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/authenticate-history.mjs",
+      "bytes": 3122,
+      "sha256": "f9c80ed79289cfdef9e211067f4d89fdf221108e00ad1d2033023fedf69a4ba9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/dev1-pin-aware-audit.json",
+      "bytes": 14145,
+      "sha256": "78657a66ad3225986baf9e03333fc6724bdc227f89cbec53c60848f7cec93e22"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/dev1-readability-metrics.json",
+      "bytes": 10567,
+      "sha256": "9fd26ace96e2260a7d334bf0286ede931d8c5c1d85a55eb5ad180bbee9b369a6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnosis.json",
+      "bytes": 4002,
+      "sha256": "549618fe29ef3ea33099b0de6ca1422f3d85a706bdafbab142970032b59fb65d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnosis.mjs",
+      "bytes": 3947,
+      "sha256": "b5ea45fe402a69af61d958d444c1db882fc8eea44d35938d14485df5a7fb1408"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-candidates-1.execution.json",
+      "bytes": 1060,
+      "sha256": "edbef5530164887bff2709117c6a3e43bbdf3a5f104de3b34454e6055d55bc8c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-candidates-1.log",
+      "bytes": 14295,
+      "sha256": "1a44c693241dc425931a67904d076341b167be3a4abf3188ef8b936a773b45ad"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen-2.execution.json",
+      "bytes": 1052,
+      "sha256": "80e4c09a54369b076ab44cdcac71d2e41f3902bac78501b38956fac8eab183ec"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen-2.log",
+      "bytes": 12602,
+      "sha256": "dadcc890834ed5980c85f0b9bd2f82d8007cdea5e9fe62f0d592fe27fe1b4688"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen-3.execution.json",
+      "bytes": 1052,
+      "sha256": "0ae5b4db4ba4f9aa15dd1ed7497102e7af0a02458f95128ee8818d641c7904af"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen-3.log",
+      "bytes": 12602,
+      "sha256": "72ccf4b3762f136d4afcea6ddd8b377da2eda8532de0f20f4140c0e63aada21e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen.execution.json",
+      "bytes": 1048,
+      "sha256": "244ff14c7465d73456fa4bd59e7c5947e3d0aecab14b4b9919c0cd66f53d200e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-frozen.log",
+      "bytes": 589,
+      "sha256": "2f271d8689e04e9c42912256a48f7da3fd011137cd57173f1249f2663d31db7e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-layout-1.execution.json",
+      "bytes": 1062,
+      "sha256": "86cfa4e1c7a3f3da1d5a28a4e4c7014cfe4be2fb461b9dff83949767bafa2794"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-layout-1.log",
+      "bytes": 420,
+      "sha256": "bbdd2e886e019fe363fcbb5e597827c47b9dd6778c5c22e9bcba902f98d382ad"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-transaction-1.json",
+      "bytes": 41851,
+      "sha256": "ca312b0d064a910025361cb7934dd5c5444619ca83e9a41f826b3e5701e99642"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused-dev2.execution.json",
+      "bytes": 1167,
+      "sha256": "7df174e0c9af8aab159b8641bda3d42af28f3d2cd1fbea65009b24fa9021606f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused-dev2.log",
+      "bytes": 227,
+      "sha256": "bb451935ed233af02a36407f0b3baf957c9927bcae5e3a8af9219b6c56a53913"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused-final.execution.json",
+      "bytes": 1169,
+      "sha256": "dafba0b8b6ab859fd63e91c0aa8e68877c9ab5a7de75cdf231b51adf6ceb1816"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused-final.log",
+      "bytes": 227,
+      "sha256": "0ec81b16243594837481719d72ec057afeb952ec11151f57f3a36f51a8d1a500"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused.execution.json",
+      "bytes": 1157,
+      "sha256": "729a3cd73fd1c0512989310381820d6a1d4282d5f6312b7175ec1f2304f6cf3d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/focused.log",
+      "bytes": 227,
+      "sha256": "3ef4d6f805c32539b1eacef59ea07d635dc2685f4f1e68e61f4af89736593712"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/full.execution.json",
+      "bytes": 947,
+      "sha256": "fbb718fe54ac0ce5d9a2044a62e62f957b57f287e0dfbaa4310b305f92b2b7bd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "16d327bd4b48a3fdef3cf30570ff997cd02a81a71dbe1f02d5ae0ea893c3eae8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/history-authentication.json",
+      "bytes": 6765,
+      "sha256": "82ec649dcd3d69b0885cebe257e9a39596cd99d9a4cef1aea696c93941a143d2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint-dev2.execution.json",
+      "bytes": 1019,
+      "sha256": "d62a5c87ee286afbd2cbda659afbc1b47fd53d14eefa034d5b19892faa828b90"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint-dev2.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint-final.execution.json",
+      "bytes": 1021,
+      "sha256": "2b386a18a93f0ccf1ed42aec5220d42f14205637ff249a2642adbf33fb401c95"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint.execution.json",
+      "bytes": 1009,
+      "sha256": "83e438e4c6c50544a4ec107d628911a240d70a058c333ddbcfb7d1cc23dd7f5e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev1-verification.json",
+      "bytes": 19569,
+      "sha256": "56a276be8738f4f162771686815533dab78eeaecfb7a20eff8a87c4fe03a2880"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev1.execution.json",
+      "bytes": 1108,
+      "sha256": "3d4d2be6edd06299283140201ec195b3db6f9cb10c7b5b69e0e85467e432c286"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev1.log",
+      "bytes": 448,
+      "sha256": "f7edddab2a95a974c4f34af2ab7318b5a5a8ca93f02264ad7b94c0205480619e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev2-verification.json",
+      "bytes": 19750,
+      "sha256": "f0c0195c007147c7bf95ac1d8e5e0b69565f4502ec37db1e34f2fdf878082fa2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev2.execution.json",
+      "bytes": 1108,
+      "sha256": "49cecd017344b820269d9517c9bf03f5a65a92219ee6579d766e1986f1ceb812"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-dev2.log",
+      "bytes": 448,
+      "sha256": "3e6954641ab27730a41747b20cdf72818fc1777e72b567f0c0acd49cc2653387"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-final.execution.json",
+      "bytes": 1111,
+      "sha256": "a402b66e25ef3818571b0b7f261c420d8fba863d8e65e340525d7946096eefc7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/native-final.log",
+      "bytes": 448,
+      "sha256": "52ad0513d144292dec667f213cb6bd69539c98fa09c8b48d36144f5b84747244"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/pin-aware-audit.json",
+      "bytes": 14146,
+      "sha256": "1f5d7b89ad0d2c91a9a88e3d32f9ea1f8cbc42b2fa2a74ed715a91a892d8c2e7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/pin-aware-audit.mjs",
+      "bytes": 7491,
+      "sha256": "929e3d606aa5d24240f8a6c5cfacc029f6becea8154d299e955c41671d72c8c6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/qa.json",
+      "bytes": 15147,
+      "sha256": "16eb006a6bd823a3cc7203713bc9e0911735fbdf3c390b9c987c4d84d81dfe34"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/qa.mjs",
+      "bytes": 6772,
+      "sha256": "56a4d95eaaae4095f27523927525348265503fc6db943fc67e9cd91ab26378ce"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-designapi.execution.json",
+      "bytes": 1006,
+      "sha256": "b9debcb991b39cfac893bfc63de189b21e0ccd7379a0c7fea79cb64a9d149ff3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-designapi.log",
+      "bytes": 50,
+      "sha256": "9550f58d4049ce6ee5a60fa8650247a68d0d26df66fa2b8104af3d092dca5882"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-layout.execution.json",
+      "bytes": 1025,
+      "sha256": "a056ff6579a718a837d90b3bb283a1340769c9e322408c5b9007c4c8774e7af7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-layout.log",
+      "bytes": 88,
+      "sha256": "65a9a2660a520b9593fd7f8abec8482cd7716e641ad030811feed15548c5f677"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-ownership.execution.json",
+      "bytes": 1066,
+      "sha256": "1ff0d29addb273a75f73a1008bf2d2f51e80b45473c58cde1e835e6b81f67df9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/race-ownership.log",
+      "bytes": 49,
+      "sha256": "abb219da7898b82921d22a9088ae2699a20691a6085c4b0855294e7a448ebb41"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/readability-metrics.json",
+      "bytes": 10568,
+      "sha256": "eaa4fcd15e4396b8c8d048d1506153f6cfcbf546467d4a6058507e641c8519c5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/readability-metrics.mjs",
+      "bytes": 3824,
+      "sha256": "3b15698d56e4234ade5849deb09edca5905eb388e262e76ae582c81511906595"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/record-verification.mjs",
+      "bytes": 1192,
+      "sha256": "749613859129526598f92f24bc722d2aedd09a1d3cda5f0ca371abf07248bbb4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "5b4721410df39495a2c3200820e99c62bda40603e5c3942deaaac9ba90c78a24"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/run.mjs",
+      "bytes": 5751,
+      "sha256": "b7eebbfe1b06ec4cc9e09d01c6a2687779071ac03b9fde0a61a9375a3675d36e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/verification.json",
+      "bytes": 19751,
+      "sha256": "6c8aae9101f3cd1468c312042e0b569997f5b3fbcdc9f188f8348a6f23610940"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/verify-archive.mjs",
+      "bytes": 4490,
+      "sha256": "fab86edc25d9b1f00d6a4c844a84cea762bbc53ddcbcfdb17428bc4e5c1597e2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/verify.mjs",
+      "bytes": 17689,
+      "sha256": "752ec104cfafc4a57e65130275ae08631dda71fe6c77d2d9327cea905e315f13"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/vet.execution.json",
+      "bytes": 894,
+      "sha256": "193e27e96fa5c8cc4fe0f37f8d7cdaeeae335780a450a1109e62f165a44c55ac"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/visual-review.json",
+      "bytes": 4593,
+      "sha256": "f15a5b49125d91d85e12c7aa24992c060388d624230c6449c19a8d717e86ef88"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/visual-review.mjs",
+      "bytes": 2055,
+      "sha256": "60f5a60ba6d2aefad646de8b125102f4262c955b47245daa6bf594bf8610733b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/AUTHORIZATION.md",
+      "bytes": 1650,
+      "sha256": "6eec6ee1970f852d7159fcc9f8a46cc43f6593e4496dd4bf10f6f21cf8454689"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/FEASIBILITY.md",
+      "bytes": 3910,
+      "sha256": "825fd2afd184a1bda3a124c48ac1e863da37703c7287a321d312d17939bebe4a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/PREPARATION-REVIEW.md",
+      "bytes": 6299,
+      "sha256": "60fdad47612ca56f47d12782c72d8462c52e786bcf7ef3379168b80f5bc6116f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/SPEC.md",
+      "bytes": 9411,
+      "sha256": "6620dabd488792289d4d28651dca1a6c98354ad7e9a67632957b015f0534f241"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/authenticate.mjs",
+      "bytes": 15528,
+      "sha256": "7e04164854a0e756ac3754d683b75ae0494eb15225a70feaf71078df61fac72c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/authenticate.test.mjs",
+      "bytes": 1908,
+      "sha256": "01bfd65b8a62c1990f4ec8e71ccac0db2bdc10d0c305484cfd45347c8428f82b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/corpus.json",
+      "bytes": 14668,
+      "sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/freeze.json",
+      "bytes": 20769,
+      "sha256": "fafd5c8e381fc51e7633e5677b583ca6f041db9c3753151e0d51dc1109fef57a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/pricing.json",
+      "bytes": 1156,
+      "sha256": "e4ebbd0fa65c0364fc4301a0ed60ab52900eca9663c0a68f97336c795d1edf2b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C01.initial.request.json",
+      "bytes": 91483,
+      "sha256": "f7e9135a66e0d3bd43b5d567849b3e0da1f1316fe4417b6d9b529ec35ac2b199"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C01.max_diagnostics.request.json",
+      "bytes": 104144,
+      "sha256": "342b3934579a8cee255f4b49d9a0d40a3fd37f60c49bbacc22f8b0178b6894ff"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C02.initial.request.json",
+      "bytes": 91309,
+      "sha256": "540c307bd377f3d8477402e6cc493dee0007472d9e665eda9e75633ab98a6d33"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/C02.max_diagnostics.request.json",
+      "bytes": 103970,
+      "sha256": "3af48e241774c89df29d4b8e8a8bc2dde5443b23971fb7aee856ac999b0aa27f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I01.initial.request.json",
+      "bytes": 91553,
+      "sha256": "5a910edb97bb8b0d9f1b9bff8ea520b866ce0868a463db235d1d1a1a8a492a4b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I01.max_diagnostics.request.json",
+      "bytes": 104214,
+      "sha256": "f75710dca34631b45a29374360a53bf79c9caeeece0d1a7849caa11d518e3510"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I02.initial.request.json",
+      "bytes": 91815,
+      "sha256": "6e316e740f9790dcad406b7f2865061f473bd282bdd5bf22742840da31631af0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I02.max_diagnostics.request.json",
+      "bytes": 104476,
+      "sha256": "ea8863247cd04ecb9f4e9da0a12a64d58fc4a9fdf4d7b221e8e552456d993876"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I03.initial.request.json",
+      "bytes": 92325,
+      "sha256": "0bf1b5aa3139054a693091534cef8c186511d8265b4eef38a40f01f4550040a4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I03.max_diagnostics.request.json",
+      "bytes": 104986,
+      "sha256": "672bee4b9352ce6840eaeee68f24861eab7465c5a5d175cfe341db95e5e34799"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I04.initial.request.json",
+      "bytes": 91173,
+      "sha256": "c083784fc07962b535b3d11a7819fef0e0ba234423d5d3bfe98fd88d78bdbdce"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/I04.max_diagnostics.request.json",
+      "bytes": 103834,
+      "sha256": "1d57ff210d0bcf5863d7bd26f474dd5850b6c0d32d32aab81cf0c259ddea83fc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R01.initial.request.json",
+      "bytes": 90763,
+      "sha256": "8000464d76acf6b189111e1178986f95dbc7e717f158d3114899a16788b6b73a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R01.max_diagnostics.request.json",
+      "bytes": 103424,
+      "sha256": "898783b40b1d39ba976177b00eb42b4a82aa6e8e2e332d9dee6e15f0b56260e7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R02.initial.request.json",
+      "bytes": 91389,
+      "sha256": "47c3aa240b406d32c0ff0530a48570cff5be5afc127f0feaf8542ca770ed7778"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/R02.max_diagnostics.request.json",
+      "bytes": 104050,
+      "sha256": "a330f36490f71f4002f23cd7893589ca85e718e3f8f09f88ced2622a7f778f73"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/installed-capabilities.json",
+      "bytes": 3939,
+      "sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/preflight.json",
+      "bytes": 3382,
+      "sha256": "5af557e1da37f5482ff89bcffb9f0c7539d147b2f19fb0a6c8e0a9e98596a721"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/live-v1/snapshot/provider-schema.json",
+      "bytes": 80241,
+      "sha256": "5c7cbfaf57e60e1d11a6462c1f7771befd0e1c72f4f68429d3c837521e32083a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/DEVELOPMENT.md",
+      "bytes": 6220,
+      "sha256": "3ddab7c35dbc848199cb67f397eb1d988d3bd378871bb974de56baaddbc98250"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/PLAN.md",
+      "bytes": 4803,
+      "sha256": "1d989ff706dc5ca49365011add6fea0aa247d34358f23fd958bc4b44333898c8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/README.md",
+      "bytes": 8626,
+      "sha256": "b3d1f533d75cbc5e0bf5931f90197b7b0233c223e6958ee1889f01a79c686057"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/REVIEW.md",
+      "bytes": 4158,
+      "sha256": "3f99fe1819dae82017edc876958cbd3958c877b0329cc418a228bcd177a0d0c0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/VISUAL_REVIEW.md",
+      "bytes": 4654,
+      "sha256": "776e2e4eef6d4698db58f5f881a583e692c01ecbebdb41c4267ec136bfe43a47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/archive-manifest.json",
+      "bytes": 417968,
+      "sha256": "2d028f2f36ef7b95e17f108ade15883e2fe82ca4932f294b514389652f114ab1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/archive.json",
+      "bytes": 812,
+      "sha256": "f48dd9cb9a72e1a1f9cacd4a905161ee963f3f4f94db0ee1438fe4acf493633a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/archive.mjs",
+      "bytes": 2897,
+      "sha256": "8c95ce0fb1358f056bec9eba1a1a8106b9361997629611902f5cb0349f1b24b2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/attempts.json",
+      "bytes": 72231,
+      "sha256": "836f72aca27b5b85072c113fb760f8fd42651cb7395c3bc8267c4992696e5d01"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/attempts.mjs",
+      "bytes": 3299,
+      "sha256": "237b4a4443cf2db39ae209a6e6608eb0aec731e2801487e09d65c0caa3dbddbc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/authenticate-history.mjs",
+      "bytes": 3194,
+      "sha256": "31faf2c75889379511299364d522ba5a8c970e12f8f99ec622958c73f40cd12b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev1-pin-aware-audit.json",
+      "bytes": 14035,
+      "sha256": "4bbd26051e07147e6ce898d2b6664c7571ac8e580152af77c450dfbf00e1e834"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev1-readability-metrics.json",
+      "bytes": 10526,
+      "sha256": "4f9197d093ae3cd301aa7eeec45db634c50b885a72203c176c82153f39733b81"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev1-wiring-metrics.json",
+      "bytes": 3136,
+      "sha256": "0c34f672dc30b70c74d917de3ee3ae0321b9329c58a3c49a77a6c336d775f6c6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev2-pin-aware-audit.json",
+      "bytes": 14059,
+      "sha256": "caccdd30df8a24b33f34d5abe5c7f86dfb59536b06aeebf29bfda491e3fb88cc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev2-readability-metrics.json",
+      "bytes": 10532,
+      "sha256": "4039dcf50fc569f1cfef8c813598acad84a880b99e6d669019cf742ee681253e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/dev2-wiring-metrics.json",
+      "bytes": 3137,
+      "sha256": "f19d692067e3b128763544017195f6336d856162b8900b2c78dbfbc187eadb04"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnosis.json",
+      "bytes": 5070,
+      "sha256": "5a34178194dbe6f5cf9bff835aeeb7ec7e135e207ad1aafd2695f39a154ba1dd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnosis.mjs",
+      "bytes": 3463,
+      "sha256": "712253281c71ff3237a218d549fcda5f4b70269c8eb50255e770724a983e105e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-1.execution.json",
+      "bytes": 1064,
+      "sha256": "f3bbadfb3e5a0e8b222e314afb0f07fe7e3e3b62e2a3be13698453a2f0cfee96"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-1.log",
+      "bytes": 12187,
+      "sha256": "8d0aed78e85c0a2bc3ae1b034fc635402b8f4995795b0accb869ce5827593bf0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-2.execution.json",
+      "bytes": 1064,
+      "sha256": "e02ddbb5e83a790ccc9543554141fb3f1726bafbf97d4479564127ad2226522a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-2.log",
+      "bytes": 11521,
+      "sha256": "bcf50c74cf8dcf7842d0546c4a93b17a4062443f5efb6017c873362f51ab4d30"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-3.execution.json",
+      "bytes": 1064,
+      "sha256": "98d32c885a3b8748b18085f237f1fae4c3466b4a9e24e7ba98e2d9232c88a15c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-candidates-3.log",
+      "bytes": 13622,
+      "sha256": "75bfca67095231a8a70e40677fe46729196179d5ea6034908c5cc4a2ae72f051"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-1.execution.json",
+      "bytes": 1066,
+      "sha256": "b89c476e3feda469ae6928e5a78e3e60694a6f2ec7e215c88aa314470318abb3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-1.log",
+      "bytes": 430,
+      "sha256": "243fb1581cd9b4d5704bf0b6fa63f48deb2f1b46234ff06211cef372c8a99b49"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-2.execution.json",
+      "bytes": 1066,
+      "sha256": "14b020076acd50ab7e2123c85ddf65d6ea3b7c1639dc3687b57fa0dd4ed9fa44"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-2.log",
+      "bytes": 430,
+      "sha256": "7951b6aed7874d42f61624319446050d4985f41681bd242ab14477df56d53237"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-3.execution.json",
+      "bytes": 1066,
+      "sha256": "45bc6677e1cf198a51a5b3b3872754b0af40e71e82f1b645b3948a7fe4ff2940"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-layout-3.log",
+      "bytes": 430,
+      "sha256": "fe22b55080b58753b4a79ce5b120a759a24bb72a525445d821ed3ec294fa7ffd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-transaction-1.json",
+      "bytes": 43047,
+      "sha256": "5bd508f33f81b903c4528b2dca34502879df7f98e8525c2318dc1304e813278b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-transaction-2.json",
+      "bytes": 42989,
+      "sha256": "09f16ec8ab983e798b4816123f7110e02f4432984260e5cca0f17d76e98f2634"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/diagnostic-transaction-3.json",
+      "bytes": 42533,
+      "sha256": "fbf074df9a9f32fe52b8a341a5a86ed3260318da560cd8ffb802eecb01688472"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-dev2.execution.json",
+      "bytes": 1183,
+      "sha256": "3dab92d5f260e1b1bac3336d5267c927ad981db342d26f8a101d8d7d04b7aab0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-dev2.log",
+      "bytes": 227,
+      "sha256": "5853ef7716ec11b1c03a578788c813240dc61d3adc4db46e86f3d9f5fa2a9d28"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-dev3.execution.json",
+      "bytes": 1183,
+      "sha256": "904da607510f3ef2431fa06ca7a04b34020594f42ef0be1d69b695b7fc9e4eea"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-dev3.log",
+      "bytes": 227,
+      "sha256": "db7bc3d71094683bf3171854d85fc76a1abf62b42824273f4deaaec8abe90edc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-final.execution.json",
+      "bytes": 1185,
+      "sha256": "3b57cdd51437df083fa9265837b30741758efe3402ad233fd911827552dd8c05"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused-final.log",
+      "bytes": 227,
+      "sha256": "a0203acf0e7572a80b7b4dd4bbc7af200e14de76854851f8507ec352a9398076"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused.execution.json",
+      "bytes": 1173,
+      "sha256": "e2df70fd2d3d14f3e6fde105240788527c6bfae9b5bf5d144b3a2309f9c40e9e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/focused.log",
+      "bytes": 227,
+      "sha256": "da3934e8df61edbd18a71746de2091bc89d1e01555fd8f681a5908f333dff61f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/full.execution.json",
+      "bytes": 945,
+      "sha256": "10cf908f99c7f132bf6cf8eff7413aa07a2c81e7233a52e8c99c9ed950b032b1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "99c7bc380091e5391a602d1c8a50d269c348b0cba05982933c5282bb8afd6493"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/history-authentication.json",
+      "bytes": 7307,
+      "sha256": "85a4317f09aac48b4d5e6c4577f1a7b201e9fef31717114708ae8b588d5d99e2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-dev2.execution.json",
+      "bytes": 1017,
+      "sha256": "2c4d581a501cab985d398a6ac16ebbe8fd2774a6fa442e4b271e8c5be6e57dbb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-dev2.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-dev3.execution.json",
+      "bytes": 1017,
+      "sha256": "8e58184ef84facd08beb96f9ea5487568e36f1ba544de97f494c517cc773f414"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-dev3.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-final.execution.json",
+      "bytes": 1019,
+      "sha256": "f0e144991c91dfd0a0cc9bb63e9fe016a17ae8d314ec24f88ca35d0ce4c82109"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint.execution.json",
+      "bytes": 1007,
+      "sha256": "2d9882449c899e28ff4db23f78c3efd3c2bc985ba97bc42e690515320409eb4e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev1-verification.json",
+      "bytes": 19874,
+      "sha256": "76cea9616d9af53ffa0397ed1c883e25203ed86b2675ab44b878918257db5a98"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev1.execution.json",
+      "bytes": 1110,
+      "sha256": "eaafd199fb71b287414d301cbc74bf3f62247ce82462503f90cbc66330775e59"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev1.log",
+      "bytes": 484,
+      "sha256": "324c024d1430b85f6c9fa5736c6da2b6be71d80c8ea9b2ce135c51b2fc5d9ae1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev2-verification.json",
+      "bytes": 19874,
+      "sha256": "e1e5251dbd4aa9e54f2ea7c55acfa0d1a0e5816fcc40ba44a16aa84d4ad92851"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev2.execution.json",
+      "bytes": 1110,
+      "sha256": "69f68ff3c5fd82d278ec00ecc4e21468993a937ea48bd81eaea368c3a6417636"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev2.log",
+      "bytes": 485,
+      "sha256": "33943b30d3886d11962414869cc7a930aedbeba99c4d893b15dfa1260c0b8ec6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev3-verification.json",
+      "bytes": 19852,
+      "sha256": "64b5a0863dbf023dce79ac847515f8181208d1beb532fac8003945131240b3ce"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev3.execution.json",
+      "bytes": 1110,
+      "sha256": "d9e4dcbaa211ac7a28839368bed65331ac6cb6eb7f65299d883737a0372a957c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-dev3.log",
+      "bytes": 485,
+      "sha256": "40619b69a67644f1406f9882cb1f378b947c576a6c9c128c62cc242a1cea04ef"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-final.execution.json",
+      "bytes": 1113,
+      "sha256": "f8104c3c6c5c47314e258ed5f1bc52ed36e4ed39fc1bc8a7a998efabddf9bf8f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/native-final.log",
+      "bytes": 484,
+      "sha256": "cd1d08b756d0930cfbaf9cbdd33f3185cbd8b85ac06068fa9e0b922e3d77bed2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/pin-aware-audit.json",
+      "bytes": 14025,
+      "sha256": "12d7152783d8789a082d581c276fe2b4d3eaf74a082219b53252edef8853b564"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/pin-aware-audit.mjs",
+      "bytes": 7489,
+      "sha256": "a4bdf9baac88ca1ec30d9f9baaba00488f681059610c55d76f1b6d56198d2aaa"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/qa.json",
+      "bytes": 18658,
+      "sha256": "30b583d6d33f5ce14d4925f0a0fc50c476dbbc6df8e3f0f90f42a7dd64dd9d29"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/qa.mjs",
+      "bytes": 6921,
+      "sha256": "e76e8cb791a1e059696f8395448320a5b823a26d359e46507aae1c36fe016827"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-designapi.execution.json",
+      "bytes": 1004,
+      "sha256": "4c4eb55c918af59982c6144bf1342fa122cd13db7b3ba6513eefd70520769468"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-designapi.log",
+      "bytes": 50,
+      "sha256": "ec9c2ef07544ff150ced94a594f59cd7322407dbaa45238754a7eee6069e6c26"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-layout.execution.json",
+      "bytes": 1023,
+      "sha256": "5a550cce98d0b0540f804e64c7a62e68e3b3526c08022c396b23ef5a1b91470b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-layout.log",
+      "bytes": 88,
+      "sha256": "58563ebf404113ba304580c4cb3a16452f3a58c473f4c6dce5bed3031f0f94b9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-ownership.execution.json",
+      "bytes": 1076,
+      "sha256": "f371789eb1156c88b012891b49ca5115712579bc5e9ecd24ff4250c73dee6394"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/race-ownership.log",
+      "bytes": 49,
+      "sha256": "694e9e4ed009734b68faf1bdb1af43237152e1a2fcaa25a491ba567065457675"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/readability-metrics.json",
+      "bytes": 10517,
+      "sha256": "166986cd1a82ea8ad4501f20568f4c6bb3aad0698c952ca3cccc5a808ce94b69"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/readability-metrics.mjs",
+      "bytes": 3827,
+      "sha256": "c26721974958adc59b08dfc20e07353c6a53c5d6bc97d57cc4e92f7eb0610074"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/record-verification.mjs",
+      "bytes": 1190,
+      "sha256": "c9efde238c31bbeda697eef186be2d0a6ec4bced08bfaea727e7f06d3225115f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "75efdaf0b3ccad1e5470eb2e1aab39a607baccea9db2896ac1ffb2bf8eac7e28"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/run.mjs",
+      "bytes": 5555,
+      "sha256": "86ef024a82ca95e39b23e10810356849361bf6a1d9ff366e2acc57e8e6e62eb3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/verification.json",
+      "bytes": 19853,
+      "sha256": "239f564c1078b8be0e0d8fa6e521eb7efdbc6cbd8138fa774613e9e121dde92d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/verify-archive.mjs",
+      "bytes": 4484,
+      "sha256": "5f938ed4dbb9a24bd3da4afb04bd5871029081fb28311ca6538f5e51cc368698"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/verify.mjs",
+      "bytes": 17734,
+      "sha256": "e5da8215a6561fd7ecb241523c33be6c0710e239bc304ac44b59a98e672c31f7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/vet.execution.json",
+      "bytes": 892,
+      "sha256": "2d5131977c71764c02e1b7da2d0c3c8a1ff90e64a14e5eac57c8ca6350866874"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/visual-review.json",
+      "bytes": 4573,
+      "sha256": "7b68fd17d488726bb908ffb6ec26b2a54624e0b38434ae23204575acf4d44107"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/visual-review.mjs",
+      "bytes": 2059,
+      "sha256": "60478cd1cdd1b09cb6cd29bd167e0c50509ebb1649c500567f494fe58fd328d0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/wiring-metrics.json",
+      "bytes": 3140,
+      "sha256": "6e16f925639d2f2b9b2d596445ebb248de89eefa992272a7844c4502f9067e07"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/local-wiring-readability-offline-v1/wiring-metrics.mjs",
+      "bytes": 4598,
+      "sha256": "149f4887fecd2f0b4b3a840c3bccf90c978dd6977815668b237361b54e28a69d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/DEVELOPMENT.md",
+      "bytes": 4464,
+      "sha256": "bb6cb00dafa911744a2416249cba6c49d7ce0c74d7d006b63088becaecebd0cc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/PLAN.md",
+      "bytes": 2830,
+      "sha256": "e89d87aedec7c07bda3d9a8783fa99a99f6967d5c0ebdbf3648d8953a20241cc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/README.md",
+      "bytes": 7496,
+      "sha256": "d6839cccb3f15092c7d379d96836a51d0c8bd7e2fe41471ba0d4d8e36778a409"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/REVIEW.md",
+      "bytes": 7024,
+      "sha256": "a337ef94d634aaf99159b5b0fc2dce78e91d22e4ce26e7922d6a64197bfe3e81"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/archive-evidence.mjs",
+      "bytes": 3423,
+      "sha256": "7d2de443f5036ad7041b3fd1036996119de25028f5eec978eceaf06bb2a91f22"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/archive-verification.json",
+      "bytes": 3352,
+      "sha256": "38a3176dbef6a044ddd7ce77bfe9ac9b9e401c7f2e57fc88f424a7f2e6844b3d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/audit-history.mjs",
+      "bytes": 2339,
+      "sha256": "64c9e91d09f7158d726d079a8dcf74fc7f3b47dd41e344e0426e72b943a50af9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/development-tests.log",
+      "bytes": 28195,
+      "sha256": "da8238cb777ec55e8425ebd840c66b4b258184a1c1411195e0d2560628758dbf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/execution.json",
+      "bytes": 9313,
+      "sha256": "8aa8d6dba0d4861fb9f15d53aff0eaba044396c09379e0c62610590675f00124"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/focused-tests.log",
+      "bytes": 141,
+      "sha256": "e2c279d8ae12ebb8082085ccd9c1056bc76ec24eb5fa1d99b2e8aa0681b773d6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/full-tests.log",
+      "bytes": 8129,
+      "sha256": "0c894aca7cd73b5445c7a4406f880f8ba8b30d9d40127305be7fc97466b7d244"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/native-tests.log",
+      "bytes": 989,
+      "sha256": "bc65b33688b28fad3967331eda6fb1ca7e6f1856a003880a159cff2ad389d9bb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/pre-final-full-tests.log",
+      "bytes": 20653,
+      "sha256": "fc8dadd02ab1acb6b6a9371de6fb19c5a0cf43f65b3ad8ecbb1b5764f4c3b82c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/pre-final-race-tests.log",
+      "bytes": 274,
+      "sha256": "0d4be57a348ea198bd6324bd08fcb1d4e66c77de02e69a82a0b88c6e516eb09c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/preservation-final.json",
+      "bytes": 3153,
+      "sha256": "dcf7982b45b06ac383b4d9e89ccc1ead2aead8e21aa960568d279ed34d33984d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/preservation.json",
+      "bytes": 3153,
+      "sha256": "e008bd8c55a280592865871e74880267b05946a4a1e1596bd2e0f356bba6cc6e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/previous-phase-verification.json",
+      "bytes": 533,
+      "sha256": "e9669278c0530771722900576336e7bb808c506cbe5fe8d601da6e38524f2d68"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/race-tests.log",
+      "bytes": 274,
+      "sha256": "ffb8755c0af08cf3271e06cd70f2dbb3864737616a3cc89206a503bfd3bb35e1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/render-review.mjs",
+      "bytes": 2462,
+      "sha256": "1bedb50e070b920ef1a816b7b0f402dd144366bde3a54dccf081d70852c804ae"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/results.json",
+      "bytes": 2841,
+      "sha256": "b796827cc534b55d9bf04c0d8aac770b0deccf4cc2218b32b338fb5fa2868736"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/source-snapshot.mjs",
+      "bytes": 1247,
+      "sha256": "957734dbff3bb5443c18c6f45884410dc8f0c24d7804659d42aecb65c74314db"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/verification.json",
+      "bytes": 11887,
+      "sha256": "9c4a96d16b5fafd5688008a5efef7f6ca06db686dbfc50c5180fd0aa37611b7e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/verify-archive.mjs",
+      "bytes": 2767,
+      "sha256": "dea5c0b87c714716f1f4203775ae5e725a278810a9f480fd6f5b5d29879d9eed"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/verify.mjs",
+      "bytes": 15863,
+      "sha256": "52aeb472535bb4eb17bf90480de255e2e7522bc8ca25ea81e3721e3ce53f15a9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/vet.log",
+      "bytes": 20,
+      "sha256": "634e78d043af60a2c6f8b111a9e457dd1606115ae4c814c6755f23fe08d671a4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/PLAN.md",
+      "bytes": 3160,
+      "sha256": "56053d40bb42276791aad5553fee6138fc4957bf78a4875653919302dea08bef"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/README.md",
+      "bytes": 7926,
+      "sha256": "9a33403f88ad288bf4d5a8a03ab044914276a60cc4c19942193b3ad826f74792"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/REVIEW.md",
+      "bytes": 3100,
+      "sha256": "cb07a66c9f4adb08c95f7c10cee00ce751f2cb2a7af411f0a235b7619d54e003"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/preservation.json",
+      "bytes": 3152,
+      "sha256": "ff6b7cc03f28d0ad7f89ec5ffdda926f0a2944e958d5dc9f469555bedeac1758"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/verification.json",
+      "bytes": 7829,
+      "sha256": "b08a95c5127ed835e84f2050fc19c8d658e84ba10283392e0ca75ab012be2d37"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/offline-repair-v1/verify-preservation.mjs",
+      "bytes": 4682,
+      "sha256": "b2c56b86ff07d55cba79b380989cb5a8d64898814beb73944118f69c77550606"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/DEVELOPMENT.md",
+      "bytes": 3673,
+      "sha256": "a0d6cccd9018ceb0180b53b0c6f3658e22c937717e47e0836e4eba6ae8203c9d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/PLAN.md",
+      "bytes": 3826,
+      "sha256": "e48528836e218f5d6a5cf7af32c0512c96b62b7eef9a79d772f6a21bd6f8cb81"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/README.md",
+      "bytes": 7604,
+      "sha256": "a59f222f8682cebbb18c484c9a5effa1d4bc2c7c1429cb6be913b2231b4780b0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/REVIEW.md",
+      "bytes": 6711,
+      "sha256": "4a1879b3cdd578f830ef39040eb1c6b38e0ae4d79ba592c6ac11ca5226ac6bdd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/archive-manifest.json",
+      "bytes": 204345,
+      "sha256": "28a4bb5753e1f226a11aea636b8ecf5f0de91ae0c98cd387e34261039d2b3bf6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/archive.json",
+      "bytes": 799,
+      "sha256": "5ef482cc3bdcf58ddfbf232b4247c2c491ca0ded29393e039ab6cc18b76b5b2f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/archive.mjs",
+      "bytes": 2872,
+      "sha256": "07c77e8e69c1a2d636b0ec455eeb015c558c9f8719e5e916753e10d6d29e01c7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/authenticate-history.mjs",
+      "bytes": 2935,
+      "sha256": "f04894bba0496f0f1b89d201e06038ec0e2b43f3793b32056e48b82d201d12c9"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/dev1-readability-metrics.json",
+      "bytes": 10450,
+      "sha256": "987f66dffa88046b8e473a1683bc55f9883c47ebeba72f8ba750505835f6c175"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused-dev2.execution.json",
+      "bytes": 1063,
+      "sha256": "3cfd33161826fb7134e677b2bc948572b13c24ea87e40575c5556691735faedf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused-dev2.log",
+      "bytes": 135,
+      "sha256": "e296df03ffd42ccca517d031d779879700baa64c8a445147502351b6428daaae"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused-final.execution.json",
+      "bytes": 1065,
+      "sha256": "4aed6ebd474662ac0bfb0c1c205be717bf08d25d840f936e134cf836f9021cd2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused-final.log",
+      "bytes": 135,
+      "sha256": "6558ca30f492328727834fec579d52c4695b7b2ab5d76249278cea102fef7539"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused.execution.json",
+      "bytes": 1053,
+      "sha256": "8db7a8b6c0f56441f35ddcca0ea28bca87e0d4ab647a5754b22e9d4d85b7a727"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/focused.log",
+      "bytes": 135,
+      "sha256": "82bf918ffd8098a34a8409a842a20188214a243ba4b206fd14db91584a910f43"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/full.execution.json",
+      "bytes": 939,
+      "sha256": "364074aec2060af8814cdae9cb45be8a064e1ee838a4360e63b9e86a3f965627"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/full.log",
+      "bytes": 8128,
+      "sha256": "a27fdc6971e65f009b12e906c4ca13d7710c52867aaea6f6115eed6129c02622"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/history-authentication.json",
+      "bytes": 5681,
+      "sha256": "4915a05ff716cf67776c48a81b344f8fd907a3b4456eacca6588151e5fef2550"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/lint-final.execution.json",
+      "bytes": 943,
+      "sha256": "f164ece6a71a0bf9a709cb25910305218c6add37912079b1dfcd3e740da92da0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/lint.execution.json",
+      "bytes": 931,
+      "sha256": "c8b8b5d7232dfe541190a9cd512f29f1fd43b25847f32f94e3c876b5e24663cb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/native-dev1-verification.json",
+      "bytes": 18768,
+      "sha256": "ffc1eceab32b41ad9b75a6aad11e56481562d9db53c383cd620d616c5ad0105b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/native-dev1.execution.json",
+      "bytes": 1095,
+      "sha256": "096e62ee8658b97576c9e51e9d8f7f73ced7c31a5f7689fe7f92ccd49df68028"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/native-dev1.log",
+      "bytes": 466,
+      "sha256": "a8467df6d54e582efe2fb957aefe21ed7186cae7bad98a62ff72949f9d75ef0b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/native-final.execution.json",
+      "bytes": 1098,
+      "sha256": "79e12312dacee03e923e0ee63e8e87b49ab308ba7ea3fd68fa4c4b6846c807a2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/native-final.log",
+      "bytes": 468,
+      "sha256": "b7ff6300272893f82d2dc026834fcaff656f1b0305f47a845e07a56dbe26ff86"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/qa.json",
+      "bytes": 2597,
+      "sha256": "399382208a1e28576e0e17c6e58a95f3e10fb0585b55c38f8e8c2564eb997a28"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/qa.mjs",
+      "bytes": 5377,
+      "sha256": "b73388e078512ca5ce9b800e4abb368dc52d77fc7a0fe40fb40fdf4d181e5d44"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/race-layout.execution.json",
+      "bytes": 1017,
+      "sha256": "ff290ed7d72b4d14fed61d8358662666d71d601f6ce89d28a7eab1ee7e127f3b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/race-layout.log",
+      "bytes": 88,
+      "sha256": "8b13d04b8ae781415d8e9a92f974383dc13288108ffbd1ec83b6da904941c366"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/race-ownership.execution.json",
+      "bytes": 1027,
+      "sha256": "98d75d2e9423e3a3f4e56d04f473a9f281d2b87901c65c36b296bb62a639eadc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/race-ownership.log",
+      "bytes": 49,
+      "sha256": "a83b57e73806ce90c81742ab20017d8dffb357111bfdb2fc6c0b52427305dd96"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/readability-metrics.json",
+      "bytes": 10451,
+      "sha256": "f66bbdcf1f1182b08c819e4157a6608d71667ba89012d0043fb71d1e79a667c1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/readability-metrics.mjs",
+      "bytes": 3764,
+      "sha256": "3f56aaf76f88d60ddc12b4131a0a764ab06936625af4f8174471ed35db7e3f0b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "5b4721410df39495a2c3200820e99c62bda40603e5c3942deaaac9ba90c78a24"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/run.mjs",
+      "bytes": 4734,
+      "sha256": "fea0d94fe9c799039fc250179b0a7bbab6fd0ce56694c5253a7c79b34a6dbf0f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/verification.json",
+      "bytes": 18769,
+      "sha256": "dc7f007f9251511a28ac73719a4729637338f074d9a801b0b4d25d9380e0bb8a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/verify-archive.mjs",
+      "bytes": 4466,
+      "sha256": "b8517ca425c644071bd3234b320a790468c0d3efc6180bd6bc24bfca96a46d93"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/verify.mjs",
+      "bytes": 15944,
+      "sha256": "d26885175e9c79b2176f568a61989a69c8b41bc83b9dacaf6a4550b90ac46691"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/vet.execution.json",
+      "bytes": 886,
+      "sha256": "9de3f3f85448c3afa5eade2b785b76c8239a4e040512e633ac7d02d32448849e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/ownership-locality-offline-v2/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/DEVELOPMENT.md",
+      "bytes": 3330,
+      "sha256": "5529df67ba2dbceb68c85b9df8baa925a446147572b2ab98ab2cb08185f5eb5c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/PLAN.md",
+      "bytes": 3208,
+      "sha256": "48ae856977edcfb7b1fecd7b193d79c99329f1226801d50f0591ead49d1d7a29"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/README.md",
+      "bytes": 7306,
+      "sha256": "21ae4af61b2c078203bf46b78cf15b6bd57acd07aaf38a05f40490361b2506d1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/REVIEW.md",
+      "bytes": 6431,
+      "sha256": "774b6618d30e6c4ac6b14d86520c93a8cdd151294224935c7d89530662d6c25a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/archive-manifest.json",
+      "bytes": 310153,
+      "sha256": "d29e576515dee35861431e2027c141d87ef1692689f2c10237022c979edcb987"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/archive.json",
+      "bytes": 446552,
+      "sha256": "4b3b1a5d47db504845b10400599cfed2e208b659ce569ce5c0db4fea84008d78"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/archive.mjs",
+      "bytes": 4050,
+      "sha256": "cbecae44c71eb0c125be5ae77094d8fa7572820fb99c47854d9a03c7a07fa7e5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/authenticate-history.mjs",
+      "bytes": 3103,
+      "sha256": "23379bd492baa9a0be8f479ff6e8364bba5b5d9c8a165581ef9ffa07bdffca8d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused-dev2.execution.json",
+      "bytes": 1186,
+      "sha256": "8386e0586b1f4eb325487b3cf13f82ca536044da684913303314d7e6c459ae66"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused-dev2.log",
+      "bytes": 3113,
+      "sha256": "091cb8ec3d01179ffef250a217f697562e5022ea4eec1e14faf1dd5e0bba3b7f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused-final.execution.json",
+      "bytes": 1188,
+      "sha256": "636cafbf518fc3ca41564c185868f0b06aa731a3caec4bab258ce5cd2c07594b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused-final.log",
+      "bytes": 136,
+      "sha256": "2572f5496d607175d45ec06b9b9e1c25926fceec0cafff7afa7cb7e95538456c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused.execution.json",
+      "bytes": 1176,
+      "sha256": "cff89cccc6f0cff6293b710cde3cb6cc5e83647c115dbc7624cf2304917400c6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/focused.log",
+      "bytes": 136,
+      "sha256": "6b414817cdd9d4bbffa92f7b21efbcd647ffb4d87f780d0d9c51c30456c56af8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/full.execution.json",
+      "bytes": 944,
+      "sha256": "5d05c7a07912842aabda4c401a5d9164ff67f6d62f38ce7b20362d8a8d2d3e42"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "904768b02ac41e9322d9aa6a40fb7a9c7e4fa88376df99ed7b25fa5abee55eb5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/history-authentication.json",
+      "bytes": 4502,
+      "sha256": "6fb903dad6d1cab2a6c9c9b35b7087e17b50f5e52fdddc2d8378c3a6e148e0b4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/lint-final.execution.json",
+      "bytes": 949,
+      "sha256": "dfffb2a065e10d5449515b1ec7fb8ec180938261b35bc9abe88193fa47658ba8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/lint.execution.json",
+      "bytes": 937,
+      "sha256": "5b51e0836aeae732a1f779cc566c3af19b98a4ec8eb2c206ff4daed6a9ed56b0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-dev1-pre-crops-verification.json",
+      "bytes": 18485,
+      "sha256": "20ab23d56c814d6029c91046b81558ae2f54a56983ef7a3d5f6c87f41065caae"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-dev1.execution.json",
+      "bytes": 1104,
+      "sha256": "9b8f7c5941a3d987cfee322a657149a1dded0d1d82490cae2fdd35ac9d4066b0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-dev1.log",
+      "bytes": 460,
+      "sha256": "ef0250e96e4c076efcff5a9b309c4b61cad22cca107a09c4ddfed240d854175a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-dev2.execution.json",
+      "bytes": 1104,
+      "sha256": "2655d2d53cfaa326ac0c1d45f24f692d845ea1ce0c6fe21346c79cb43fc54839"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-dev2.log",
+      "bytes": 460,
+      "sha256": "5adebace41333cb4c9af55f95f6e6592e5d0c0a76c9098267e26d037dd8846ff"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-final.execution.json",
+      "bytes": 1107,
+      "sha256": "c3e00a59cc1bf1c5f710994ea87158c319fa3e13a9a3acded78ac93c6c69f6fa"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/native-final.log",
+      "bytes": 461,
+      "sha256": "b73c807a8d152527c0a4c016dda8264fff03fdd7b3f10f8bafaf4c46eb4b8c1c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/qa.json",
+      "bytes": 2295,
+      "sha256": "7eb5cfde817891cb13dcfc77df4e5c16f6d491700d95b4065f9cafa5c3f2976a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/qa.mjs",
+      "bytes": 3748,
+      "sha256": "f2b95eaf7628ed129b981375fa7351d7da4d51c3fcc7d862b3854781e6e02c50"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/race.execution.json",
+      "bytes": 1047,
+      "sha256": "a64e5467ecd86142b338f9a310845df6089aa2b0ea105f2c2f14d7b4d47e09f2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/race.log",
+      "bytes": 139,
+      "sha256": "19083fb17ade86849dff3091f58518aea29e95d12809a46dd5e7f13915103b8e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/run.mjs",
+      "bytes": 4650,
+      "sha256": "80eb726e4ce4ac490642b5202f78245671acdda6ecf8fa5f2a24fd5300ed5950"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/verification.json",
+      "bytes": 18656,
+      "sha256": "fd66dbecbf386498c31ace475d0b5bbcf00ca9e8271f34fa85cc3e0175425a99"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/verify-archive.mjs",
+      "bytes": 4532,
+      "sha256": "4f269fdfa625ce2bad95a51dd722a7e1851bacce2e8fcd24e9fd5cfa6de28e5f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/verify.mjs",
+      "bytes": 15107,
+      "sha256": "7c2742e8f4d891bab219dc0f0be562772cb5a96947e1d5c3185d2d6c5839e852"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/vet.execution.json",
+      "bytes": 891,
+      "sha256": "a4c73bebeff0eaa2fa54aed5f078d831f4554859210e7b4ad6a59bdf44e67025"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pcb-seed-rotated-fields-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/DEVELOPMENT.md",
+      "bytes": 5548,
+      "sha256": "c9166c55a8ec031f94aa608e3d884c8ab82f3b2c1bb001e134aabf81324a918d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/PLAN.md",
+      "bytes": 4991,
+      "sha256": "e3ebc9569060918d6a373c0327e2a83cabe6fd733d26f324e2befdca5ab0808a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/README.md",
+      "bytes": 7722,
+      "sha256": "6e302441dca6d2d96ffff83801657d98c3378b839084dc961367d9a023f8f484"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/REVIEW.md",
+      "bytes": 7337,
+      "sha256": "cc5a56344d61676f932ace3005709be86b99f7e5c1430daa44165e87eb7bfdda"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/archive-manifest.json",
+      "bytes": 211321,
+      "sha256": "7d671d0ba7bc73d10b57e3d874a4a59b945f312f908d9595c6b902edf6266399"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/archive.json",
+      "bytes": 805,
+      "sha256": "773c25fb4926fc2881c149a8f760268ef7c72d682b047bda0a34290bce5c8f2f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/archive.mjs",
+      "bytes": 2888,
+      "sha256": "a083ddcdead846f420bb1ae3ee5bc989ba158809a063cc09fe20a9109ce64db6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/attempts.json",
+      "bytes": 39511,
+      "sha256": "a56e4dfd7d2ec3590fb1e6c491542bc535fa5ef7f18c4be30d0663f619753ba5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/attempts.mjs",
+      "bytes": 3117,
+      "sha256": "c6278122612c9e8c9b94788cd26fe0b0f53d336845acfd18c6555e66571eb9b0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/authenticate-history.mjs",
+      "bytes": 3048,
+      "sha256": "5563c1eb527100ee34b668980c96fe62ff913878a741bd49a1c6ae42a8ba7a40"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/dev1-readability-metrics.json",
+      "bytes": 10501,
+      "sha256": "40d564da234ad6a947d0d27a2691506a7c960b66834a750a7240288d7f9aafea"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/dev2-readability-metrics.json",
+      "bytes": 10499,
+      "sha256": "ee689990b9536e88d7ade5ea67356d37ba7954b7ec089f727d620cd3a4c48551"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/dev3-pin-aware-audit.json",
+      "bytes": 4427,
+      "sha256": "8fc3b9e69116759d7605f56ce2b9e840ad7614a80f88fcb7fef9a9772c0636b2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/dev3-readability-metrics.json",
+      "bytes": 10504,
+      "sha256": "fe38f5f867b698b45cac1dcd0e992af68240b2b891b0d2c9a161ace1c1c0414d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-dev2.execution.json",
+      "bytes": 1150,
+      "sha256": "9e73d100224085871ad62385102d94bac8af6a1501cc674e07cdbc9422eb33f7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-dev2.log",
+      "bytes": 245,
+      "sha256": "ed40b8cd59dedb85b0ca3afbdc32438ae4e2c0c953787a52977a3c5dc74bfd99"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-dev3.execution.json",
+      "bytes": 1150,
+      "sha256": "d077bfc76e875a00e5ba60daa3860e2d592562b41a756ef6d2e45b3f3825c569"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-dev3.log",
+      "bytes": 245,
+      "sha256": "bf7e3b082812cd8c66593c2d44b6d47e056a56087fdee5e53df511e80ffa1346"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-final.execution.json",
+      "bytes": 1152,
+      "sha256": "613d2dd61ea0a6a550c6150d8aeab0c3bfa00a0b34b4e9475d0a33c84a08276d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused-final.log",
+      "bytes": 245,
+      "sha256": "c3718d725498e6f54458cbc71fa26f2d763ac573079f8ccf055ae708dc5d254c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused.execution.json",
+      "bytes": 1140,
+      "sha256": "cb210b9ca3b0b8d9e9816d50a318d804579112a1b4ab7e40bed294c737ee5d2b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/focused.log",
+      "bytes": 245,
+      "sha256": "534d164547b25172bfb1716da40559c8f87545a24025c86175b94594698cde1c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/full.execution.json",
+      "bytes": 942,
+      "sha256": "16da10788dab72d62b56315861ccbf0dac175ccba411e63d8e3ba8b843cb5a79"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "15f85380168d9b0aefdb7dc41fafe69c41337ec5f3c6f034859f38cd70c1c0cc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/history-authentication.json",
+      "bytes": 6220,
+      "sha256": "acf36c7c561c0b06a790bc176e2088ab5fc3ff59804a25c17d0994d0d0079a4a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-dev2.execution.json",
+      "bytes": 1014,
+      "sha256": "90e94c1c2e72c314f99b509f30c4022074d5a20498873eb6e43fbf288c9a04fb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-dev2.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-dev3.execution.json",
+      "bytes": 1014,
+      "sha256": "4032d71d1b80031d58bfe7a676ff17468f1e49f45964345b646e78e2e4cd4141"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-dev3.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-final.execution.json",
+      "bytes": 1016,
+      "sha256": "7a7593d7c6a8dd7e888f218e201ef7e5e82945ae4f49b7c266d41d0d531aa2a3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint.execution.json",
+      "bytes": 1004,
+      "sha256": "fc8e2067c86d2d0643636d50cf985a922112e5c1f349534cbe5b4414e487306f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev1.execution.json",
+      "bytes": 1101,
+      "sha256": "560ace857d1149238ca78fdc28f576844a944913cd107d3f3a3187bbf211634e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev1.log",
+      "bytes": 566,
+      "sha256": "68223e4907ddf5782514829b0e793ecd2c06e114b211ab4791346712783a27ab"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev2.execution.json",
+      "bytes": 1101,
+      "sha256": "97a3e08224d2fa1bea68fd98e02ddb581691cfad52ff3d32466ea999a2418863"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev2.log",
+      "bytes": 949,
+      "sha256": "c49c9ec47b0eb8267097b947e3f534f9469a0fd15450fc5e471322c2441758af"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev3-verification.json",
+      "bytes": 13367,
+      "sha256": "bda881f33d32b450f03fa46476b42371abb73c550c4d8620e72b42d7b0caa22f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev3.execution.json",
+      "bytes": 1101,
+      "sha256": "8651fe122c403a3a18a9faabb6f4015dd2bb5521c38efa8b3ed94441fe25fe57"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-dev3.log",
+      "bytes": 949,
+      "sha256": "31403aa985b5c4b3921990b720c064214e08a751e59029bd89210b31591aeaf4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-final.execution.json",
+      "bytes": 1104,
+      "sha256": "659edb3ce9d93935f85d96f6577d17b8395c07ddfcfb3f8963625c9b2ae71244"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/native-final.log",
+      "bytes": 949,
+      "sha256": "a0170ed4a0ea588331cd8a74bea54de707499a4659ddae338f7c23aaa6f9f5c2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/pin-aware-audit.json",
+      "bytes": 4428,
+      "sha256": "ceabdbe8063a5e9b183aa968e2353265c65aca4fe05e3f5dc104cca4c4b42f84"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/pin-aware-audit.mjs",
+      "bytes": 7443,
+      "sha256": "70c7a12b14e7c74e4e91ffa60453780c44972332933ed34071699c9ac6acad04"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/qa.json",
+      "bytes": 13244,
+      "sha256": "bd05cb076417ef6130a9d54a5a6bab562ac02834c7863c5c02892e73cf0a3cb7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/qa.mjs",
+      "bytes": 5832,
+      "sha256": "59636d495a25530fda00906e9030176cfeecc8fbf110065e70584513059e7a4b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-designapi.execution.json",
+      "bytes": 1001,
+      "sha256": "b2e3ef1de711441503f498ddf60e2ba7fc36c307376cf6ff2ea867a3af9661aa"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-designapi.log",
+      "bytes": 50,
+      "sha256": "26316f4940c4076aacebdd3a098fb24c377ba2dd8b211ee9d8e46716072c9a68"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-layout.execution.json",
+      "bytes": 1020,
+      "sha256": "086098448ce802cf13681e258c86faa3a8972122baa228a09fcca69dec9bc076"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-layout.log",
+      "bytes": 88,
+      "sha256": "27e4a28c74220b0dcc059a71a2c5fb3b886472801b0fb139497b65762eecebc7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-ownership.execution.json",
+      "bytes": 1055,
+      "sha256": "fd89d06541458cd97ac51a6b9db3a6999c6f06496bafe0ae882e9294cb78dc84"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/race-ownership.log",
+      "bytes": 49,
+      "sha256": "d9f818842601a5b4ba0a45c1eec3d9b6c90907d175f9dd64b45ee181898dd578"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/readability-metrics.json",
+      "bytes": 10505,
+      "sha256": "08b9e1d9d10122fe1cee0ed2a219ff16090fc45f3261b59cab0bc44833df640f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/readability-metrics.mjs",
+      "bytes": 3816,
+      "sha256": "8bc5f8ed38904425334d95daf94f52b0f06677c95606e677f2a03826b337ceca"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/record-verification.mjs",
+      "bytes": 1129,
+      "sha256": "8d4f4d202471338f6b6b25f849b331c3dc63df00abea7a996ae977735b260436"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "5b4721410df39495a2c3200820e99c62bda40603e5c3942deaaac9ba90c78a24"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/run.mjs",
+      "bytes": 4962,
+      "sha256": "a6cc74279a2bb1d90a7094701fc336bab228f355b8f3027a4694671d935561ee"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/verification.json",
+      "bytes": 13368,
+      "sha256": "b259f88ca740a24d975ce03aafb45f040395e9dd4b7f2a72859297139806e8b5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/verify-archive.mjs",
+      "bytes": 4475,
+      "sha256": "6c2bf12e3589922b6c25ae8890e8c0f031aa498d53e96e759f82bfca3ccd5e3a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/verify.mjs",
+      "bytes": 17594,
+      "sha256": "e17a09c6155f0a8406d5b9750d77e805ee4677a792daf1ec0f7bb90845053434"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/vet.execution.json",
+      "bytes": 889,
+      "sha256": "db3c1d3b7fdc565250c6cba108587772f07489c9939decea96e7fa5b56a2af36"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/pin-aware-readability-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/DEVELOPMENT.md",
+      "bytes": 3868,
+      "sha256": "6e3165bd6c25f281dcd10fa0df2c101396c206d8f4d88bc58ba1f5ec415231e5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/PLAN.md",
+      "bytes": 3522,
+      "sha256": "a4bf77cdf5f10174955eb0795e9ad1d8b09521feeae57da5815e6d15e32a143d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/README.md",
+      "bytes": 9754,
+      "sha256": "686a2eb083d13437f98e7a2ff779e83b1948e34c4add95f56b23f5011ea8681a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/REVIEW.md",
+      "bytes": 4107,
+      "sha256": "b7e6ae5c5f83a8eb56b0c9cd7d2b4fe0b685292e7396232b3978b64a2e984fd2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/VISUAL_REVIEW.md",
+      "bytes": 3984,
+      "sha256": "9a6d376d5fd56082e06cb10b741435211b7ba4b244b73988c4e652cac3cfb96d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/archive-manifest.json",
+      "bytes": 278559,
+      "sha256": "91c9d853a79f645609e0bd2c2a8542836971dcd97754d501ee7d0ec6614ab699"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/archive.json",
+      "bytes": 792,
+      "sha256": "9712ee658435fdaedce0b59a5da321c29dad7a5a53626fed93b3500f6fafc79e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/archive.mjs",
+      "bytes": 2867,
+      "sha256": "509fdbe2dc4f11d783fcea4b92cfaf59607f30f130ce1f110836fd93ddb0afd3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/attempts.json",
+      "bytes": 48762,
+      "sha256": "f478ca5db486cddde29200d5c1d406ee0b77e652f51979a6815fb76385d10fd3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/attempts.mjs",
+      "bytes": 3299,
+      "sha256": "237b4a4443cf2db39ae209a6e6608eb0aec731e2801487e09d65c0caa3dbddbc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/authenticate-history.mjs",
+      "bytes": 3256,
+      "sha256": "5463bb2839696dc4f00357f6784e0083dfdd8b025aea9b993eef6e585e77061b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev1-pin-aware-audit.json",
+      "bytes": 14048,
+      "sha256": "b0e0bd96abb8ee5924f9c964319916bf6edc8297819466f643df512f14f93e53"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev1-power-rail-audit.json",
+      "bytes": 8732,
+      "sha256": "5694069338f764b81372cfa0a0c53032829315f54d332094ca6264d666dfa943"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev1-readability-metrics.json",
+      "bytes": 10501,
+      "sha256": "f5c1dbdabee26904fb7fce4c1a6d3723f9d2602ed8b42b19db6433b286033f40"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev1-wiring-metrics.json",
+      "bytes": 3102,
+      "sha256": "62776b0092e3ba8a9e37c842e867c01271d80306762068e56b1d0e78d15c87c3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev2-pin-aware-audit.json",
+      "bytes": 14122,
+      "sha256": "695d9e9b8884314eb5a57c6dfc17e35ed4c35afb774121d86539ee0ca46f069c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev2-power-rail-audit.json",
+      "bytes": 8726,
+      "sha256": "9032a268d2e8765901aab583e1b03096cb3d0e13b50338658ee01d2f0225aede"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev2-readability-metrics.json",
+      "bytes": 10499,
+      "sha256": "ec278918cfd46551c84ba8518a684469f6f3c810144cde2cf6cb5a0dbeb5ada3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/dev2-wiring-metrics.json",
+      "bytes": 3101,
+      "sha256": "e54d6d4b77a5a3033ea63ec4ab36db278e3e546c67a89e267736ecdf99d47e33"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnosis.json",
+      "bytes": 4822,
+      "sha256": "c6cc8ce99c829fb52dbc3816b2c54935331fc30ca2020ef16a8cef69037ff7aa"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnosis.mjs",
+      "bytes": 2936,
+      "sha256": "fe130102d70364f4e9fded4927e9c43932a0c4afe510de7b54670013d2c6a220"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-1.execution.json",
+      "bytes": 1054,
+      "sha256": "27b8a164e4be232d239a2a1df421059445a07f2665afd944d5ba7601dfd269ac"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-1.log",
+      "bytes": 13374,
+      "sha256": "17f9726ab72917a00c2d64684fdba01950f33cdde7a55bf5e3e8a14da9e2895b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-2.execution.json",
+      "bytes": 1054,
+      "sha256": "d52c251f81cb213f37850581c67930fbbae6353ac1da3afc625ad721138a618a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-2.log",
+      "bytes": 13517,
+      "sha256": "de2316c2165ac175b209aba60c32771b7c62d4a165f2606af2c456d2611c4783"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-3.execution.json",
+      "bytes": 1054,
+      "sha256": "e6ef97bfdea0ddbdcb82bb7a559af28db7cbd1c2c72baa6f76d05064479031b3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-candidates-3.log",
+      "bytes": 11128,
+      "sha256": "3b675f70706324069158ca1b583d60093a608a0c59269a8be4169ed8ae6d43bd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-1.execution.json",
+      "bytes": 1058,
+      "sha256": "b147ee8dedfd9be96137baedb40a76bffd2ee29fb6820005790b610581ae424a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-1.log",
+      "bytes": 426,
+      "sha256": "edb7bb4e2d05aa0acc7cb06405af39e69eb0351ad89577945360aa37a3353577"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-2.execution.json",
+      "bytes": 1058,
+      "sha256": "aa87f61c813d0c172a7c5f45c734ae8b6f030fe5abd6e1114c6419c693778bfe"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-2.log",
+      "bytes": 426,
+      "sha256": "e7ee126f744f4032264133d8ce1ef49042466d30227d7f54a9947b61be64cd13"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-3.execution.json",
+      "bytes": 1058,
+      "sha256": "e2068545600314e26344b37efed61aff0de773e96dea1ac1ef1abc2145d70f0d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-layout-3.log",
+      "bytes": 427,
+      "sha256": "9069002f55e0a7f6ea4ee82dd660c1c5695cc6dcc1e7587096eea0e8d51a9ee6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-1.json",
+      "bytes": 42526,
+      "sha256": "90af22df10fad2d077a0594a5bc1bb9c414b5b383cfc69baaf9ff401f7a0acd1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-2.json",
+      "bytes": 42577,
+      "sha256": "5dd4256a265599c1357e5949ef31beb568e37c8e3e43b1c9c4c0c2de718d9e96"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-2.json.layout.json",
+      "bytes": 61176,
+      "sha256": "1fdeb7f0a7975503866828bcabf2ab025b6a9be2ff18590a88d0eaeeb54e6b91"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-3.json",
+      "bytes": 44610,
+      "sha256": "344205e95a9ad4ecbf68fed05d3c916a67d73adfca4c921be4a6897c8abc2cdd"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-3.json.layout.json",
+      "bytes": 63510,
+      "sha256": "b851d2fb759588f1e6150ba7a38e5ccd997bf026d0313c537300bb158beb6035"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-dev2.execution.json",
+      "bytes": 1173,
+      "sha256": "89906b7ea7a997e57286506219ac8dfde76329679745e59033d34a3749e9cae4"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-dev2.log",
+      "bytes": 227,
+      "sha256": "53172335d778f791fe6eb1952166fd59e9488de7d3da11b46bb51fc7bce21bcc"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-dev3.execution.json",
+      "bytes": 1173,
+      "sha256": "c6889718f96bca73273c2934495e8e3d08fb52881394442bc416219c5fe3b165"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-dev3.log",
+      "bytes": 448,
+      "sha256": "a02c4eba1b8b8e2edf1ad1d772e6df13b7c4e6d8f8d571aa7491184c2fef832c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-final.execution.json",
+      "bytes": 1175,
+      "sha256": "ee5a08bf0933d2a6ed4383a6064bc82b1ab9cba911a6489d2b4f595ae12dc567"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-final.log",
+      "bytes": 227,
+      "sha256": "f403e6a5f1ba5e6fd643923a3a731545cc7dcc0f220e3d2d18c287e7f30cd398"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-native-dev1.execution.json",
+      "bytes": 1187,
+      "sha256": "f201171ad44efe55caf942097af2ed9d1d022b13974e3fddaaa9ad1c71f24a74"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-native-dev1.log",
+      "bytes": 227,
+      "sha256": "fb02ecc545f1881c9d0114ff98f09d18caf19f7a51df80b7712c2558893b400b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-native-dev2.execution.json",
+      "bytes": 1187,
+      "sha256": "cbeb317010e844b0a6c37ca1a977e04a0f49311a7a39563f929df2306d05a514"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused-native-dev2.log",
+      "bytes": 227,
+      "sha256": "6475c8ed2e425472c6f861cb9f0616e72e88a76ed1a444c444837feb45a3a46d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused.execution.json",
+      "bytes": 1163,
+      "sha256": "9c0ea997f17ceca3746e972ad2f5cb0b8f3c5c0e281c2d508022d32057b3b507"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/focused.log",
+      "bytes": 586,
+      "sha256": "0fa843e4a0b23de9db23fc329d310a3dc0864eca5d82602746b80c3f4a03e9d1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/full.execution.json",
+      "bytes": 935,
+      "sha256": "e66406be7ebf4d1c2a5c766098cf6d63482ce474ad3e48ce9642b35882f0076c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/full.log",
+      "bytes": 8128,
+      "sha256": "2295067dfdd6e47739fbb73921552d492179d00be815fe3bcb533e3bb4c031a8"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/history-authentication.json",
+      "bytes": 7839,
+      "sha256": "292488d9073c4b5d57ef706d7617ce348356512418794c006417e5d770de61aa"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint-dev2.execution.json",
+      "bytes": 1007,
+      "sha256": "e93a20bf434f278a55e6ac064903746f40d8701a21f1beaa77a556cc6e9cb737"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint-dev2.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint-final.execution.json",
+      "bytes": 1009,
+      "sha256": "2a66f48726111f767ce7f2e3e483d2352ebb51c042c5218663a12f77c0e28628"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint-final.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint.execution.json",
+      "bytes": 997,
+      "sha256": "9b54ed932f29dad124a48ed8c53735fd7f1314dcc35922697990d367015ea238"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev1-verification.json",
+      "bytes": 28119,
+      "sha256": "26795bdb8dd748144e046a6d5a07dde1928856f6a65ae5b58bde7729de8a0bf5"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev1.execution.json",
+      "bytes": 1092,
+      "sha256": "bae8c2f1a74a98bafd0bd83d9003bae4e32a90861b90f563f987886be25f09ea"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev1.log",
+      "bytes": 601,
+      "sha256": "f83984dd9d80ee09cf436e4fbd3738166ac36131f6a990a51edae209de8daed7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev2-verification.json",
+      "bytes": 19649,
+      "sha256": "12820639682526fbb4d3772d6da6aa088f02c2415addfbeb56b4d19b9e5989b3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev2.execution.json",
+      "bytes": 1092,
+      "sha256": "7524fafb32bc6c7e3c5fbc64e8866a1914fa59c397b9b7d0ebc4cc156eb43fdb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-dev2.log",
+      "bytes": 497,
+      "sha256": "ea271d12f01f86601b92846c4e5a1626b5035e51d5c8011fcc0b37c8b62a24a3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-final.execution.json",
+      "bytes": 1095,
+      "sha256": "6109073dc5a7562d1c2835ae658f3217524832ae27d6835cf95980245441e70b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/native-final.log",
+      "bytes": 497,
+      "sha256": "8b1715cac08f91b2879e72ea2335c4a53a66ba05e94a7c120a39180422b6a62b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/pin-aware-audit.json",
+      "bytes": 14123,
+      "sha256": "6739822c6f3f19a8beca06fff0113dd4c124e3d328fd04953a2ad02a3fd6d04e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/pin-aware-audit.mjs",
+      "bytes": 7479,
+      "sha256": "7957a55a469f4937de51ab1e0c75b9ba6e824f2029a03deb28949f7b08db4270"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/power-rail-audit.json",
+      "bytes": 8729,
+      "sha256": "c47c69b2ba2cb49937cdd74487bb54381dad2adf85e6659b15f4d6b163df5670"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/power-rail-audit.mjs",
+      "bytes": 6002,
+      "sha256": "59d1a1b7ae8734bbf1e99edf86a598ab2bb18c445768afe8ec48dd2573afbb93"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/qa.json",
+      "bytes": 19523,
+      "sha256": "bd4845e1e1c4fd69e88a16a9348ec0a705835edc29bafc02c6e846a531ca5bc2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/qa.mjs",
+      "bytes": 7642,
+      "sha256": "d8ca0f677a508f4e8a8a6a018a7fbf0fa40c4d8603791de3de00e3716607649a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-designapi.execution.json",
+      "bytes": 994,
+      "sha256": "0b603bc4fbac614e1370a1c09701bdb715a3ca2b4ff826489220f07b487c61a3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-designapi.log",
+      "bytes": 50,
+      "sha256": "ab7f35025453cb7e165740f164959c5c718e981594bb15692cd2e1a0bee417b3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-layout.execution.json",
+      "bytes": 1013,
+      "sha256": "a739ae63813add127b45f3899776c35bb5c4ae3ae65601fc8c920e31b8bbf03c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-layout.log",
+      "bytes": 88,
+      "sha256": "0cc0109bbfa6b60ed077ce481b6f27a5f90fb99e30dfb9d1d3945e9a02fe127d"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-ownership.execution.json",
+      "bytes": 1080,
+      "sha256": "6bb6d2bc8a2ec36f17b9ae328ddcb71050f0475e541736af54b4384e2b4d2157"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/race-ownership.log",
+      "bytes": 49,
+      "sha256": "4f750e1d2462d76a64c44dba7dcd4fc5f1fd47f14d4d053f73ae4264dd63cd6a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/readability-metrics.json",
+      "bytes": 10500,
+      "sha256": "93777ec50f59bb8935a499285bfb86657aefe33f26cf09a55b5fbd9e70d40b4e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/readability-metrics.mjs",
+      "bytes": 3815,
+      "sha256": "cd4155011773889ab3ba71c63f73386e579f1921d9f1b781cf2136dd30127516"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/record-verification.mjs",
+      "bytes": 1180,
+      "sha256": "a0d41c919c602bbc9981e1846b7708eb9ca23127f16edc7a2bf882292d131ea2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/render-review.mjs",
+      "bytes": 3067,
+      "sha256": "75efdaf0b3ccad1e5470eb2e1aab39a607baccea9db2896ac1ffb2bf8eac7e28"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/run.mjs",
+      "bytes": 5570,
+      "sha256": "b34b7e831febe5e51fcd34c5ff8d0a89910fc6b344b3e3ec764d8d01a5fb126e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/verification.json",
+      "bytes": 19650,
+      "sha256": "4e5ff96d7c011c61f0a61df4f1913a53667e43e79cfb8c384549b25e559b5310"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/verify-archive.mjs",
+      "bytes": 4454,
+      "sha256": "9569ceb35947cb8d1fcd379c8fab825fee11756f3305d8f791845aae2fd63842"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/verify.mjs",
+      "bytes": 17700,
+      "sha256": "a85b0008fdd249689422ec68e5c24ac84ba667720f5de92602968c712c664550"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/vet.execution.json",
+      "bytes": 882,
+      "sha256": "619a13fe93e852d09e7b132188bf17c59aaa9dac17f6186a784c1bbfc268d519"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/vet.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/visual-review.json",
+      "bytes": 4425,
+      "sha256": "07d86c4db20dc3988bb039b5b0c000744f35e3e111c40ee931e4c0ec078ff25e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/visual-review.mjs",
+      "bytes": 2051,
+      "sha256": "b5d0841eeadaa0d80d721d972e61c7ea265d01465e4d26cbb198637336e9e93e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/wiring-metrics.json",
+      "bytes": 3104,
+      "sha256": "9562ac80d08358175cac8c6ca84fcff1384702cc29892017f4dad50b195d523c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/power-locality-offline-v1/wiring-metrics.mjs",
+      "bytes": 4586,
+      "sha256": "16f851136257a70ac3690277f2eafba30a8bc4ce09d599010c11a34bb9e118df"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/README.md",
+      "bytes": 10150,
+      "sha256": "7dea43b6c560253856515e02e85ae4bd3039025729777440389ffd9e9a71bc39"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/REVIEW.json",
+      "bytes": 1975,
+      "sha256": "126293f9da55cf032d39989ff598be2267f3448824b7498b59dc791d1082dbfb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/archives.json",
+      "bytes": 1010,
+      "sha256": "83e4b05bf8234eb9781d43f5c49886efdbec5d77dee7ada8b6ca0db81764de31"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/artifact.json",
+      "bytes": 24900,
+      "sha256": "7a29c4714fb31550bd89da2e0438d24c4fd4b661a034153815bf4848f7625643"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/audits.json",
+      "bytes": 87011,
+      "sha256": "ed8504c611666df4087b7441953f7902aa25b5e5f69e0f61fcad7de372b4ea86"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/authentication.json",
+      "bytes": 4920,
+      "sha256": "5f933a9b8a655e657faa2c1a356a5b8138ca78045adcd8e6499f98dfe654ebb1"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/derive.mjs",
+      "bytes": 6566,
+      "sha256": "f18d6e10449996e9240785b646c811637d3d406e3f6f3122635dfdcbdf29b982"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/frozen-replay-failure.json",
+      "bytes": 706,
+      "sha256": "71e871039908ca768dca42f5b1d4c1a73fcfe907ce29088e7cff2f58d49a295e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/manual-review.json",
+      "bytes": 26771,
+      "sha256": "258992ec4862670846b23e394eaf10b09c008144aec3c184b8ec9fe84df78d89"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/prerun-approval.json",
+      "bytes": 1467,
+      "sha256": "31b74c5d3c05785bc78a205810603575128b87be9516469c12186603fda5310f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/publication-inventory.json",
+      "bytes": 2416,
+      "sha256": "e2361bdeec5a55d6b27a42ca074e28a903982fdfcc5144e5fcf24d5001b313d0"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/replay-audit/main.go",
+      "bytes": 8760,
+      "sha256": "63cbbf0aa480596d828ef84ef155fb98ff4fdb53913425a0042620b284e40090"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/replay-audit/main_test.go",
+      "bytes": 1633,
+      "sha256": "2586ca4b2e1aed609ec71516669e6d29ca5fb830eeff6064018450040deda1d6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-data.mjs",
+      "bytes": 844,
+      "sha256": "80990273e05ab7fc6d5b033ee05a620b7874533c9e952c13d7d2c3a18d23a19a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/report-query.sql",
+      "bytes": 2373,
+      "sha256": "f35a3068812c2ebc34ab825ae308daea83a552d6a69968ba78b0ead1c31793d6"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/results.json",
+      "bytes": 13110,
+      "sha256": "524c11159d2857c8a080dc2be448af8da93f0868333e9cdb26af0656c3aa2982"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/supplementary-replay.json",
+      "bytes": 6617,
+      "sha256": "a214a9c1b666c8b58723943ece40ff0e2946e067bb7b2e7db34c7dc4f453a355"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/publication-live-v1/verify-publication.mjs",
+      "bytes": 4024,
+      "sha256": "21e9956b9b5801882161162290606ebcdbf5c2ed719485e9b9c40d4adfe6835e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/DEVELOPMENT.md",
+      "bytes": 4590,
+      "sha256": "304828cb00203d9fe5fd7d3a52a16d3d7cb7fdf05c359816d5a9dc8422c7c134"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/PLAN.md",
+      "bytes": 2687,
+      "sha256": "9185033b75235dec9f53aa5f32135115a933e5c7aa595b53b4d599bd51e3eed3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/README.md",
+      "bytes": 10945,
+      "sha256": "7ec6c4f7dd548b5e357512aa391bd353b9705d6736a0713f957f333d0bfc825f"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/REVIEW.md",
+      "bytes": 7739,
+      "sha256": "e899527dbed38fb7c77ecb9b9bcdcf2ab04f7805ea420d0731b49160414d72a3"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/archive-evidence.mjs",
+      "bytes": 3042,
+      "sha256": "852fa4f2fe2e6b16d0d49f28ca99fa2410f976530de581562e183fb80cc7ea3c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/archive-verification.json",
+      "bytes": 3970,
+      "sha256": "364d0751c4f89dd53c652ffc4c0b1d3a34dc4c11b0c1b0e584cbae74d7e9b107"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/audit-history.mjs",
+      "bytes": 1856,
+      "sha256": "7ed4f4cfd88937d60316498fdef8dc83c72423ca436b97ffe5075c7b1362109a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/execution.json",
+      "bytes": 7456,
+      "sha256": "053324b5442ed59f59cb3b9a3a84bfcda7ddbfd8cd3b83415e664ec26586e094"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/full-tests.log",
+      "bytes": 8128,
+      "sha256": "61a488b1291a089173b662b8a361e41a7c0de684b1b4307aaaff1c002796d6bf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/initial-red-test.log",
+      "bytes": 478,
+      "sha256": "dd9c31048613643a4850dc326590643cb438459758b1497f4c25885e9f261482"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/native-tests.log",
+      "bytes": 467,
+      "sha256": "00191dc9098857915017b83c03043ce9e5470158783893cdd4e71e09d81bedff"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/preservation-final.json",
+      "bytes": 3153,
+      "sha256": "323408b3c7b73409dcf6242b61400be0c1fb6fd81c537dade7e4fa0e8e928c8a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/preservation.json",
+      "bytes": 3152,
+      "sha256": "392cfbfdaf2bffe48dd8a0ad65ee2beb3ac7683cd4ce6e727c83d5ceebdc2248"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/previous-archive-verification.json",
+      "bytes": 363,
+      "sha256": "b734320a964e69c07adeb5ac100f48321f3dadf4498fae40935d833aa10c61bf"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/previous-phase-verification.json",
+      "bytes": 397,
+      "sha256": "07c4cbfff1bd6e7d0587c5a9aa3710ed00d142a98c617f9bee478229dff45ffb"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/race-tests.log",
+      "bytes": 271,
+      "sha256": "e31a9416d89465cac6f30b97db6247bb3d25e93864881bacc0cb9bb6f6623d5b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/render-review.mjs",
+      "bytes": 2323,
+      "sha256": "b79655b7f53245a2bb391d46cafa1211156262fcb443da8e1daa1d008adc7120"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/results.json",
+      "bytes": 1074,
+      "sha256": "ea8e2e10ca991e4be2e4e8f61543a377d4361da9efc73340673b7c7b0dc32a6c"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/seal-and-render.mjs",
+      "bytes": 4303,
+      "sha256": "87e35a34124cc203077df8348985510883ab808dd63c35898a4662cfbf53c890"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/verification.json",
+      "bytes": 7780,
+      "sha256": "c7d8e5d5e449c090a39b0afbcfbc1cfc1f15b6bbf315db57a53941428578a66a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/verify.mjs",
+      "bytes": 11188,
+      "sha256": "b88e40f7f4516f646ca3a2f1351ea72364e0520dead34fbabd1385359534d72b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/schematic-readability-offline-v1/vet.log",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/AUTHORIZATION.md",
+      "bytes": 2543,
+      "sha256": "68ef315bb501c60f30b0254bb888def9810103e56bde51a94384f4e11997b7cc"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/PLAN.md",
+      "bytes": 6373,
+      "sha256": "ff2ff6ab89bc30b32c048cbfc6ef3bfd52ae8dbdbb0b8fbd3c570df316bac360"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/PROVIDER.md",
+      "bytes": 898,
+      "sha256": "78c7f712f95d8225660e652a9c40a39000e763bcfe61f81260d92725d7439978"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/READINESS.md",
+      "bytes": 7183,
+      "sha256": "75361f4340f8232dd77dea0298a28c60af22728f3cf83b9b4e3ca78aecc3be94"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/check.mjs",
+      "bytes": 4774,
+      "sha256": "387bde966c4a3165a6ce00fa4c625f67fc893e05809270c8218d42f8ae619ec8"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/development-batch-1.json",
+      "bytes": 6072,
+      "sha256": "4888d963618a36f7c58babba08b863236a211725e04614cd7ba7c58f3debdecd"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/development.mjs",
+      "bytes": 8341,
+      "sha256": "d0c2ef52830e649b3e1dda58b6979229d620b15dbebfcacc7af1100944b44ac5"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/baseline.go",
+      "bytes": 416,
+      "sha256": "5b0f41eba1194eb4fb3e4aad0d69ad4925de43ddd9ab9e6f467318bd77b62fcf"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/candidate.go",
+      "bytes": 492,
+      "sha256": "f22589bac6db920fe0381431c679de5bb226da3c765104455422055f6872fe4f"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/main.go",
+      "bytes": 8134,
+      "sha256": "a6f9bcfb270e59aebff2d16aec1013c875e131cb28e08715033fd9080ce46cc8"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/main_test.go",
+      "bytes": 3054,
+      "sha256": "e0acb24792908effa5648fdb31042ebd7d161668cd15e5c39f5bd959ceb9bdc0"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/native.go",
+      "bytes": 5919,
+      "sha256": "eb632686e7232118fd21f4fb1434f55c37ebbe6b0cbe3976a54066f89c2ee9f7"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/engine/native_test.go",
+      "bytes": 2277,
+      "sha256": "39c0698a15f11bfd5695bdcff09b2b552a40daed2ff4d0bc800f962448ac1523"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/evidence.mjs",
+      "bytes": 3021,
+      "sha256": "210a299f874710dda8dcc2232b1b5f58877f2665907cbd94c29328de99e7072d"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/evidence.test.mjs",
+      "bytes": 3417,
+      "sha256": "8b9da23037c8ccb601d14275cf3b9a5fab2a830004909455b363090af47bf232"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/prepare.mjs",
+      "bytes": 6405,
+      "sha256": "16012a5e256ae2f24e5ab0e74f041415dd1ea34005ecd1f4c25a135c43df2464"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P01.acceptance.json",
+      "bytes": 1139,
+      "sha256": "ba717699662099bafc3de9f6c1f3734b0601c2e47bb100d2a8261f328073c102"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P01.json",
+      "bytes": 10032,
+      "sha256": "99723084089c1ea00ef488209b7d0db9d46c982c5a9afb6af01e15a41b325ac5"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P01.txt",
+      "bytes": 1970,
+      "sha256": "52f90d024452a8658e4e1482ae9c68bdf8279a9846b174c457f99c4f6454d508"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P02.acceptance.json",
+      "bytes": 1197,
+      "sha256": "0b8e382fe36515f19d2f67d3cbd9f5bf57d3ffec3b48c11c8f9f3ef4c8f01110"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P02.json",
+      "bytes": 9288,
+      "sha256": "c12daf286d2544ade0b4d27c9a4bd5f38dbbf22258b0348507295575cc378930"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P02.txt",
+      "bytes": 2064,
+      "sha256": "9ec834d859ebfa79b2c52621c1cb9020174387e75f08e754da41cabf33f2d293"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P03.acceptance.json",
+      "bytes": 1174,
+      "sha256": "7d4486ca8a7f0134d3579477a9dc2d3b8d581433e002c33be633823c48157bb8"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P03.json",
+      "bytes": 10929,
+      "sha256": "a8d7ed0015144f8cb7e9f1341cdcf797f39a94d4b02943c246932c163e2c94f3"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P03.txt",
+      "bytes": 1967,
+      "sha256": "ca2ab45b8f8f57cb12dd08c00662c6a700d1df6a58576687c8aabc5928f9c3bb"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P04.acceptance.json",
+      "bytes": 1140,
+      "sha256": "5897ca01079d1b0b2b0d1e527e0fde7941f541283b03e080ed1317cb6ffacb44"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P04.json",
+      "bytes": 9347,
+      "sha256": "c9638851494514f1e6a582a9ab8ebb36dce35b61ea0352e568845cd9ed27e9b6"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P04.txt",
+      "bytes": 1994,
+      "sha256": "3b564e3ac92a3740153c3c12289446f51b9d6e4a306d1d60723f8dab45cf9cec"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P05.acceptance.json",
+      "bytes": 1162,
+      "sha256": "a8b7aa2051464ebed026390bb3a9925432a5cf57f4f278c5b83c31d3b74dca01"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P05.json",
+      "bytes": 10945,
+      "sha256": "417c42588e8244e2771e833cf71a6240f22944cb020b5ca686dc699127a0b30b"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P05.txt",
+      "bytes": 2003,
+      "sha256": "27ac68b76483c12475a91c0e611d93103b2a4b14b28f0729fe50e0ffee591c06"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P06.acceptance.json",
+      "bytes": 1177,
+      "sha256": "482e8a70d2f8e687cd6424a021914b8a7ab8d83aed38d8f3709003faea856cab"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P06.json",
+      "bytes": 8965,
+      "sha256": "e609baddd92ea9cbcb066d765ea9af108010b09e603c75369480152081395910"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/P06.txt",
+      "bytes": 1975,
+      "sha256": "c53ee9e45f047d968a2e7e5085bd296f38bae01e6f528189e22f785aa9d3eb6d"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/probes/README.md",
+      "bytes": 3460,
+      "sha256": "4905124afc643180721add2951544ad7c26fdd1511460e3cb61c0abb32342160"
+    }
+  ],
+  "files_count": 747,
+  "command_internal_files": 131,
+  "production_changes_this_attempt": [
+    "internal/architecturesearch/reference_domains.go",
+    "internal/architecturesearch/reference_domains_test.go"
+  ],
+  "provider_calls": 0,
+  "exact_secret_scan": "absent"
+}

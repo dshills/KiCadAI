@@ -63,7 +63,7 @@ func schemaForTypeActive(value reflect.Type, active map[reflect.Type]bool) map[s
 			}
 			properties[name] = schemaForTypeActive(field.Type, active)
 		}
-		return strictSchemaObject(properties)
+		return constrainProviderType(value, strictSchemaObject(properties))
 	case reflect.Slice, reflect.Array:
 		return map[string]any{"type": "array", "items": schemaForTypeActive(value.Elem(), active)}
 	case reflect.String:

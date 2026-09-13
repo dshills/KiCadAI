@@ -1,0 +1,111 @@
+{
+  "schema": "kicadai.power-locality-diagnosis.v1",
+  "inputs": [
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/workflow_request.json",
+      "sha256": "1946b9093d8bec0e5f0eb12d0dee69f21d610ad14d6cfb8fcabdb3c87cd4556d"
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/controller_adc_100ma/schematic_transaction.json",
+      "sha256": "894d932e2d40208e9b30cd1faaa43c6586d8fe3061666fd8505cbea60b29370e"
+    },
+    {
+      "path": "/tmp/kicadai-local-wiring-readability-offline-v1-final/library_index.json",
+      "sha256": "f870dcbf7c738656691f0b337391050bd93c2a7ad37832be97bc50d8194d0359"
+    }
+  ],
+  "diagnostics": [
+    {
+      "index": 1,
+      "layout": {
+        "mode": "diagnostic-layout-1",
+        "exit_code": 0,
+        "source_snapshot_sha256": "f0c5f72097dfb8d3df2be28db489f46a1341fa5351d40d172e1da8f03d4287cf",
+        "log_sha256": "edb7bb4e2d05aa0acc7cb06405af39e69eb0351ad89577945360aa37a3353577"
+      },
+      "candidates": {
+        "mode": "diagnostic-candidates-1",
+        "exit_code": 0,
+        "source_snapshot_sha256": "b079b63317fd58986d8cc5608b1affcc1b65bcb850f66d1ee5263bd48738b02a",
+        "log_sha256": "17f9726ab72917a00c2d64684fdba01950f33cdde7a55bf5e3e8a14da9e2895b"
+      },
+      "transaction_sha256": "90af22df10fad2d077a0594a5bc1bb9c414b5b383cfc69baaf9ff401f7a0acd1",
+      "layout_projection_sha256": null
+    },
+    {
+      "index": 2,
+      "layout": {
+        "mode": "diagnostic-layout-2",
+        "exit_code": 0,
+        "source_snapshot_sha256": "889b0c66cef8813f4d22bd9513247b714ba0ad5e796e5f5784702acba4df0fa4",
+        "log_sha256": "e7ee126f744f4032264133d8ce1ef49042466d30227d7f54a9947b61be64cd13"
+      },
+      "candidates": {
+        "mode": "diagnostic-candidates-2",
+        "exit_code": 0,
+        "source_snapshot_sha256": "c9cb3cf34f7ec8acdd836b4e2ea5fe947cbde54f5831a51c56968c9561017859",
+        "log_sha256": "de2316c2165ac175b209aba60c32771b7c62d4a165f2606af2c456d2611c4783"
+      },
+      "transaction_sha256": "5dd4256a265599c1357e5949ef31beb568e37c8e3e43b1c9c4c0c2de718d9e96",
+      "layout_projection_sha256": "1fdeb7f0a7975503866828bcabf2ab025b6a9be2ff18590a88d0eaeeb54e6b91"
+    },
+    {
+      "index": 3,
+      "layout": {
+        "mode": "diagnostic-layout-3",
+        "exit_code": 0,
+        "source_snapshot_sha256": "85e36fb4068177451b89750252f05b8e099c8d10eb70f16681fc0c956cdbc7a4",
+        "log_sha256": "9069002f55e0a7f6ea4ee82dd660c1c5695cc6dcc1e7587096eea0e8d51a9ee6"
+      },
+      "candidates": {
+        "mode": "diagnostic-candidates-3",
+        "exit_code": 0,
+        "source_snapshot_sha256": "72bc1aeffe39e0c8584d816728ee62a575b494af0c4635547dda770e3bb45b51",
+        "log_sha256": "3b675f70706324069158ca1b583d60093a608a0c59269a8be4169ed8ae6d43bd"
+      },
+      "transaction_sha256": "344205e95a9ad4ecbf68fed05d3c916a67d73adfca4c921be4a6897c8abc2cdd",
+      "layout_projection_sha256": "b851d2fb759588f1e6150ba7a38e5ccd997bf026d0313c537300bb158beb6035"
+    }
+  ],
+  "negative_executions": [
+    {
+      "mode": "focused",
+      "exit_code": 1,
+      "source_snapshot_sha256": "ad3f20c25de903d34852636acc87517ede9cfc9fe22d0ce25dd6f1544169cf0d",
+      "log_sha256": "0fa843e4a0b23de9db23fc329d310a3dc0864eca5d82602746b80c3f4a03e9d1"
+    },
+    {
+      "mode": "focused-dev3",
+      "exit_code": 1,
+      "source_snapshot_sha256": "56b0d43819e91f3d213de902c89bed963ee6d315e44feb91867036165c25431f",
+      "log_sha256": "a02c4eba1b8b8e2edf1ad1d772e6df13b7c4e6d8f8d571aa7491184c2fef832c"
+    },
+    {
+      "mode": "native-dev1",
+      "exit_code": 1,
+      "source_snapshot_sha256": "205c12761ecbd6ac0fd07c6ca4eef413dfc3a8f76330fcf645952e72c5921884",
+      "log_sha256": "f83984dd9d80ee09cf436e4fbd3738166ac36131f6a990a51edae209de8daed7"
+    }
+  ],
+  "development_one_controller": {
+    "status": "fail",
+    "strict_erc": [
+      {
+        "rule": "label_multiple_wires",
+        "severity": "warning",
+        "message": "Label connects more than one wire at 1244600, 406400"
+      },
+      {
+        "rule": "unconnected_wire_endpoint",
+        "severity": "warning",
+        "message": "Unconnected wire endpoint"
+      }
+    ],
+    "second_replay": "not attempted",
+    "report_path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/erc.json",
+    "report_sha256": "edaae59ed540a5610d4fff9be6e858b04b18362b9cffc5c6980a0d6622f0a016"
+  },
+  "interpretation": "Both early unit failures and the first native controller failure remain visible. Three diagnostic candidate passes establish neither native ERC nor readability. Production repair was narrowed to pure active-plus-capacitor blocks before development 2 and final.",
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

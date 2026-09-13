@@ -1,0 +1,30 @@
+{
+  "base": "3c1572f7cd9a8120b45e16c42c67500a5fb1097b",
+  "mode": "diagnostic-layout-3",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestFunctionalLocalWiringRecordedLayoutDiagnostic$",
+    "-v",
+    "-count=1",
+    "-timeout=5m"
+  ],
+  "started_utc": "2026-09-12T13:51:16.393Z",
+  "finished_utc": "2026-09-12T13:51:27.854Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/local-wiring-readability-v1-sources/diagnostic-layout-3.json",
+  "source_snapshot_sha256": "5fcee6d66e0cddc9d1e33e54bf6602b989e760223308ef13e69f458c6aad2ecb",
+  "source_unchanged": true,
+  "log_sha256": "fe22b55080b58753b4a79ce5b120a759a24bb72a525445d821ed3ec294fa7ffd"
+}

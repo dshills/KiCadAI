@@ -43,11 +43,15 @@ type BoardDesignRules struct {
 }
 
 type NetClass struct {
-	Name        string
-	Clearance   kicadfiles.IU
-	TrackWidth  kicadfiles.IU
-	ViaDiameter kicadfiles.IU
-	ViaDrill    kicadfiles.IU
+	WireWidth    kicadfiles.IU
+	BusWidth     kicadfiles.IU
+	LineStyle    int
+	HasLineStyle bool
+	Name         string
+	Clearance    kicadfiles.IU
+	TrackWidth   kicadfiles.IU
+	ViaDiameter  kicadfiles.IU
+	ViaDrill     kicadfiles.IU
 }
 
 type Sheet struct {
@@ -103,6 +107,9 @@ func Validate(project ProjectFile) error {
 	seen := map[string]struct{}{}
 	hasDefault := false
 	for i, class := range project.NetClasses {
+		if class.WireWidth < 0 || class.BusWidth < 0 {
+			errs = append(errs, fieldError(fmt.Sprintf("net_classes[%d].schematic_width", i), "must be non-negative"))
+		}
 		className := strings.TrimSpace(class.Name)
 		if className == "" {
 			errs = append(errs, fieldError(fmt.Sprintf("net_classes[%d].name", i), "required"))
@@ -264,6 +271,9 @@ type netSettings struct {
 }
 
 type netClass struct {
+	WireWidth   float64 `json:"wire_width,omitempty"`
+	BusWidth    float64 `json:"bus_width,omitempty"`
+	LineStyle   *int    `json:"line_style,omitempty"`
 	Name        string  `json:"name"`
 	Clearance   float64 `json:"clearance"`
 	TrackWidth  float64 `json:"track_width"`
@@ -276,7 +286,16 @@ type sheet []string
 func newDocument(project ProjectFile) map[string]any {
 	classes := make([]netClass, 0, len(project.NetClasses))
 	for _, class := range project.NetClasses {
+		var lineStyle *int
+		if class.HasLineStyle {
+			value := class.LineStyle
+			lineStyle = &value
+		}
 		classes = append(classes, netClass{
+			// KiCad schematic net-class widths are in mils, unlike PCB widths.
+			WireWidth:   float64(class.WireWidth) / float64(kicadfiles.MM(0.0254)),
+			BusWidth:    float64(class.BusWidth) / float64(kicadfiles.MM(0.0254)),
+			LineStyle:   lineStyle,
 			Name:        strings.TrimSpace(class.Name),
 			Clearance:   mmNumber(class.Clearance),
 			TrackWidth:  mmNumber(class.TrackWidth),

@@ -164,12 +164,15 @@ type BusEntry struct {
 }
 
 type Text struct {
-	Raw      string
-	UUID     kicadfiles.UUID
-	Value    string
-	Position kicadfiles.Point
-	Rotation kicadfiles.Angle
-	Locked   bool
+	// NativeV10 emits the explicit simulation flag and KiCad 10 free-text
+	// save order. It is opt-in so historical drawing receipts stay unchanged.
+	NativeV10 bool
+	Raw       string
+	UUID      kicadfiles.UUID
+	Value     string
+	Position  kicadfiles.Point
+	Rotation  kicadfiles.Angle
+	Locked    bool
 }
 
 type Label struct {
@@ -1195,7 +1198,11 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 		items = append(items, newRenderItem(schematicItemLine, polyline.UUID, renderPolyline(polyline)))
 	}
 	for _, text := range schematic.Texts {
-		items = append(items, newRenderItem(schematicItemText, text.UUID, renderText(text)))
+		if text.NativeV10 {
+			items = append(items, newRawRenderItem(schematicItemText, 1, text.UUID, renderText(text)))
+		} else {
+			items = append(items, newRenderItem(schematicItemText, text.UUID, renderText(text)))
+		}
 	}
 	for _, label := range schematic.Labels {
 		items = append(items, newRenderItem(labelItemKind(label.Kind), label.UUID, renderLabel(label)))
@@ -2098,6 +2105,7 @@ func renderText(text Text) sexpr.List {
 	return sexpr.L(
 		sexpr.A("text"),
 		sexpr.S(text.Value),
+		sexpr.OmitIf(!text.NativeV10, sexpr.L(sexpr.A("exclude_from_sim"), sexpr.A("no"))),
 		renderAt(text.Position, text.Rotation),
 		renderEffects(false),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(text.UUID))),

@@ -1,0 +1,785 @@
+{
+  "schema": "kicadai.functional-readability-offline-verification.v1",
+  "base": "9ac563194a4a3b89d52d54b8ee38ce04a157ff58",
+  "root": "/tmp/kicadai-functional-readability-offline-v1-final",
+  "source": [
+    {
+      "path": "internal/compositionlowering/closed_loop_simulation.go",
+      "sha256": "bbe82bb2be4f9cefad5b87d43a5540dc3765185f747778a55e8d8a86d337a1b9"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout.go",
+      "sha256": "f142de643edab586d9e16eeaf74c83a2da4bf500b8ae203ce5bf7ef8ed846c86"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout_test.go",
+      "sha256": "db36c485c554da53390ae56683ab656e9bcc0b27281374a28c7baabd870a8bb2"
+    },
+    {
+      "path": "internal/compositionlowering/functional_readability_replay_test.go",
+      "sha256": "44aff067dde5b4766c1c121d2271b91dc4037cab5cbda2e491bab83999801796"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "sha256": "651fe19c27fb6a94898ca8c074c345ebe932d1c0a04ea3659b035ae1b6c56bde"
+    },
+    {
+      "path": "internal/schematicir/functional_layout.go",
+      "sha256": "e645aa9d7490eca775a3ed96f6a3b0e1b6fe7fb53099d2398a6255dc4cccc80d"
+    },
+    {
+      "path": "internal/schematicir/functional_layout_test.go",
+      "sha256": "1a0de84e6216d74b6abf0262f461942b10b99528d90f6ea143592f48241c5479"
+    },
+    {
+      "path": "internal/schematicir/layout.go",
+      "sha256": "0419b779f11f24867f09caff2e321d188ff58bd5c5d1a1c54a449b67820fb1fc"
+    },
+    {
+      "path": "internal/schematicir/model.go",
+      "sha256": "ea1863d478d3a3177358032790fbc3a3706fd56971a1194378baa8cb56a8a6c1"
+    },
+    {
+      "path": "internal/schematicir/native_annotations.go",
+      "sha256": "87d0d114e956644ccbb7a99013a0822e795d4805bcac0e8f71bc8310f8e742e9"
+    },
+    {
+      "path": "internal/schematicir/validate.go",
+      "sha256": "0285a43f4cacbd6af9208415b3b4efdf34a13f1271503f95787357aea0b32686"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups.go",
+      "sha256": "aa8d3ce1a5199bf4a449a222d370144131878af903ab4898c10bd1fbafa60012"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups_test.go",
+      "sha256": "68dedefdd6b1f4b71c6292ad7724fbc28675d5589cef8f6ac11ea5d283743a91"
+    },
+    {
+      "path": "internal/schematiclayout/model.go",
+      "sha256": "28f6245b6d5972eddb37a080bb7f4115452c7bc96e45b554c5e4eb146f67d571"
+    },
+    {
+      "path": "internal/schematiclayout/place.go",
+      "sha256": "3fb50ea113d6d7eacb5bc85d24d45b32c35aa4124054d7c7305767f63d51797a"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "components": 8,
+      "requirements_unchanged": true,
+      "resolution_provenance": {
+        "previous": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "current": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "electrical_and_pcb_input_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 3,
+      "native_physical_endpoints": 16,
+      "pcb": {
+        "connected_pads": 16,
+        "unconnected_pads": 0,
+        "physical_connectivity_verified": true,
+        "geometry_unchanged": true,
+        "changed_placement_count": 0,
+        "previous_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "current_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "previous_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "current_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "previous_segments": 37,
+        "current_segments": 37,
+        "previous_vias": 3,
+        "current_vias": 3,
+        "previous_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_placement_seed": "aa9ea7fa25d049b93ae2a42043a898f1d5d9f9ee0086f3cbee325486c66664f6",
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all remaining board fields, including placements and routes, compared exactly",
+        "previous_paper": [
+          "paper",
+          "A4",
+          "portrait"
+        ],
+        "current_paper": [
+          "paper",
+          "A4"
+        ]
+      },
+      "project_files": 14,
+      "actual_json_serialized_request_replay": true,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 103.04950000000001,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.17560399999999993,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "name": "controller_adc_100ma",
+      "components": 21,
+      "requirements_unchanged": true,
+      "resolution_provenance": {
+        "previous": "0bfff70f00e69d4a3911cd19faeb3acfaf5d94fa688985d6a2bfcefba45106ce",
+        "current": "0bfff70f00e69d4a3911cd19faeb3acfaf5d94fa688985d6a2bfcefba45106ce",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "electrical_and_pcb_input_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 10,
+      "native_physical_endpoints": 52,
+      "pcb": {
+        "connected_pads": 52,
+        "unconnected_pads": 26,
+        "physical_connectivity_verified": true,
+        "geometry_unchanged": true,
+        "changed_placement_count": 0,
+        "previous_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "17.5",
+              "4"
+            ]
+          },
+          {
+            "reference": "C10",
+            "at": [
+              "at",
+              "22.5",
+              "28",
+              "90"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "13.5",
+              "32",
+              "90"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "9",
+              "33"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "2",
+              "28",
+              "90"
+            ]
+          },
+          {
+            "reference": "C5",
+            "at": [
+              "at",
+              "18.5",
+              "30"
+            ]
+          },
+          {
+            "reference": "C6",
+            "at": [
+              "at",
+              "5",
+              "17.5"
+            ]
+          },
+          {
+            "reference": "C7",
+            "at": [
+              "at",
+              "10.5",
+              "19",
+              "90"
+            ]
+          },
+          {
+            "reference": "C8",
+            "at": [
+              "at",
+              "5",
+              "33"
+            ]
+          },
+          {
+            "reference": "C9",
+            "at": [
+              "at",
+              "17.5",
+              "33"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "24.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "22.5",
+              "23.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "6",
+              "29",
+              "90"
+            ]
+          },
+          {
+            "reference": "J4",
+            "at": [
+              "at",
+              "17.5",
+              "23.5"
+            ]
+          },
+          {
+            "reference": "J5",
+            "at": [
+              "at",
+              "17.5",
+              "8.5"
+            ]
+          },
+          {
+            "reference": "R1",
+            "at": [
+              "at",
+              "21.5",
+              "11.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "R2",
+            "at": [
+              "at",
+              "26",
+              "13"
+            ]
+          },
+          {
+            "reference": "R3",
+            "at": [
+              "at",
+              "2",
+              "13",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "22.5",
+              "18",
+              "90"
+            ]
+          },
+          {
+            "reference": "U2",
+            "at": [
+              "at",
+              "5",
+              "22.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U3",
+            "at": [
+              "at",
+              "9",
+              "9.5"
+            ]
+          }
+        ],
+        "current_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "17.5",
+              "4"
+            ]
+          },
+          {
+            "reference": "C10",
+            "at": [
+              "at",
+              "22.5",
+              "28",
+              "90"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "13.5",
+              "32",
+              "90"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "9",
+              "33"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "2",
+              "28",
+              "90"
+            ]
+          },
+          {
+            "reference": "C5",
+            "at": [
+              "at",
+              "18.5",
+              "30"
+            ]
+          },
+          {
+            "reference": "C6",
+            "at": [
+              "at",
+              "5",
+              "17.5"
+            ]
+          },
+          {
+            "reference": "C7",
+            "at": [
+              "at",
+              "10.5",
+              "19",
+              "90"
+            ]
+          },
+          {
+            "reference": "C8",
+            "at": [
+              "at",
+              "5",
+              "33"
+            ]
+          },
+          {
+            "reference": "C9",
+            "at": [
+              "at",
+              "17.5",
+              "33"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "24.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "22.5",
+              "23.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "6",
+              "29",
+              "90"
+            ]
+          },
+          {
+            "reference": "J4",
+            "at": [
+              "at",
+              "17.5",
+              "23.5"
+            ]
+          },
+          {
+            "reference": "J5",
+            "at": [
+              "at",
+              "17.5",
+              "8.5"
+            ]
+          },
+          {
+            "reference": "R1",
+            "at": [
+              "at",
+              "21.5",
+              "11.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "R2",
+            "at": [
+              "at",
+              "26",
+              "13"
+            ]
+          },
+          {
+            "reference": "R3",
+            "at": [
+              "at",
+              "2",
+              "13",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "22.5",
+              "18",
+              "90"
+            ]
+          },
+          {
+            "reference": "U2",
+            "at": [
+              "at",
+              "5",
+              "22.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U3",
+            "at": [
+              "at",
+              "9",
+              "9.5"
+            ]
+          }
+        ],
+        "previous_route_sha256": "d26938e2619753e2cc4245e1650a67197f5023bb462bf33eef7aab495f79ce07",
+        "current_route_sha256": "d26938e2619753e2cc4245e1650a67197f5023bb462bf33eef7aab495f79ce07",
+        "previous_segments": 203,
+        "current_segments": 203,
+        "previous_vias": 29,
+        "current_vias": 29,
+        "previous_generation_seed": "f17f3de87d3e8980599868ece7239afab50e3184bf23ae878e0301d84ffdad44",
+        "current_generation_seed": "f17f3de87d3e8980599868ece7239afab50e3184bf23ae878e0301d84ffdad44",
+        "current_placement_seed": "610f42cd5aa773fc8ff322773627a146bf1fc65187308c92653c9539404bf0bb",
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all remaining board fields, including placements and routes, compared exactly",
+        "previous_paper": [
+          "paper",
+          "A2"
+        ],
+        "current_paper": [
+          "paper",
+          "A2"
+        ]
+      },
+      "project_files": 23,
+      "actual_json_serialized_request_replay": true,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "adc_cutoff",
+          "operating_case": "supply_load",
+          "analysis": "ac_sweep",
+          "metric": "cutoff_frequency",
+          "actual": 923.3612800239786,
+          "min": 900,
+          "max": 1100,
+          "critical": false,
+          "normalized_margin": 0.02123752729452597,
+          "pass": true
+        },
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 114.049500001452,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.08760399998838397,
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "inventory": {
+    "file_count": 387,
+    "total_bytes": 1531858072,
+    "sha256": "bdfc5ad00ab34601bcdf82121b97c9f69888208429e0c80f0cf5d108c9f80ac1"
+  },
+  "provider_calls": 0,
+  "frozen_cases_added": 0,
+  "technical_gate_passed": true,
+  "complete_practical_benchmark_cases": 0,
+  "planned_examples": 2,
+  "readability": "separate visual review; native checks do not establish readability"
+}

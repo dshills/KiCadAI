@@ -1,0 +1,12 @@
+[
+  "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+  "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+  "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+  "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+  "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+  "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+  "5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.",
+  "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.",
+  "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.",
+  "No claim to firmware protocol conversion or unpowered-interface operation."
+]

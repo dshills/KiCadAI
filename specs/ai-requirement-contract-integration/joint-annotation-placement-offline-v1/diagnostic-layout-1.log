@@ -1,0 +1,5 @@
+=== RUN   TestFunctionalJointRecordedLayoutDiagnostic
+    joint_layout_diagnostic_test.go:51: diagnostic transaction only: /Users/dshills/Development/projects/KiCadAI/specs/ai-requirement-contract-integration/joint-annotation-placement-offline-v1/diagnostic-transaction-1.json; operations=115; issues=[]
+--- PASS: TestFunctionalJointRecordedLayoutDiagnostic (7.37s)
+PASS
+ok  	kicadai/internal/compositionlowering	7.722s

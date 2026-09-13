@@ -1,0 +1,12 @@
+[
+  "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+  "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+  "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+  "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+  "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+  "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+  "Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.",
+  "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.",
+  "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.",
+  "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee."
+]

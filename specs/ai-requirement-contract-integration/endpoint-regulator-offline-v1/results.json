@@ -1,0 +1,86 @@
+{
+  "schema": "kicadai.endpoint-regulator-offline-results.v1",
+  "date": "2026-09-11",
+  "evidence_kind": "synthetic offline implementation regressions, not model evaluation or board promotion",
+  "provider_calls": 0,
+  "full_board_passes_this_phase": 0,
+  "full_board_goal_achieved": false,
+  "paired_improvement_score": null,
+  "cases": [
+    {
+      "id": "standalone_regulator",
+      "components": 8,
+      "nets": 3,
+      "plans": 2,
+      "fingerprint": "633d0f643ef8ced14c451eacdfb57363cc34354ea55ddc964203f1af4116cb9b",
+      "status": "requested_simulation_behaviors_passed",
+      "measurements": {
+        "rail_v": 3.3,
+        "thermal_c": 103.04950000000001
+      },
+      "evidence_sha256": "4b97c30cf4bfa12854debfc80fc77c2164aab21cc2f9d9463a5b633a913abfdd",
+      "deterministic_lowering": true,
+      "deterministic_simulation_replay": true,
+      "full_board_promoted": false
+    },
+    {
+      "id": "regulator_filter_controller_150ma_thermal_rejected",
+      "components": 21,
+      "nets": 10,
+      "plans": 3,
+      "status": "thermal_rejected",
+      "predicted_regulator_temperature_c": 125.049500001,
+      "catalog_maximum_c": 125,
+      "complete_simulation_evaluation": false,
+      "full_board_promoted": false
+    },
+    {
+      "id": "regulator_filter_controller_100ma",
+      "components": 21,
+      "nets": 10,
+      "plans": 3,
+      "fingerprint": "a2a18c2983f97b67e3662923f8f9f31e61241d54e5645f50de5e63f6b6594dcf",
+      "status": "requested_simulation_behaviors_passed",
+      "measurements": {
+        "adc_cutoff_hz": 923.3612800239786,
+        "rail_v": 3.3,
+        "thermal_c": 114.049500001452
+      },
+      "evidence_sha256": "01080c1df3bdf35260ac83184eec3ca6c734023ce6d4ab4f78861fddadea7477",
+      "deterministic_lowering": true,
+      "deterministic_simulation_replay": true,
+      "full_board_promoted": false,
+      "relationship_to_150ma_case": "separate named offline load variant; not independent or baseline-to-pass evaluation evidence"
+    }
+  ],
+  "physical_mapping": {
+    "generated_output": {
+      "instance": "objective_regulate__regulator",
+      "function": "VOUT",
+      "symbol_pin": "3",
+      "pad": "3",
+      "net": "composition_net_003"
+    },
+    "controller_adc": {
+      "instance": "participant_controller__mcu",
+      "function": "PA0",
+      "symbol_pin": "7",
+      "pad": "7",
+      "net": "composition_net_005"
+    },
+    "controller_supply": {
+      "instance": "participant_controller__mcu",
+      "function": "VDD",
+      "symbol_pin": "4",
+      "pad": "4",
+      "net": "composition_net_003"
+    }
+  },
+  "limitations": [
+    "No new live model evaluation",
+    "No full PCB/KiCad promotion for these fixtures",
+    "Single reference domain only",
+    "Scalar participant observations only; bus/differential lane identity unsupported",
+    "Implementation-agent self-review, not independent review"
+  ]
+}

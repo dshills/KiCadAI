@@ -1,0 +1,338 @@
+{
+  "schema": "kicadai.endpoint-regulator-offline-verification.v1",
+  "starting_revision": "7f2752c0462370909273a161c00195c50240a2cb",
+  "branch": "codex/endpoint-regulator-contracts",
+  "provider_calls": 0,
+  "new_live_evaluation_performed": false,
+  "full_board_goal_achieved": false,
+  "verification_kind": "local_offline_implementation_regressions_and_self_review",
+  "environment": {
+    "go": "1.26.8 darwin/arm64; pre-existing cached toolchain",
+    "go_root_relative": ".cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64",
+    "goenv": "off",
+    "gowork": "off",
+    "goproxy": "off",
+    "gosumdb": "off",
+    "gotoolchain": "local",
+    "gomaxprocs": 4,
+    "cgo_enabled": 1,
+    "provider_keys_and_live_switch_unset": [
+      "OPENAI_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "KICADAI_OPENAI_LIVE_TEST"
+    ],
+    "authenticator_key_use": "local exact-secret scans only",
+    "go_cache": ".cache/go/build",
+    "go_module_cache": ".cache/go/mod",
+    "lint_cache": ".cache/golangci-lint"
+  },
+  "source_files": [
+    {
+      "path": "internal/architecturesearch/behavioral_projection.go",
+      "bytes": 35710,
+      "sha256": "eb49c560f6647609c1667cb12f571369304bf4af42d3ec4021d3c35e58e1f48c"
+    },
+    {
+      "path": "internal/architecturesearch/contracts.go",
+      "bytes": 42903,
+      "sha256": "55908eedf0d0488d104bbd41bd21603967b3c01d60e73e57866c83153c5e1807"
+    },
+    {
+      "path": "internal/architecturesearch/endpoint_contracts.go",
+      "bytes": 4547,
+      "sha256": "7afd21ef104624dfa1dcc89e66490e4f290ef1e5b5a6f675bb2e873b4d5f9ddf"
+    },
+    {
+      "path": "internal/architecturesearch/endpoint_contracts_test.go",
+      "bytes": 11193,
+      "sha256": "1f548e18ef4f9ad70ce747fd21d5bba7bdfff23edc3c8dedebd88a45c4104a0e"
+    },
+    {
+      "path": "internal/architecturesearch/hierarchy.go",
+      "bytes": 48443,
+      "sha256": "74300931558990b18c3c64ab87db38af766705e50ad3c1d1baa1551b519660bb"
+    },
+    {
+      "path": "internal/architecturesearch/power_sequence.go",
+      "bytes": 10293,
+      "sha256": "21f3640569803c1973883da0860d1b13a10cb6e2fc14600e29701aa26ef26093"
+    },
+    {
+      "path": "internal/architecturesearch/power_tree.go",
+      "bytes": 6538,
+      "sha256": "56027f9ffd5ec6047190852da165a986364d3f8ac2fe5b4469e0a62c42a0998a"
+    },
+    {
+      "path": "internal/architecturesearch/regulation_sources.go",
+      "bytes": 3400,
+      "sha256": "eab6621c07da48c903b4e978813a64baecfc81e55f76cf5568992dcf29305d09"
+    },
+    {
+      "path": "internal/architecturesearch/search.go",
+      "bytes": 78474,
+      "sha256": "666720405d884409d3545c9566394de8030846617c94f2c4f8523a1cfb285220"
+    },
+    {
+      "path": "internal/architecturesearch/validate.go",
+      "bytes": 58525,
+      "sha256": "eae1ce8ff4cb575c55a3aa1947d0ad6c94a1e7d59527be5190fbd4bdbb062ea7"
+    },
+    {
+      "path": "internal/behavioralintent/endpoint_contracts_test.go",
+      "bytes": 3015,
+      "sha256": "1b235937b3ad5ec5eaace13f6a0e7c0d72694e8ff427e47b33116a30b9f0e12f"
+    },
+    {
+      "path": "internal/behavioralintent/provider_context.go",
+      "bytes": 10939,
+      "sha256": "59bcd7806b38c7fe4fee77b4773908589f0a91cc17fafbc2d8cd14ac7e277d35"
+    },
+    {
+      "path": "internal/behavioralintent/semantic_schema.go",
+      "bytes": 12988,
+      "sha256": "3546c411257645a99955ca9911863f46dbc317d6996a805960cdbe5603347969"
+    },
+    {
+      "path": "internal/closedloopsynthesis/participant_endpoint_test.go",
+      "bytes": 2921,
+      "sha256": "5a8eefe1a7d1b1302b965139a6406a205373b35770d087986e79368ed68dea55"
+    },
+    {
+      "path": "internal/closedloopsynthesis/resolved_simulation_contracts.go",
+      "bytes": 66587,
+      "sha256": "94364e969ee28c5dbe976a76ad4b19a8c4dc93b43cb6197fde7d9b34191de8b0"
+    },
+    {
+      "path": "internal/compositionlowering/endpoint_contracts_test.go",
+      "bytes": 11140,
+      "sha256": "0c6d27fbf28bf2f3d9c5daccd377a93380c392b1501a73392edfb6a36e0d0f4d"
+    },
+    {
+      "path": "internal/compositionlowering/lower.go",
+      "bytes": 45753,
+      "sha256": "a2a900bd9575eb6882b2ed6863bfc2fbee688b3545f504a2bc5c0f2982c7eddd"
+    }
+  ],
+  "focused_go_args": [
+    "test",
+    "-short",
+    "-count=1",
+    "./internal/architecturesearch",
+    "./internal/behavioralintent",
+    "./internal/closedloopsynthesis",
+    "./internal/compositionlowering",
+    "-run",
+    "^TestParticipantPortObservation|^TestParticipantObservationRejects|^TestStandaloneRegulator|^TestGeneratedOutput|^TestProviderSchemaExposesQualified|^TestCompilerRetainsQualified|^TestParticipantPinAssertion|^TestEndpointContracts",
+    "-v",
+    "-timeout",
+    "3m"
+  ],
+  "review": {
+    "kind": "implementation_agent_self_review",
+    "document": "REVIEW.md",
+    "independent_review": false,
+    "gemini_requests": 0
+  },
+  "remote_mutations": {
+    "push": false,
+    "pull_request": false,
+    "merge": false,
+    "release": false
+  },
+  "preservation_receipt": "preservation.json",
+  "checks": [
+    {
+      "name": "new contract regressions and trusted simulations",
+      "command": "go test -short -count=1 ./internal/architecturesearch ./internal/behavioralintent ./internal/closedloopsynthesis ./internal/compositionlowering -run ^TestParticipantPortObservation|^TestParticipantObservationRejects|^TestStandaloneRegulator|^TestGeneratedOutput|^TestProviderSchemaExposesQualified|^TestCompilerRetainsQualified|^TestParticipantPinAssertion|^TestEndpointContracts -v -timeout 3m",
+      "status": "passed",
+      "log": "focused-tests.log",
+      "details": "Two fixtures pass requested simulation behaviors and deterministic replay. Separate 150 mA controller fixture requires a thermal rejection, not a promoted-board pass."
+    },
+    {
+      "name": "final-source package race checks",
+      "command": "go test -race -short -count=1 ./internal/architecturesearch ./internal/behavioralintent ./internal/airequirementeval ./internal/closedloopsynthesis -timeout 3m",
+      "status": "passed",
+      "log": "race-tests.log"
+    },
+    {
+      "name": "final-source composition integration race check",
+      "command": "go test -race -short -count=1 ./internal/compositionlowering -run '^TestEndpointContracts' -v -timeout 3m",
+      "status": "passed",
+      "log": "composition-race-tests.log",
+      "scope": "New integration regression only; not a complete compositionlowering race suite."
+    },
+    {
+      "name": "provider wire form bounds",
+      "command": "go test -short ./internal/airequirementeval -run '^TestOfflineRepairRequestFormsRemainWithinExistingWireBudget$' -count=1 -v",
+      "status": "passed",
+      "log": "request-bounds.log",
+      "forms": 16,
+      "largest_bytes": 126382,
+      "unchanged_limit_bytes": 131072,
+      "headroom_bytes": 4690,
+      "network_delegate": false,
+      "scope": "Initial/correction forms only; not arbitrary future follow-up state."
+    },
+    {
+      "name": "repository vet",
+      "command": "go vet ./...",
+      "status": "passed",
+      "output": ""
+    },
+    {
+      "name": "affected-package lint",
+      "command": "golangci-lint run ./internal/architecturesearch/... ./internal/behavioralintent/... ./internal/airequirementeval/... ./internal/closedloopsynthesis/... ./internal/compositionlowering/...",
+      "status": "passed",
+      "version": "2.13.1",
+      "issues": 0,
+      "log": "lint.log"
+    },
+    {
+      "name": "historical preservation",
+      "command": "node specs/ai-requirement-contract-integration/offline-repair-v1/verify-preservation.mjs",
+      "status": "passed",
+      "receipt": "preservation.json",
+      "historical_gate_passed": false
+    },
+    {
+      "name": "whitespace/error check",
+      "command": "git diff --check",
+      "status": "passed"
+    },
+    {
+      "name": "final uncached complete repository short suite",
+      "command": "go test -short -count=1 ./... -timeout 12m",
+      "status": "passed",
+      "log": "repository-tests.log",
+      "packages_with_tests": 151,
+      "packages_without_tests": 14,
+      "total_packages": 165,
+      "topology_package_seconds": 679.464,
+      "scope": "Short mode; explicitly skipped long/native opt-in tests are not promoted into passes."
+    },
+    {
+      "name": "reported measurements and evidence hash reconciliation",
+      "status": "passed",
+      "cases": 3,
+      "exact_values_and_hashes_match_focused_transcript": true,
+      "full_board_claims": false
+    },
+    {
+      "name": "receipt hashes, local links, and focused reproduction helper",
+      "status": "passed",
+      "command": "node specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/verify.mjs --run-focused",
+      "source_files": 17,
+      "artifact_files": 14,
+      "local_links_checked": 7,
+      "broken_links": 0
+    }
+  ],
+  "superseded_runs": [
+    {
+      "name": "earlier repository short run",
+      "status": "interrupted_by_implementation_agent",
+      "exit_code": 1,
+      "log": "superseded-repository-tests.log",
+      "reason": "Stopped the identified go process and topology-test child after review found the source-capacity versus consumer-demand correction. Not a final-source pass or timeout."
+    },
+    {
+      "name": "earlier broad race run",
+      "status": "interrupted_by_implementation_agent",
+      "exit_code": 1,
+      "log": "superseded-race-tests.log",
+      "reason": "Stopped the identified pre-correction go process and long composition-test child. Replaced by final-source package race tests plus a focused composition integration race test; the complete compositionlowering race suite remains uncompleted."
+    }
+  ],
+  "implementation_findings": [
+    "Exact qualified scalar participant observation and sibling isolation",
+    "Generated public output without dummy consumer",
+    "Internal consumer role direction and current-demand budget",
+    "Multiple reference domains and bundled interface observations fail closed",
+    "150 mA controller thermal rejection retained; separate 100 mA design variant is not paired evaluation evidence"
+  ],
+  "remaining_gaps": [
+    "Explicit multi-reference routing",
+    "Explicit bundled interface lane observations",
+    "No live model evaluation or provider schema probe for the new forms",
+    "New fixture schematic/PCB/KiCad promotion and full-project replay not demonstrated",
+    "No independent or external review",
+    "Six complete boards and two materially different paired improvements not established"
+  ],
+  "verified_utc": "2026-09-11T17:05:20.568Z",
+  "final_repository_started_utc": "2026-09-11T16:50:36.786Z",
+  "all_scoped_implementation_checks_passed": true,
+  "artifact_files": [
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/PLAN.md",
+      "bytes": 3607,
+      "sha256": "8ddab57f2f1e0128ea21ac1736ff375319a17551976ac4d5715443e8fda0c2af"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/README.md",
+      "bytes": 6207,
+      "sha256": "c3f6074a4173317e0d4630c939835d8161117a1463095c55fbb480bbe120a3d2"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/REVIEW.md",
+      "bytes": 5092,
+      "sha256": "d367816e25556d838e8be49d53b9e521b9b28818d6636e0bf0dab4e52dda0a2e"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/composition-race-tests.log",
+      "bytes": 3178,
+      "sha256": "08626aad85c8cc738f9865577c7abd63c3b6730f98f6432c926c4918a0bd7eae"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/focused-tests.log",
+      "bytes": 7642,
+      "sha256": "7447ed2560869a814f2403f36370de8ebb136a9c97cc12df61feccaf7ba186c7"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/lint.log",
+      "bytes": 10,
+      "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/preservation.json",
+      "bytes": 3152,
+      "sha256": "cff6048b055e0bd48eb1bcbee5b980a634dcd44628008a3014889416e1c25a9a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/race-tests.log",
+      "bytes": 191,
+      "sha256": "f1c24a48e2d098daf31f49b0c228594551dc86e7c10c44a7eb13685306a976da"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/repository-tests.log",
+      "bytes": 8128,
+      "sha256": "6e22cc7a037630295ebe26abc894da0dc1ab484c899dd29fc5c68c5a2b4ddf8a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/request-bounds.log",
+      "bytes": 337,
+      "sha256": "f1a7bf08b111f6ab79540ec8cf7498b17dc0b57de7e1f3b759b9ff66c3ef8c47"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/results.json",
+      "bytes": 2892,
+      "sha256": "ecc0b7497884d28ad749e3c01b8900a039557539679c9b5e961580400a034a5b"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/superseded-race-tests.log",
+      "bytes": 191,
+      "sha256": "0897fb700b81288df7d24c3ab8628deca36102d6d97b7af0acf55efa8d22d851"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/superseded-repository-tests.log",
+      "bytes": 6390,
+      "sha256": "7596e1051edccd36b6393cca370c878918cd271855d83624d165ba0d7b26782a"
+    },
+    {
+      "path": "specs/ai-requirement-contract-integration/endpoint-regulator-offline-v1/verify.mjs",
+      "bytes": 2919,
+      "sha256": "4f01d9205857d53a9b1cbe66b4ef04c6854d1682cdbbbbd51e3ea1cbbfa1c208"
+    }
+  ]
+}

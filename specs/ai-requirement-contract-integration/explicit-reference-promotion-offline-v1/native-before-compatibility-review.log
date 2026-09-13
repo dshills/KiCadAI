@@ -1,0 +1,8 @@
+=== RUN   TestExplicitReferenceNativePromotion
+=== RUN   TestExplicitReferenceNativePromotion/standalone_regulator
+=== RUN   TestExplicitReferenceNativePromotion/controller_adc_100ma
+--- PASS: TestExplicitReferenceNativePromotion (27.04s)
+    --- PASS: TestExplicitReferenceNativePromotion/standalone_regulator (6.79s)
+    --- PASS: TestExplicitReferenceNativePromotion/controller_adc_100ma (9.50s)
+PASS
+ok  	kicadai/internal/compositionlowering	27.503s

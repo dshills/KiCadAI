@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.ownership-locality-archive.v2",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/ownership-locality-offline-v2-all-runs.tar.gz",
+  "bytes": 155401900,
+  "sha256": "10bb71602b9707f902b1ad956106706708eea1205875d3ca75d0c1408da0fab4",
+  "manifest_sha256": "28a4bb5753e1f226a11aea636b8ecf5f0de91ae0c98cd387e34261039d2b3bf6",
+  "streamed": {
+    "files_verified": 785,
+    "bytes_verified": 3065660404,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

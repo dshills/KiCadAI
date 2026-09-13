@@ -1,0 +1,44 @@
+{
+  "schema": "kicadai.completion-publication-qa.v1",
+  "completed_by_utc": "2026-09-12T18:44:11Z",
+  "source": [
+    {
+      "path": "specs/practical-board-completion-v1/publication-checks.mjs",
+      "bytes": 3472,
+      "sha256": "08235249270d95bf2b209474c95dce29a6199e9a355c26e7ff8b65fd9691d640"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/publication.test.mjs",
+      "bytes": 2452,
+      "sha256": "f271b779e5ac23adcb17a09b58e8b55e85ca9162740676b604eff17a3e33de86"
+    },
+    {
+      "path": "specs/practical-board-completion-v1/verify-publication.mjs",
+      "bytes": 7520,
+      "sha256": "d085cbd193fd902577a09db3bd7c62a3498172d0baf253842cf2a4eec3885f46"
+    }
+  ],
+  "tests": {
+    "command": "node --test specs/practical-board-completion-v1/publication.test.mjs specs/practical-board-completion-v1/evidence.test.mjs specs/practical-sensor-controller-boards/evidence-utils.test.mjs specs/practical-sensor-controller-boards/protocol-v2.test.mjs",
+    "exit_code": 0,
+    "passed": 14,
+    "failed": 0,
+    "output": "✔ inventories fail closed on altered, extra, missing, linked and unsafe records (3.568584ms)\n✔ exact-secret scan covers chunk boundaries (1.512959ms)\n✔ full denominator is mandatory and development cannot become final success (1.902958ms)\n✔ frozen probes bind exact nonreserved original briefs and acceptance clauses (0.951458ms)\n✔ published negative result retains all cases and all sixty clauses (0.786541ms)\n✔ unrun final cannot become a scored zero or an inferred success (0.631708ms)\n✔ missing or weakened clause and missing gate fail closed (1.617709ms)\n✔ human authored probes and unknown measurements cannot be promoted (0.93325ms)\n✔ historical scores and request ledger cannot be rewritten (0.295ms)\n✔ RSS includes descendants, excludes unrelated processes, and rejects malformed readings (0.531458ms)\n✔ environment and build identities fail closed (0.153417ms)\n✔ retention sampling and nested provider failures (1.534083ms)\n✔ v2 preserves every original frozen input except the approved evaluator timeout (1.163ms)\n✔ v2 supervisor changes only seal routing, required coverage and protocol metadata (0.448584ms)\nℹ tests 14\nℹ suites 0\nℹ pass 14\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 46.783\n"
+  },
+  "read_only_verification": {
+    "command": "node specs/practical-board-completion-v1/verify-publication.mjs",
+    "exit_code": 0,
+    "verified": true,
+    "cases": 16,
+    "development_clause_audits": 60,
+    "raw_files": 456,
+    "original_raw_files": 472,
+    "historical_phases": 8,
+    "archive_sha256": "155394882dcc4f9d6fd7f5e4d32f138bd1edac7a19f185b92772e8d2bf97b4db",
+    "exact_secret_scan": "absent",
+    "milestone_achieved": false,
+    "provider_calls": 0,
+    "native_executions": 0
+  },
+  "scope": "Publication consistency and retained-byte checks only; not a fresh provider or board run."
+}

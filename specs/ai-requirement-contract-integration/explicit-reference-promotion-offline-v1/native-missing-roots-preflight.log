@@ -1,0 +1,6 @@
+=== RUN   TestExplicitReferenceNativePromotion
+    reference_promotion_test.go:54: native libraries unavailable [{MISSING_FILE warning     roots.klc_root KLC root is not configured [] [] []  } {MISSING_FILE warning     roots.symbols_root symbols root is not configured [] [] []  } {MISSING_FILE warning     roots.footprints_root footprints root is not configured [] [] []  } {MISSING_FILE warning     roots.templates_root templates root is not configured [] [] []  }]
+--- FAIL: TestExplicitReferenceNativePromotion (0.00s)
+FAIL
+FAIL	kicadai/internal/compositionlowering	0.346s
+FAIL

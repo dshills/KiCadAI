@@ -1,0 +1,8 @@
+=== RUN   TestNativeJointFrozenCandidateDiagnostic
+    native_joint_diagnostic_test.go:42: immutable input controller_adc_100ma/schematic_transaction.json sha256=ce07f78c2d98904cf989ee1c452399ee103d9c5e2d6f38bbf9d223b263d0a8f2
+    native_joint_diagnostic_test.go:43: immutable input library_index.json sha256=7ec33bdf90748cf42d19a603e8623f8c7c7269e5b33b56c1e477f7b476e1093d
+    native_joint_diagnostic_test.go:59: schematic waypoints must start and end at connected pin anchors
+--- FAIL: TestNativeJointFrozenCandidateDiagnostic (7.74s)
+FAIL
+FAIL	kicadai/internal/transactions	8.086s
+FAIL

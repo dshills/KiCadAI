@@ -1,0 +1,28 @@
+{
+  "base": "446e19c9b934ad8026b4e9ec2996b47d9ef413f9",
+  "mode": "lint-final",
+  "command": "/Users/dshills/Development/Go/bin/golangci-lint",
+  "args": [
+    "run",
+    "--timeout=12m",
+    "./internal/circuitgraph",
+    "./internal/designworkflow",
+    "./internal/kicadfiles/designapi"
+  ],
+  "started_utc": "2026-09-12T07:24:26.063Z",
+  "finished_utc": "2026-09-12T07:24:27.891Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/pcb-seed-rotated-fields-v1-sources/lint-final.json",
+  "source_snapshot_sha256": "217f99c87e1c58b5ecc71b8393fe003f8ea6d076bedeee3f2d812eec44e48e95",
+  "source_unchanged": true,
+  "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+}

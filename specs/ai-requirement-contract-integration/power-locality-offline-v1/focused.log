@@ -1,0 +1,9 @@
+ok  	kicadai/internal/compositionlowering	0.758s
+ok  	kicadai/internal/schematicir	0.715s
+--- FAIL: TestFunctionalPowerLocalityRootDeterministic (0.00s)
+    power_locality_test.go:94: active device did not root the tree [{RAIL {a-cap 1} {b-cap 1} [{20320000 30480000} {44450000 30480000}] false <nil> <nil>} {RAIL {z-active 1} {a-cap 1} [{69850000 30480000} {69850000 35560000} {20320000 35560000} {20320000 30480000}] false <nil> <nil>}]
+FAIL
+FAIL	kicadai/internal/schematiclayout	0.952s
+ok  	kicadai/internal/kicadfiles/designapi	1.049s
+ok  	kicadai/internal/transactions	0.507s
+FAIL

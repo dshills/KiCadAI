@@ -1,0 +1,291 @@
+{
+  "schema": "kicadai.functional-locality-descriptive.v1",
+  "root": "/tmp/kicadai-functional-readability-offline-v1-final",
+  "prior": "/tmp/kicadai-pcb-seed-rotated-fields-offline-v1-final",
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "groups": [
+        {
+          "id": "functional_boundaries",
+          "label": "External interfaces and rail flags",
+          "members": [
+            "J1",
+            "J2",
+            "J3",
+            "#FLG01",
+            "#FLG02"
+          ]
+        },
+        {
+          "id": "functional_objective_regulate",
+          "label": "objective:regulate",
+          "members": [
+            "C1",
+            "C2",
+            "U1",
+            "C3",
+            "C4"
+          ]
+        }
+      ],
+      "decoupling": [
+        {
+          "component": "objective_regulate__input_bypass",
+          "reference": "C1",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U1",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 86.36,
+          "current_mm": 78.86280745700091
+        },
+        {
+          "component": "objective_regulate__output_bypass",
+          "reference": "C2",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U1",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 66.04,
+          "current_mm": 54.71327444048656
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_input__32f0b628",
+          "reference": "C3",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U1",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 45.72,
+          "current_mm": 79.55513559789837
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_output_f53c4ab4",
+          "reference": "C4",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U1",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 92.45739559386259,
+          "current_mm": 55.70654898663172
+        }
+      ],
+      "mean_decoupling_distance_mm": {
+        "previous": 72.64434889846565,
+        "current": 67.20944162050439
+      },
+      "explicit_support_parents": [
+        {
+          "component": "support_objective_regulate__regulator_regulator_input__32f0b628",
+          "reference": "C3",
+          "parent": "objective_regulate__regulator",
+          "parent_reference": "U1",
+          "previous_mm": 45.72,
+          "current_mm": 79.55513559789837
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_output_f53c4ab4",
+          "reference": "C4",
+          "parent": "objective_regulate__regulator",
+          "parent_reference": "U1",
+          "previous_mm": 92.45739559386259,
+          "current_mm": 55.70654898663172
+        }
+      ],
+      "mean_support_parent_distance_mm": {
+        "previous": 69.08869779693129,
+        "current": 67.63084229226504
+      },
+      "paper": {
+        "previous": "A4",
+        "previous_portrait": true,
+        "current": "A4",
+        "current_portrait": false
+      }
+    },
+    {
+      "name": "controller_adc_100ma",
+      "groups": [
+        {
+          "id": "functional_boundaries",
+          "label": "External interfaces and rail flags",
+          "members": [
+            "J1",
+            "J2",
+            "J3",
+            "J4",
+            "#FLG01",
+            "#FLG02"
+          ]
+        },
+        {
+          "id": "functional_objective_regulate",
+          "label": "objective:regulate",
+          "members": [
+            "C4",
+            "C5",
+            "U2",
+            "C8",
+            "C9"
+          ]
+        },
+        {
+          "id": "functional_objective_condition_adc",
+          "label": "objective:condition_adc",
+          "members": [
+            "C1",
+            "C2",
+            "R1",
+            "R2",
+            "U1",
+            "C3"
+          ]
+        },
+        {
+          "id": "functional_participant_controller",
+          "label": "participant:controller",
+          "members": [
+            "U3",
+            "C6",
+            "C7",
+            "C10",
+            "R3",
+            "J5"
+          ]
+        }
+      ],
+      "decoupling": [
+        {
+          "component": "objective_regulate__input_bypass",
+          "reference": "C4",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U2",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 66.03999999999999,
+          "current_mm": 78.86280745700094
+        },
+        {
+          "component": "objective_regulate__output_bypass",
+          "reference": "C5",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U2",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 45.72,
+          "current_mm": 54.71327444048657
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_input__32f0b628",
+          "reference": "C8",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U2",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 56.39715241038327,
+          "current_mm": 79.55513559789841
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_output_f53c4ab4",
+          "reference": "C9",
+          "group": "functional_objective_regulate",
+          "anchor": "objective_regulate__regulator",
+          "anchor_reference": "U2",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 108.7167475598861,
+          "current_mm": 55.706548986631745
+        },
+        {
+          "component": "objective_condition_adc__supply_bypass",
+          "reference": "C3",
+          "group": "functional_objective_condition_adc",
+          "anchor": "objective_condition_adc__opamp",
+          "anchor_reference": "U1",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 119.81156037711888,
+          "current_mm": 115.00339125434517
+        },
+        {
+          "component": "participant_controller__mcu_power_bulk_mcu_vdd_vdda",
+          "reference": "C6",
+          "group": "functional_participant_controller",
+          "anchor": "participant_controller__mcu",
+          "anchor_reference": "U3",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 128.96598311182683,
+          "current_mm": 100.19326125044539
+        },
+        {
+          "component": "participant_controller__mcu_power_local_mcu_vdd_vdd_c7a30991",
+          "reference": "C7",
+          "group": "functional_participant_controller",
+          "anchor": "participant_controller__mcu",
+          "anchor_reference": "U3",
+          "anchor_basis": "only active component in explicitly owned group",
+          "previous_mm": 112.27834341492577,
+          "current_mm": 139.14471459599176
+        }
+      ],
+      "mean_decoupling_distance_mm": {
+        "previous": 91.13282669630584,
+        "current": 89.02559051182857
+      },
+      "explicit_support_parents": [
+        {
+          "component": "support_objective_regulate__regulator_regulator_input__32f0b628",
+          "reference": "C8",
+          "parent": "objective_regulate__regulator",
+          "parent_reference": "U2",
+          "previous_mm": 56.39715241038327,
+          "current_mm": 79.55513559789841
+        },
+        {
+          "component": "support_objective_regulate__regulator_regulator_output_f53c4ab4",
+          "reference": "C9",
+          "parent": "objective_regulate__regulator",
+          "parent_reference": "U2",
+          "previous_mm": 108.7167475598861,
+          "current_mm": 55.706548986631745
+        },
+        {
+          "component": "support_participant_controller__mcu_stm32_reset_reset_filter",
+          "reference": "C10",
+          "parent": "participant_controller__mcu",
+          "parent_reference": "U3",
+          "previous_mm": 46.69733182955957,
+          "current_mm": 43.17999999999999
+        },
+        {
+          "component": "support_participant_controller__mcu_stm32_reset_reset_pullup",
+          "reference": "R3",
+          "parent": "participant_controller__mcu",
+          "parent_reference": "U3",
+          "previous_mm": 67.10601165320438,
+          "current_mm": 52.853976198579424
+        },
+        {
+          "component": "support_participant_controller__mcu_stm32_swd_swd_header",
+          "reference": "J5",
+          "parent": "participant_controller__mcu",
+          "parent_reference": "U3",
+          "previous_mm": 92.4573955938626,
+          "current_mm": 76.79037960578135
+        }
+      ],
+      "mean_support_parent_distance_mm": {
+        "previous": 74.27492780937918,
+        "current": 61.61720807777819
+      },
+      "paper": {
+        "previous": "A2",
+        "previous_portrait": false,
+        "current": "A2",
+        "current_portrait": false
+      }
+    }
+  ],
+  "method": "Euclidean symbol-origin distance in millimeters from sealed generation transactions. Group anchors require exactly one active component. Support-parent values use recorded explicit ownership. These are descriptive post-run measures, not preregistered pass thresholds or PCB distances.",
+  "readability_passes": 0,
+  "practical_benchmark_passes_added": 0
+}

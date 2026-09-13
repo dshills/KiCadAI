@@ -1,0 +1,98 @@
+{
+  "schema": "kicadai.ownership-locality-qa.v2",
+  "source_files": 11,
+  "executions": [
+    {
+      "mode": "focused",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:04:27.296Z",
+      "finished_utc": "2026-09-12T10:04:32.054Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "focused-dev2",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:05:46.450Z",
+      "finished_utc": "2026-09-12T10:05:50.867Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "focused-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:08:40.643Z",
+      "finished_utc": "2026-09-12T10:08:42.623Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-dev1",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:06:28.741Z",
+      "finished_utc": "2026-09-12T10:06:59.632Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:08:58.831Z",
+      "finished_utc": "2026-09-12T10:09:36.709Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "lint",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:06:29.914Z",
+      "finished_utc": "2026-09-12T10:06:31.514Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "lint-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:12:46.439Z",
+      "finished_utc": "2026-09-12T10:12:47.138Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "race-ownership",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:09:01.260Z",
+      "finished_utc": "2026-09-12T10:09:13.619Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "race-layout",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:09:13.696Z",
+      "finished_utc": "2026-09-12T10:12:43.847Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "vet",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:12:43.930Z",
+      "finished_utc": "2026-09-12T10:12:46.376Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "full",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T10:09:00.018Z",
+      "finished_utc": "2026-09-12T10:21:51.052Z",
+      "source_unchanged": true
+    }
+  ],
+  "full_suite": {
+    "passed_packages": 151,
+    "no_test_packages": 14,
+    "longest": {
+      "package": "kicadai/internal/opentopologysynthesis",
+      "seconds": 690.673
+    },
+    "exit_code": 0
+  },
+  "links_checked": 24,
+  "exact_secret_scan": "absent",
+  "provider_calls": 0,
+  "technical_examples_passed": 2,
+  "complete_readability_examples": 0,
+  "benchmark_passes_added": 0
+}

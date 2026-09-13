@@ -1,0 +1,29 @@
+{
+  "base": "e6f648bbbb05d1d8bc883e61356511d8708aec2e",
+  "mode": "race-designapi",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "-race",
+    "./internal/kicadfiles/designapi",
+    "-short",
+    "-count=1",
+    "-timeout=12m"
+  ],
+  "started_utc": "2026-09-12T16:12:12.765Z",
+  "finished_utc": "2026-09-12T16:12:15.742Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/power-locality-v1-sources/race-designapi.json",
+  "source_snapshot_sha256": "0c7f2819acef280119cd126321fe330e86b66e75bdd97784ac766533e66d0dae",
+  "source_unchanged": true,
+  "log_sha256": "ab7f35025453cb7e165740f164959c5c718e981594bb15692cd2e1a0bee417b3"
+}

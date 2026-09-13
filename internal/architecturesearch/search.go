@@ -456,6 +456,10 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 		}
 		ports = append(ports, RoleContract{Role: "power", Anchor: requirementDomainAnchor(requirement, domain), Contract: NormalizePortContract(powerContract)})
 		referenceDomain := firstReferenceDomain(requirement)
+		if domain.ReferenceDomain != "" {
+			id, _ := ResolveReferenceDomain(requirement, domain.ID)
+			referenceDomain = requirementDomain(requirement, id)
+		}
 		referenceContract := PortContract{
 			ID: participant.ID + "_reference", Kind: "reference", Direction: "bidirectional", Domain: referenceDomain.ID,
 			Voltage:         domainVoltageRange(referenceDomain),
@@ -1769,6 +1773,9 @@ func participantAnchor(participant, port string) string {
 }
 
 func requirementDomainAnchor(requirement Requirement, domain Domain) string {
+	if source, valid := generatedSupplySource(requirement, domain); valid && source.Kind == "port" {
+		return externalAnchor(source.ID)
+	}
 	if domain.Source != "" && domain.Source != "external" && domain.Source != "generated" {
 		for _, signal := range requirement.Requirements.Signals {
 			if signal.ID == domain.Source {

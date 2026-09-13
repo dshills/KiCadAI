@@ -1,0 +1,28 @@
+{
+  "base": "3c1572f7cd9a8120b45e16c42c67500a5fb1097b",
+  "mode": "full",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./...",
+    "-short",
+    "-count=1",
+    "-timeout=12m"
+  ],
+  "started_utc": "2026-09-12T14:07:27.277Z",
+  "finished_utc": "2026-09-12T14:19:51.563Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/local-wiring-readability-v1-sources/full.json",
+  "source_snapshot_sha256": "87f40a312df3a286a4a53362ea04a090dfcfad77b7d3197b7c20c6be30a7fb5b",
+  "source_unchanged": true,
+  "log_sha256": "99c7bc380091e5391a602d1c8a50d269c348b0cba05982933c5282bb8afd6493"
+}

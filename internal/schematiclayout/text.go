@@ -22,7 +22,7 @@ func placeComponentText(components []PlacedComponent, rules Rules) ([]PlacedComp
 		if component.ReferenceText.Box.Empty() {
 			field, clean := chooseTextPosition(referenceText, component.PlacedAt, bodyByRef[component.Ref], occupied, rules, true)
 			component.ReferenceText = field
-			occupied = append(occupied, field.Box.Translate(component.PlacedAt))
+			occupied = append(occupied, occupiedFieldBox(field.Box.Translate(component.PlacedAt), rules))
 			if !clean {
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "reference field required crowded fallback placement"})
 			}
@@ -30,7 +30,7 @@ func placeComponentText(components []PlacedComponent, rules Rules) ([]PlacedComp
 		if component.Value != "" && component.ValueText.Box.Empty() {
 			field, clean := chooseTextPosition(component.Value, component.PlacedAt, bodyByRef[component.Ref], occupied, rules, false)
 			component.ValueText = field
-			occupied = append(occupied, field.Box.Translate(component.PlacedAt))
+			occupied = append(occupied, occupiedFieldBox(field.Box.Translate(component.PlacedAt), rules))
 			if !clean {
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "value field required crowded fallback placement"})
 			}
@@ -76,18 +76,25 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, label
 		if !clean {
 			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "reference field required crowded fallback placement"})
 		}
-		occupied = append(occupied, component.ReferenceText.Box.Translate(component.PlacedAt))
+		occupied = append(occupied, occupiedFieldBox(component.ReferenceText.Box.Translate(component.PlacedAt), rules))
 		if component.Value != "" {
 			component.ValueText, clean = chooseTextPositionWithin(component.Value, component.PlacedAt, body, occupied, rules, false, usable)
 			if !clean {
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "value field required crowded fallback placement"})
 			}
-			occupied = append(occupied, component.ValueText.Box.Translate(component.PlacedAt))
+			occupied = append(occupied, occupiedFieldBox(component.ValueText.Box.Translate(component.PlacedAt), rules))
 		} else {
 			component.ValueText = TextBox{}
 		}
 	}
 	return placed, diagnostics
+}
+
+func occupiedFieldBox(box Rect, rules Rules) Rect {
+	if rules.OrientEndpointLabels {
+		return box.Inflate(rules.MinTextSpacing / 2)
+	}
+	return box
 }
 
 func chooseTextPosition(text string, origin kicadfiles.Point, body Rect, occupied []Rect, rules Rules, preferAbove bool) (TextBox, bool) {

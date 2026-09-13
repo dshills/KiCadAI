@@ -1,0 +1,75 @@
+{
+  "schema": "kicadai.explicit-reference-offline-results.v1",
+  "as_of_utc": "2026-09-11T17:38:47Z",
+  "goal_achieved": false,
+  "scope": "offline reference routing and native validation; no live campaign",
+  "synthetic_examples": 2,
+  "final_native_generations": 4,
+  "earlier_pre_review_native_generations_retained": 4,
+  "unsuccessful_native_preflights": 2,
+  "native_stage_passes": 4,
+  "complete_practical_board_passes": 0,
+  "frozen_ai_cases_added": 0,
+  "provider_calls": 0,
+  "reference_contract": "explicit supply reference identity; legacy omission preserved; reviewed isolation gates retained",
+  "cases": [
+    {
+      "id": "standalone_regulator",
+      "components": 8,
+      "routed_nets": 3,
+      "erc_findings": 0,
+      "drc_findings": 0,
+      "output_v": 3.3,
+      "junction_temperature_c": 103.04950000000001,
+      "common_replay_files": 14,
+      "readability": "fail",
+      "full_tree_replay": false,
+      "fabrication_ready": false
+    },
+    {
+      "id": "controller_adc_100ma",
+      "components": 21,
+      "routed_nets": 10,
+      "erc_findings": 0,
+      "drc_findings": 0,
+      "output_v": 3.3,
+      "junction_temperature_c": 114.049500001452,
+      "adc_cutoff_hz": 923.3612800239786,
+      "adc_cutoff_allowed_hz": [
+        900,
+        1100
+      ],
+      "common_replay_files": 23,
+      "readability": "fail",
+      "full_tree_replay": false,
+      "fabrication_ready": false
+    }
+  ],
+  "preserved_engineering_rejection": {
+    "case": "controller_150ma",
+    "predicted_junction_temperature_c": 125.049500001,
+    "maximum_c": 125
+  },
+  "request_budget": {
+    "forms": 16,
+    "max_bytes": 126585,
+    "cap_bytes": 131072
+  },
+  "evidence": {
+    "raw_root": "/tmp/kicadai-explicit-reference-promotion-offline-v1-final",
+    "inventory_files": 316,
+    "inventory_bytes": 1527502860,
+    "inventory_sha256": "012c5386774cd31a2fdd5769fe6c0523c6646eecec94ea1459817f4f5cfdef85",
+    "archive": "archive.json",
+    "archive_fresh_extraction_verified": true,
+    "source_receipt": "verification.json",
+    "historical_preservation": "preservation.json"
+  },
+  "unreadiness": [
+    "Schematic readability: label/symbol overlap and unclear functional layout",
+    "Post-render first-run .kicad_prl additions prevent strict whole-tree identity",
+    "No new frozen baseline-to-pass cases; full milestone not rerun",
+    "No independent external review or PR; no fabrication approval"
+  ],
+  "next_step_requires_approval": "separate schematic readability/layout phase and sealed-before-render replay handling"
+}

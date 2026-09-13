@@ -1,0 +1,61 @@
+=== RUN   TestExplicitReferenceDomainIdentityAndValidation
+=== RUN   TestExplicitReferenceDomainIdentityAndValidation/invalid_
+=== RUN   TestExplicitReferenceDomainIdentityAndValidation/invalid_missing
+=== RUN   TestExplicitReferenceDomainIdentityAndValidation/invalid_sensor_3v3
+=== RUN   TestExplicitReferenceDomainIdentityAndValidation/invalid_input_5v
+--- PASS: TestExplicitReferenceDomainIdentityAndValidation (0.00s)
+    --- PASS: TestExplicitReferenceDomainIdentityAndValidation/invalid_ (0.00s)
+    --- PASS: TestExplicitReferenceDomainIdentityAndValidation/invalid_missing (0.00s)
+    --- PASS: TestExplicitReferenceDomainIdentityAndValidation/invalid_sensor_3v3 (0.00s)
+    --- PASS: TestExplicitReferenceDomainIdentityAndValidation/invalid_input_5v (0.00s)
+=== RUN   TestExplicitReferenceRejectsContradictoryObjectiveReturn
+--- PASS: TestExplicitReferenceRejectsContradictoryObjectiveReturn (0.00s)
+=== RUN   TestReferenceDomainCanonicalizationPreservesLegacyEncoding
+--- PASS: TestReferenceDomainCanonicalizationPreservesLegacyEncoding (0.00s)
+PASS
+ok  	kicadai/internal/architecturesearch	0.259s
+=== RUN   TestProviderSchemaExposesQualifiedPinAndGeneratedOutputForms
+--- PASS: TestProviderSchemaExposesQualifiedPinAndGeneratedOutputForms (0.01s)
+=== RUN   TestCompilerRetainsQualifiedParticipantObservationWithoutPublicSubstitute
+--- PASS: TestCompilerRetainsQualifiedParticipantObservationWithoutPublicSubstitute (0.00s)
+PASS
+ok  	kicadai/internal/behavioralintent	0.425s
+=== RUN   TestParticipantPinAssertionUsesExactNodeAndLocalReference
+--- PASS: TestParticipantPinAssertionUsesExactNodeAndLocalReference (0.00s)
+PASS
+ok  	kicadai/internal/closedloopsynthesis	0.562s
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/standalone_regulator
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:198: simulation measurements=[{RequirementID:rail OperatingCase:supply_load Actual:3.3} {RequirementID:thermal OperatingCase:supply_load Actual:103.04950000000001}] evidence=4b97c30cf4bfa12854debfc80fc77c2164aab21cc2f9d9463a5b633a913abfdd
+    endpoint_contracts_test.go:199: selected=633d0f643ef8ced14c451eacdfb57363cc34354ea55ddc964203f1af4116cb9b components=8 physical_nets=3 plans=2 exact_adc=
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_150ma_thermal_rejected
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:121: participant:controller.adc -> participant_controller__mcu.PA0 symbol_pin=7 pad=7 net=composition_net_005
+    endpoint_contracts_test.go:122: participant:controller.power -> participant_controller__mcu.VDD symbol_pin=4 pad=4 net=composition_net_003
+    endpoint_contracts_test.go:170: retained engineering rejection: trusted simulation plan 2 (nonlinear_circuit_dc_v1: thermal,thermal,thermal,thermal,thermal,thermal,thermal,thermal) failed: analyses.thermal_supply_load_b75160283b925b95.devices.objective_regulate__regulator: predicted steady-state temperature 125.049500001 C exceeds catalog-backed maximum 125 C
+=== RUN   TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_100ma
+    endpoint_contracts_test.go:119: objective:regulate.output -> objective_regulate__regulator.VOUT symbol_pin=3 pad=3 net=composition_net_003
+    endpoint_contracts_test.go:121: participant:controller.adc -> participant_controller__mcu.PA0 symbol_pin=7 pad=7 net=composition_net_005
+    endpoint_contracts_test.go:122: participant:controller.power -> participant_controller__mcu.VDD symbol_pin=4 pad=4 net=composition_net_003
+    endpoint_contracts_test.go:198: simulation measurements=[{RequirementID:adc_cutoff OperatingCase:supply_load Actual:923.3612800239786} {RequirementID:rail OperatingCase:supply_load Actual:3.3} {RequirementID:thermal OperatingCase:supply_load Actual:114.049500001452}] evidence=01080c1df3bdf35260ac83184eec3ca6c734023ce6d4ab4f78861fddadea7477
+    endpoint_contracts_test.go:199: selected=a2a18c2983f97b67e3662923f8f9f31e61241d54e5645f50de5e63f6b6594dcf components=21 physical_nets=10 plans=3 exact_adc=composition_net_005
+--- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests (0.21s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/standalone_regulator (0.02s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_150ma_thermal_rejected (0.07s)
+    --- PASS: TestEndpointContractsReachRealLoweredNetsAndWriterRequests/regulator_filter_controller_100ma (0.11s)
+=== RUN   TestExplicitReferenceReachesParticipantPhysicalReturn
+    reference_domains_test.go:49: participant:controller.reference -> participant_controller__mcu.VSS symbol_pin=5 pad=5 net=composition_net_001
+    reference_domains_test.go:50: objective:regulate.reference -> objective_regulate__regulator.GND symbol_pin=1 pad=1 net=composition_net_001
+    reference_domains_test.go:51: objective:condition_adc.reference -> objective_condition_adc__opamp.V_MINUS symbol_pin=2 pad=2 net=composition_net_001
+--- PASS: TestExplicitReferenceReachesParticipantPhysicalReturn (0.05s)
+=== RUN   TestExplicitReferenceNativePromotion
+    reference_promotion_test.go:48: requires explicit artifact directory and native KiCad CLI
+--- SKIP: TestExplicitReferenceNativePromotion (0.00s)
+PASS
+ok  	kicadai/internal/compositionlowering	0.985s
+=== RUN   TestOfflineRepairRequestFormsRemainWithinExistingWireBudget
+    request_bounds_test.go:65: captured 16 initial/correction forms; largest=126585 bytes; unchanged limit=131072 bytes; live requests=0
+--- PASS: TestOfflineRepairRequestFormsRemainWithinExistingWireBudget (0.10s)
+PASS
+ok  	kicadai/internal/airequirementeval	0.685s

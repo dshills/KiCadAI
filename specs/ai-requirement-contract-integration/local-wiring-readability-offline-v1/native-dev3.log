@@ -1,0 +1,8 @@
+=== RUN   TestFunctionalLocalWiringSerializedReplay
+=== RUN   TestFunctionalLocalWiringSerializedReplay/standalone_regulator
+=== RUN   TestFunctionalLocalWiringSerializedReplay/controller_adc_100ma
+--- PASS: TestFunctionalLocalWiringSerializedReplay (26.59s)
+    --- PASS: TestFunctionalLocalWiringSerializedReplay/standalone_regulator (7.00s)
+    --- PASS: TestFunctionalLocalWiringSerializedReplay/controller_adc_100ma (10.22s)
+PASS
+ok  	kicadai/internal/compositionlowering	27.088s

@@ -1,0 +1,70 @@
+panic: test timed out after 12m0s
+	running tests:
+		TestBehavioralCorpusResolvesAndExecutesTrustedAnalysisPlans (11m20s)
+		TestBehavioralCorpusResolvesAndExecutesTrustedAnalysisPlans/mixed_function_control_power (27s)
+
+goroutine 1978 [running]:
+testing.(*M).startAlarm.func1()
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2802 +0x498
+created by time.goFunc
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/time/sleep.go:215 +0x44
+
+goroutine 1 [chan receive, 11 minutes]:
+testing.(*T).Run(0xc000208488, {0x1018f7b1a, 0x3b}, 0x102763298)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2109 +0x7dc
+testing.runTests.func1(0xc000208488)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2585 +0x78
+testing.tRunner(0xc000208488, 0xc00033fab8)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2036 +0x168
+testing.runTests({0x10189b30b, 0x7}, {0x1018d0199, 0x24}, 0xc000010060, {0x10283ef20, 0x83, 0x83}, {0xc00007bbc0?, 0xc00003f400?, ...})
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2583 +0x7a4
+testing.(*M).Run(0xc000277cc0)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2443 +0xb3c
+main.main()
+	_testmain.go:306 +0x104
+
+goroutine 205 [chan receive]:
+testing.(*T).Run(0xc02daa9208, {0x1018bf43e, 0x1c}, 0xc000219b90)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2109 +0x7dc
+kicadai/internal/compositionlowering.TestBehavioralCorpusResolvesAndExecutesTrustedAnalysisPlans(0xc02daa9208)
+	/Users/dshills/Development/projects/KiCadAI/internal/compositionlowering/closed_loop_simulation_test.go:1202 +0x1e4
+testing.tRunner(0xc02daa9208, 0x102763298)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2003 [runnable]:
+kicadai/internal/simmodel.nonlinearResidualWithObserver({{0xc0016c2c08, 0x1f, 0x1f}, {0xc001712a00, 0x1f, 0x1f}, {0xc0016e0508, 0x1f, 0x4b}, 0xc03ee19020, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_nonlinear.go:2797 +0x53c
+kicadai/internal/simmodel.nonlinearResidual(...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_nonlinear.go:2765
+kicadai/internal/simmodel.solveNonlinearDCForComparatorStateWithInitial({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_nonlinear.go:1127 +0x32fc
+kicadai/internal/simmodel.solveNonlinearDCFromWarmStateWithPowerTransition({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_nonlinear.go:153 +0x5f8
+kicadai/internal/simmodel.solveNonlinearDCFromWarmState({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_nonlinear.go:124 +0x178
+kicadai/internal/simmodel.solveDCSweepAnalysis({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_dc_sweep.go:70 +0xac4
+kicadai/internal/simmodel.evaluateMNA({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/mna_solver.go:92 +0xf34
+kicadai/internal/simmodel.evaluateNominal({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...})
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/registry.go:665 +0xc34
+kicadai/internal/simmodel.Evaluate({{0x1018d4aba, 0x26}, {0xc000485300, 0x40}, {0x10189dcd9, 0xa}, {0xc008ab4100, 0x40}, {0x1018b475a, 0x17}, ...})
+	/Users/dshills/Development/projects/KiCadAI/internal/simmodel/registry.go:652 +0x348
+kicadai/internal/closedloopsynthesis.evaluateTrustedSimulationPlans({0xc000366a88, 0x17, 0x0?}, 0x0)
+	/Users/dshills/Development/projects/KiCadAI/internal/closedloopsynthesis/simmodel_adapter.go:247 +0x314
+kicadai/internal/closedloopsynthesis.SimModelEvaluator.evaluate({{0x102770f00, 0xc00074a120}, {{0xc0352e3ec0, 0x24}, 0x1, {0xc035480008, 0xbd, 0xd7}}, _, _}, ...)
+	/Users/dshills/Development/projects/KiCadAI/internal/closedloopsynthesis/simmodel_adapter.go:193 +0x764
+kicadai/internal/closedloopsynthesis.SimModelEvaluator.Evaluate(...)
+	/Users/dshills/Development/projects/KiCadAI/internal/closedloopsynthesis/simmodel_adapter.go:157
+kicadai/internal/compositionlowering.TestBehavioralCorpusResolvesAndExecutesTrustedAnalysisPlans.func1(0xc000208248)
+	/Users/dshills/Development/projects/KiCadAI/internal/compositionlowering/closed_loop_simulation_test.go:1245 +0xf94
+testing.tRunner(0xc000208248, 0xc000219b90)
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 205
+	/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+FAIL	kicadai/internal/compositionlowering	720.646s
+ok  	kicadai/internal/schematicir	236.018s
+ok  	kicadai/internal/schematiclayout	3.157s
+FAIL

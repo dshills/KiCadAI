@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 )
 
 var electricalValuePattern = regexp.MustCompile(`^[+-]?([0-9]*\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][+-]?[0-9]+)?\s*(p|n|u|U|µ|μ|m|k|K|Meg|M|G|T)?\s*(Ohm|ohm|Ω|R|F|H|h|V|v|A|a|W|w|Hz|hz)?\s*$|^[+-]?([0-9]+(R|p|n|u|U|µ|μ|m|k|K|Meg|M|G|T)[0-9]*|[0-9]*(R|p|n|u|U|µ|μ|m|k|K|Meg|M|G|T)[0-9]+)\s*(Ohm|ohm|Ω|F|H|h|V|v|A|a|W|w|Hz|hz)?\s*$`)
@@ -528,6 +529,15 @@ func (ctx *validationContext) validateGroups(componentPins map[string]map[string
 }
 
 func validateLayout(document Document, componentPins map[string]map[string]struct{}, add func(string, string)) {
+	validateFunctionalLayout(document, add)
+	if profile := document.Layout.NativeProfile; profile != "" && profile != schematiclayout.NativeAnnotationV2 {
+		add("layout.native_profile", "unsupported native annotation profile")
+	}
+	for i, group := range document.Layout.Groups {
+		if group.RankPolicy != "" && (document.Layout.NativeProfile != schematiclayout.NativeAnnotationV2 || group.RankPolicy != "inferred-v1") {
+			add(fmt.Sprintf("layout.groups[%d].rank_policy", i), "unsupported persisted rank policy")
+		}
+	}
 	if document.Layout.Flow != FlowLeftToRight {
 		add("layout.flow", "only left_to_right flow is supported in v1")
 	}

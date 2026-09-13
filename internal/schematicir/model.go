@@ -212,14 +212,26 @@ const (
 )
 
 type Layout struct {
-	Flow                  Flow        `json:"flow"`
-	Origin                Origin      `json:"origin"`
-	Groups                []Group     `json:"groups,omitempty"`
-	Lanes                 Lanes       `json:"lanes"`
-	Rules                 LayoutRules `json:"rules"`
-	MaxComponentsPerSheet int         `json:"max_components_per_sheet,omitempty"`
-	Placements            []Placement `json:"placements,omitempty"`
-	Buses                 []BusLayout `json:"buses,omitempty"`
+	NativeProfile         string            `json:"native_profile,omitempty"`
+	FunctionalProfile     string            `json:"functional_profile,omitempty"`
+	FunctionalOwners      []FunctionalOwner `json:"functional_owners,omitempty"`
+	Flow                  Flow              `json:"flow"`
+	Origin                Origin            `json:"origin"`
+	Groups                []Group           `json:"groups,omitempty"`
+	Lanes                 Lanes             `json:"lanes"`
+	Rules                 LayoutRules       `json:"rules"`
+	MaxComponentsPerSheet int               `json:"max_components_per_sheet,omitempty"`
+	Placements            []Placement       `json:"placements,omitempty"`
+	Buses                 []BusLayout       `json:"buses,omitempty"`
+}
+
+// FunctionalOwner preserves explicit fragment and synthesis-parent provenance.
+// It is drawing metadata, not an electrical or PCB placement constraint.
+type FunctionalOwner struct {
+	Component string `json:"component"`
+	Group     string `json:"group"`
+	Source    string `json:"source"`
+	Parent    string `json:"parent,omitempty"`
 }
 
 type Flow string
@@ -246,6 +258,9 @@ type Group struct {
 	// Inferred is runtime-only normalization evidence. Explicit groups are hard
 	// rank constraints; inferred groups remain graph-layout hints.
 	Inferred bool `json:"-"`
+	// RankPolicy persists inferred rank semantics only in the versioned native
+	// profile. Empty continues to mean an explicit/fixed serialized group.
+	RankPolicy string `json:"rank_policy,omitempty"`
 }
 
 type GroupRole string

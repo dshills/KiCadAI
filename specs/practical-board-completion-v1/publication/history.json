@@ -1,0 +1,20 @@
+{
+  "verified_utc": "2026-09-12T18:25:57.194Z",
+  "original_freeze_files": 25,
+  "original_inventory_sha256": "613aa7b05fbbab109ea3a6cadee2589c21e322ef9e9539aa17872d9c98448893",
+  "original_raw_files": 472,
+  "original_raw_bytes": 101237999,
+  "original_raw_exact_match": true,
+  "exact_secret_scan": "absent",
+  "provider_calls": 0,
+  "latest_closed_offline": {
+    "root": "/tmp/kicadai-power-locality-offline-v1-final",
+    "inventory": {
+      "file_count": 387,
+      "total_bytes": 1531267624,
+      "sha256": "6b0a51eb3d51023ede5c9737ffc47cb7bdbfd16612da5e987856b22c9cc5ce79"
+    },
+    "prior_documents_unchanged": true,
+    "complete_practical_cases": 0
+  }
+}

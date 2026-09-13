@@ -1,0 +1,5 @@
+=== RUN   TestFunctionalPowerLocalityRecordedLayoutDiagnostic
+    power_locality_diagnostic_test.go:51: diagnostic transaction only: /Users/dshills/Development/projects/KiCadAI/specs/ai-requirement-contract-integration/power-locality-offline-v1/diagnostic-transaction-1.json; operations=115; issues=[]
+--- PASS: TestFunctionalPowerLocalityRecordedLayoutDiagnostic (7.82s)
+PASS
+ok  	kicadai/internal/compositionlowering	8.178s

@@ -1,0 +1,31 @@
+{
+  "schema": "kicadai.interface-prerun-approval.v1",
+  "recorded_utc": "2026-09-11 15:10:36 UTC",
+  "user_firewall_reply": "approved",
+  "approved_executable": "/tmp/kicadai-ai-requirement-eval-v1",
+  "remote_hostname": "api.openai.com",
+  "remote_port": 443,
+  "lulu_tcp_only_selector_available": false,
+  "evaluator_transport": "TCP/TLS",
+  "saved_rule_observed": true,
+  "display_paths_verified": [
+    "/tmp/kicadai-ai-requirement-eval-v1"
+  ],
+  "rule_action": "Allow",
+  "new_rule_added_by_agent_this_turn": false,
+  "other_rules_changed_by_agent_this_turn": false,
+  "observation_note": "The matching rule was already saved when inspected after the user's approval; the agent verified the rule and exact executable path through LuLu UI without adding a duplicate.",
+  "source_commit": "909c6a0290be26c7f13b96ea0c7cb81c60c58756",
+  "binary_sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f",
+  "freeze_sha256": "fafd5c8e381fc51e7633e5677b583ca6f041db9c3753151e0d51dc1109fef57a",
+  "offline_verify": "passed; keys removed; zero provider calls",
+  "live_root_absent": true,
+  "existing_key_present": true,
+  "existing_key_reuse_authorized": true,
+  "model": "gpt-5.6-sol",
+  "max_generation_requests": 20,
+  "max_estimated_or_reserved_usd": 25,
+  "official_model_docs_rechecked_utc_date": "2026-09-11",
+  "official_model_docs_source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+  "frozen_pricing_still_matches": true
+}

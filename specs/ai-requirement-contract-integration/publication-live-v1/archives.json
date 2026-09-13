@@ -1,0 +1,29 @@
+{
+  "schema": "kicadai.interface-local-archives.v1",
+  "local_only": true,
+  "git_ignored": true,
+  "raw_root": "/tmp/kicadai-ai-requirement-interface-v1",
+  "archives": [
+    {
+      "path": ".cache/ai-requirement-interface-evidence-v1-909c6a0/raw-evidence.tar",
+      "bytes": 17095680,
+      "sha256": "f01e8d954d86e36b87c95444e30001038de4173b1210deba2e7ed91816e5470e",
+      "top_level": "kicadai-ai-requirement-interface-v1"
+    },
+    {
+      "path": ".cache/ai-requirement-interface-evidence-v1-909c6a0/binaries.tar",
+      "bytes": 23400448,
+      "sha256": "afd186a224deee3af31202a3d90842b239d6d436b7f37465bb41696dbb4c9b7c",
+      "binaries": [
+        {
+          "path": "kicadai-ai-requirement-eval-v1",
+          "sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f"
+        },
+        {
+          "path": "kicadai-interface-v1-supplementary-replay-audit",
+          "sha256": "6e46b445c64c8b6a92d95ce3d61e2591e85977abba96254af62ce81d7d6074a5"
+        }
+      ]
+    }
+  ]
+}

@@ -58,12 +58,19 @@ func Read(data []byte) (ProjectFile, error) {
 			return ProjectFile{}, fmt.Errorf("net_settings: %w", err)
 		}
 		for _, class := range settings.Classes {
+			lineStyle := 0
+			if class.LineStyle != nil {
+				lineStyle = *class.LineStyle
+			}
 			project.NetClasses = append(project.NetClasses, NetClass{
 				Name:        class.Name,
 				Clearance:   kicadfiles.MM(class.Clearance),
 				TrackWidth:  kicadfiles.MM(class.TrackWidth),
 				ViaDiameter: kicadfiles.MM(class.ViaDiameter),
 				ViaDrill:    kicadfiles.MM(class.ViaDrill),
+				WireWidth:   kicadfiles.MM(class.WireWidth * 0.0254),
+				BusWidth:    kicadfiles.MM(class.BusWidth * 0.0254),
+				LineStyle:   lineStyle, HasLineStyle: class.LineStyle != nil,
 			})
 		}
 	}

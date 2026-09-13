@@ -1,0 +1,87 @@
+{
+  "schema": "kicadai.local-wiring-diagnosis.v1",
+  "inputs": [
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/workflow_request.json",
+      "bytes": 1100953,
+      "sha256": "b5e27f1051c4acc95d6781e0ca581832a04d053c422178acd799732a1ed97637"
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/schematic_transaction.json",
+      "bytes": 74013,
+      "sha256": "680cb6596a8486ceb6588e9c9dfdf5e9ba7ba55061b111755771cfabc53bba7f"
+    },
+    {
+      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/library_index.json",
+      "bytes": 1512480327,
+      "sha256": "ede67fa472362962bf46a600cb2210a7a202acd313feee93a425bc89d3cc1257"
+    }
+  ],
+  "diagnostics": [
+    {
+      "number": 1,
+      "layout_exit_code": 0,
+      "candidate_exit_code": 1,
+      "layout_source": "4ced4039b064255d9f34664f23435e8b51a328b570ec40518f5894d7720b0e46",
+      "candidate_source": "82ed107d111132aefdeda48237a002babfbfb885342a2d3589bbc396e173ec31",
+      "transaction_sha256": "5bd508f33f81b903c4528b2dca34502879df7f98e8525c2318dc1304e813278b",
+      "operations": 115,
+      "paper": "A2",
+      "portrait": false,
+      "direct_branches": 17,
+      "label_branches": 27,
+      "failures": [
+        "    native_local_wiring_diagnostic_test.go:90: labels=42 placement_error=native annotation placement exhausted for label SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2 at 447040000,300990000: no wire/body-clear candidate",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=0 uuid=56703ccf-7d95-5431-8307-69706768bb38 text=\"composition_net_005\" count=0 origin={421640000 278130000}",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=1 uuid=79d116f4-47b6-5ea7-a17e-165391e7a5bd text=\"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PF2\" count=0 origin={447040000 300990000}"
+      ]
+    },
+    {
+      "number": 2,
+      "layout_exit_code": 0,
+      "candidate_exit_code": 1,
+      "layout_source": "494efa1e56380697f8af5992873ea81ec1484f7a35524d20e92db8ccb4bfc30f",
+      "candidate_source": "db615a0aff3d62ba9f90d83bb9a26ed749ad60fd5c9591fcde632343b93eb4a5",
+      "transaction_sha256": "09f16ec8ab983e798b4816123f7110e02f4432984260e5cca0f17d76e98f2634",
+      "operations": 115,
+      "paper": "A2",
+      "portrait": true,
+      "direct_branches": 17,
+      "label_branches": 27,
+      "failures": [
+        "    native_local_wiring_diagnostic_test.go:90: labels=41 placement_error=native annotation placement exhausted for label composition_net_001 at 125730000,429260000: no wire/body-clear candidate",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=0 uuid=7eec17d7-0612-5526-a3db-7d2e3b595bda text=\"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA14\" count=0 origin={125730000 431800000}",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=1 uuid=823d01fe-7ea1-5610-a344-1d467f6cee38 text=\"SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13\" count=0 origin={125730000 426720000}",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=2 uuid=f53489f7-d286-5189-bf82-f0c89c99f0cf text=\"composition_net_001\" count=0 origin={125730000 429260000}"
+      ]
+    },
+    {
+      "number": 3,
+      "layout_exit_code": 0,
+      "candidate_exit_code": 1,
+      "layout_source": "5fcee6d66e0cddc9d1e33e54bf6602b989e760223308ef13e69f458c6aad2ecb",
+      "candidate_source": "0d61b459644511422bd50ce055eca93b7724e8e48bb3048b0a5a0495f84585d8",
+      "transaction_sha256": "fbf074df9a9f32fe52b8a341a5a86ed3260318da560cd8ffb802eecb01688472",
+      "operations": 115,
+      "paper": "A2",
+      "portrait": true,
+      "direct_branches": 11,
+      "label_branches": 33,
+      "failures": [
+        "    native_local_wiring_diagnostic_test.go:90: labels=47 placement_error=native annotation placement exhausted for label composition_net_001 at 173990000,417830000: no wire/body-clear candidate",
+        "    native_local_wiring_diagnostic_test.go:92: candidate_order=0 uuid=f151a0f1-9640-50de-beec-6408b8e9d2e7 text=\"composition_net_001\" count=0 origin={173990000 417830000}"
+      ]
+    }
+  ],
+  "conclusions": [
+    "Connector/high-fanout policy hid most local supply conductors. Full net-name placement corridors increased support spacing.",
+    "Blindly shortening every local corridor blocked PF2 and an ADC net label. Retaining signal and cross-group singleton corridors was necessary.",
+    "Early direct conductors blocked later connector labels. Routing now reserves narrow future-label corridors for foreign nets.",
+    "Ground labels still needed full placement clearance; only multi-endpoint canonical power nets receive shorter placement reservations.",
+    "The last two native development iterations balanced the group packing and removed duplicate outer padding while preserving the declared gutter."
+  ],
+  "final_transaction_not_claimed_equal_to_earlier_diagnostics": true,
+  "diagnostics_are_native_evaluations": false,
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

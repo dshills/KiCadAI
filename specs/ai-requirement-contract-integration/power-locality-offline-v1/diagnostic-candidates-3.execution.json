@@ -1,0 +1,30 @@
+{
+  "base": "e6f648bbbb05d1d8bc883e61356511d8708aec2e",
+  "mode": "diagnostic-candidates-3",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/transactions",
+    "-run",
+    "^TestNativeLocalWiringFrozenCandidateDiagnostic$",
+    "-v",
+    "-count=1",
+    "-timeout=5m"
+  ],
+  "started_utc": "2026-09-12T16:04:42.778Z",
+  "finished_utc": "2026-09-12T16:04:52.161Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/power-locality-v1-sources/diagnostic-candidates-3.json",
+  "source_snapshot_sha256": "72bc1aeffe39e0c8584d816728ee62a575b494af0c4635547dda770e3bb45b51",
+  "source_unchanged": true,
+  "log_sha256": "3b675f70706324069158ca1b583d60093a608a0c59269a8be4169ed8ae6d43bd"
+}

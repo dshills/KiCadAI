@@ -1,0 +1,595 @@
+{
+  "I01": {
+    "workflow": "pass_after_correction_candidate_pending_authentication",
+    "selected": "I01/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "Four distinct external endpoints remain: supply_input, ground_connection, analog_input and analog_output, with appropriate power/reference/analog kinds and directions.",
+        "pointers": [
+          "/compilation/requirement/requirements/ports"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The external supply domain retains nominal 3.3 V and bounds 3.1–3.5 V, repeated consistently on its power port.",
+        "pointers": [
+          "/compilation/requirement/requirements/domains/1",
+          "/compilation/requirement/requirements/ports/3"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "analog_input is ground-referenced and bounded at 0–0.9 V.",
+        "pointers": [
+          "/compilation/requirement/requirements/ports/0",
+          "/compilation/requirement/requirements/domains/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The analog output has a minimum 180000 Ohm load condition, with matching objective constraint.",
+        "pointers": [
+          "/compilation/requirement/requirements/operating_cases/0/conditions/0",
+          "/compilation/requirement/requirements/objectives/0/constraints/8"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The filter is low-pass, target 3300 Hz with 5% tolerance; its output cutoff measurement uses 3135–3465 Hz bounds.",
+        "pointers": [
+          "/compilation/requirement/requirements/objectives/0/constraints/1",
+          "/compilation/requirement/requirements/objectives/0/constraints/3",
+          "/compilation/requirement/requirements/behavioral_requirements/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The cutoff requirement references cutoff_supply_range, whose supply condition spans the complete 3.1–3.5 V range.",
+        "pointers": [
+          "/compilation/requirement/requirements/behavioral_requirements/0/operating_cases",
+          "/compilation/requirement/requirements/operating_cases/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Board limits are exactly 16 components and 38×27 mm.",
+        "pointers": [
+          "/compilation/requirement/requirements/constraints"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Only the requested frequency-filter objective is present. Explicit exclusions prohibit controller, digital-interface, protection and timing functions; no component identities or physical topology are supplied.",
+        "pointers": [
+          "/compilation/requirement",
+          "/compilation/requirement/requirements/system_constraints"
+        ]
+      }
+    ],
+    "note": "The first attempt failed compiler coverage validation; the second is ready with zero issues. Semantic preservation was reviewed independently of compiler acceptance; authentication and replay are still required."
+  },
+  "I02": {
+    "workflow": "fail",
+    "selected": "I02/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "The proposal retains external nominal 5.1 V supply, full 4.9–5.3 V range and a distinct ground return.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains",
+          "/proposal/requirement/requirements/ports/0",
+          "/proposal/requirement/requirements/ports/1"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The external analog-input port retains 0–0.06 V.",
+        "pointers": [
+          "/proposal/requirement/requirements/ports/2"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The low-pass target is 1900 Hz ±6%, with 1786–2014 Hz measured on filtered_signal.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives/0",
+          "/proposal/requirement/requirements/behavioral_requirements/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "filtered_signal is an internal analog signal sourced by low_pass_filter and sunk by signal_amplifier; it is not declared as an external port.",
+        "pointers": [
+          "/proposal/requirement/requirements/signals",
+          "/proposal/requirement/requirements/objectives",
+          "/proposal/requirement/requirements/ports"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The proposed amplifier target is 2.5 ratio ±8%; the input_to_output_gain_requirement observes analog_output with bounds 2.3–2.7 and a 100 Hz condition targeting the only external analog input.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives/1",
+          "/proposal/requirement/requirements/behavioral_requirements/1",
+          "/proposal/requirement/requirements/operating_cases/1"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The amplifier load constraint and analog-output operating condition retain at least 220000 Ohm.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives/1/constraints/1",
+          "/proposal/requirement/requirements/operating_cases/1/conditions/2"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Both measurements reference full-range supply cases; gain also retains the 100 Hz external-input condition.",
+        "pointers": [
+          "/proposal/requirement/requirements/operating_cases",
+          "/proposal/requirement/requirements/behavioral_requirements"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The proposal retains 24 components and 46×31 mm, adds only the requested filter/amplifier functions, and does not choose components, topology, controller, clock, bus, protection or startup behavior.",
+        "pointers": [
+          "/proposal/requirement",
+          "/proposal/coverage/6"
+        ]
+      }
+    ],
+    "note": "These are semantic observations about a rejected proposal, not acceptance. Both attempts fail coverage validation: statement_006 references the project name analog_signal_conditioning_board as a requirement identifier, which is not a declared requirement entity. The compiler retains no executable requirement."
+  },
+  "I03": {
+    "workflow": "fail",
+    "selected": "I03/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "The rejected proposal declares an existing external participant, an analog sink ADC port, single-ended mode, and an explicit prohibition on designing or programming it. This preserves the supplied participant facts; it does not establish that the capability label external_controller is a synthesized catalog block.",
+        "pointers": [
+          "/proposal/requirement/requirements/participants/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The stated external analog-input range 0–1.1 V is preserved in the port bounds and operating amplitude. The selected proposal's source direction is separately flagged for follow-up interpretation; this clause's quantitative bound is intact.",
+        "pointers": [
+          "/proposal/requirement/requirements/ports/0",
+          "/proposal/requirement/requirements/operating_cases/0/conditions/1"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The participant constraints explicitly preserve at least 150000 Ohm ADC input resistance and ground reference.",
+        "pointers": [
+          "/proposal/requirement/requirements/participants/0/constraints",
+          "/proposal/requirement/requirements/domains/1"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The shared external domain retains nominal 3.4 V and full 3.2–3.6 V range; a ground domain and return are present and the participant references that supply domain.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains",
+          "/proposal/requirement/requirements/ports/1",
+          "/proposal/requirement/requirements/ports/2",
+          "/proposal/requirement/requirements/participants/0/domain"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The filter output binding uses existing_controller/controller_adc_input, and the external ports contain no replacement analog output.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives/0/bindings",
+          "/proposal/requirement/requirements/ports"
+        ]
+      },
+      {
+        "status": "fail",
+        "reason": "2700 Hz ±7%, the equivalent 2511–2889 Hz limits and full supply range are retained, but both accepted-shape observations select only the whole circuit. The requested input-to-ADC measurement endpoint is not explicitly identified by either measurement. This strict semantic audit does not infer a participant measurement from a generic circuit observation.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives/0",
+          "/proposal/requirement/requirements/behavioral_requirements",
+          "/proposal/requirement/requirements/operating_cases"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The interface-board limits remain 15 components and 35×28 mm; participant constraints state that the external controller is not to be designed or programmed.",
+        "pointers": [
+          "/proposal/requirement/requirements/constraints",
+          "/proposal/requirement/requirements/participants/0/constraints"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The only new functional objective is the filter, and the participant is explicitly existing/external. No MCU part, firmware, bus, clock, protection, timing guarantee, placement, routing or physical implementation is supplied.",
+        "pointers": [
+          "/proposal/requirement",
+          "/proposal/coverage/9"
+        ]
+      }
+    ],
+    "note": "Rejected on both attempts. The first has two invalid whole-circuit observation IDs. The correction fixes those IDs but fails five coverage references: unqualified participant-port IDs and the project name are not known requirement IDs. No executable requirement is retained. Potential external-port direction interpretation and the unregistered-as-objective external_controller label are caveats, not additional decisive compiler findings."
+  },
+  "I04": {
+    "workflow": "fail_semantic",
+    "selected": "I04/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "The input domain and sink port retain external nominal 7 V and full 6.5–7.5 V range, with a separate external ground.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains/0",
+          "/proposal/requirement/requirements/domains/1",
+          "/proposal/requirement/requirements/ports/0",
+          "/proposal/requirement/requirements/ports/1"
+        ]
+      },
+      {
+        "status": "fail",
+        "reason": "There is one output port and a regulation objective, but regulated_output_supply is explicitly marked source=external. This represents the purported regulated rail as an independently external supply instead of a rail produced by the requested board.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains/2",
+          "/proposal/requirement/requirements/ports/2",
+          "/proposal/requirement/requirements/objectives/0/bindings"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The DC output measurement preserves exact 2.94–3.06 V limits without weakening the range.",
+        "pointers": [
+          "/proposal/requirement/requirements/behavioral_requirements/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The output is a source port and the load condition spans 0.005–0.025 A; its 25 mA source bound is consistent.",
+        "pointers": [
+          "/proposal/requirement/requirements/ports/2",
+          "/proposal/requirement/requirements/operating_cases/0/conditions/1"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "dc_operating_point observes the regulated output and references a case containing the full 6.5–7.5 V, 0.005–0.025 A and 10–35 degC ranges.",
+        "pointers": [
+          "/proposal/requirement/requirements/behavioral_requirements/0",
+          "/proposal/requirement/requirements/operating_cases/0"
+        ]
+      },
+      {
+        "status": "fail",
+        "reason": "The proposal creates regulated_output_supply but gives it external provenance and declares no supply signal. The required coherent derived-rail source and endpoint bindings are absent.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains",
+          "/proposal/requirement/requirements/objectives",
+          "/proposal/requirement/requirements"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The exact board limits remain 18 components and 39×26 mm.",
+        "pointers": [
+          "/proposal/requirement/requirements/constraints"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Only voltage regulation is requested; explicit constraints exclude a controller, bus, current-limit guarantee, fault-recovery timing and second output. No parts or physical implementation are supplied.",
+        "pointers": [
+          "/proposal/requirement",
+          "/proposal/requirement/requirements/system_constraints"
+        ]
+      }
+    ],
+    "note": "The compiler accepts the correction with no issues, but semantic acceptance fails on output supply provenance. This is a compiler-accepted semantic counterexample, not a successful board or faithful-ready case."
+  },
+  "R01": {
+    "workflow": "pass_first_attempt_candidate_pending_authentication",
+    "selected": "R01/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "The structured unsupported result identifies missing radiation dose-response/calibration/accuracy verification and independent traceable certification.",
+        "pointers": [
+          "/compilation/status",
+          "/proposal/capability_gaps"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Normalized gap and uncertainty IDs are linked correctly; required_evidence lists actual missing models, calibration, uncertainty budget and independent certificates without claiming they exist.",
+        "pointers": [
+          "/proposal/capability_gaps",
+          "/proposal/uncertainties"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The reasons and coverage preserve mandatory one-percent accuracy and certification, explicitly rejecting an uncalibrated detector or a substituted measurement.",
+        "pointers": [
+          "/proposal/capability_gaps",
+          "/proposal/coverage"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "All four source statements are accounted for exactly once with capability_gap disposition and valid gap/uncertainty references.",
+        "pointers": [
+          "/compilation/source/statements",
+          "/compilation/coverage"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The complete proposal and compilation contain no executable requirement or clarification; the terminal status is unsupported, not ready.",
+        "pointers": [
+          "/proposal",
+          "/compilation"
+        ]
+      }
+    ],
+    "note": "One live request; zero compiler issues. Refusal faithfulness reviewed locally; authentication and replay remain required."
+  },
+  "R02": {
+    "workflow": "pass_first_attempt_candidate_pending_authentication",
+    "selected": "R02/initial/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "The structured unsupported result identifies unavailable v3 control, event and transition semantics, rather than presenting a partial executable requirement.",
+        "pointers": [
+          "/compilation/status",
+          "/proposal/capability_gaps/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The linked source coverage preserves the 3.3 V supply and active-high enable/fault polarities; the gap reason and uncertainty preserve the startup-disabled and stateful event requirements.",
+        "pointers": [
+          "/proposal/coverage/0",
+          "/proposal/coverage/1",
+          "/proposal/capability_gaps/0",
+          "/proposal/uncertainties/0"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Coverage explicitly retains enable at 2 ms, on delay <=40 us after 70 us fault inactivity, and fault at 5 ms with off delay <=15 us; the gap rejects static substitution.",
+        "pointers": [
+          "/proposal/coverage/2",
+          "/proposal/coverage/3",
+          "/proposal/coverage/5"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The latched-off state and ordered enable fall-then-rise reset remain required missing capabilities; no guessed control implementation is supplied.",
+        "pointers": [
+          "/proposal/capability_gaps/0",
+          "/proposal/uncertainties/0",
+          "/proposal/coverage/3"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "All six statements have capability-gap coverage, using the normalized gap_stateful_event_control and unc_stateful_event_control identities.",
+        "pointers": [
+          "/compilation/source/statements",
+          "/compilation/coverage",
+          "/compilation/capability_gaps"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Neither proposal nor compilation has an executable requirement; there is no clarification, component choice or physical design.",
+        "pointers": [
+          "/proposal",
+          "/compilation"
+        ]
+      }
+    ],
+    "note": "One live request, compiler unsupported with zero issues. Local semantic review supports the intended refusal, pending terminal authentication and replay."
+  },
+  "C01": {
+    "workflow": "pass_first_attempt_each_leg_candidate_pending_authentication_replay",
+    "selected": "C01/follow-up/selected.json",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "One initial question asks only cutoff frequency and percent tolerance, owns exactly uncertainty_cutoff_specification at the same path, and produces needs_clarification with no executable requirement.",
+        "pointers": [],
+        "evidence": [
+          {
+            "path": "C01/initial/selected.json",
+            "pointer": "/proposal/clarifications"
+          },
+          {
+            "path": "C01/initial/selected.json",
+            "pointer": "/proposal/uncertainties"
+          },
+          {
+            "path": "C01/initial/selected.json",
+            "pointer": "/compilation"
+          }
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The initial question does not re-ask known facts; both the initial source coverage and the final requirement preserve the original interfaces, voltage, load and board limits.",
+        "pointers": [
+          "/proposal/requirement",
+          "/proposal/coverage"
+        ],
+        "evidence": [
+          {
+            "path": "C01/initial/selected.json",
+            "pointer": "/proposal/coverage"
+          },
+          {
+            "path": "C01/answer-review.json",
+            "pointer": ""
+          }
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The final contract preserves nominal 4.1 V and 3.9–4.3 V range, ground-referenced 0–0.8 V input and output load resistance at least 160000 Ohm.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains",
+          "/proposal/requirement/requirements/ports",
+          "/proposal/requirement/requirements/operating_cases"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The frozen answer is copied verbatim in a follow-up carrying the source, capability, prior-proposal and prior-compilation hashes and the exact owned clarification/uncertainty IDs. The post-run supplementary offline audit validated the original bindings.",
+        "pointers": [],
+        "evidence": [
+          {
+            "path": "C01/bound-answer.json",
+            "pointer": ""
+          },
+          {
+            "path": "C01/answer-review.json",
+            "pointer": ""
+          }
+        ],
+        "requires_replay": true
+      },
+      {
+        "status": "pass",
+        "reason": "The answer becomes a 4200 Hz ±7% low-pass objective and an output ac_sweep requirement bounded 3906–4494 Hz, linked to the complete 3.9–4.3 V supply case.",
+        "pointers": [
+          "/proposal/requirement/requirements/objectives",
+          "/proposal/requirement/requirements/behavioral_requirements",
+          "/proposal/requirement/requirements/operating_cases"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The follow-up compiler returns ready with zero issues; all eight original statements remain covered, no answered blocker identity recurs, and the only functional objective is frequency_filter.",
+        "pointers": [
+          "/compilation/status",
+          "/compilation/source/statements",
+          "/proposal/coverage",
+          "/proposal/uncertainties",
+          "/proposal/clarifications",
+          "/proposal/capability_gaps",
+          "/proposal/requirement/requirements/objectives"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Board limits remain 14 components and 37×23 mm. All four tampered answer-binding controls were rejected by the post-run supplementary offline audit.",
+        "pointers": [
+          "/proposal/requirement/requirements/constraints"
+        ],
+        "requires_replay": true
+      }
+    ],
+    "note": "One initial and one bound-answer request, neither requiring correction. Admission was reviewed locally before the answer was released. All semantic clauses passed and the supplementary offline audit validated bindings and rejected four controls. The sealed replay itself failed on an omitted issues member; this remains a campaign-level evidence-method deviation."
+  },
+  "C02": {
+    "selected": "C02/follow-up/selected.json",
+    "workflow": "failed_follow_up_compilation_and_semantic_coverage",
+    "note": "Correct initial question and fixed answer, but final follow-up remains invalid after its permitted correction. It duplicates input_voltage constraint identity, targets an unresolved domain in an operating condition, and loses material ground_reference source coverage. The regulated output supply is also labeled external, a source-modeling caveat shared with I04; unlike I04 this proposal was rejected.",
+    "clauses": [
+      {
+        "status": "pass",
+        "reason": "One initial question asks only minimum/maximum regulated load current, owns uncertainty_load_current_range at the same path, and produces needs_clarification with no executable requirement.",
+        "pointers": [],
+        "evidence": [
+          {
+            "path": "C02/initial/selected.json",
+            "pointer": "/proposal/clarifications"
+          },
+          {
+            "path": "C02/initial/selected.json",
+            "pointer": "/proposal/uncertainties"
+          },
+          {
+            "path": "C02/initial/selected.json",
+            "pointer": "/compilation"
+          }
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The initial question does not re-ask input, output, temperature or board limits; final proposal retains those values.",
+        "pointers": [
+          "/proposal/requirement",
+          "/proposal/coverage"
+        ],
+        "evidence": [
+          {
+            "path": "C02/initial/selected.json",
+            "pointer": "/proposal/clarifications"
+          }
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Rejected proposal retains input nominal 7.6 V/full 7.2–8 V, a single external output bounded 3.234–3.366 V, ground and 20–30 degC. This quantity/interface clause does not certify its source modeling or executable status.",
+        "pointers": [
+          "/proposal/requirement/requirements/domains",
+          "/proposal/requirement/requirements/ports",
+          "/proposal/requirement/requirements/operating_cases"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "The fixed 0.006–0.018 A answer is bound verbatim to the prior source, capability, proposal and compilation hashes and exact owned uncertainty/clarification IDs; supplementary offline validation confirms these bindings.",
+        "pointers": [],
+        "evidence": [
+          {
+            "path": "C02/bound-answer.json",
+            "pointer": ""
+          },
+          {
+            "path": "C02/answer-review.json",
+            "pointer": ""
+          }
+        ],
+        "requires_replay": true
+      },
+      {
+        "status": "fail",
+        "reason": "The final response is invalid, not ready. Voltage bounds and the three numeric operating ranges survive, but duplicate constraint identity and unresolved operating target prevent an executable DC contract. The regulated supply is also incorrectly labeled an independent external source.",
+        "pointers": [
+          "/compilation/status",
+          "/compilation/issues",
+          "/proposal/requirement/requirements/objectives/0/constraints",
+          "/proposal/requirement/requirements/operating_cases",
+          "/proposal/requirement/requirements/behavioral_requirements",
+          "/proposal/requirement/requirements/domains/2"
+        ]
+      },
+      {
+        "status": "pass",
+        "reason": "Limits remain 17 components and 41×25 mm, with no additional controller, digital interface, output, current-limit or fault-timing behavior.",
+        "pointers": [
+          "/proposal/requirement/requirements/constraints",
+          "/proposal/requirement/requirements/objectives",
+          "/proposal/requirement/requirements/behavioral_requirements",
+          "/proposal/coverage/6"
+        ]
+      },
+      {
+        "status": "fail",
+        "reason": "The correction removes recurring answered identities and supplementary offline tamper controls reject all four altered bindings, but ground_reference has no source statement evidence. This combined complete-coverage clause fails.",
+        "pointers": [
+          "/compilation/issues",
+          "/proposal/coverage",
+          "/proposal/uncertainties",
+          "/proposal/clarifications"
+        ],
+        "requires_replay": true
+      }
+    ]
+  }
+}

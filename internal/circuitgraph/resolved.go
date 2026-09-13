@@ -101,6 +101,9 @@ type ResolvedBinding struct {
 }
 
 type ResolveOptions struct {
+	// SchematicLayoutProfile is an explicit synthesis opt-in. Empty preserves
+	// the frozen legacy generation policy and its replay hashes.
+	SchematicLayoutProfile string
 	Catalog                *components.Catalog
 	CatalogID              string
 	CatalogHash            string

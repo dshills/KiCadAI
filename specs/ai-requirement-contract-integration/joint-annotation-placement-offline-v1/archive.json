@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.joint-annotation-placement-archive.v1",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-offline-v1-all-runs.tar.gz",
+  "bytes": 232216947,
+  "sha256": "db853bb88dd2adc9ef9f9893b07a619a7fc5b4fc44ab74dce63f5ff4eaad2af0",
+  "manifest_sha256": "3e5e3a6805d7a60d693f71b3a268f01aa5df2550abe2d2d6979e2c5b26a3fbe7",
+  "streamed": {
+    "files_verified": 1180,
+    "bytes_verified": 4596891439,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

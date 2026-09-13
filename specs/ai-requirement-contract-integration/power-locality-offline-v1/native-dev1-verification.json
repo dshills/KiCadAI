@@ -1,0 +1,645 @@
+{
+  "schema": "kicadai.power-locality-offline-verification.v1",
+  "base": "e6f648bbbb05d1d8bc883e61356511d8708aec2e",
+  "root": "/tmp/kicadai-power-locality-offline-v1-dev1",
+  "source": [
+    {
+      "path": "internal/compositionlowering/functional_layout.go",
+      "sha256": "3c268ae9d015c6eeaeb76678f7b4506daf6e858e6f3e5b4f317b8f9fdf459d8c"
+    },
+    {
+      "path": "internal/compositionlowering/functional_layout_test.go",
+      "sha256": "f79ce229b6968c3806d49d5d8d62c7ef01b34966df8fbb424f37b26c93b9c060"
+    },
+    {
+      "path": "internal/compositionlowering/power_locality_diagnostic_test.go",
+      "sha256": "2d58bb772e487721e9d0c3c84e046d31cc9331badb53c0cd9f4f3bc9e2200183"
+    },
+    {
+      "path": "internal/compositionlowering/power_locality_replay_test.go",
+      "sha256": "789ae3a09acf4d9a5890daa92afb60b2098e656019d2f6d9e7fd7525eae54be8"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "sha256": "51a9a4848d1278eb03ffd048aac568bac10a05feaa7d6af252174b1baef22459"
+    },
+    {
+      "path": "internal/schematicir/functional_layout.go",
+      "sha256": "e9e4a36edc3b31cbe8ec55929a376bd20990d9de6a5fed1093733c32d903e689"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_blocks.go",
+      "sha256": "b32bfdfe3eb99665d3096cc4797d04877072c632da91dd66d2cf1bf9ca3ac4c5"
+    },
+    {
+      "path": "internal/schematicir/native_annotations.go",
+      "sha256": "d4c455e932e55e2998d779f168b480475d3dc8705b233175b115031d02755ffc"
+    },
+    {
+      "path": "internal/schematiclayout/functional_groups.go",
+      "sha256": "7211b40ded2bccb7df63ccd559e8bf8ee5f8984227339cc464cff489743dc479"
+    },
+    {
+      "path": "internal/schematiclayout/functional_support.go",
+      "sha256": "41d5c1cb4a518a12715a6cd550ee5239fc189ad9baefe77b117f99e10eb183d7"
+    },
+    {
+      "path": "internal/schematiclayout/joint_support.go",
+      "sha256": "92ab626e7a533e13376c73ceab24caeafe1dfba8a3a03050e5ebda9b6eab430d"
+    },
+    {
+      "path": "internal/schematiclayout/local_wiring.go",
+      "sha256": "c07e49e61ad4dd41eb7981dcd39a8c4c4e495ad39164fed7165aeb2dc66e229f"
+    },
+    {
+      "path": "internal/schematiclayout/model.go",
+      "sha256": "70dc04e84c51024748d905a3611f9e64986e07ffebd2eb35a9b18ea827a0adc1"
+    },
+    {
+      "path": "internal/schematiclayout/power_locality.go",
+      "sha256": "4caf30fee36333f0f2148a4bc4306831c5668c97502420e8e9e424d928eda908"
+    },
+    {
+      "path": "internal/schematiclayout/power_locality_test.go",
+      "sha256": "e5f65a2f1f4bbfa9c29fb7fe6e0ab4bb3bbc9863c89728b86f69e591a7428eb8"
+    },
+    {
+      "path": "internal/schematiclayout/route.go",
+      "sha256": "85cf16ce188a63a252414ed2584e66b38dec558e6b8236ff1007d3b2bc0d369b"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "technical_gate_passed": true,
+      "components": 8,
+      "requirements_unchanged": true,
+      "resolution_provenance": {
+        "previous": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "current": "6cd7aa4773518ab597be7da380daaa1b2233f0bbe81789aa43371413bea652bd",
+        "cross_phase_exclusion": "only KiCadAI Resolution Hash; all other schematic circuit fields exact"
+      },
+      "electrical_and_pcb_input_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 3,
+      "native_physical_endpoints": 16,
+      "pcb": {
+        "connected_pads": 16,
+        "unconnected_pads": 0,
+        "physical_connectivity_verified": true,
+        "geometry_unchanged": true,
+        "changed_placement_count": 0,
+        "previous_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "current_placements": [
+          {
+            "reference": "C1",
+            "at": [
+              "at",
+              "13.5",
+              "5.5"
+            ]
+          },
+          {
+            "reference": "C2",
+            "at": [
+              "at",
+              "6",
+              "14.5"
+            ]
+          },
+          {
+            "reference": "C3",
+            "at": [
+              "at",
+              "13.5",
+              "2.5"
+            ]
+          },
+          {
+            "reference": "C4",
+            "at": [
+              "at",
+              "9.5",
+              "15",
+              "90"
+            ]
+          },
+          {
+            "reference": "J1",
+            "at": [
+              "at",
+              "10.5",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "J2",
+            "at": [
+              "at",
+              "9",
+              "3"
+            ]
+          },
+          {
+            "reference": "J3",
+            "at": [
+              "at",
+              "3",
+              "10.5",
+              "90"
+            ]
+          },
+          {
+            "reference": "U1",
+            "at": [
+              "at",
+              "4",
+              "3.5"
+            ]
+          }
+        ],
+        "previous_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "current_route_sha256": "6e3712832ae5454ac79859b0fff9a2477e215a484701997186befccc9e63b992",
+        "previous_segments": 37,
+        "current_segments": 37,
+        "previous_vias": 3,
+        "current_vias": 3,
+        "previous_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_generation_seed": "47c3cd69c4f818c128e9237099f4107700439c3ed2558eda5442a733793ec78d",
+        "current_placement_seed": "aa9ea7fa25d049b93ae2a42043a898f1d5d9f9ee0086f3cbee325486c66664f6",
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all remaining board fields, including placements and routes, compared exactly",
+        "previous_paper": [
+          "paper",
+          "A4"
+        ],
+        "current_paper": [
+          "paper",
+          "A3"
+        ]
+      },
+      "project_files": 14,
+      "actual_json_serialized_request_replay": true,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 103.04950000000001,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.17560399999999993,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "name": "controller_adc_100ma",
+      "technical_gate_passed": false,
+      "requirements_unchanged": true,
+      "non_layout_request_unchanged": true,
+      "assertions": [
+        {
+          "requirement_id": "adc_cutoff",
+          "operating_case": "supply_load",
+          "analysis": "ac_sweep",
+          "metric": "cutoff_frequency",
+          "actual": 923.3612800239786,
+          "min": 900,
+          "max": 1100,
+          "critical": false,
+          "normalized_margin": 0.02123752729452597,
+          "pass": true
+        },
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 114.049500001452,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.08760399998838397,
+          "pass": true
+        }
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "stages": [
+            {
+              "name": "schematic",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "schematic_electrical",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "placement",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "routing",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "project_write",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "writer_correctness",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "validation",
+              "status": "ok",
+              "issues": [
+                {
+                  "code": "SKIPPED_EXTERNAL_TOOL",
+                  "severity": "info",
+                  "path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+                  "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                  "suggestion": "run `kicadai --json check project \"/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                },
+                {
+                  "code": "SKIPPED_EXTERNAL_TOOL",
+                  "severity": "info",
+                  "path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_pcb",
+                  "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                  "suggestion": "run `kicadai --json check project \"/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                },
+                {
+                  "code": "VALIDATION_TRACE",
+                  "severity": "info",
+                  "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                  "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                  "refs": [
+                    "C10",
+                    "C2",
+                    "C3",
+                    "C4",
+                    "C5",
+                    "C6",
+                    "C7",
+                    "C8",
+                    "C9",
+                    "J1",
+                    "J2",
+                    "J3",
+                    "J4",
+                    "J5",
+                    "U1",
+                    "U2",
+                    "U3"
+                  ],
+                  "nets": [
+                    "composition_net_001"
+                  ],
+                  "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                },
+                {
+                  "code": "VALIDATION_TRACE",
+                  "severity": "info",
+                  "path": "tracks.71.end",
+                  "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                  "nets": [
+                    "composition_net_001"
+                  ],
+                  "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                },
+                {
+                  "code": "VALIDATION_TRACE",
+                  "severity": "info",
+                  "path": "tracks.123.start",
+                  "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                  "nets": [
+                    "composition_net_001"
+                  ],
+                  "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                },
+                {
+                  "code": "VALIDATION_TRACE",
+                  "severity": "info",
+                  "path": "tracks.145.end",
+                  "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                  "nets": [
+                    "composition_net_002"
+                  ],
+                  "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                }
+              ]
+            },
+            {
+              "name": "simulation",
+              "status": "ok",
+              "issues": []
+            },
+            {
+              "name": "kicad_checks",
+              "status": "warning",
+              "issues": [
+                {
+                  "code": "VALIDATION_FAILED",
+                  "severity": "warning",
+                  "message": "Label connects more than one wire at 1244600, 406400",
+                  "suggestion": "repair category: unknown"
+                },
+                {
+                  "code": "VALIDATION_FAILED",
+                  "severity": "warning",
+                  "message": "Unconnected wire endpoint",
+                  "suggestion": "repair category: connectivity"
+                }
+              ]
+            }
+          ],
+          "native_checks": {
+            "artifact_count": 2,
+            "drc": {
+              "kind": "drc",
+              "status": "pass",
+              "target_path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first",
+              "file_type": "pcb",
+              "project_context": "full",
+              "units": "mm",
+              "kicad_cli_path": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+              "kicad_version": "10.0.3",
+              "command": [
+                "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+                "pcb",
+                "drc",
+                "--format",
+                "json",
+                "--severity-all",
+                "--exit-code-violations",
+                "--units",
+                "mm",
+                "--output",
+                "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-drc-1519932790/drc.json",
+                "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-drc-1519932790/first/offline_controller_adc.kicad_pcb"
+              ],
+              "working_dir": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-drc-1519932790/first",
+              "duration_ms": 1100,
+              "report_path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-drc-1519932790/drc.json",
+              "stdout": "Found 0 violations\nFound 0 unconnected items\nSaved DRC Report to /tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-drc-1519932790/drc.json\n",
+              "summary": {
+                "total_findings": 0,
+                "prompt": "No ERC/DRC findings."
+              }
+            },
+            "drc_required": true,
+            "erc": {
+              "kind": "erc",
+              "status": "fail",
+              "target_path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first",
+              "file_type": "schematic",
+              "project_context": "full",
+              "units": "mm",
+              "kicad_cli_path": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+              "kicad_version": "10.0.3",
+              "command": [
+                "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+                "sch",
+                "erc",
+                "--format",
+                "json",
+                "--severity-all",
+                "--exit-code-violations",
+                "--units",
+                "mm",
+                "--output",
+                "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/erc.json",
+                "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/first/offline_controller_adc.kicad_sch"
+              ],
+              "working_dir": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/first",
+              "exit_code": 5,
+              "duration_ms": 807,
+              "report_path": "/tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/erc.json",
+              "stdout": "Found 2 violations\nSaved ERC Report to /tmp/kicadai-power-locality-offline-v1-dev1/controller_adc_100ma/first/.kicadai/checks/kicadai-check-erc-3161746417/erc.json\n",
+              "stderr": "Fontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 19: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 20: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 23: invalid constant used : monospace\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 42: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 43: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 46: invalid constant used : sans-serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 68: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 69: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 72: invalid constant used : serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 88: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 89: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 92: invalid constant used : emoji\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 108: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 109: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 112: invalid constant used : math\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 120: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 121: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 124: invalid constant used : system-ui\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 132: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 133: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 136: invalid constant used : cursive\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 144: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 145: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 148: invalid constant used : fantasy\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 156: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 157: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 160: invalid constant used : ui-sans-serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 168: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 169: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 172: invalid constant used : ui-serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 180: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 181: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 184: invalid constant used : ui-monospace\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 192: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 193: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 196: invalid constant used : ui-rounded\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 204: invalid attribute 'xsi:nil'\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 205: invalid constant used : \nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-guessfamily.conf\", line 208: invalid constant used : fangsong\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/48-spacing.conf\", line 14: invalid constant used : monospace\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/49-sansserif.conf\", line 10: invalid constant used : serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/49-sansserif.conf\", line 18: invalid constant used : sans-serif\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/49-sansserif.conf\", line 26: invalid constant used : monospace\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/49-sansserif.conf\", line 34: invalid constant used : emoji\nFontconfig warning: \"/opt/homebrew/etc/fonts/conf.d/49-sansserif.conf\", line 42: invalid constant used : math\n",
+              "findings": [
+                {
+                  "id": "abd9cd3b203598c71b55a40abf678536",
+                  "kind": "erc",
+                  "severity": "warning",
+                  "rule": "label_multiple_wires",
+                  "code": "label_multiple_wires",
+                  "message": "Label connects more than one wire at 1244600, 406400",
+                  "sheet": "/",
+                  "location": {
+                    "x": 1.2446,
+                    "y": 0.4064,
+                    "units": "mm"
+                  },
+                  "objects": [
+                    {
+                      "type": "Label",
+                      "id": "2e32499b-a3e6-5a41-8146-18cf2355735f"
+                    },
+                    {
+                      "type": "Vertical",
+                      "id": "a5e29f1c-2e1b-556b-860e-dbf2e370bfbd"
+                    }
+                  ],
+                  "raw": "{\"description\":\"Label connects more than one wire at 1244600, 406400\",\"items\":[{\"description\":\"Label 'composition_net_001'\",\"pos\":{\"x\":1.2446,\"y\":0.4064},\"uuid\":\"2e32499b-a3e6-5a41-8146-18cf2355735f\"},{\"description\":\"Vertical Wire, length 0.0762 mm\",\"pos\":{\"x\":1.2446,\"y\":0.4318},\"uuid\":\"a5e29f1c-2e1b-556b-860e-dbf2e370bfbd\"}],\"severity\":\"warning\",\"type\":\"label_multiple_wires\"}",
+                  "repair_category": "unknown"
+                },
+                {
+                  "id": "40cf0da534a0aeebc13e689f84f444bc",
+                  "kind": "erc",
+                  "severity": "warning",
+                  "rule": "unconnected_wire_endpoint",
+                  "code": "unconnected_wire_endpoint",
+                  "message": "Unconnected wire endpoint",
+                  "sheet": "/",
+                  "location": {
+                    "x": 1.2954,
+                    "y": 0.4318,
+                    "units": "mm"
+                  },
+                  "objects": [
+                    {
+                      "type": "Vertical",
+                      "id": "0694583a-a449-5849-aa6f-1e74054d3438"
+                    }
+                  ],
+                  "raw": "{\"description\":\"Unconnected wire endpoint\",\"items\":[{\"description\":\"Vertical Wire, length 0.0254 mm\",\"pos\":{\"x\":1.2954,\"y\":0.4318},\"uuid\":\"0694583a-a449-5849-aa6f-1e74054d3438\"}],\"severity\":\"warning\",\"type\":\"unconnected_wire_endpoint\"}",
+                  "repair_category": "connectivity"
+                }
+              ],
+              "summary": {
+                "total_findings": 2,
+                "by_severity": {
+                  "warning": 2
+                },
+                "by_category": {
+                  "connectivity": 1,
+                  "unknown": 1
+                },
+                "prompt": "2 ERC/DRC finding(s); categories: connectivity=1, unknown=1"
+              }
+            },
+            "erc_required": true
+          },
+          "acceptance": {
+            "requested": "erc-drc",
+            "achieved": "connectivity",
+            "fabrication_ready": false
+          }
+        }
+      ],
+      "project_files": [
+        {
+          "run": "first",
+          "files": 23
+        }
+      ],
+      "actual_json_serialized_request_replay": false,
+      "byte_exact_generated_project_replay": false,
+      "emitted_pin_pad_and_geometry_audit": "not certified: full native project did not pass",
+      "reason": "A failed or absent required stage cannot be counted as a technical or readability pass"
+    }
+  ],
+  "inventory": {
+    "file_count": 297,
+    "total_bytes": 1526406922,
+    "sha256": "af4ebd7da6d382683edb8d754934f441e70971b2794bbbc7d9f2e279771a78db"
+  },
+  "provider_calls": 0,
+  "frozen_cases_added": 0,
+  "technical_gate_passed": false,
+  "technical_examples_passed": 1,
+  "complete_practical_benchmark_cases": 0,
+  "planned_examples": 2,
+  "readability": "separate visual review; native checks do not establish readability"
+}

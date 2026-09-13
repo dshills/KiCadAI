@@ -1,0 +1,1655 @@
+{
+  "schema": "kicadai.interface-clause-audits.v1",
+  "reviewer": "Codex local source-bound semantic review",
+  "independent_reviewer": false,
+  "case_count": 8,
+  "clause_count": 57,
+  "raw_inventory_sha256": "fada814dd6f4c8e32dc5797ead08455bb86eb977283e411e026b4a5fbfb330d9",
+  "cases": [
+    {
+      "case_id": "I01",
+      "title": "External analog filter interface",
+      "kind": "ready",
+      "source_sha256": "720f98ea1448ee6b1ce3d12a3e1336bdde0da22b8b298186a136138c5d6658fc",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "I01/initial/selected.json",
+      "selected_sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+      "first_attempt_status": "invalid",
+      "initial_final_status": "ready",
+      "follow_up_final_status": "",
+      "initial_attempts": 2,
+      "follow_up_attempts": 0,
+      "requests": 2,
+      "estimated_or_reserved_microusd": 293330,
+      "estimated_or_reserved_usd": 0.29333,
+      "clause_passes": 8,
+      "clause_count": 8,
+      "observed_faithful_workflow": true,
+      "first_attempt_each_leg_faithful": false,
+      "compiler_status_appropriate": true,
+      "final_issues": [],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "External supply, ground, analog input and analog output remain distinct interfaces.",
+          "status": "pass",
+          "reason": "Four distinct external endpoints remain: supply_input, ground_connection, analog_input and analog_output, with appropriate power/reference/analog kinds and directions.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/ports",
+              "value_sha256": "46360d93d98039bdec4981b01fe758d0d1dfce8f197fcd9a3cd7726cd10d446d"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "Nominal 3.3 V supply and complete 3.1–3.5 V range retained.",
+          "status": "pass",
+          "reason": "The external supply domain retains nominal 3.3 V and bounds 3.1–3.5 V, repeated consistently on its power port.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/domains/1",
+              "value_sha256": "771e6bff4176f9b96a86d57ac7260bc2c29b568906c27468dfada5ea1d27746b"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/ports/3",
+              "value_sha256": "49c2771fb2714a2031531c1da724cceb0b31e37612a96d6abc49cad7b0bf0588"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Ground-referenced input range 0–0.9 V retained.",
+          "status": "pass",
+          "reason": "analog_input is ground-referenced and bounded at 0–0.9 V.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/ports/0",
+              "value_sha256": "34638b656e80e4cb0491c91b0b2dc665ae01e94847582460241b5ee13b52e324"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/domains/0",
+              "value_sha256": "7b9d118dbf594da3d12188195504b9b1b974400f3303a59b7df0968613d986a8"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Output load resistance minimum 180000 Ohm retained.",
+          "status": "pass",
+          "reason": "The analog output has a minimum 180000 Ohm load condition, with matching objective constraint.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/operating_cases/0/conditions/0",
+              "value_sha256": "3e6bab2a4e140920900da1e442b6a048b033a3fdf308a671f4f2fb5f582aee50"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/objectives/0/constraints/8",
+              "value_sha256": "536f6781e383156bd3067ca88e8ad96709081f647dc8c8d82e4f228b992088d9"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "Low-pass cutoff target 3300 Hz, tolerance 5%, equivalently 3135–3465 Hz, observed on output.",
+          "status": "pass",
+          "reason": "The filter is low-pass, target 3300 Hz with 5% tolerance; its output cutoff measurement uses 3135–3465 Hz bounds.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/objectives/0/constraints/1",
+              "value_sha256": "48a0769f4ddf7e44f6b67d29b8dff9b4773e8f04c1568d749ba1624f5b9db34f"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/objectives/0/constraints/3",
+              "value_sha256": "8099ef7cf737d844682e4807ee65db9406d54f4db888684361d1ba6127b1d97c"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/behavioral_requirements/0",
+              "value_sha256": "997c2970de8bf38dd8c5afc507c0f918f051b1a7b764edd262b437e56ef3ee4e"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "Behavior evaluated across the full supplied voltage range.",
+          "status": "pass",
+          "reason": "The cutoff requirement references cutoff_supply_range, whose supply condition spans the complete 3.1–3.5 V range.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/behavioral_requirements/0/operating_cases",
+              "value_sha256": "4ed405cbb6d273a3d213d1f3128781766e7d1bc816808073519279a9b4b2780f"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/operating_cases/0",
+              "value_sha256": "342de7a2433d83662c0c6c17dd8362c512e94fafaed920a39a1cd72a58ec8ae7"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "Maximum 16 components and 38×27 mm retained.",
+          "status": "pass",
+          "reason": "Board limits are exactly 16 components and 38×27 mm.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/constraints",
+              "value_sha256": "d582b40a4992d352d3e9e104468478a4b75fc3d78ce61928d1f4c64d8af5f159"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "text": "No unrequested controller, digital interface, protection, timing, component choice or physical implementation.",
+          "status": "pass",
+          "reason": "Only the requested frequency-filter objective is present. Explicit exclusions prohibit controller, digital-interface, protection and timing functions; no component identities or physical topology are supplied.",
+          "evidence": [
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement",
+              "value_sha256": "536b99ad9163e96b4c0b9e95f60e482299cacf20a9f0886d4ff616f79540d8a7"
+            },
+            {
+              "path": "I01/initial/selected.json",
+              "sha256": "d57795def6319438bf551a41fd86e25146d3ff0cacb919ade86c19f2e32dbe23",
+              "pointer": "/compilation/requirement/requirements/system_constraints",
+              "value_sha256": "eb4f50e70a9a30cf5080b1d63156276fa8149cfd850536d27029c8cecc8f010d"
+            }
+          ]
+        }
+      ],
+      "note": "The first attempt failed compiler coverage validation; the second is ready with zero issues. Semantic preservation was reviewed independently of compiler acceptance; authentication and replay are still required."
+    },
+    {
+      "case_id": "I02",
+      "title": "Composed filter and gain interface",
+      "kind": "ready",
+      "source_sha256": "771a227b24c4847d5bceff7f3faab589732d7b32366fd279dfb1d06ff0ea6d28",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "I02/initial/selected.json",
+      "selected_sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+      "first_attempt_status": "invalid",
+      "initial_final_status": "invalid",
+      "follow_up_final_status": "",
+      "initial_attempts": 2,
+      "follow_up_attempts": 0,
+      "requests": 2,
+      "estimated_or_reserved_microusd": 299980,
+      "estimated_or_reserved_usd": 0.29998,
+      "clause_passes": 8,
+      "clause_count": 8,
+      "observed_faithful_workflow": false,
+      "first_attempt_each_leg_faithful": false,
+      "compiler_status_appropriate": false,
+      "final_issues": [
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[5].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        }
+      ],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "External nominal 5.1 V supply, full 4.9–5.3 V range and ground return retained.",
+          "status": "pass",
+          "reason": "The proposal retains external nominal 5.1 V supply, full 4.9–5.3 V range and a distinct ground return.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/domains",
+              "value_sha256": "894556ea8797eabff69c62a29e16e6ba24be90e2759b23561ef119dfaa3be02f"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/ports/0",
+              "value_sha256": "11545cff2bf81d62287d55142978352170046c472ba94a3a1e30f1dabb045916"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/ports/1",
+              "value_sha256": "5d55f3b44a22d66b16d4fbee2a573c37247565b3ac11a76c6953fa2a516384d3"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "External analog input range 0–0.06 V retained.",
+          "status": "pass",
+          "reason": "The external analog-input port retains 0–0.06 V.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/ports/2",
+              "value_sha256": "40034b94f2e22917140d3f66577f9dbf06943d45bf42aa758bdd4b205d013ef9"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Low-pass filter cutoff 1900 Hz ±6%, equivalently 1786–2014 Hz, observed on filtered internal signal.",
+          "status": "pass",
+          "reason": "The low-pass target is 1900 Hz ±6%, with 1786–2014 Hz measured on filtered_signal.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/objectives/0",
+              "value_sha256": "74b54bd6e36badd92ee43de18341ce8fd5ce24ec50f7e09be69c3844ea4bbd61"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements/0",
+              "value_sha256": "158e4dbb53190f12c546b40743f8170f7b895e1d661cb4f80b4c235e639c6b3b"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Filter then amplification functional order preserved with one properly sourced/sunk internal signal, not a new external connector.",
+          "status": "pass",
+          "reason": "filtered_signal is an internal analog signal sourced by low_pass_filter and sunk by signal_amplifier; it is not declared as an external port.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/signals",
+              "value_sha256": "86be3b0fac74b2d20adbdca04dd5addd55f107c808a89fb2e5145e90681a4d63"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/objectives",
+              "value_sha256": "b50df4ff671de2a0bd4c3a32c52d9caa8305f2b6838a11787929abe281162266"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/ports",
+              "value_sha256": "fd97ec1cfc31a40014e864224ed5640adacba23270d2c84c28614ead3861bd0e"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "Amplification target 2.5 ratio ±8%, equivalently 2.3–2.7, for complete input-to-output gain at 100 Hz.",
+          "status": "pass",
+          "reason": "The proposed amplifier target is 2.5 ratio ±8%; the input_to_output_gain_requirement observes analog_output with bounds 2.3–2.7 and a 100 Hz condition targeting the only external analog input.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/objectives/1",
+              "value_sha256": "06dc2907ec74957eb2b845f594a839ccfd91778009a2a4942198ff3446242641"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements/1",
+              "value_sha256": "6a7defaf13055b2845537be52af879e274c4aec0e07f380e037d467018739a95"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/operating_cases/1",
+              "value_sha256": "f3a75aff185b99047b2b0c452cc1ab2b80336ccfbcefaccb360c5056a295a6d0"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "External output load resistance at least 220000 Ohm retained.",
+          "status": "pass",
+          "reason": "The amplifier load constraint and analog-output operating condition retain at least 220000 Ohm.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/objectives/1/constraints/1",
+              "value_sha256": "010b2e1a2ed6a657e754785403e50e73d0518cb22e2da572c8dd17cab948de88"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/operating_cases/1/conditions/2",
+              "value_sha256": "e7338e496cabfff3a3eb095fd10262e691b3ecc357210d816ffb1e519edd8555"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "Both measurable requirements cover the full supply range; 100 Hz gain evaluation condition retained.",
+          "status": "pass",
+          "reason": "Both measurements reference full-range supply cases; gain also retains the 100 Hz external-input condition.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "b33ce0c71c9b0bd09a12fc64567a58ee26d0b3ddc1e22e6aaa80189c4068c942"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements",
+              "value_sha256": "23dd56408d83174860af2e458ec174928e412ad92b628794f849f8237527e178"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "text": "Maximum 24 components, 46×31 mm; no unrequested functions, physical topology, component identities or startup guarantees.",
+          "status": "pass",
+          "reason": "The proposal retains 24 components and 46×31 mm, adds only the requested filter/amplifier functions, and does not choose components, topology, controller, clock, bus, protection or startup behavior.",
+          "evidence": [
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/requirement",
+              "value_sha256": "4fb6f206094b0fcac2c8a2cffa5d97f83efc0bf42f03353981e434295f95e2fa"
+            },
+            {
+              "path": "I02/initial/selected.json",
+              "sha256": "28b0ee270a650543c231ca0ae1ce2fb3c1bc1d37aa16caa629ad22a7f4b512c4",
+              "pointer": "/proposal/coverage/6",
+              "value_sha256": "46ff014726038ca29ba8b85c37d58193e713d9b6d999ce2aa50e9d6346934bad"
+            }
+          ]
+        }
+      ],
+      "note": "These are semantic observations about a rejected proposal, not acceptance. Both attempts fail coverage validation: statement_006 references the project name analog_signal_conditioning_board as a requirement identifier, which is not a declared requirement entity. The compiler retains no executable requirement."
+    },
+    {
+      "case_id": "I03",
+      "title": "Existing controller participant endpoint",
+      "kind": "ready",
+      "source_sha256": "17d88bd3cf6333647598bbdb8d9963755e1cf212ec7afb3b42246ed68488fc6c",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "I03/initial/selected.json",
+      "selected_sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+      "first_attempt_status": "invalid",
+      "initial_final_status": "invalid",
+      "follow_up_final_status": "",
+      "initial_attempts": 2,
+      "follow_up_attempts": 0,
+      "requests": 2,
+      "estimated_or_reserved_microusd": 331220,
+      "estimated_or_reserved_usd": 0.33122,
+      "clause_passes": 7,
+      "clause_count": 8,
+      "observed_faithful_workflow": false,
+      "first_attempt_each_leg_faithful": false,
+      "compiler_status_appropriate": false,
+      "final_issues": [
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[2].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        },
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[4].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        },
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[4].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        },
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[6].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        },
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage[8].references",
+          "message": "coverage reference is unknown or inconsistent with its disposition"
+        }
+      ],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Existing controller is a participant, not newly synthesized or programmed; its required ADC port is a single-ended analog sink.",
+          "status": "pass",
+          "reason": "The rejected proposal declares an existing external participant, an analog sink ADC port, single-ended mode, and an explicit prohibition on designing or programming it. This preserves the supplied participant facts; it does not establish that the capability label external_controller is a synthesized catalog block.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/participants/0",
+              "value_sha256": "cff6920fb8ea6ef0e36bce5b7aca64bc571003803602210c29128e8dc450f52b"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "External analog input range 0–1.1 V retained.",
+          "status": "pass",
+          "reason": "The stated external analog-input range 0–1.1 V is preserved in the port bounds and operating amplitude. The selected proposal's source direction is separately flagged for follow-up interpretation; this clause's quantitative bound is intact.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/ports/0",
+              "value_sha256": "e82043c9eb7cd3c8df196917ce2ca5b642dd2068698c6a2e961e3d7f149f8c6b"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/operating_cases/0/conditions/1",
+              "value_sha256": "b46e80377de395eb5b5f3cc7e7e3ecc3e017611e3f1445d4d6ccf554a8d8c050"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Controller ADC minimum input resistance 150000 Ohm and ground reference retained.",
+          "status": "pass",
+          "reason": "The participant constraints explicitly preserve at least 150000 Ohm ADC input resistance and ground reference.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/participants/0/constraints",
+              "value_sha256": "09ed3467279ea0d9cff74d13b6e2c3091cbc0b642439553f6229200b3ec1e1ac"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/domains/1",
+              "value_sha256": "7b9d118dbf594da3d12188195504b9b1b974400f3303a59b7df0968613d986a8"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "External shared nominal 3.4 V supply, full 3.2–3.6 V range, and ground return retained.",
+          "status": "pass",
+          "reason": "The shared external domain retains nominal 3.4 V and full 3.2–3.6 V range; a ground domain and return are present and the participant references that supply domain.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/domains",
+              "value_sha256": "5ce8cc5a799c7f986e138ce0b21a2e0a373bc0d17c6454c712b7aa23dd21aef8"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/ports/1",
+              "value_sha256": "76dce173ad2aca2d4c2daf36cc161e1f6df0c3965d4f957163719b54535e24a5"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/ports/2",
+              "value_sha256": "5c395877a5208d7d1c032a856d82e94b0376a16a49d44ad32c694ff5e7ec9c70"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/participants/0/domain",
+              "value_sha256": "52350a343a044f405253741dd6c4b5de06bee812ba6eb331cb57bd76357273f8"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "Filter binding terminates at declared participant/participant_port; no unrelated replacement output.",
+          "status": "pass",
+          "reason": "The filter output binding uses existing_controller/controller_adc_input, and the external ports contain no replacement analog output.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/objectives/0/bindings",
+              "value_sha256": "16c4770dde858afe1226bf64355b86d0de6a6b7146d95b29deade6d62f2789f9"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/ports",
+              "value_sha256": "2a38701cefab9bfd2a7e0bc3880b0545bf6143120334ed17c69a09c596414d77"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "Cutoff 2700 Hz ±7%, equivalently 2511–2889 Hz, measured over the requested input-to-ADC interface across the full supply range.",
+          "status": "fail",
+          "reason": "2700 Hz ±7%, the equivalent 2511–2889 Hz limits and full supply range are retained, but both accepted-shape observations select only the whole circuit. The requested input-to-ADC measurement endpoint is not explicitly identified by either measurement. This strict semantic audit does not infer a participant measurement from a generic circuit observation.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/objectives/0",
+              "value_sha256": "dbcf03ba97053c9b69cd5dc514f16980ee0286e73ebe6de12de36f36e13607d1"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements",
+              "value_sha256": "def37643bd34f6e40bc0a940b3b95e4573fb5e6d388e8a57d04301a573ae89e8"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "556810183264d2ca64a567d784ea386af45cf5aa2bfe96d62644c4f7af0f599f"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "Maximum 15 components and 35×28 mm apply to the interface board.",
+          "status": "pass",
+          "reason": "The interface-board limits remain 15 components and 35×28 mm; participant constraints state that the external controller is not to be designed or programmed.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/constraints",
+              "value_sha256": "df2403111b4deddafe5afe096494d9229f4b9d280e0077a01d7564cb4b8accbd"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement/requirements/participants/0/constraints",
+              "value_sha256": "09ed3467279ea0d9cff74d13b6e2c3091cbc0b642439553f6229200b3ec1e1ac"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "text": "No new MCU, firmware, bus, clock, protection, timing guarantee or physical implementation supplied.",
+          "status": "pass",
+          "reason": "The only new functional objective is the filter, and the participant is explicitly existing/external. No MCU part, firmware, bus, clock, protection, timing guarantee, placement, routing or physical implementation is supplied.",
+          "evidence": [
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/requirement",
+              "value_sha256": "487e957d77fcb1c99a0ae880798a6a5c7f7118b2033a1f8a867f7995dec5cbf2"
+            },
+            {
+              "path": "I03/initial/selected.json",
+              "sha256": "e5e9cfe895b98ed7c086285de98c08afdce6d9aba3dcb835c4d15cbf70153888",
+              "pointer": "/proposal/coverage/9",
+              "value_sha256": "5c432a1b9ded4eb6017d70ccb88bfb1368aaf38b2c27f8ca4dc6e37aed7d67cc"
+            }
+          ]
+        }
+      ],
+      "note": "Rejected on both attempts. The first has two invalid whole-circuit observation IDs. The correction fixes those IDs but fails five coverage references: unqualified participant-port IDs and the project name are not known requirement IDs. No executable requirement is retained. Potential external-port direction interpretation and the unregistered-as-objective external_controller label are caveats, not additional decisive compiler findings."
+    },
+    {
+      "case_id": "I04",
+      "title": "Regulation across supply and load cases",
+      "kind": "ready",
+      "source_sha256": "c44282e3b2b4ec24065915bdd9c353ebd903e01e5600baf630cd97a11f46877c",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "I04/initial/selected.json",
+      "selected_sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+      "first_attempt_status": "invalid",
+      "initial_final_status": "ready",
+      "follow_up_final_status": "",
+      "initial_attempts": 2,
+      "follow_up_attempts": 0,
+      "requests": 2,
+      "estimated_or_reserved_microusd": 288995,
+      "estimated_or_reserved_usd": 0.288995,
+      "clause_passes": 6,
+      "clause_count": 8,
+      "observed_faithful_workflow": false,
+      "first_attempt_each_leg_faithful": false,
+      "compiler_status_appropriate": true,
+      "final_issues": [],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "External nominal 7 V input with full 6.5–7.5 V range and external ground retained.",
+          "status": "pass",
+          "reason": "The input domain and sink port retain external nominal 7 V and full 6.5–7.5 V range, with a separate external ground.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/domains/0",
+              "value_sha256": "ab643ac78f68081a2f4da0afc83fb3990107c6c8a7fe2b5e0504fe4de8a81f6b"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/domains/1",
+              "value_sha256": "7b9d118dbf594da3d12188195504b9b1b974400f3303a59b7df0968613d986a8"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/ports/0",
+              "value_sha256": "2814fc799d3b72f8f927561401384d462084bead7550e600bac428621eca6b1e"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/ports/1",
+              "value_sha256": "7a1553b5e0be122de633c661ba3062cdf148ddd46b2a828a3c02ebffa6f5ce58"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "One regulated external output, not a second output or an independent external source.",
+          "status": "fail",
+          "reason": "There is one output port and a regulation objective, but regulated_output_supply is explicitly marked source=external. This represents the purported regulated rail as an independently external supply instead of a rail produced by the requested board.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/domains/2",
+              "value_sha256": "9d38a96c59becb52a3ff7f80de864d6a98fc33792407510bcfd6a03118472b7e"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/ports/2",
+              "value_sha256": "67939684b670cd91481313209e2f7989f58c13c6edeb82ab9cc14b0380a3d0ac"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/objectives/0/bindings",
+              "value_sha256": "c7c6cc450cf31639a816eb9db722d4649862b778ebb41e7533f1dc70bf75bfa6"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Output DC voltage bounds exactly 2.94–3.06 V; no weaker tolerance substituted.",
+          "status": "pass",
+          "reason": "The DC output measurement preserves exact 2.94–3.06 V limits without weakening the range.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements/0",
+              "value_sha256": "1853c751544e513bb38888035168122e4e54f3cefcf9bca7281fe82c0fe9ce57"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Full sourced load-current range 0.005–0.025 A retained.",
+          "status": "pass",
+          "reason": "The output is a source port and the load condition spans 0.005–0.025 A; its 25 mA source bound is consistent.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/ports/2",
+              "value_sha256": "67939684b670cd91481313209e2f7989f58c13c6edeb82ab9cc14b0380a3d0ac"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/operating_cases/0/conditions/1",
+              "value_sha256": "b7ed4e6e5cb59b114d867c5554199563cdf0ac0d2c4cc27bc1821d47345e9635"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "Measurable DC behavior covers full input-voltage, load-current and 10–35 degC ambient ranges.",
+          "status": "pass",
+          "reason": "dc_operating_point observes the regulated output and references a case containing the full 6.5–7.5 V, 0.005–0.025 A and 10–35 degC ranges.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements/0",
+              "value_sha256": "1853c751544e513bb38888035168122e4e54f3cefcf9bca7281fe82c0fe9ce57"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/operating_cases/0",
+              "value_sha256": "676bf2d7adf45081d1ad58832c9769c49c0267b1fa7f9267ecabcad0236160d8"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "Any derived supply-domain source uses a declared supply signal with coherent endpoint bindings, not an invented component or source.",
+          "status": "fail",
+          "reason": "The proposal creates regulated_output_supply but gives it external provenance and declares no supply signal. The required coherent derived-rail source and endpoint bindings are absent.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/domains",
+              "value_sha256": "91e914b0d53e37a240649002f028fbf06209010949bd5f0883486d2fa62c8e16"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/objectives",
+              "value_sha256": "ebf0f8dac739f60223762f5769f2b3f09874aeccf8c6f2e96d3b01f07881a90f"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements",
+              "value_sha256": "251745f117fc552b7642e90e68be42247d198d97d498b71449205f27a49c3340"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "Maximum 18 components, 39×26 mm.",
+          "status": "pass",
+          "reason": "The exact board limits remain 18 components and 39×26 mm.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/constraints",
+              "value_sha256": "a82e6011221063cf3785664e4e8b70b3daa1c27c2a84eacb9686529c4d26189c"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "text": "No new controller, digital bus, current-limit guarantee, fault-recovery timing, components or physical implementation.",
+          "status": "pass",
+          "reason": "Only voltage regulation is requested; explicit constraints exclude a controller, bus, current-limit guarantee, fault-recovery timing and second output. No parts or physical implementation are supplied.",
+          "evidence": [
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement",
+              "value_sha256": "4a02c88ac0a18d324d6c23c92890e35a7c8d2f8f96c02626139a1211fcf17bfd"
+            },
+            {
+              "path": "I04/initial/selected.json",
+              "sha256": "db82cfda8471b2e324e36a0971ca272361de4df6424a408a496eb16365512aea",
+              "pointer": "/proposal/requirement/requirements/system_constraints",
+              "value_sha256": "5d1d42c363df0132c6c2faa7668fa033a7d97708d1bfdf7352f50d4d33e97fba"
+            }
+          ]
+        }
+      ],
+      "note": "The compiler accepts the correction with no issues, but semantic acceptance fails on output supply provenance. This is a compiler-accepted semantic counterexample, not a successful board or faithful-ready case."
+    },
+    {
+      "case_id": "R01",
+      "title": "Unavailable radiation calibration and certification",
+      "kind": "refusal",
+      "source_sha256": "9a4e7df7081124e5a876c9d9eb150856e4aa5e85da21b8662161525d129138e0",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "R01/initial/selected.json",
+      "selected_sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+      "first_attempt_status": "unsupported",
+      "initial_final_status": "unsupported",
+      "follow_up_final_status": "",
+      "initial_attempts": 1,
+      "follow_up_attempts": 0,
+      "requests": 1,
+      "estimated_or_reserved_microusd": 101980,
+      "estimated_or_reserved_usd": 0.10198,
+      "clause_passes": 5,
+      "clause_count": 5,
+      "observed_faithful_workflow": true,
+      "first_attempt_each_leg_faithful": true,
+      "compiler_status_appropriate": true,
+      "final_issues": [],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Structured unsupported result identifies unavailable trusted radiation dose-response/calibration and certification evidence.",
+          "status": "pass",
+          "reason": "The structured unsupported result identifies missing radiation dose-response/calibration/accuracy verification and independent traceable certification.",
+          "evidence": [
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/compilation/status",
+              "value_sha256": "0bc6f540bbf1d48a52b38b78f201053bc6ac6a49a3bd6105deccacea34c8b9b8"
+            },
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal/capability_gaps",
+              "value_sha256": "980ce876340fcb9a40f161f1e16996dd2e2eb58b4731b6275f4fa3c0d582a917"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "Capability gap uses valid normalized identifiers and identifies missing evidence without inventing it.",
+          "status": "pass",
+          "reason": "Normalized gap and uncertainty IDs are linked correctly; required_evidence lists actual missing models, calibration, uncertainty budget and independent certificates without claiming they exist.",
+          "evidence": [
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal/capability_gaps",
+              "value_sha256": "980ce876340fcb9a40f161f1e16996dd2e2eb58b4731b6275f4fa3c0d582a917"
+            },
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal/uncertainties",
+              "value_sha256": "b9fa672edf12ffe543934cbc50b463206b19c3e89f0955c56a5c95aa5214f91e"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Mandatory one-percent accuracy and certification are preserved, not relaxed into a detector or another measurement.",
+          "status": "pass",
+          "reason": "The reasons and coverage preserve mandatory one-percent accuracy and certification, explicitly rejecting an uncalibrated detector or a substituted measurement.",
+          "evidence": [
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal/capability_gaps",
+              "value_sha256": "980ce876340fcb9a40f161f1e16996dd2e2eb58b4731b6275f4fa3c0d582a917"
+            },
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "a3481c5aff4fd6762290e77bf7735a12af4be8d653bdd0e1ca607241f12d9636"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "All material source statements have correct capability-gap coverage.",
+          "status": "pass",
+          "reason": "All four source statements are accounted for exactly once with capability_gap disposition and valid gap/uncertainty references.",
+          "evidence": [
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/compilation/source/statements",
+              "value_sha256": "4e083af4c6edda16aff86682d77a5bf7118e2ea55bd2124082d7650bb8ed3124"
+            },
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/compilation/coverage",
+              "value_sha256": "760b5edcf68dd2895e542b2faaf2f67f4fb6d8f151af20659d5beebcd6941084"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "No executable requirement, circuit, board, misleading ready result or clarification that changes the demanded guarantee.",
+          "status": "pass",
+          "reason": "The complete proposal and compilation contain no executable requirement or clarification; the terminal status is unsupported, not ready.",
+          "evidence": [
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/proposal",
+              "value_sha256": "d7fa9a492586452d937f0760346c4b990d8ad02c7bd2764c301ba155168fa417"
+            },
+            {
+              "path": "R01/initial/selected.json",
+              "sha256": "5834039b4f54e9bfe401f8c8969c6018da5ddd166acba258f8a46c4c70f824c4",
+              "pointer": "/compilation",
+              "value_sha256": "73472986dd9e291c9d8f62374ca8e4c86715b755771c5a43e6ba033cdaaa60b7"
+            }
+          ]
+        }
+      ],
+      "note": "One live request; zero compiler issues. Refusal faithfulness reviewed locally; authentication and replay remain required."
+    },
+    {
+      "case_id": "R02",
+      "title": "Unavailable event-directed control contract",
+      "kind": "refusal",
+      "source_sha256": "43d4a175701ffdc6db7b1295cda6ced1cca4ee16f3ef166e263dd4f48da836c7",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "R02/initial/selected.json",
+      "selected_sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+      "first_attempt_status": "unsupported",
+      "initial_final_status": "unsupported",
+      "follow_up_final_status": "",
+      "initial_attempts": 1,
+      "follow_up_attempts": 0,
+      "requests": 1,
+      "estimated_or_reserved_microusd": 97525,
+      "estimated_or_reserved_usd": 0.097525,
+      "clause_passes": 6,
+      "clause_count": 6,
+      "observed_faithful_workflow": true,
+      "first_attempt_each_leg_faithful": true,
+      "compiler_status_appropriate": true,
+      "final_issues": [],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Structured unsupported result identifies control/event/transition semantics unavailable through the advertised v3 contract.",
+          "status": "pass",
+          "reason": "The structured unsupported result identifies unavailable v3 control, event and transition semantics, rather than presenting a partial executable requirement.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/compilation/status",
+              "value_sha256": "0bc6f540bbf1d48a52b38b78f201053bc6ac6a49a3bd6105deccacea34c8b9b8"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/capability_gaps/0",
+              "value_sha256": "a3d839be86a82a4313b1fb60c893ef9cfcd2a34b9a9b5cde4e0526235b4cc26b"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "Gap reason preserves startup-disabled, active-high enable/fault polarity and the requested event-dependent behavior.",
+          "status": "pass",
+          "reason": "The linked source coverage preserves the 3.3 V supply and active-high enable/fault polarities; the gap reason and uncertainty preserve the startup-disabled and stateful event requirements.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/0",
+              "value_sha256": "43f76236f48f369c777b2336d45f372dad6f24437878afa5494bb4fe63be762f"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/1",
+              "value_sha256": "29e53b0e2553bbc2294df6a783bb4c3e9b3eda9eb1152c30eb675718db533fbf"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/capability_gaps/0",
+              "value_sha256": "a3d839be86a82a4313b1fb60c893ef9cfcd2a34b9a9b5cde4e0526235b4cc26b"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/uncertainties/0",
+              "value_sha256": "e8ee4833fe6d8926519d07eb44e2f04811ea2d6e23efb2d00228e0a62227dc02"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Enable event at 2 ms, on delay ≤40 us, prior fault inactivity ≥70 us, fault event at 5 ms and off delay ≤15 us are not replaced with static behavior.",
+          "status": "pass",
+          "reason": "Coverage explicitly retains enable at 2 ms, on delay <=40 us after 70 us fault inactivity, and fault at 5 ms with off delay <=15 us; the gap rejects static substitution.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/2",
+              "value_sha256": "a3ef58861914d493d532824e97e37b0e9284863149ed1d711ba60f4abf60400b"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/3",
+              "value_sha256": "2c9e42930978a236392bfc11ec19e8857242e7a964ad01eba04c60be9bac3664"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/5",
+              "value_sha256": "9187f93082742b997cf29f862cce26e0193f611c653bab8a97fcc342deaa533e"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Fault latch/reset dependency remains a missing required capability rather than a guessed implementation.",
+          "status": "pass",
+          "reason": "The latched-off state and ordered enable fall-then-rise reset remain required missing capabilities; no guessed control implementation is supplied.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/capability_gaps/0",
+              "value_sha256": "a3d839be86a82a4313b1fb60c893ef9cfcd2a34b9a9b5cde4e0526235b4cc26b"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/uncertainties/0",
+              "value_sha256": "e8ee4833fe6d8926519d07eb44e2f04811ea2d6e23efb2d00228e0a62227dc02"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal/coverage/3",
+              "value_sha256": "2c9e42930978a236392bfc11ec19e8857242e7a964ad01eba04c60be9bac3664"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "text": "Complete capability-gap source coverage and normalized gap identifiers.",
+          "status": "pass",
+          "reason": "All six statements have capability-gap coverage, using the normalized gap_stateful_event_control and unc_stateful_event_control identities.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/compilation/source/statements",
+              "value_sha256": "70b2a4c9aca230eb3f948af74654d12aa484b4501931ef330c3e6848e6c969fa"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/compilation/coverage",
+              "value_sha256": "f8a59223db303997f8e20e036dca7efd35ef19088a8711f36d5c1432ad6870bc"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/compilation/capability_gaps",
+              "value_sha256": "07f780f9810a654503dd1b3144c8a9f8ce08a3308ef0b3e29a450dddc2f1836a"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "No executable requirement or physical design; no clarification that changes mandatory behavior.",
+          "status": "pass",
+          "reason": "Neither proposal nor compilation has an executable requirement; there is no clarification, component choice or physical design.",
+          "evidence": [
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/proposal",
+              "value_sha256": "c91ca411141c0e6921df08b1fb60d3e10d45da9eeaf90e2ba577ac39dffcd192"
+            },
+            {
+              "path": "R02/initial/selected.json",
+              "sha256": "2840204fc4e58080ac048d1e104c131db207092b2201a93a04baae151fe1d9d4",
+              "pointer": "/compilation",
+              "value_sha256": "70f9885572fd7d0b387512747254c3344d670a3681ae62751077073dd5325eb9"
+            }
+          ]
+        }
+      ],
+      "note": "One live request, compiler unsupported with zero issues. Local semantic review supports the intended refusal, pending terminal authentication and replay."
+    },
+    {
+      "case_id": "C01",
+      "title": "Missing cutoff and tolerance",
+      "kind": "clarification",
+      "source_sha256": "e02a2173b297b2c6c724f2419e76e6fa6d82964a52446e0debfc83298f313696",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "C01/follow-up/selected.json",
+      "selected_sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+      "first_attempt_status": "needs_clarification",
+      "initial_final_status": "needs_clarification",
+      "follow_up_final_status": "ready",
+      "initial_attempts": 1,
+      "follow_up_attempts": 1,
+      "requests": 2,
+      "estimated_or_reserved_microusd": 246300,
+      "estimated_or_reserved_usd": 0.2463,
+      "clause_passes": 7,
+      "clause_count": 7,
+      "observed_faithful_workflow": true,
+      "first_attempt_each_leg_faithful": true,
+      "compiler_status_appropriate": true,
+      "final_issues": [],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Before answers, one minimal question asks only for cutoff frequency and tolerance, with exact uncertainty ownership and no executable requirement.",
+          "status": "pass",
+          "reason": "One initial question asks only cutoff frequency and percent tolerance, owns exactly uncertainty_cutoff_specification at the same path, and produces needs_clarification with no executable requirement.",
+          "evidence": [
+            {
+              "path": "C01/initial/selected.json",
+              "sha256": "ef10479daae85e57fd35d7ede4ac13f0eeffb6222f0267daa510c89e1ae74786",
+              "pointer": "/proposal/clarifications",
+              "value_sha256": "f373026cdcd26d268835e68d25f286cc4e0719fa662e90c62ccc53b22be151d7"
+            },
+            {
+              "path": "C01/initial/selected.json",
+              "sha256": "ef10479daae85e57fd35d7ede4ac13f0eeffb6222f0267daa510c89e1ae74786",
+              "pointer": "/proposal/uncertainties",
+              "value_sha256": "4752486409194717271699faf117fe50c0718775c7bb040e11823b77207f502c"
+            },
+            {
+              "path": "C01/initial/selected.json",
+              "sha256": "ef10479daae85e57fd35d7ede4ac13f0eeffb6222f0267daa510c89e1ae74786",
+              "pointer": "/compilation",
+              "value_sha256": "d4bc31d908f231cf40d630532137f97ad537d1010020d46ed8a4d8b53920ac24"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "No already supplied voltage, interfaces, load, component or board-size facts are re-asked or changed.",
+          "status": "pass",
+          "reason": "The initial question does not re-ask known facts; both the initial source coverage and the final requirement preserve the original interfaces, voltage, load and board limits.",
+          "evidence": [
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement",
+              "value_sha256": "41d9792ad5a93de4b506e22d363d775127ca6325d18507fc384b9cf388a498f2"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "d0fe5df7e9bed8f96b98fd456051b73259e5bbb5c17f111ebcc71426edd80ec4"
+            },
+            {
+              "path": "C01/initial/selected.json",
+              "sha256": "ef10479daae85e57fd35d7ede4ac13f0eeffb6222f0267daa510c89e1ae74786",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "20acbd7e8396c4c30515499edaa5176349cb895b50b83d7eba4c9297bd31299d"
+            },
+            {
+              "path": "C01/answer-review.json",
+              "sha256": "c934742992b54fa4b4032874cd1ae8d8465fa5ab430ca5d58ebd143edfaa2be4",
+              "pointer": "",
+              "value_sha256": "b89e3d04cfdf188eedde0d42b31113c578996ec909821971fb74ecf95b6fdbff"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Original nominal 4.1 V supply and 3.9–4.3 V range; input 0–0.8 V; output load ≥160000 Ohm retained.",
+          "status": "pass",
+          "reason": "The final contract preserves nominal 4.1 V and 3.9–4.3 V range, ground-referenced 0–0.8 V input and output load resistance at least 160000 Ohm.",
+          "evidence": [
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/domains",
+              "value_sha256": "0a23292e7736caed3097d61cba0b6974899a62dc32eccf5f7ef2eee780e53efc"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/ports",
+              "value_sha256": "18095137ff0ce1aad89e2d78f42cbc0fbfb3f438abaf669e3e66539681e83901"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "6e3eb4dcb6e05891dbff4b6e4a92e37a40682be18724490f690c58f293fbcf25"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Frozen answer is bound to exact source, capability snapshot, prior proposal/compilation and owned uncertainty IDs.",
+          "status": "pass",
+          "reason": "The frozen answer is copied verbatim in a follow-up carrying the source, capability, prior-proposal and prior-compilation hashes and the exact owned clarification/uncertainty IDs. The post-run supplementary offline audit validated the original bindings.",
+          "evidence": [
+            {
+              "path": "C01/bound-answer.json",
+              "sha256": "f6bd0951d12327b9bce93cc6bf3797783b3be2f4e9230bb26a0b5c309f1c4510",
+              "pointer": "",
+              "value_sha256": "e54f58bc06484c2b40ca5bbe0e0794a7418bbcc38216f7bc297154452270907d"
+            },
+            {
+              "path": "C01/answer-review.json",
+              "sha256": "c934742992b54fa4b4032874cd1ae8d8465fa5ab430ca5d58ebd143edfaa2be4",
+              "pointer": "",
+              "value_sha256": "b89e3d04cfdf188eedde0d42b31113c578996ec909821971fb74ecf95b6fdbff"
+            }
+          ],
+          "supplementary_replay": {
+            "path": "supplementary-replay.json",
+            "sha256": "a214a9c1b666c8b58723943ece40ff0e2946e067bb7b2e7db34c7dc4f453a355",
+            "case_id": "C01",
+            "controls_rejected": 4,
+            "sealed_replay_passed": false
+          }
+        },
+        {
+          "number": 5,
+          "text": "After answer, cutoff 4200 Hz ±7% or 3906–4494 Hz is a measurable output behavior across the full supply range.",
+          "status": "pass",
+          "reason": "The answer becomes a 4200 Hz ±7% low-pass objective and an output ac_sweep requirement bounded 3906–4494 Hz, linked to the complete 3.9–4.3 V supply case.",
+          "evidence": [
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/objectives",
+              "value_sha256": "8f1daa5415a56340bc6a5da1fced3f32e74d96f374b2a306dd2b5fc608bf1300"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements",
+              "value_sha256": "a0dae175625695e9771fb1e47985f145585480b4e461bb628c943415ea116e95"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "6e3eb4dcb6e05891dbff4b6e4a92e37a40682be18724490f690c58f293fbcf25"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "After answer, ready contract has no reused answered blocker identity, no missing original source coverage and no unrequested function.",
+          "status": "pass",
+          "reason": "The follow-up compiler returns ready with zero issues; all eight original statements remain covered, no answered blocker identity recurs, and the only functional objective is frequency_filter.",
+          "evidence": [
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/compilation/status",
+              "value_sha256": "40ec7f71ea684c8b976e79e8e425f87779e6de57f4821dcfc8066dbcad2defe0"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/compilation/source/statements",
+              "value_sha256": "0789a1707b99233521d2ae52cab00325a166bef284da899af8df3e2462fb5c44"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "d0fe5df7e9bed8f96b98fd456051b73259e5bbb5c17f111ebcc71426edd80ec4"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/uncertainties",
+              "value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/clarifications",
+              "value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/capability_gaps",
+              "value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/objectives",
+              "value_sha256": "8f1daa5415a56340bc6a5da1fced3f32e74d96f374b2a306dd2b5fc608bf1300"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "Maximum 14 components and 37×23 mm retained; tampered answer bindings reject in offline replay.",
+          "status": "pass",
+          "reason": "Board limits remain 14 components and 37×23 mm. All four tampered answer-binding controls were rejected by the post-run supplementary offline audit.",
+          "evidence": [
+            {
+              "path": "C01/follow-up/selected.json",
+              "sha256": "70d94920878eb10c49db6b6542c721fbde1044a1718593bcc8822a46d0a4c324",
+              "pointer": "/proposal/requirement/requirements/constraints",
+              "value_sha256": "4afad6bc1349fdd2b37688047cf6babb77566597f95639ca8e6813860dc5a6d8"
+            }
+          ],
+          "supplementary_replay": {
+            "path": "supplementary-replay.json",
+            "sha256": "a214a9c1b666c8b58723943ece40ff0e2946e067bb7b2e7db34c7dc4f453a355",
+            "case_id": "C01",
+            "controls_rejected": 4,
+            "sealed_replay_passed": false
+          }
+        }
+      ],
+      "note": "One initial and one bound-answer request, neither requiring correction. Admission was reviewed locally before the answer was released. All semantic clauses passed and the supplementary offline audit validated bindings and rejected four controls. The sealed replay itself failed on an omitted issues member; this remains a campaign-level evidence-method deviation."
+    },
+    {
+      "case_id": "C02",
+      "title": "Missing regulated-load range",
+      "kind": "clarification",
+      "source_sha256": "de678ba74d1e4ca168f9c6fc0b15cea15cc44bff75c2770cb55a530543bdf7e7",
+      "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+      "selected": "C02/follow-up/selected.json",
+      "selected_sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+      "first_attempt_status": "needs_clarification",
+      "initial_final_status": "needs_clarification",
+      "follow_up_final_status": "invalid",
+      "initial_attempts": 1,
+      "follow_up_attempts": 2,
+      "requests": 3,
+      "estimated_or_reserved_microusd": 405860,
+      "estimated_or_reserved_usd": 0.40586,
+      "clause_passes": 5,
+      "clause_count": 7,
+      "observed_faithful_workflow": false,
+      "first_attempt_each_leg_faithful": false,
+      "compiler_status_appropriate": false,
+      "final_issues": [
+        {
+          "code": "ARCHITECTURE_IDENTITY_DUPLICATE",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.objectives[0].constraints[1].name",
+          "message": "constraint name is duplicated"
+        },
+        {
+          "code": "ARCHITECTURE_BINDING_UNRESOLVED",
+          "severity": "error",
+          "path": "proposal.requirement.requirements.operating_cases[0].conditions[0].target",
+          "message": "operating condition references an unknown semantic target"
+        },
+        {
+          "code": "BEHAVIORAL_INTENT_SOURCE_COVERAGE_INVALID",
+          "severity": "error",
+          "path": "proposal.coverage",
+          "message": "material requirement ground_reference has no source statement evidence"
+        }
+      ],
+      "evidence_authentication_passed": true,
+      "supplementary_offline_compilation_matched": true,
+      "sealed_replay_passed": false,
+      "board_pass": false,
+      "clauses": [
+        {
+          "number": 1,
+          "text": "Before answers, one minimal question asks only for load-current range with valid uncertainty ownership and no executable requirement.",
+          "status": "pass",
+          "reason": "One initial question asks only minimum/maximum regulated load current, owns uncertainty_load_current_range at the same path, and produces needs_clarification with no executable requirement.",
+          "evidence": [
+            {
+              "path": "C02/initial/selected.json",
+              "sha256": "d978100b5f91eef780090d02f89064a2c72ce448e57be56f98dd0fa537adfa19",
+              "pointer": "/proposal/clarifications",
+              "value_sha256": "5b8de0e2c0c6350eaed4e01379ac4ef96f556a6861856d4b43da85cc51abc2de"
+            },
+            {
+              "path": "C02/initial/selected.json",
+              "sha256": "d978100b5f91eef780090d02f89064a2c72ce448e57be56f98dd0fa537adfa19",
+              "pointer": "/proposal/uncertainties",
+              "value_sha256": "a50048071433e49c6993943fb2b04a095b9a73449be905bb99217a64f9be909b"
+            },
+            {
+              "path": "C02/initial/selected.json",
+              "sha256": "d978100b5f91eef780090d02f89064a2c72ce448e57be56f98dd0fa537adfa19",
+              "pointer": "/compilation",
+              "value_sha256": "c3cf62cec2d2d5808ee7651c99058cee53b72ea8e3d37b72315c097b821a3e33"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "text": "Supplied input, output, temperature and board limits are not re-asked or changed.",
+          "status": "pass",
+          "reason": "The initial question does not re-ask input, output, temperature or board limits; final proposal retains those values.",
+          "evidence": [
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement",
+              "value_sha256": "93d87d6ff1db0aeaeee675a21d5fc2ade5999e6717f3b6011749411b3cf2f415"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "4cacfc98b44e401ae9a0f4ba4927abdb188d825f364f0e8dc24d4941617338a7"
+            },
+            {
+              "path": "C02/initial/selected.json",
+              "sha256": "d978100b5f91eef780090d02f89064a2c72ce448e57be56f98dd0fa537adfa19",
+              "pointer": "/proposal/clarifications",
+              "value_sha256": "5b8de0e2c0c6350eaed4e01379ac4ef96f556a6861856d4b43da85cc51abc2de"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "text": "Nominal 7.6 V input and full 7.2–8 V range, one external output 3.234–3.366 V, external ground and 20–30 degC retained.",
+          "status": "pass",
+          "reason": "Rejected proposal retains input nominal 7.6 V/full 7.2–8 V, a single external output bounded 3.234–3.366 V, ground and 20–30 degC. This quantity/interface clause does not certify its source modeling or executable status.",
+          "evidence": [
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/domains",
+              "value_sha256": "5757382888d07b03baec5b889a52344060b9d441fa54e9fc6735d0ae2e13e1f0"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/ports",
+              "value_sha256": "17f33cad288e610ef4745c02be97dd40024816c079204635732a9ed240301573"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "50b9fd9c867a0c9c44c5365e14b54a2c903f720bca489dc723104425f0069dac"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "text": "Frozen 0.006–0.018 A answer is bound to exact prior source/capability/proposal/compilation and uncertainty identities.",
+          "status": "pass",
+          "reason": "The fixed 0.006–0.018 A answer is bound verbatim to the prior source, capability, proposal and compilation hashes and exact owned uncertainty/clarification IDs; supplementary offline validation confirms these bindings.",
+          "evidence": [
+            {
+              "path": "C02/bound-answer.json",
+              "sha256": "f78e3463f189c11a9934e023a09a73191ca88089148754d8354299655dc94f75",
+              "pointer": "",
+              "value_sha256": "751dcb9005ea5066538fce9a4f85f1d6b8e5c33946e2d3163540744cbfaee8ad"
+            },
+            {
+              "path": "C02/answer-review.json",
+              "sha256": "77f94e0aa0fb34c330e5a916d0ba0292ce98ff8d86c1555d219cb1d866589c4e",
+              "pointer": "",
+              "value_sha256": "7edccc536feb51c9b0c787ee3a81094e9a7a6bb6ecf908b6052352e56ced75f1"
+            }
+          ],
+          "supplementary_replay": {
+            "path": "supplementary-replay.json",
+            "sha256": "a214a9c1b666c8b58723943ece40ff0e2946e067bb7b2e7db34c7dc4f453a355",
+            "case_id": "C02",
+            "controls_rejected": 4,
+            "sealed_replay_passed": false
+          }
+        },
+        {
+          "number": 5,
+          "text": "After answer, ready DC voltage behavior covers complete input, load-current and ambient ranges without weakened output bounds.",
+          "status": "fail",
+          "reason": "The final response is invalid, not ready. Voltage bounds and the three numeric operating ranges survive, but duplicate constraint identity and unresolved operating target prevent an executable DC contract. The regulated supply is also incorrectly labeled an independent external source.",
+          "evidence": [
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/compilation/status",
+              "value_sha256": "5300ed0fabc7e270acce0ed6f1a575ec29129cc30c617e1e31540b6ebdc0e411"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/compilation/issues",
+              "value_sha256": "e3b7a60677837930ac925ba347ddd5efc81cafd1f860a196e381aec94820598d"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/objectives/0/constraints",
+              "value_sha256": "9de6cfd76757ad109fd1474bdbdbefa0b110d393b7b199591d77b4f004b7d3ba"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/operating_cases",
+              "value_sha256": "50b9fd9c867a0c9c44c5365e14b54a2c903f720bca489dc723104425f0069dac"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements",
+              "value_sha256": "23083b1036376c8dba94297f5982ddf6d78c5a9bb91c64c5fcbb19b2b5361f57"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/domains/2",
+              "value_sha256": "32e37604e05d2a15039caa0ff11cb88cd8b6a1e8cf9eb578855318cf3c1420ad"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "text": "Maximum 17 components and 41×25 mm retained; no added controller, digital interface, output, current-limit or fault-timing guarantee.",
+          "status": "pass",
+          "reason": "Limits remain 17 components and 41×25 mm, with no additional controller, digital interface, output, current-limit or fault-timing behavior.",
+          "evidence": [
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/constraints",
+              "value_sha256": "93c76b7569a57d1be60489ac58ffa02cfa58cce8fd73f814a1096c5a29da28af"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/objectives",
+              "value_sha256": "8cb5435607d297830c79212974ba58f53bbb5fdd2571be0a0aad615c3053de5e"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/requirement/requirements/behavioral_requirements",
+              "value_sha256": "23083b1036376c8dba94297f5982ddf6d78c5a9bb91c64c5fcbb19b2b5361f57"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/coverage/6",
+              "value_sha256": "7ce35947f107cacd23b43d9c6e28396d44c8aec8bdf65e64d9ff4345405eedc3"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "text": "All original facts and coverage survive; answered blocker identities do not recur; tampered answer bindings reject offline.",
+          "status": "fail",
+          "reason": "The correction removes recurring answered identities and supplementary offline tamper controls reject all four altered bindings, but ground_reference has no source statement evidence. This combined complete-coverage clause fails.",
+          "evidence": [
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/compilation/issues",
+              "value_sha256": "e3b7a60677837930ac925ba347ddd5efc81cafd1f860a196e381aec94820598d"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/coverage",
+              "value_sha256": "4cacfc98b44e401ae9a0f4ba4927abdb188d825f364f0e8dc24d4941617338a7"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/uncertainties",
+              "value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "path": "C02/follow-up/selected.json",
+              "sha256": "60659d7b7788059f1ce447b926bc625ee61e7fd3001da3e8cbfcdc498828e278",
+              "pointer": "/proposal/clarifications",
+              "value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "supplementary_replay": {
+            "path": "supplementary-replay.json",
+            "sha256": "a214a9c1b666c8b58723943ece40ff0e2946e067bb7b2e7db34c7dc4f453a355",
+            "case_id": "C02",
+            "controls_rejected": 4,
+            "sealed_replay_passed": false
+          }
+        }
+      ],
+      "note": "Correct initial question and fixed answer, but final follow-up remains invalid after its permitted correction. It duplicates input_voltage constraint identity, targets an unresolved domain in an operating condition, and loses material ground_reference source coverage. The regulated output supply is also labeled external, a source-modeling caveat shared with I04; unlike I04 this proposal was rejected."
+    }
+  ]
+}

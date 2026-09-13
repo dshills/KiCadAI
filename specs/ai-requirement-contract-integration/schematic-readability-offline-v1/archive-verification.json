@@ -1,0 +1,107 @@
+{
+  "verified_utc": "2026-09-11T18:59:08.353Z",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/schematic-readability-offline-v1-all-runs.tar.gz",
+  "archive_bytes": 758924689,
+  "archive_sha256": "4f92199d5d04da2d3760b076b95ad2af58ee6aa94815e3920a720ae272bff8d0",
+  "extracted": "/Users/dshills/Development/projects/KiCadAI/.cache/schematic-readability-offline-v1-archive-verification",
+  "all_development_and_final_runs_retained": true,
+  "fresh_extraction_verified": true,
+  "exact_existing_secret_absent": true,
+  "inventories": [
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev1",
+      "file_count": 10,
+      "total_bytes": 1512958414,
+      "sha256": "d6e107cb4c3e3f41c0fea5a004f592929be06edfc6dfdae1f86cfacbf033be77"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev2",
+      "file_count": 272,
+      "total_bytes": 1525979942,
+      "sha256": "c9c35ba82e8924227da079a207131b25e187a41c95c9bf6bae321246f8b32233"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev3",
+      "file_count": 358,
+      "total_bytes": 1528237495,
+      "sha256": "0444d4688b788fa4a41577efdbe524fa65ee9833be4aa126a4372997e054df9b"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev4",
+      "file_count": 356,
+      "total_bytes": 1528104150,
+      "sha256": "a4af708685258999a74ffd1dd92336c137128214ed3ef93903f8b5d2b529afd2"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev5",
+      "file_count": 77,
+      "total_bytes": 1518787719,
+      "sha256": "427a735b1a6eb21152e19ee63ca0c5142310755a25a072bacf63dcbc28e249e3"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev6",
+      "file_count": 360,
+      "total_bytes": 1528205578,
+      "sha256": "c236112aab767afaee27740d5ca1818ab7e8248bc4309dec295d7557a661e41e"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev7",
+      "file_count": 360,
+      "total_bytes": 1528158807,
+      "sha256": "420e4c3af4edc1e4298f732dc62f837d6a95ef8e76911c1ca80e469ec2d3410f"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev8",
+      "file_count": 362,
+      "total_bytes": 1528223912,
+      "sha256": "f3983e0578ee533c4f78555f2357098ac2bc71b18b1912289232c697887754c1"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-dev9",
+      "file_count": 362,
+      "total_bytes": 1528224932,
+      "sha256": "c4f227625411cc3d9700e00731d95a30cd47a3ef2042b6ba5329c0ab9cac0e09"
+    },
+    {
+      "name": "kicadai-schematic-readability-offline-v1-final",
+      "file_count": 380,
+      "total_bytes": 1529020156,
+      "sha256": "4bf3e2c52f64e33eefcf27d115ced94bf78815a7ce6594439f93b79349be32ff"
+    }
+  ],
+  "commands": [
+    {
+      "command": "/usr/bin/tar",
+      "args": [
+        "-czf",
+        "/Users/dshills/Development/projects/KiCadAI/.cache/schematic-readability-offline-v1-all-runs.tar.gz",
+        "-C",
+        "/tmp",
+        "kicadai-schematic-readability-offline-v1-dev1",
+        "kicadai-schematic-readability-offline-v1-dev2",
+        "kicadai-schematic-readability-offline-v1-dev3",
+        "kicadai-schematic-readability-offline-v1-dev4",
+        "kicadai-schematic-readability-offline-v1-dev5",
+        "kicadai-schematic-readability-offline-v1-dev6",
+        "kicadai-schematic-readability-offline-v1-dev7",
+        "kicadai-schematic-readability-offline-v1-dev8",
+        "kicadai-schematic-readability-offline-v1-dev9",
+        "kicadai-schematic-readability-offline-v1-final"
+      ],
+      "status": 0,
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/tar",
+      "args": [
+        "-xzf",
+        "/Users/dshills/Development/projects/KiCadAI/.cache/schematic-readability-offline-v1-all-runs.tar.gz",
+        "-C",
+        "/Users/dshills/Development/projects/KiCadAI/.cache/schematic-readability-offline-v1-archive-verification"
+      ],
+      "status": 0,
+      "stderr": ""
+    }
+  ],
+  "provider_calls": 0
+}

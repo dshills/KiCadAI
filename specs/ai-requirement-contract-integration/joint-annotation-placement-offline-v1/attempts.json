@@ -1,0 +1,1297 @@
+{
+  "schema": "kicadai.pin-aware-bounded-attempts.v1",
+  "attempts": [
+    {
+      "label": "dev1",
+      "root": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T11:52:28.340Z",
+      "finished_utc": "2026-09-12T11:52:54.696Z",
+      "source_snapshot_sha256": "474544fa765ec1ea45d2137b308c8981bba04a5a81807d4498ccb9635d551fc5",
+      "source_files": 15,
+      "cases": [
+        {
+          "name": "standalone_regulator",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "e533f84eacfb0617ed445632751c01adcfa0902d08e6552072a46f5e6490d086",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/first/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/first/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "3e7dd9dea9603019a01fd2b0fa78650892071bddaaffa4ae4ef862833b99aba1",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/second/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/second/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        },
+        {
+          "name": "controller_adc_100ma",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "90dae62ea58984ff74bb4d5fbce90ee2244dca08579bf67d0610eeabd636d20d",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/first/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "c7b21932705237e40b2517c3e8bce6f63ddf7f2b3507964cb9ad91e6bcc41dc6",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/second/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/second/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev1/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        }
+      ]
+    },
+    {
+      "label": "dev2",
+      "root": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T11:56:05.246Z",
+      "finished_utc": "2026-09-12T11:56:31.076Z",
+      "source_snapshot_sha256": "ba341454f3a61a56af3f828dfeddcaac0897ee63a02e06e16cef7eacca50188e",
+      "source_files": 16,
+      "cases": [
+        {
+          "name": "standalone_regulator",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "818bf65cb09424f88fe2b9d4f6794ab9e6fc29969b0d48906d27977ef0f5af71",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/first/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/first/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "801a45e51312fadf12190a688fd4b616f6d35ec3a1d4701fb15f6170cffec011",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/second/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/second/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        },
+        {
+          "name": "controller_adc_100ma",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "c5522020f47e9515bcabc06c895ad44cb50b252ad8d34d3e60e41c8d735c4439",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/first/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "a07a1a39cdebaf710ec7552ef88b760b08a2dcc039ec571cd0ef3cb31e1e4422",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/second/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/second/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-dev2/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        }
+      ]
+    },
+    {
+      "label": "final",
+      "root": "/tmp/kicadai-joint-annotation-placement-offline-v1-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T11:57:14.903Z",
+      "finished_utc": "2026-09-12T11:57:40.685Z",
+      "source_snapshot_sha256": "3105e538b2bb29384dbea0cc36f4e6aed4b86b82d1ece982c152a9eda882d6ca",
+      "source_files": 16,
+      "cases": [
+        {
+          "name": "standalone_regulator",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "25f6c0f9986d59adc39dd72f553605c2afcf3cce4598ec7d9696a767ef16bb94",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/first/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/first/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/first\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "d5500eab86d0a2b7f6e318f4c6b3ae04efeecbab7f41fa18826efbf1e537322d",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/second/offline_regulated_output.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/second/offline_regulated_output.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/standalone_regulator/second\"` for KiCad ERC/DRC evidence"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        },
+        {
+          "name": "controller_adc_100ma",
+          "runs": [
+            {
+              "run": "first",
+              "status": "pass",
+              "receipt_sha256": "8869aba808a8107ebd56ec5986b0b5858e1457a250eca70efb14a23c442ec34d",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/first/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/first/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/first\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            },
+            {
+              "run": "second",
+              "status": "pass",
+              "receipt_sha256": "bcc9e83d13039811cf4fe8976ecef864835c7af52be9000cf344303a3612cff8",
+              "stages": [
+                {
+                  "name": "schematic",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "schematic_electrical",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "placement",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "routing",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "project_write",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "writer_correctness",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "validation",
+                  "status": "ok",
+                  "issues": [
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/second/offline_controller_adc.kicad_sch",
+                      "message": "erc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "SKIPPED_EXTERNAL_TOOL",
+                      "severity": "info",
+                      "path": "/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/second/offline_controller_adc.kicad_pcb",
+                      "message": "drc_validation is available through the `check` command and is not run by default during structural evaluation",
+                      "suggestion": "run `kicadai --json check project \"/tmp/kicadai-joint-annotation-placement-offline-v1-final/controller_adc_100ma/second\"` for KiCad ERC/DRC evidence"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "pcb.connectivity.center_point_summary.composition_net_001",
+                      "message": "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+                      "refs": [
+                        "C10",
+                        "C2",
+                        "C3",
+                        "C4",
+                        "C5",
+                        "C6",
+                        "C7",
+                        "C8",
+                        "C9",
+                        "J1",
+                        "J2",
+                        "J3",
+                        "J4",
+                        "J5",
+                        "U1",
+                        "U2",
+                        "U3"
+                      ],
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.71.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.123.start",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_001"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    },
+                    {
+                      "code": "VALIDATION_TRACE",
+                      "severity": "info",
+                      "path": "tracks.145.end",
+                      "message": "route endpoint is not connected to a same-net pad, via, or route endpoint",
+                      "nets": [
+                        "composition_net_002"
+                      ],
+                      "suggestion": "no repair required; the complete extent-aware connectivity proof is authoritative"
+                    }
+                  ]
+                },
+                {
+                  "name": "simulation",
+                  "status": "ok",
+                  "issues": []
+                },
+                {
+                  "name": "kicad_checks",
+                  "status": "ok",
+                  "issues": []
+                }
+              ],
+              "acceptance": {
+                "requested": "erc-drc",
+                "achieved": "erc-drc",
+                "fabrication_ready": false
+              }
+            }
+          ],
+          "complete_technical_pass": true
+        }
+      ]
+    }
+  ],
+  "development_attempts": 2,
+  "frozen_final_attempts": 1,
+  "final_matches_last_development_inputs_and_available_primary_projects": true,
+  "provider_calls": 0,
+  "benchmark_passes_added": 0
+}

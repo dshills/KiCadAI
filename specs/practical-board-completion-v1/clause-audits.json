@@ -1,0 +1,2342 @@
+{
+  "schema": "kicadai.completion-clause-audits.v1",
+  "auditor": "implementing_agent_self_review",
+  "independent_review": false,
+  "scope": "Six non-reserved authored development probes only; no renewed live final, no reserved evaluation.",
+  "cases": [
+    {
+      "case_id": "P01",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "Reverse-input protection has no registered provider. Sensor AND semantics and the remaining clauses are not demonstrated by named facts or by the first-alternative sensor selector.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P01.json",
+        "sha256": "99723084089c1ea00ef488209b7d0db9d46c982c5a9afb6af01e15a41b325ac5"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P01.txt",
+        "sha256": "52f90d024452a8658e4e1482ae9c68bdf8279a9846b174c457f99c4f6454d508"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "On-board temperature AND humidity measurement, not an either/or substitution.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "On-board temperature AND humidity measurement, not an either/or substitution.",
+          "actual": null,
+          "bound": "On-board temperature AND humidity measurement, not an either/or substitution.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.",
+          "actual": null,
+          "bound": "Controller connected to the actual sensor over 100 kHz I2C; 50 pF bus and <=1 us rise time proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.",
+          "actual": null,
+          "bound": "3.3 V 115200-baud bidirectional UART electrical interface with <=20 pF loads.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P01-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage.",
+          "actual": null,
+          "bound": "4.75-5.25 V input; 3.15-3.45 V internal rail; <=100 mA total input; reversed input survives without damage.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+              "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+              "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+              "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "Reverse-input protection has no registered provider. Sensor AND semantics and the remaining clauses are not demonstrated by named facts or by the first-alternative sensor selector."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/result.json",
+          "sha256": "f715fbbc423232b12664bd4577b410d36ed962478572302413a8804748cdf93d"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/search.json",
+          "sha256": "61ea3a18fe96f7a111ec475acfcddcc16e966600848c003e15e424273a559a24"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P01/candidate-1/input-identity.json",
+          "sha256": "c86cc215a7579cd22304d5ea55e2f00077d990e7f6d897015b93531a4c2c9935"
+        }
+      ]
+    },
+    {
+      "case_id": "P02",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "Selected-controller ADC-drive facts are not derived; acquisition capacitance/time/settling cannot be invented to satisfy provider admission.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P02.json",
+        "sha256": "c12daf286d2544ade0b4d27c9a4bd5f38dbbf22258b0348507295575cc378930"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P02.txt",
+        "sha256": "9ec834d859ebfa79b2c52621c1cb9020174387e75f08e754da41cabf33f2d293"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+          "actual": null,
+          "bound": "0.05-1.0 V input, <=100 ohm source, >=100 kohm input impedance; ADC-bound gain 2 within 2% over DC-100 Hz.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+          "actual": null,
+          "bound": "ADC-bound output stays 0.08-2.1 V; >=15 dB relative attenuation at 10 kHz; selected ADC source-drive/settling qualified for <=1000 sample/s.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+          "actual": null,
+          "bound": "3.15-3.45 V external power <=100 mA; 3.3 V UART at 115200 baud/20 pF; controlled indicator <=2 mA.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "No unrequested powered-off input operation or firmware/calibration claim.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P02-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No unrequested powered-off input operation or firmware/calibration claim.",
+          "actual": null,
+          "bound": "No unrequested powered-off input operation or firmware/calibration claim.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+              "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+              "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+              "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "Selected-controller ADC-drive facts are not derived; acquisition capacitance/time/settling cannot be invented to satisfy provider admission."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/result.json",
+          "sha256": "aa0c2a38b6211a7e660d8d8737864557ff07e2a7f818b77f1ae29fc50c8abba2"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/search.json",
+          "sha256": "5d60b0e454ce09ed65dcbf015323c8f10e20689486c34035281157db1728dbf1"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P02/candidate-1/input-identity.json",
+          "sha256": "8aa46fe10ae89ddfb162b359d62d43cb4635749d4d7485d4f28cbe577348dc9c"
+        }
+      ]
+    },
+    {
+      "case_id": "P03",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "Internal consumer-load propagation is not demonstrated. The total input budget is not an independently justified internal regulator output-current bound.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P03.json",
+        "sha256": "a8d7ed0015144f8cb7e9f1341cdcf797f39a94d4b02943c246932c163e2c94f3"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P03.txt",
+        "sha256": "ca2ab45b8f8f57cb12dd08c00662c6a700d1df6a58576687c8aabc5928f9c3bb"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.",
+          "actual": null,
+          "bound": "Two independent controller I2C interfaces: external 5 V/100 kHz/100 pF/3 mA and internal 3.3 V/400 kHz/50 pF.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.",
+          "actual": null,
+          "bound": "External bus has derived bias and voltage compatibility; rising edges <=1 us and <=300 ns respectively.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.",
+          "actual": null,
+          "bound": "On-board temperature AND pressure measurement; ready output at 3.3 V for <=1 mA/20 pF.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P03-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved.",
+          "actual": null,
+          "bound": "4.75-5.25 V input <=100 mA; 3.15-3.45 V regulated rail; simultaneous-power assumption preserved.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+              "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+              "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+              "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "Internal consumer-load propagation is not demonstrated. The total input budget is not an independently justified internal regulator output-current bound."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/result.json",
+          "sha256": "76014431b1506a07f96e0e7af626b5a11dea703d4b7f0ef4da288bc6c050c2b4"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/search.json",
+          "sha256": "4ab81cf87ee4cb5796a25fa403d6008a1997872739335b8aca25c8b2287fecf0"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P03/candidate-1/input-identity.json",
+          "sha256": "8de7c5297d2065ed67445407f113023d1d4d7bcdb45a9b2826e8e30c6aa4b209"
+        }
+      ]
+    },
+    {
+      "case_id": "P04",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "The authored aggregate UART encoding is not a qualified representation of fixed opposite-direction lanes. Baseline decoder incompatibility is not an engine uplift.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P04.json",
+        "sha256": "c9638851494514f1e6a582a9ab8ebb36dce35b61ea0352e568845cd9ed27e9b6"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P04.txt",
+        "sha256": "3b564e3ac92a3740153c3c12289446f51b9d6e4a306d1d60723f8dab45cf9cec"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.",
+          "actual": null,
+          "bound": "5 V UART at 115200 baud plus bidirectional-directional-role SPI at <=1 MHz in the 3.3 V domain.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.",
+          "actual": null,
+          "bound": "3.3 V auxiliary rail 3.15-3.45 V at up to 20 mA, within <=100 mA total 4.75-5.25 V input.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.",
+          "actual": null,
+          "bound": "<=20 pF lines and <=50 mm external traces; no SPI overvoltage; chip select high/inactive during reset.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "No claim to firmware protocol conversion or unpowered-interface operation.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P04-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No claim to firmware protocol conversion or unpowered-interface operation.",
+          "actual": null,
+          "bound": "No claim to firmware protocol conversion or unpowered-interface operation.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+              "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+              "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+              "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "The authored aggregate UART encoding is not a qualified representation of fixed opposite-direction lanes. Baseline decoder incompatibility is not an engine uplift."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/result.json",
+          "sha256": "7ea07a30a4041a3671323af7af8c8f34e3901de6b8e0a7383f11d47adbf4792c"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/search.json",
+          "sha256": "522ddfe39a8c95d6d2be49b9b5b4e5340a52f2615da6d6128228b8613fe14746"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P04/candidate-1/input-identity.json",
+          "sha256": "2f8fffbddf40f0ab3693278f8f86622fe14bab844a82a8112cc83b01ce0c51f5"
+        }
+      ]
+    },
+    {
+      "case_id": "P05",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "The input-current budget has no proven internal load propagation. Later actuator, ADC and UART checks were not reached.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P05.json",
+        "sha256": "417c42588e8244e2771e833cf71a6240f22944cb020b5ca686dc699127a0b30b"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P05.txt",
+        "sha256": "27ac68b76483c12475a91c0e611d93103b2a4b14b28f0729fe50e0ffee591c06"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.",
+          "actual": null,
+          "bound": "External non-inductive <=20 mA sinking output at <=1 kHz, <=0.25 V on drop and <=10 uA off leakage.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.",
+          "actual": null,
+          "bound": "Off during startup/reset without relying on firmware; input including load <=100 mA at 4.75-5.25 V.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.",
+          "actual": null,
+          "bound": "3.15-3.45 V controller rail; 0.2-2.8 V/100 ohm ADC interface qualified for <=100 sample/s; 3.3 V UART 115200 baud/20 pF.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "No inductive-load, energy-storage or firmware closed-loop claim.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P05-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No inductive-load, energy-storage or firmware closed-loop claim.",
+          "actual": null,
+          "bound": "No inductive-load, energy-storage or firmware closed-loop claim.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+              "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+              "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+              "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "The input-current budget has no proven internal load propagation. Later actuator, ADC and UART checks were not reached."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/result.json",
+          "sha256": "2111b221f98afaab7a8aa07350c181062d18d1fc0e128ba3e9798fa1d429a353"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/search.json",
+          "sha256": "f79516a6bef5915ae8e0ad90163d8e14f29d50bb8aa12a8c4eea60a0ca314792"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P05/candidate-1/input-identity.json",
+          "sha256": "9c198f8027a5f79edbddb36fc6d1db00c9aba565fca20ce9cd09334e3a716c71"
+        }
+      ]
+    },
+    {
+      "case_id": "P06",
+      "kind": "human_authored_development_probe",
+      "accepted_ai_requirement": false,
+      "complete_board_pass": false,
+      "first_unqualified_gate": "requirement_interpretation",
+      "observed_engine_failure": "architecture_search",
+      "interpretation": "The authored generic digital interface does not supply the explicit protocol/signaling evidence required by this provider. Other functions were not tested.",
+      "input": {
+        "path": "specs/practical-board-completion-v1/probes/P06.json",
+        "sha256": "e609baddd92ea9cbcb066d765ea9af108010b09e603c75369480152081395910"
+      },
+      "original_brief": {
+        "path": "specs/practical-board-completion-v1/probes/P06.txt",
+        "sha256": "c53ee9e45f047d968a2e7e5085bd296f38bae01e6f528189e22f785aa9d3eb6d"
+      },
+      "clauses": [
+        {
+          "clause_number": 1,
+          "clause": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-01",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "actual": null,
+          "bound": "Catalog-qualified programmable controller with usable wired programming and reviewed clock/reset/boot/power support.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 2,
+          "clause": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-02",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "actual": null,
+          "bound": "Every declared external electrical interface is present with compatible voltage, current, timing and return connections.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 3,
+          "clause": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-03",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "actual": null,
+          "bound": "All stated conditions, including -10 to 50 degC ambient, supply/load/tolerance corners and startup, are retained and checked; applicable thermal limits pass.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 4,
+          "clause": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-04",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "actual": null,
+          "bound": "Board fits 100 by 80 mm, has no more than four copper layers, and external connectors are perimeter-accessible.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 5,
+          "clause": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-05",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "actual": null,
+          "bound": "All eight SPEC acceptance gates pass, including read-only schematic visual audit and two clean downstream replays.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 6,
+          "clause": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-06",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "actual": null,
+          "bound": "No application-firmware or manufactured-hardware performance is represented as electrically proven.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 7,
+          "clause": "Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-07",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.",
+          "actual": null,
+          "bound": "Catalog-qualified controller clock 16 MHz within 100 ppm including initial/loading/temperature uncertainty.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 8,
+          "clause": "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-08",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.",
+          "actual": null,
+          "bound": "5 V CMOS event input <=10 kHz/100 ohms and 5 V output <=1 mA/20 pF, with non-conflicting wired programming.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 9,
+          "clause": "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-09",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.",
+          "actual": null,
+          "bound": "Normally open pushbutton has defined inactive state; controlled indicator <=2 mA; reset/boot works with stated loads.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        },
+        {
+          "clause_number": 10,
+          "clause": "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee.",
+          "qualification": "not_demonstrated",
+          "assertion_id": "P06-clause-10",
+          "observation": "No selected circuit; no independent semantic/electrical/physical qualification.",
+          "condition": "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee.",
+          "actual": null,
+          "bound": "4.75-5.25 V input <=100 mA; no firmware timing/debounce guarantee.",
+          "measurement_status": "unavailable",
+          "reason": "Architecture search stopped before synthesis. JSON shape validity and named constraint facts do not prove this acceptance clause.",
+          "evidence": [
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+              "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+              "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+              "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+            },
+            {
+              "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+              "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+            }
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "gate": "requirement_interpretation",
+          "status": "unqualified",
+          "pass": false,
+          "reason": "The authored generic digital interface does not supply the explicit protocol/signaling evidence required by this provider. Other functions were not tested."
+        },
+        {
+          "gate": "component_model_qualification",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "electrical_analyses",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "schematic_readability",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "placement",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "routing_connectivity",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "native_validation_writer",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        },
+        {
+          "gate": "deterministic_replay",
+          "status": "not_run",
+          "pass": false,
+          "reason": "No selected candidate reached this gate."
+        }
+      ],
+      "no_manual_output_repair": true,
+      "manual_assistance": "Human-authored structured input, generic code changes, implementing-agent review; human-active minutes unavailable.",
+      "evidence": [
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/result.json",
+          "sha256": "6152827ae0e7fb156dcaaba4e16b47fb1a83b0a377d643bd84655a6227d0a07e"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/search.json",
+          "sha256": "05c9c52e56c2776974da473924137e7d4e51a0ae846c9c86b4e74635ea3f6024"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/validation.json",
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        {
+          "path": ".cache/practical-board-completion-v1/development/batch-1/P06/candidate-1/input-identity.json",
+          "sha256": "c34e2a80932d201681681e3e70ef7be06944fb98cf69582296cd8852b2b7dd26"
+        }
+      ]
+    }
+  ]
+}

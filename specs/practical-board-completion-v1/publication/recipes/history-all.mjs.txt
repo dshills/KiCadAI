@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {join} from 'node:path';
+import {inventory,sha} from '../specs/practical-board-completion-v1/evidence.mjs';
+const repo=process.cwd(),base=join(repo,'specs/ai-requirement-contract-integration'),secret=process.env.OPENAI_API_KEY;assert(secret);
+const env={...process.env};for(const k of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY'])delete env[k];
+const json=p=>JSON.parse(fs.readFileSync(p));
+const oldWalk=(dir,prefix='')=>fs.readdirSync(join(dir,prefix),{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name,'en')).flatMap(e=>{const p=join(prefix,e.name);return e.isDirectory()?oldWalk(dir,p):[p];});
+const digest=async path=>{const h=createHash('sha256');let bytes=0;for await(const b of fs.createReadStream(path)){h.update(b);bytes+=b.length;}return {bytes,sha256:h.digest('hex')};};
+const rows=[];
+for(const [name,commit] of [
+ ['power-locality-offline-v1','4d7e8c87a6bbd80de8e78b3271b1202ee13ee701'],
+ ['local-wiring-readability-offline-v1','e6f648bbbb05d1d8bc883e61356511d8708aec2e'],
+ ['joint-annotation-placement-offline-v1','3c1572f7cd9a8120b45e16c42c67500a5fb1097b'],
+ ['pin-aware-readability-offline-v1','7647dda9ba4d94d57213fe8f7ecaf5d474c667fe'],
+ ['ownership-locality-offline-v2','f8b29a9904dd02c38583cb4c15d72f55b5ee6b75'],
+ ['functional-readability-offline-v1','c2ec8c88da11f8cf4aac498775e216ae2baaa34d'],
+ ['pcb-seed-rotated-fields-offline-v1','9ac563194a4a3b89d52d54b8ee38ce04a157ff58'],
+ ['native-readability-replay-offline-v1','446e19c9b934ad8026b4e9ec2996b47d9ef413f9']
+]){
+ const phase=join(base,name),v=json(join(phase,'verification.json'));
+ assert.equal(execFileSync('git',['diff',commit,'--name-only','--',phase],{env,encoding:'utf8'}),'');
+ for(const f of v.source)assert.equal(sha(execFileSync('git',['show',commit+':'+f.path],{env,maxBuffer:8*1024*1024})),f.sha256);
+ const map=new Map(inventory(v.root,secret).map(f=>[f.path,f])),files=oldWalk(v.root).map(p=>map.get(p));
+ const actual={file_count:files.length,total_bytes:files.reduce((n,f)=>n+f.bytes,0),sha256:sha(JSON.stringify(files))};assert.deepEqual(actual,v.inventory);
+ const archive=json(join(phase,name==='native-readability-replay-offline-v1'?'archive-verification.json':'archive.json'));
+ const a=await digest(archive.archive);assert.equal(a.bytes,archive.bytes??archive.archive_bytes);assert.equal(a.sha256,archive.sha256??archive.archive_sha256);
+ rows.push({phase:name,commit,source_files:v.source.length,raw:actual,archive:{path:archive.archive,...a},historical_documents_unchanged:true,complete_practical_cases:0});
+ console.log(JSON.stringify({phase:name,files:files.length,verified:true}));
+}
+fs.writeFileSync(join(repo,'.cache/practical-board-completion-v1/publication-draft/history-closed-phases.json'),JSON.stringify({verified_utc:new Date().toISOString(),phases:rows,exact_secret_scan:'absent',provider_calls:0,native_executions:0,interpretation:'Byte/source authentication only; no new simulations, native runs, visual judgments or benchmark passes.'},null,2)+'\n',{flag:'wx',mode:0o600});

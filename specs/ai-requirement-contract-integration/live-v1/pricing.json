@@ -1,0 +1,23 @@
+{
+  "schema": "kicadai.interface-evaluation-pricing.v1",
+  "checked_utc_date": "2026-09-11",
+  "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+  "model": "gpt-5.6-sol",
+  "documented_responses_streaming_structured_outputs": true,
+  "account_access_verified_before_campaign": false,
+  "input_usd_per_million": 4,
+  "cached_input_usd_per_million": 0.4,
+  "output_usd_per_million": 20,
+  "cache_write_input_multiplier": 1.25,
+  "conservative_input_usd_per_million": 5,
+  "reservation_input_tokens_per_encoded_request_byte": 1,
+  "reservation_extra_input_tokens": 4096,
+  "reservation_output_tokens": 16384,
+  "long_context_threshold_input_tokens": 272000,
+  "maximum_reserved_input_tokens": 135168,
+  "maximum_single_request_reservation_usd": 1.00352,
+  "maximum_twenty_unreleased_reservations_usd": 20.0704,
+  "maximum_campaign_estimated_or_reserved_usd": 25,
+  "actual_billed_usd": null,
+  "notes": "All input tokens are conservatively costed at the documented cache-write rate. No cache-hit discount is assumed. Unknown or rejected usage retains the full reservation. This is not an invoice or an account-wide spending guarantee."
+}

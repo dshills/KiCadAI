@@ -1,0 +1,254 @@
+{
+  "schema": "kicadai.schematic-readability-offline-verification.v1",
+  "base": "b9d48213aa0431d5cf19824287c6403a4aea5529",
+  "root": "/tmp/kicadai-schematic-readability-offline-v1-final",
+  "source": [
+    {
+      "path": "internal/circuitgraph/resolved.go",
+      "sha256": "38e5692af0e81b63adfa8ea1cbad0f6d2a84d9ed6ba98e796413b6d30576db08"
+    },
+    {
+      "path": "internal/circuitgraph/synthesis.go",
+      "sha256": "c233c834a75613f0965e56d36d58b32f3df75899126c20b28f3b3f8584d9d44a"
+    },
+    {
+      "path": "internal/circuitgraph/synthesized_readability_test.go",
+      "sha256": "6616d4ae598c6633f669cf206cd56acedcad8e4a6696472772c1f3400e9dba1a"
+    },
+    {
+      "path": "internal/compositionlowering/readability_promotion_test.go",
+      "sha256": "dd7305c9d96ab12d65b77fb03a54baf62c1cfda77c7acc5faff92db3fec5ed72"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder.go",
+      "sha256": "41009a95ea1df15706c90ce121af9f14e516a04ea39ec534b07d9487d327aa0d"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/builder_test.go",
+      "sha256": "03619f23a14d68416f9c1556aec4cf73e646f133a6bf5c4b4ca81c31523c8bc9"
+    },
+    {
+      "path": "internal/kicadfiles/designapi/native_label_readability_test.go",
+      "sha256": "1a5edc3857c9849888cc204cc385213044ec9bbb848d6e91680d5dbffbe45fe4"
+    },
+    {
+      "path": "internal/kicadfiles/project/project.go",
+      "sha256": "935453f0a95061464f24fd0a6e368e3c2c1bb5d9fa52e13296ca400fb576bf63"
+    },
+    {
+      "path": "internal/kicadfiles/project/read.go",
+      "sha256": "80ba57163856b7316dcd2ec02cf081912a66417aa723cc7dca5f439f1584587e"
+    },
+    {
+      "path": "internal/kicadfiles/project/schematic_defaults_test.go",
+      "sha256": "582d871cb7c1a6b334013c8083c14b609e703a7daced240f55a236c2006b5400"
+    },
+    {
+      "path": "internal/schematicir/adapter.go",
+      "sha256": "50b4314a14c2743b42d774f2b185e70e4587d95d35e7caa826058790d0ed316c"
+    },
+    {
+      "path": "internal/schematicir/native_annotation_test.go",
+      "sha256": "a1770a455c69ac40d1f2c5c31bdcb8dbfa1c84f76d7aa728701d4af38d0a0af9"
+    },
+    {
+      "path": "internal/schematicir/readability_diagnostics_test.go",
+      "sha256": "9a2982c3b0a664c13b996d67d5adc78f6b30049406544d133120ca93984f0d16"
+    },
+    {
+      "path": "internal/schematiclayout/text.go",
+      "sha256": "27d9ec04451ce3f2e713262a76681d339b8bc840d86fe77eb8233120c8369ba2"
+    },
+    {
+      "path": "internal/transactions/apply.go",
+      "sha256": "c5a310d8a922e310a89b7c80f8ebf2e1ce812cb0a814b6694304e0fd8a9d4363"
+    },
+    {
+      "path": "internal/transactions/model.go",
+      "sha256": "45315c91a09c0f2c5bdb6536dc4af5925444eefc7792bbb2c4b0a751cedd5c75"
+    }
+  ],
+  "cases": [
+    {
+      "name": "standalone_regulator",
+      "components": 8,
+      "requirements_unchanged": true,
+      "electrical_and_pcb_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 3,
+      "native_physical_endpoints": 16,
+      "pcb": {
+        "connected_pads": 16,
+        "unconnected_pads": 0,
+        "geometry_and_connectivity_unchanged": true,
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all other S-expression content exact",
+        "previous_paper": [
+          "paper",
+          "A4",
+          "portrait"
+        ],
+        "current_paper": [
+          "paper",
+          "A4",
+          "portrait"
+        ]
+      },
+      "project_files": 14,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 103.04950000000001,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.17560399999999993,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "name": "controller_adc_100ma",
+      "components": 21,
+      "requirements_unchanged": true,
+      "electrical_and_pcb_invariants": [
+        "components",
+        "nets",
+        "regions",
+        "simulation",
+        "schematic_support",
+        "routing_policy",
+        "catalog_id",
+        "catalog_hash"
+      ],
+      "runs": [
+        {
+          "run": "first",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        },
+        {
+          "run": "second",
+          "required_stages": 9,
+          "erc_findings": 0,
+          "drc_findings": 0,
+          "writer_skips": 0,
+          "achieved": "erc-drc",
+          "fabrication_ready": false
+        }
+      ],
+      "native_physical_nets": 10,
+      "native_physical_endpoints": 52,
+      "pcb": {
+        "connected_pads": 52,
+        "unconnected_pads": 26,
+        "geometry_and_connectivity_unchanged": true,
+        "comparison_to_previous_phase": "net IDs resolved to names; drawing-paper setting excluded; all other S-expression content exact",
+        "previous_paper": [
+          "paper",
+          "A2",
+          "portrait"
+        ],
+        "current_paper": [
+          "paper",
+          "A2"
+        ]
+      },
+      "project_files": 23,
+      "byte_exact_generated_project_replay": true,
+      "normalization": "none",
+      "assertions": [
+        {
+          "requirement_id": "adc_cutoff",
+          "operating_case": "supply_load",
+          "analysis": "ac_sweep",
+          "metric": "cutoff_frequency",
+          "actual": 923.3612800239786,
+          "min": 900,
+          "max": 1100,
+          "critical": false,
+          "normalized_margin": 0.02123752729452597,
+          "pass": true
+        },
+        {
+          "requirement_id": "rail",
+          "operating_case": "supply_load",
+          "analysis": "dc_operating_point",
+          "metric": "dc_voltage",
+          "actual": 3.3,
+          "min": 3.2,
+          "max": 3.4,
+          "critical": true,
+          "normalized_margin": 0.02941176470588225,
+          "pass": true
+        },
+        {
+          "requirement_id": "thermal",
+          "operating_case": "supply_load",
+          "analysis": "thermal",
+          "metric": "junction_temperature",
+          "actual": 114.049500001452,
+          "max": 125,
+          "critical": true,
+          "normalized_margin": 0.08760399998838397,
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "inventory": {
+    "file_count": 380,
+    "total_bytes": 1529020156,
+    "sha256": "4bf3e2c52f64e33eefcf27d115ced94bf78815a7ce6594439f93b79349be32ff"
+  },
+  "provider_calls": 0,
+  "frozen_cases_added": 0,
+  "readability": "separate visual review; native checks do not establish readability"
+}

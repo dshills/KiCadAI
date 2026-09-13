@@ -1,0 +1,112 @@
+{
+  "schema": "kicadai.interface-preflight.v1",
+  "capability_sha256": "1c2bc1b3b234d1db5f3edb71ebff5e8a97e9bf9879489103bdb874b0d6248388",
+  "provider_schema_sha256": "5c7cbfaf57e60e1d11a6462c1f7771befd0e1c72f4f68429d3c837521e32083a",
+  "instruction_sha256": "ae6b6178e67f8c0ea4d90d53d183123f7edaf07905293bdb1b119cd2ea30d586",
+  "corpus_sha256": "f9d756ce19042ce5edea4ceb56e13338213071e6a4771fa28de795f9252d566f",
+  "live_requests": 0,
+  "resource_preflight": {
+    "account_access_probed": false,
+    "live_root_absent": true,
+    "process_tree_rss_bytes": 30359552,
+    "snapshot_bytes_before_report": 1649088
+  },
+  "requests": [
+    {
+      "case_id": "I01",
+      "form": "initial",
+      "bytes": 91553,
+      "sha256": "5a910edb97bb8b0d9f1b9bff8ea520b866ce0868a463db235d1d1a1a8a492a4b"
+    },
+    {
+      "case_id": "I01",
+      "form": "max_diagnostics",
+      "bytes": 104214,
+      "sha256": "f75710dca34631b45a29374360a53bf79c9caeeece0d1a7849caa11d518e3510"
+    },
+    {
+      "case_id": "I02",
+      "form": "initial",
+      "bytes": 91815,
+      "sha256": "6e316e740f9790dcad406b7f2865061f473bd282bdd5bf22742840da31631af0"
+    },
+    {
+      "case_id": "I02",
+      "form": "max_diagnostics",
+      "bytes": 104476,
+      "sha256": "ea8863247cd04ecb9f4e9da0a12a64d58fc4a9fdf4d7b221e8e552456d993876"
+    },
+    {
+      "case_id": "I03",
+      "form": "initial",
+      "bytes": 92325,
+      "sha256": "0bf1b5aa3139054a693091534cef8c186511d8265b4eef38a40f01f4550040a4"
+    },
+    {
+      "case_id": "I03",
+      "form": "max_diagnostics",
+      "bytes": 104986,
+      "sha256": "672bee4b9352ce6840eaeee68f24861eab7465c5a5d175cfe341db95e5e34799"
+    },
+    {
+      "case_id": "I04",
+      "form": "initial",
+      "bytes": 91173,
+      "sha256": "c083784fc07962b535b3d11a7819fef0e0ba234423d5d3bfe98fd88d78bdbdce"
+    },
+    {
+      "case_id": "I04",
+      "form": "max_diagnostics",
+      "bytes": 103834,
+      "sha256": "1d57ff210d0bcf5863d7bd26f474dd5850b6c0d32d32aab81cf0c259ddea83fc"
+    },
+    {
+      "case_id": "R01",
+      "form": "initial",
+      "bytes": 90763,
+      "sha256": "8000464d76acf6b189111e1178986f95dbc7e717f158d3114899a16788b6b73a"
+    },
+    {
+      "case_id": "R01",
+      "form": "max_diagnostics",
+      "bytes": 103424,
+      "sha256": "898783b40b1d39ba976177b00eb42b4a82aa6e8e2e332d9dee6e15f0b56260e7"
+    },
+    {
+      "case_id": "R02",
+      "form": "initial",
+      "bytes": 91389,
+      "sha256": "47c3aa240b406d32c0ff0530a48570cff5be5afc127f0feaf8542ca770ed7778"
+    },
+    {
+      "case_id": "R02",
+      "form": "max_diagnostics",
+      "bytes": 104050,
+      "sha256": "a330f36490f71f4002f23cd7893589ca85e718e3f8f09f88ced2622a7f778f73"
+    },
+    {
+      "case_id": "C01",
+      "form": "initial",
+      "bytes": 91483,
+      "sha256": "f7e9135a66e0d3bd43b5d567849b3e0da1f1316fe4417b6d9b529ec35ac2b199"
+    },
+    {
+      "case_id": "C01",
+      "form": "max_diagnostics",
+      "bytes": 104144,
+      "sha256": "342b3934579a8cee255f4b49d9a0d40a3fd37f60c49bbacc22f8b0178b6894ff"
+    },
+    {
+      "case_id": "C02",
+      "form": "initial",
+      "bytes": 91309,
+      "sha256": "540c307bd377f3d8477402e6cc493dee0007472d9e665eda9e75633ab98a6d33"
+    },
+    {
+      "case_id": "C02",
+      "form": "max_diagnostics",
+      "bytes": 103970,
+      "sha256": "3af48e241774c89df29d4b8e8a8bc2dde5443b23971fb7aee856ac999b0aa27f"
+    }
+  ]
+}

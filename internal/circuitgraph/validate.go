@@ -10,6 +10,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 	"kicadai/internal/simmodel"
 )
 
@@ -470,6 +471,9 @@ func (validator *graphValidator) buses(netsByName map[string]Net) {
 
 func (validator *graphValidator) schematic(componentsByID map[string]Component) {
 	intent := validator.document.Schematic
+	if profile := intent.Rules.NativeProfile; profile != "" && profile != schematiclayout.NativeAnnotationV2 {
+		validator.add(CodeLayoutUnsupported, "schematic.rules.native_profile", "unsupported native annotation profile")
+	}
 	if intent.Flow != FlowLeftToRight || intent.Origin != OriginCentered {
 		validator.add(CodeLayoutUnsupported, "schematic", "v1 requires left_to_right flow and centered origin")
 	}

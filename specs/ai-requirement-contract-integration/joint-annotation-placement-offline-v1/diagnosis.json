@@ -1,0 +1,101 @@
+{
+  "schema": "kicadai.joint-annotation-diagnosis.v1",
+  "executions": [
+    {
+      "mode": "diagnostic-frozen",
+      "exit_code": 1,
+      "log_sha256": "2f271d8689e04e9c42912256a48f7da3fd011137cd57173f1249f2663d31db7e",
+      "source_snapshot_sha256": "c3e14a497e7ecfa005e389f5d3242b080aba6de802b15789c13fcefe2aa4a881"
+    },
+    {
+      "mode": "diagnostic-frozen-2",
+      "exit_code": 0,
+      "log_sha256": "dadcc890834ed5980c85f0b9bd2f82d8007cdea5e9fe62f0d592fe27fe1b4688",
+      "source_snapshot_sha256": "a105958872f6b9afa54ec476532b4dc8ed8c978a4f522c111f38d3734428cbce"
+    },
+    {
+      "mode": "diagnostic-frozen-3",
+      "exit_code": 0,
+      "log_sha256": "72ccf4b3762f136d4afcea6ddd8b377da2eda8532de0f20f4140c0e63aada21e",
+      "source_snapshot_sha256": "15a9483ac95eb914924dc89be226fe50218ae5d591be8058f790bfd07e6b1635"
+    },
+    {
+      "mode": "diagnostic-layout-1",
+      "exit_code": 0,
+      "log_sha256": "bbdd2e886e019fe363fcbb5e597827c47b9dd6778c5c22e9bcba902f98d382ad",
+      "source_snapshot_sha256": "1a15adec669d54fee158a910357afc846008a2e3590edc2313b89dafcb81b179"
+    },
+    {
+      "mode": "diagnostic-candidates-1",
+      "exit_code": 0,
+      "log_sha256": "1a44c693241dc425931a67904d076341b167be3a4abf3188ef8b936a773b45ad",
+      "source_snapshot_sha256": "c591c3d3daa572ebc57f9f7f7f82ab6ac3927b6ccfbcc27102532825d4d66bdd"
+    }
+  ],
+  "original_transaction_sha256": "ce07f78c2d98904cf989ee1c452399ee103d9c5e2d6f38bbf9d223b263d0a8f2",
+  "recorded_library_sha256": "7ec33bdf90748cf42d19a603e8623f8c7c7269e5b33b56c1e477f7b476e1093d",
+  "frozen_profile": "ownership-v3",
+  "frozen_label_count": 52,
+  "frozen_solver_visits": 3,
+  "single_candidate_conflicts": [
+    {
+      "first": {
+        "uuid": "626ee27c-c969-5a25-9823-f20e5b0216f5",
+        "text": "SUPPORT_PARTICIPANT_CONTROLLER__MCU_PA13",
+        "origin": {
+          "X": 331470000,
+          "Y": 386080000
+        },
+        "candidates": [
+          {
+            "at": {
+              "X": 331470000,
+              "Y": 386080000
+            },
+            "box": {
+              "MinX": 330200000,
+              "MinY": 335280000,
+              "MaxX": 331470000,
+              "MaxY": 386080000
+            },
+            "rotation": 90
+          }
+        ]
+      },
+      "second": {
+        "uuid": "e56c4540-f431-583a-a74b-e37842b68fac",
+        "text": "composition_net_003",
+        "origin": {
+          "X": 311150000,
+          "Y": 350520000
+        },
+        "candidates": [
+          {
+            "at": {
+              "X": 311150000,
+              "Y": 350520000
+            },
+            "box": {
+              "MinX": 311150000,
+              "MinY": 349250000,
+              "MaxX": 335280000,
+              "MaxY": 350520000
+            },
+            "rotation": 0
+          }
+        ]
+      }
+    }
+  ],
+  "repair_profile": "ownership-v4",
+  "repair_label_count": 51,
+  "repair_solver_error": null,
+  "repair_diagnostic_transaction_sha256": "ca312b0d064a910025361cb7934dd5c5444619ca83e9a41f826b3e5701e99642",
+  "native_final_projection_matches_diagnostic": true,
+  "interpretation": "A hard rectangle intersection between two single-candidate labels, not the 50000-visit search bound. Joint component-and-label-corridor reservation supplies a feasible alternate drawing. Label count changes with routing islands; emitted physical connectivity must still be independently verified.",
+  "initial_failed_diagnostic": "The first reconstruction omitted the workflow resolver-hydration flag and stopped at waypoint-anchor validation. Retained as a harness failure, not native evidence. Later diagnostics use a local operation copy with the identical workflow hydration flag; frozen source bytes remain unchanged.",
+  "scope": "In-memory recorded-metadata replay only; no KiCad CLI, generated-project writes or provider requests. One separately named derived JSON transaction is retained.",
+  "provider_calls": 0,
+  "native_evaluations_added": 0,
+  "benchmark_passes_added": 0
+}

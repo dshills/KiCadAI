@@ -1,0 +1,18 @@
+{
+  "schema": "kicadai.completion-readiness-archive.v1",
+  "path": "/Users/dshills/Development/projects/KiCadAI/.cache/practical-board-completion-v1-readiness.tar.gz",
+  "bytes": 93501440,
+  "sha256": "155394882dcc4f9d6fd7f5e4d32f138bd1edac7a19f185b92772e8d2bf97b4db",
+  "manifest_sha256": "e30455a1e6ad0c02d6855c6fb64b7c7da6f2e7b3b4bf6710ca37ca470bbb2270",
+  "streamed": {
+    "files_verified": 456,
+    "bytes_verified": 202181472,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "started_utc": "2026-09-12T18:35:54.477Z",
+  "finished_utc": "2026-09-12T18:35:59.135Z",
+  "all_original_raw_files_unchanged": true,
+  "provider_calls": 0
+}

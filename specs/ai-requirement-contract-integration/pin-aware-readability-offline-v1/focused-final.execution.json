@@ -1,0 +1,33 @@
+{
+  "base": "f8b29a9904dd02c38583cb4c15d72f55b5ee6b75",
+  "mode": "focused-final",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout",
+    "./internal/kicadfiles/designapi",
+    "./internal/transactions",
+    "-run",
+    "Test(Functional|NativeBlock)",
+    "-count=1",
+    "-timeout=3m"
+  ],
+  "started_utc": "2026-09-12T11:09:12.657Z",
+  "finished_utc": "2026-09-12T11:09:14.014Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/pin-aware-readability-v1-sources/focused-final.json",
+  "source_snapshot_sha256": "944f59dae8198fc802c188f8f0352f9b759e370f1065faf1c0bbafa6e6cfd5a6",
+  "source_unchanged": true,
+  "log_sha256": "c3718d725498e6f54458cbc71fa26f2d763ac573079f8ccf055ae708dc5d254c"
+}

@@ -1,0 +1,7 @@
+--- FAIL: TestFunctionalOwnershipPreservesPhysicalRequest (0.03s)
+    functional_layout_test.go:74: serialized layout differs
+FAIL
+FAIL	kicadai/internal/compositionlowering	0.582s
+ok  	kicadai/internal/schematicir	0.708s
+ok  	kicadai/internal/schematiclayout	0.281s
+FAIL

@@ -1,0 +1,112 @@
+{
+  "schema": "kicadai.functional-readability-qa.v1",
+  "source_files": 15,
+  "executions": [
+    {
+      "mode": "focused",
+      "exit_code": 1,
+      "started_utc": "2026-09-12T08:23:11.142Z",
+      "finished_utc": "2026-09-12T08:23:15.272Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "focused-dev2",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:23:55.948Z",
+      "finished_utc": "2026-09-12T08:23:57.324Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "focused-dev3",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:28:49.944Z",
+      "finished_utc": "2026-09-12T08:28:54.972Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "focused-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:29:47.460Z",
+      "finished_utc": "2026-09-12T08:29:48.391Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-dev1",
+      "exit_code": 1,
+      "started_utc": "2026-09-12T08:23:57.378Z",
+      "finished_utc": "2026-09-12T08:24:17.457Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-dev2",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:26:08.810Z",
+      "finished_utc": "2026-09-12T08:26:39.536Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-dev3",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:28:55.034Z",
+      "finished_utc": "2026-09-12T08:29:29.240Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "native-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:30:40.824Z",
+      "finished_utc": "2026-09-12T08:31:12.097Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "lint",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:27:06.258Z",
+      "finished_utc": "2026-09-12T08:27:07.704Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "lint-final",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:29:46.054Z",
+      "finished_utc": "2026-09-12T08:29:47.405Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "race",
+      "exit_code": 1,
+      "started_utc": "2026-09-12T08:30:42.014Z",
+      "finished_utc": "2026-09-12T08:42:50.767Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "vet",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:42:50.828Z",
+      "finished_utc": "2026-09-12T08:42:52.502Z",
+      "source_unchanged": true
+    },
+    {
+      "mode": "full",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T08:32:18.858Z",
+      "finished_utc": "2026-09-12T08:44:51.807Z",
+      "source_unchanged": true
+    }
+  ],
+  "full_suite": {
+    "passed_packages": 151,
+    "no_test_packages": 14,
+    "longest": {
+      "package": "kicadai/internal/opentopologysynthesis",
+      "seconds": 675.774
+    },
+    "exit_code": 0
+  },
+  "links_checked": 17,
+  "exact_secret_scan": "absent",
+  "provider_calls": 0,
+  "technical_examples_passed": 2,
+  "complete_readability_examples": 0,
+  "benchmark_passes_added": 0
+}

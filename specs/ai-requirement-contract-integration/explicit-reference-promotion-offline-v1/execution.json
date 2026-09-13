@@ -1,0 +1,81 @@
+{
+  "schema": "kicadai.explicit-reference-offline-execution.v1",
+  "provider_calls": 0,
+  "final_checks": [
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/architecturesearch ./internal/behavioralintent ./internal/closedloopsynthesis ./internal/compositionlowering ./internal/airequirementeval -run 'TestExplicitReference|TestReferenceDomain|TestParticipantPinAssertion|TestEndpointContractsReach|TestProviderSchemaExposes|TestCompilerRetainsQualified|TestOfflineRepairRequestForms' -v -count=1 -timeout 2m",
+      "exit_code": 0,
+      "log": "focused-tests.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test -short -count=1 ./... -timeout 12m",
+      "exit_code": 0,
+      "log": "repository-tests.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test -race -short -count=1 ./internal/architecturesearch ./internal/behavioralintent ./internal/closedloopsynthesis ./internal/airequirementeval -timeout 4m",
+      "exit_code": 0,
+      "log": "race-tests.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test -race -short -count=1 ./internal/compositionlowering -run 'TestExplicitReferenceReaches|TestEndpointContractsReach' -v -timeout 3m",
+      "exit_code": 0,
+      "log": "composition-race-tests.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off GOLANGCI_LINT_CACHE=/Users/dshills/Development/projects/KiCadAI/.cache/golangci-lint /Users/dshills/Development/Go/bin/golangci-lint run ./internal/architecturesearch/... ./internal/behavioralintent/... ./internal/closedloopsynthesis/... ./internal/compositionlowering/... --timeout 5m",
+      "exit_code": 0,
+      "log": "lint.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go vet ./...",
+      "exit_code": 0,
+      "log": "vet.log"
+    },
+    {
+      "command": "KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_REFERENCE_PROMOTION_ARTIFACTS=/tmp/kicadai-explicit-reference-promotion-offline-v1-final KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestExplicitReferenceNativePromotion$' -v -count=1 -timeout 41m",
+      "exit_code": 0,
+      "log": "native-tests.log"
+    },
+    {
+      "command": "env -u OPENAI_API_KEY -u GEMINI_API_KEY -u ANTHROPIC_API_KEY -u GOOGLE_API_KEY node specs/ai-requirement-contract-integration/explicit-reference-promotion-offline-v1/verify-archive.mjs",
+      "exit_code": 0,
+      "log": "archive-verification.json"
+    }
+  ],
+  "repository_package_counts": {
+    "passed": 151,
+    "without_tests": 14,
+    "total": 165
+  },
+  "native_preflights": [
+    {
+      "log": "native-missing-roots-preflight.log",
+      "exit_code": 1,
+      "board_generation_started": false,
+      "reason": "Library-root environment absent"
+    },
+    {
+      "log": "native-inventory-preflight-truncated.log",
+      "exit_code": 1,
+      "board_generation_started": false,
+      "transcript_truncated": true,
+      "reason": "New harness globally blocked on unrelated installed library inventory diagnostics; changed to existing native runner behavior, retaining diagnostics and selected-entry checks"
+    }
+  ],
+  "superseded_runs": [
+    {
+      "log": "native-before-compatibility-review.log",
+      "exit_code": 0,
+      "authoritative_final_source": false,
+      "raw_root": "/tmp/kicadai-explicit-reference-promotion-offline-v1-native",
+      "reason": "Final explicit-only legacy guard was verified in a fresh native run"
+    },
+    {
+      "log": "superseded-repository-tests.log",
+      "exit_code": 143,
+      "passed": false,
+      "reason": "Terminated after synthetic test fixture correction; no complete suite result claimed"
+    }
+  ]
+}

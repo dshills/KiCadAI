@@ -539,6 +539,10 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height, Portrait: payload.PaperPortrait}
 		}
 		return designapi.New(designapi.Options{
+			NativeSchematicProfile:     payload.NativeSchematicProfile,
+			NativeSchematicNotes:       payload.NativeSchematicNotes,
+			NativeSchematicBlocks:      payload.NativeSchematicBlocks,
+			SchematicNetClassDefaults:  payload.SchematicNetClassDefaults,
 			Name:                       payload.Name,
 			Seed:                       firstNonEmpty(opts.Seed, payload.Name),
 			DesignID:                   deterministicDesignUUID(payload.Name, opts.Seed),

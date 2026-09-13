@@ -1,0 +1,30 @@
+{
+  "base": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+  "mode": "diagnostic-candidates-1",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "test",
+    "./internal/transactions",
+    "-run",
+    "^TestNativeJointFrozenCandidateDiagnostic$",
+    "-v",
+    "-count=1",
+    "-timeout=5m"
+  ],
+  "started_utc": "2026-09-12T11:51:56.073Z",
+  "finished_utc": "2026-09-12T11:52:04.197Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/joint-annotation-placement-v1-sources/diagnostic-candidates-1.json",
+  "source_snapshot_sha256": "c591c3d3daa572ebc57f9f7f7f82ab6ac3927b6ccfbcc27102532825d4d66bdd",
+  "source_unchanged": true,
+  "log_sha256": "1a44c693241dc425931a67904d076341b167be3a4abf3188ef8b936a773b45ad"
+}

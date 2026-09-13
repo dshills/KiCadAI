@@ -1,0 +1,186 @@
+{
+  "schema": "kicadai.joint-annotation-placement-history.v1",
+  "verified_utc": "2026-09-12T11:54:18.512Z",
+  "previous": [
+    {
+      "name": "pin-aware-readability",
+      "commit": "7647dda9ba4d94d57213fe8f7ecaf5d474c667fe",
+      "source_files": 21,
+      "inventory": {
+        "file_count": 170,
+        "total_bytes": 1519829973,
+        "sha256": "6eb57530693a8badf726b9136e416c81e8c44f64827dbdb90ab46ea0add8120a"
+      },
+      "archive": {
+        "bytes": 304232946,
+        "sha256": "b7028b8d2656edb083963df01b4e179655f254633c1772279f7039d9c817d064"
+      },
+      "technical_gate_passed": false,
+      "complete_practical_benchmark_cases": 0
+    },
+    {
+      "name": "ownership-locality",
+      "commit": "f8b29a9904dd02c38583cb4c15d72f55b5ee6b75",
+      "source_files": 11,
+      "inventory": {
+        "file_count": 387,
+        "total_bytes": 1531697222,
+        "sha256": "cd3dd9467ede0ff7efb1ffe590f95a3fd1a463a88335b5c50427d4d7171813cc"
+      },
+      "archive": {
+        "bytes": 155401900,
+        "sha256": "10bb71602b9707f902b1ad956106706708eea1205875d3ca75d0c1408da0fab4"
+      },
+      "technical_gate_passed": true,
+      "complete_practical_benchmark_cases": 0
+    },
+    {
+      "name": "functional-readability",
+      "commit": "c2ec8c88da11f8cf4aac498775e216ae2baaa34d",
+      "source_files": 15,
+      "inventory": {
+        "file_count": 387,
+        "total_bytes": 1531858072,
+        "sha256": "bdfc5ad00ab34601bcdf82121b97c9f69888208429e0c80f0cf5d108c9f80ac1"
+      },
+      "archive": {
+        "bytes": 306861937,
+        "sha256": "798f6087e1affd6f4c91d7ace58dbd36677ef47d20a955dd2ca771483ea42bdb"
+      },
+      "technical_gate_passed": true,
+      "complete_practical_benchmark_cases": 0
+    },
+    {
+      "name": "pcb-seed-rotated-fields",
+      "commit": "9ac563194a4a3b89d52d54b8ee38ce04a157ff58",
+      "source_files": 10,
+      "inventory": {
+        "file_count": 386,
+        "total_bytes": 1532405841,
+        "sha256": "8404851b3f7857a869245e2380fc81cdf4d80032009be14e6cf9e6ba96a0fd5a"
+      },
+      "archive": {
+        "bytes": 232891237,
+        "sha256": "63c409b9ebf9f2a32c1cac90abfe4140b093e8bde1369f35dfb95de5ff3d5cdf"
+      },
+      "technical_gate_passed": true,
+      "complete_practical_benchmark_cases": 0
+    },
+    {
+      "name": "native-readability-replay",
+      "commit": "446e19c9b934ad8026b4e9ec2996b47d9ef413f9",
+      "source_files": 23,
+      "inventory": {
+        "file_count": 170,
+        "total_bytes": 1520345919,
+        "sha256": "03a8607120794aa86323a68970137aa085d1b727984d94140d61d49437e9c036"
+      },
+      "archive": {
+        "bytes": 828583049,
+        "sha256": "7e0207678095c5fd7326456122f269e3de02ae23f4947692f2abcb8245d72704"
+      },
+      "technical_gate_passed": false,
+      "complete_practical_benchmark_cases": 0
+    }
+  ],
+  "preceding": {
+    "verified_utc": "2026-09-12T11:54:15.928Z",
+    "previous_source_commit": "ec2ececb4e52643f0767d0fcbb70213f1ec7209c",
+    "previous_source_files_authenticated": 16,
+    "previous_reports_unchanged": true,
+    "previous_archive_bytes": 758924689,
+    "previous_archive_sha256": "4f92199d5d04da2d3760b076b95ad2af58ee6aa94815e3920a720ae272bff8d0",
+    "previous_raw_inventory": {
+      "file_count": 380,
+      "total_bytes": 1529020156,
+      "sha256": "4bf3e2c52f64e33eefcf27d115ced94bf78815a7ce6594439f93b79349be32ff"
+    },
+    "provider_calls": 0
+  },
+  "campaign": {
+    "schema": "kicadai.offline-repair-preservation.v1",
+    "verified_utc": "2026-09-12T11:54:18.508Z",
+    "historical_source": "49953eaa599612aaf8e60f31ab3e786f32ddc722",
+    "historical_source_checkout": "/Users/dshills/Development/projects/KiCadAI/.cache/interface-v1-source-49953",
+    "historical_tracked_paths_unchanged": true,
+    "interface": {
+      "schema": "kicadai.interface-publication-verification.v1",
+      "verified_utc": "2026-09-12T11:54:16.939Z",
+      "raw_authenticated": true,
+      "raw_files": 304,
+      "frozen_files": 110,
+      "source_bound_cases": 8,
+      "source_bound_clauses": 57,
+      "reproduced_results": true,
+      "independent_sql_node_rows_match": true,
+      "report_rows": 8,
+      "publication_files": 18,
+      "publication_inventory_verified": true,
+      "publication_secret_scan": "absent",
+      "raw_and_binary_archive_contents_verified": true,
+      "temporary_verification_directory": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-interface-archive-verification-tUXqCx",
+      "sealed_replay_passed": false,
+      "supplementary_attempts_matched": 15,
+      "tampered_bindings_rejected": 8,
+      "provider_calls": 0,
+      "gate_passed": false
+    },
+    "practical": {
+      "raw_files": 472,
+      "raw_bytes": 101237999,
+      "exact_secret_scan": "absent_from_all_retained_files_including_decompressed_library_index",
+      "campaign_complete": true,
+      "prior_inventories_reverified": [
+        {
+          "inventory": "baseline-evidence-inventory.json",
+          "sha256": "48502181af3ae2e94f7cf4854560764ac13e9d75d0abe96a78bf71d07281bf34",
+          "file_count": 25
+        },
+        {
+          "inventory": "recovery-1-evidence-inventory.json",
+          "sha256": "b05ac83e87cef9710b0cfa582ac883ccab5fc3ca1033cb4d51a209ae464755ed",
+          "file_count": 28
+        },
+        {
+          "inventory": "recovery-2-evidence-inventory.json",
+          "sha256": "2930f9a9fa63f0c01a63c12c7871358531cba5d86a4c344d417f69f1a0cd39de",
+          "file_count": 31
+        }
+      ],
+      "publication": {
+        "verified_utc": "2026-09-12T11:54:18.372Z",
+        "cases": 16,
+        "clauses": 108,
+        "table_rows": 16,
+        "local_links": 38,
+        "local_archive_sha256_verified": true,
+        "raw_evidence_authenticated_by_this_script": false,
+        "provider_calls": 0
+      },
+      "audit_count": 16,
+      "clauses": 108
+    },
+    "fixture": {
+      "path": "internal/behavioralintent/testdata/interface_v1_i04_counterexample.json",
+      "original_sha256": "ea3ff80eaed18fec6316a56a61a47046285576d0b56b29de48ec445a87c94b02",
+      "repository_sha256": "1db54ac9e1953cb99682d0c7507705fb7c71c110fc0a34c6bede5aba2a21ebfb",
+      "change": "one final LF only"
+    },
+    "sealed_binaries_unchanged": [
+      {
+        "path": "/tmp/kicadai-ai-requirement-eval-v1",
+        "sha256": "6d75691600d14771ae860480a08c77b441552debfa0ec608657ce986ae6a402f"
+      },
+      {
+        "path": "/tmp/kicadai-practical-board-eval-protocol-v2",
+        "sha256": "2628c1017a32837b69c230cf3690c8f4ba8f0089e1899967bde525cb2f370a94"
+      }
+    ],
+    "changed_files_secret_scan": "absent",
+    "changed_files_scanned": 407,
+    "provider_calls": 0,
+    "historical_gate_passed": false,
+    "new_live_evaluation_performed": false
+  },
+  "provider_calls": 0
+}

@@ -1,0 +1,25 @@
+{
+  "base": "446e19c9b934ad8026b4e9ec2996b47d9ef413f9",
+  "mode": "vet",
+  "command": "/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+  "args": [
+    "vet",
+    "./..."
+  ],
+  "started_utc": "2026-09-12T07:24:27.347Z",
+  "finished_utc": "2026-09-12T07:24:32.579Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/pcb-seed-rotated-fields-v1-sources/vet.json",
+  "source_snapshot_sha256": "22cee4303ab6145eb8b02db46bcc2ae2faf66b86552f052ab223c32e9f0fb838",
+  "source_unchanged": true,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

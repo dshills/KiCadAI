@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.power-locality-archive.v1",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/power-locality-offline-v1-all-runs.tar.gz",
+  "bytes": 232971592,
+  "sha256": "531c3c4ce8444883dfafdf80356659df04d9e936e70f72d0ecab1e59430546bc",
+  "manifest_sha256": "91c9d853a79f645609e0bd2c2a8542836971dcd97754d501ee7d0ec6614ab699",
+  "streamed": {
+    "files_verified": 1094,
+    "bytes_verified": 4595461563,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

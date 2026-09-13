@@ -334,6 +334,15 @@ func objectiveRolesForPowerDomainObservation(requirement Requirement, objective 
 
 func observationPowerDomain(requirement Requirement, observation Observation) (string, bool) {
 	switch observation.Kind {
+	case "participant_port":
+		participant, port, exists := ResolveParticipantPort(requirement, observation.ID)
+		if exists && scalarParticipantPort(port) {
+			for _, domain := range requirement.Requirements.Domains {
+				if domain.ID == participant.Domain && domain.Kind == "supply" {
+					return domain.ID, true
+				}
+			}
+		}
 	case "port":
 		for _, port := range requirement.Requirements.Ports {
 			if port.ID != observation.ID || port.Domain == "" {
@@ -422,6 +431,8 @@ func objectiveRolesForObservation(requirement Requirement, objective Objective, 
 			endpoint = "port:" + binding.Port
 		case binding.Signal != "":
 			endpoint = "signal:" + binding.Signal
+		case binding.Participant != "":
+			endpoint = participantAnchor(binding.Participant, binding.ParticipantPort)
 		default:
 			continue
 		}
@@ -502,6 +513,10 @@ func objectiveConsumesEndpoint(requirement Requirement, objective Objective, end
 func objectiveOutputEndpoints(requirement Requirement, objective Objective) []string {
 	var endpoints []string
 	for _, binding := range objective.Bindings {
+		if endpoint, ok := participantBindingEndpoint(requirement, binding, true); ok {
+			endpoints = append(endpoints, endpoint)
+			continue
+		}
 		if binding.Signal != "" && (binding.Direction == "source" || binding.Direction == "bidirectional") {
 			endpoints = append(endpoints, "signal:"+binding.Signal)
 			continue
@@ -509,8 +524,8 @@ func objectiveOutputEndpoints(requirement Requirement, objective Objective) []st
 		if binding.Port == "" {
 			continue
 		}
-		port, ok := requirementPort(requirement, binding.Port)
-		if ok && (port.Direction == "source" || port.Direction == "bidirectional") {
+		direction, ok := objectivePortDirection(requirement, binding)
+		if ok && (direction == "source" || direction == "bidirectional") {
 			endpoints = append(endpoints, "port:"+binding.Port)
 		}
 	}
@@ -804,6 +819,10 @@ func behavioralObjectiveInputEndpoints(requirement Requirement, objective Object
 		case "bias", "control", "enable", "fault", "interlock", "negative_power", "permit", "positive_power", "power", "reference", "trip":
 			continue
 		}
+		if endpoint, ok := participantBindingEndpoint(requirement, binding, false); ok {
+			endpoints = append(endpoints, endpoint)
+			continue
+		}
 		if binding.Signal != "" && (binding.Direction == "sink" || binding.Direction == "bidirectional") {
 			endpoints = append(endpoints, "signal:"+binding.Signal)
 			continue
@@ -811,8 +830,8 @@ func behavioralObjectiveInputEndpoints(requirement Requirement, objective Object
 		if binding.Port == "" {
 			continue
 		}
-		port, ok := requirementPort(requirement, binding.Port)
-		if ok && (port.Direction == "sink" || port.Direction == "bidirectional") {
+		direction, ok := objectivePortDirection(requirement, binding)
+		if ok && (direction == "sink" || direction == "bidirectional") {
 			endpoints = append(endpoints, "port:"+binding.Port)
 		}
 	}
@@ -822,6 +841,12 @@ func behavioralObjectiveInputEndpoints(requirement Requirement, objective Object
 
 func observationEndpoints(requirement Requirement, observation Observation) []string {
 	switch observation.Kind {
+	case "participant_port":
+		participant, port, exists := ResolveParticipantPort(requirement, observation.ID)
+		if exists && scalarParticipantPort(port) {
+			return []string{participantAnchor(participant.ID, port.ID)}
+		}
+		return nil
 	case "port":
 		return []string{"port:" + observation.ID}
 	case "signal":
@@ -847,12 +872,15 @@ func observationEndpoints(requirement Requirement, observation Observation) []st
 
 func objectiveProducesEndpoint(requirement Requirement, objective Objective, endpoint string) bool {
 	for _, binding := range objective.Bindings {
+		if produced, ok := participantBindingEndpoint(requirement, binding, true); ok && endpoint == produced {
+			return true
+		}
 		if binding.Signal != "" && binding.Direction == "source" && endpoint == "signal:"+binding.Signal {
 			return true
 		}
 		if binding.Port != "" && endpoint == "port:"+binding.Port {
-			port, ok := requirementPort(requirement, binding.Port)
-			if ok && (port.Direction == "source" || port.Direction == "bidirectional") {
+			direction, ok := objectivePortDirection(requirement, binding)
+			if ok && (direction == "source" || direction == "bidirectional") {
 				return true
 			}
 		}
@@ -863,6 +891,10 @@ func objectiveProducesEndpoint(requirement Requirement, objective Objective, end
 func objectiveInputEndpoints(requirement Requirement, objective Objective) []string {
 	var endpoints []string
 	for _, binding := range objective.Bindings {
+		if endpoint, ok := participantBindingEndpoint(requirement, binding, false); ok {
+			endpoints = append(endpoints, endpoint)
+			continue
+		}
 		if binding.Signal != "" && (binding.Direction == "sink" || binding.Direction == "bidirectional") {
 			endpoints = append(endpoints, "signal:"+binding.Signal)
 			continue
@@ -870,8 +902,8 @@ func objectiveInputEndpoints(requirement Requirement, objective Objective) []str
 		if binding.Port == "" {
 			continue
 		}
-		port, ok := requirementPort(requirement, binding.Port)
-		if ok && (port.Direction == "sink" || port.Direction == "bidirectional") {
+		direction, ok := objectivePortDirection(requirement, binding)
+		if ok && (direction == "sink" || direction == "bidirectional") {
 			endpoints = append(endpoints, "port:"+binding.Port)
 		}
 	}

@@ -80,6 +80,7 @@ type Domain struct {
 	MaxVoltageV     *float64 `json:"max_voltage_v,omitempty"`
 	MaxCurrentA     *float64 `json:"max_current_a,omitempty"`
 	Source          string   `json:"source"`
+	ReferenceDomain string   `json:"reference_domain,omitempty"`
 }
 
 type Port struct {

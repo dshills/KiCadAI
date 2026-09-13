@@ -1,6 +1,10 @@
 package transactions
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"kicadai/internal/schematiclayout"
+)
 
 type OperationKind string
 
@@ -183,11 +187,15 @@ type PadSpec struct {
 }
 
 type CreateProjectOperation struct {
-	Op            OperationKind     `json:"op"`
-	Name          string            `json:"name"`
-	Paper         string            `json:"paper,omitempty"`
-	PaperPortrait bool              `json:"paper_portrait,omitempty"`
-	TextVariables map[string]string `json:"text_variables,omitempty"`
+	NativeSchematicBlocks     []schematiclayout.NativeAnnotationBlock `json:"native_schematic_blocks,omitempty"`
+	NativeSchematicNotes      []string                                `json:"native_schematic_notes,omitempty"`
+	NativeSchematicProfile    string                                  `json:"native_schematic_profile,omitempty"`
+	SchematicNetClassDefaults bool                                    `json:"schematic_net_class_defaults,omitempty"`
+	Op                        OperationKind                           `json:"op"`
+	Name                      string                                  `json:"name"`
+	Paper                     string                                  `json:"paper,omitempty"`
+	PaperPortrait             bool                                    `json:"paper_portrait,omitempty"`
+	TextVariables             map[string]string                       `json:"text_variables,omitempty"`
 }
 
 type SetBoardOutlineOperation struct {

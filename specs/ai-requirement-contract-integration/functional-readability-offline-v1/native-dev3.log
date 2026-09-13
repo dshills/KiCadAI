@@ -1,0 +1,8 @@
+=== RUN   TestFunctionalReadabilitySerializedReplay
+=== RUN   TestFunctionalReadabilitySerializedReplay/standalone_regulator
+=== RUN   TestFunctionalReadabilitySerializedReplay/controller_adc_100ma
+--- PASS: TestFunctionalReadabilitySerializedReplay (33.49s)
+    --- PASS: TestFunctionalReadabilitySerializedReplay/standalone_regulator (6.80s)
+    --- PASS: TestFunctionalReadabilitySerializedReplay/controller_adc_100ma (9.04s)
+PASS
+ok  	kicadai/internal/compositionlowering	33.878s

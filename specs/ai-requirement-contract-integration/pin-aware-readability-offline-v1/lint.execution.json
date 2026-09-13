@@ -1,0 +1,30 @@
+{
+  "base": "f8b29a9904dd02c38583cb4c15d72f55b5ee6b75",
+  "mode": "lint",
+  "command": "/Users/dshills/Development/Go/bin/golangci-lint",
+  "args": [
+    "run",
+    "--timeout=12m",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout",
+    "./internal/kicadfiles/designapi",
+    "./internal/transactions"
+  ],
+  "started_utc": "2026-09-12T11:00:38.141Z",
+  "finished_utc": "2026-09-12T11:00:39.766Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/pin-aware-readability-v1-sources/lint.json",
+  "source_snapshot_sha256": "7da9bd8007e24f77bda64819a7371b7fa6a361de0e8751afaa3c1d6cfe9ed6c1",
+  "source_unchanged": true,
+  "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+}

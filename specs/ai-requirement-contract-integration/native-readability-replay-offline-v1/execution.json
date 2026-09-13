@@ -1,0 +1,117 @@
+{
+  "schema": "kicadai.native-readability-replay-offline-execution.v1",
+  "base": "ec2ececb4e52643f0767d0fcbb70213f1ec7209c",
+  "branch": "codex/native-readability-replay",
+  "final_source_files": 23,
+  "final_source_snapshot": ".cache/native-readability-replay-v1-sources/final.json",
+  "final_source_snapshot_sha256": "33a5702254063ea692be740661e7e99176bc8dc06cc6a0e62335105b4c4f0d9a",
+  "source_edits_after_final_native_run": false,
+  "provider_calls": 0,
+  "commands": [
+    {
+      "kind": "final_native_evaluation",
+      "command": "KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints KICADAI_NATIVE_REPLAY_ARTIFACTS=/tmp/kicadai-native-readability-replay-offline-v1-final KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/compositionlowering -run '^TestNativeReadabilitySerializedReplay$' -v -count=1 -timeout=41m",
+      "exit_code": 1,
+      "log": "native-tests.log",
+      "result": "standalone two passes; controller project-write failure; phase gate false"
+    },
+    {
+      "kind": "full_repository_short_suite",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./... -short -count=1 -timeout=12m",
+      "exit_code": 0,
+      "log": "full-tests.log",
+      "packages_passed": 151,
+      "packages_without_tests": 14,
+      "package_timeout_seconds": 720,
+      "longest_package": "kicadai/internal/opentopologysynthesis",
+      "longest_package_seconds": 715.006
+    },
+    {
+      "kind": "focused_regressions",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./internal/kicadfiles/schematic ./internal/schematicir ./internal/kicadfiles/designapi -run 'TestNative' -count=1 -timeout=2m",
+      "exit_code": 0,
+      "log": "focused-tests.log"
+    },
+    {
+      "kind": "race",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test -race ./internal/schematicir ./internal/circuitgraph ./internal/schematiclayout ./internal/kicadfiles/designapi ./internal/kicadfiles/schematic ./internal/transactions -short -count=1 -timeout=12m",
+      "exit_code": 0,
+      "packages": 6,
+      "log": "race-tests.log"
+    },
+    {
+      "kind": "lint",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off GOLANGCI_LINT_CACHE=/Users/dshills/Development/projects/KiCadAI/.cache/golangci-lint /Users/dshills/Development/Go/bin/golangci-lint run ./internal/schematicir/... ./internal/circuitgraph/... ./internal/schematiclayout/... ./internal/kicadfiles/designapi/... ./internal/kicadfiles/schematic/... ./internal/transactions/... ./internal/compositionlowering/... --timeout=5m",
+      "exit_code": 0,
+      "issues": 0,
+      "log": "lint.log"
+    },
+    {
+      "kind": "vet",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go vet ./...",
+      "exit_code": 0,
+      "log": "vet.log"
+    },
+    {
+      "kind": "evidence_authentication",
+      "command": "node specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/verify.mjs",
+      "exit_code": 0,
+      "receipt": "verification.json",
+      "authenticity_passed": true,
+      "phase_gate_passed": false
+    },
+    {
+      "kind": "archive",
+      "command": "node specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/archive-evidence.mjs",
+      "exit_code": 0,
+      "receipt": "archive-verification.json"
+    },
+    {
+      "kind": "archive_independent_recheck",
+      "command": "node specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/verify-archive.mjs",
+      "exit_code": 0,
+      "receipt": "archive-verification.json"
+    },
+    {
+      "kind": "prior_source_raw_archive",
+      "command": "node specs/ai-requirement-contract-integration/native-readability-replay-offline-v1/audit-history.mjs",
+      "exit_code": 0,
+      "receipt": "previous-phase-verification.json"
+    },
+    {
+      "kind": "historical_campaign_preservation_and_local_exact_secret_scan",
+      "command": "node specs/ai-requirement-contract-integration/offline-repair-v1/verify-preservation.mjs",
+      "exit_code": 0,
+      "receipt": "preservation-final.json"
+    }
+  ],
+  "supplementary": {
+    "development_native_invocations": 11,
+    "development_workflow_rows": 28,
+    "development_all_required_stage_success_rows": 16,
+    "development_project_write_failure_rows": 6,
+    "development_writer_failure_rows": 4,
+    "development_validation_warning_rows": 2,
+    "compile_only_native_invocations": [
+      "dev7"
+    ],
+    "log": "development-tests.log",
+    "pre_final_full_suite": {
+      "exit_code": 1,
+      "packages_passed": 150,
+      "packages_without_tests": 14,
+      "timeout_package": "kicadai/internal/opentopologysynthesis",
+      "timeout_seconds": 720,
+      "log": "pre-final-full-tests.log",
+      "not_a_final_source_verification": true
+    },
+    "pre_final_race": {
+      "exit_code": 0,
+      "log": "pre-final-race-tests.log",
+      "not_a_final_source_verification": true
+    }
+  },
+  "resource_note": "Pre-final/full/race processes overlapped. Pre-final full suite timed out; final full suite passed without extending the 12-minute per-package bound. Raw and extracted evidence are retained; approximately 26 GiB disk space remained after archiving.",
+  "phase_gate_passed": false,
+  "goal_complete": false
+}

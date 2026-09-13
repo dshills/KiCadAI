@@ -1,0 +1,90 @@
+{
+  "schema": "kicadai.schematic-readability-offline-execution.v1",
+  "base": "b9d48213aa0431d5cf19824287c6403a4aea5529",
+  "provider_calls": 0,
+  "commands": [
+    {
+      "kind": "repository_short_tests",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test ./... -short -count=1 -timeout=12m",
+      "exit_code": 0,
+      "log": "full-tests.log",
+      "passed_packages": 151,
+      "packages_without_tests": 14,
+      "longest_package_seconds": 679.708
+    },
+    {
+      "kind": "race",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go test -race ./internal/circuitgraph ./internal/kicadfiles/designapi ./internal/kicadfiles/project ./internal/schematicir ./internal/schematiclayout ./internal/transactions -short -count=1 -timeout=12m",
+      "exit_code": 0,
+      "log": "race-tests.log"
+    },
+    {
+      "kind": "lint",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off GOLANGCI_LINT_CACHE=/Users/dshills/Development/projects/KiCadAI/.cache/golangci-lint /Users/dshills/Development/Go/bin/golangci-lint run --timeout=5m ./internal/circuitgraph ./internal/compositionlowering ./internal/kicadfiles/designapi ./internal/kicadfiles/project ./internal/schematicir ./internal/schematiclayout ./internal/transactions",
+      "exit_code": 0,
+      "log": "lint.log"
+    },
+    {
+      "kind": "vet",
+      "command": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go vet ./...",
+      "exit_code": 0,
+      "log": "vet.log"
+    },
+    {
+      "kind": "native",
+      "exit_code": 0,
+      "log": "native-tests.log",
+      "test": "TestTopologyReadabilityNativePromotion",
+      "package": "./internal/compositionlowering",
+      "package_seconds": 31.237,
+      "case_context_bound_minutes": 20,
+      "repeats_per_case": 2,
+      "environment": {
+        "KICADAI_SYMBOLS_ROOT": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+        "KICADAI_FOOTPRINTS_ROOT": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+        "KICADAI_READABILITY_ARTIFACTS": "/tmp/kicadai-schematic-readability-offline-v1-final",
+        "KICADAI_KICAD_CLI": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "KICADAI_KICADAI_OFFLINE": "1 (unused typo; not a safety control)"
+      },
+      "effective_go_prefix": "env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_OPENAI_LIVE_TEST PATH=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin:$PATH GOROOT=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= CGO_ENABLED=1 GOMAXPROCS=4 GOCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/build GOMODCACHE=/Users/dshills/Development/projects/KiCadAI/.cache/go/mod GOPROXY=off GOSUMDB=off /Users/dshills/Development/projects/KiCadAI/.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64/bin/go",
+      "note": "Effective environment and test selection recorded; exact shell token ordering is not a retained transcript. Reproduction must use a new artifact root; native test is opt-in and not established by the short suite."
+    },
+    {
+      "kind": "seal_and_native_export",
+      "command": "node specs/ai-requirement-contract-integration/schematic-readability-offline-v1/seal-and-render.mjs /tmp/kicadai-schematic-readability-offline-v1-final",
+      "exit_code": 0,
+      "native_command_receipt": "/tmp/kicadai-schematic-readability-offline-v1-final/render-commands.json"
+    },
+    {
+      "kind": "detailed_visual_exports",
+      "command": "node specs/ai-requirement-contract-integration/schematic-readability-offline-v1/render-review.mjs /tmp/kicadai-schematic-readability-offline-v1-final",
+      "exit_code": 0,
+      "command_receipt": "/tmp/kicadai-schematic-readability-offline-v1-final/visual-review-commands.json"
+    },
+    {
+      "kind": "evidence_verification",
+      "command": "node specs/ai-requirement-contract-integration/schematic-readability-offline-v1/verify.mjs",
+      "exit_code": 0,
+      "receipt": "verification.json"
+    },
+    {
+      "kind": "historical_preservation",
+      "command": "node specs/ai-requirement-contract-integration/offline-repair-v1/verify-preservation.mjs",
+      "exit_code": 0,
+      "receipt": "preservation.json",
+      "key_usage": "local exact-secret scan only"
+    },
+    {
+      "kind": "previous_phase",
+      "command": "node specs/ai-requirement-contract-integration/schematic-readability-offline-v1/audit-history.mjs",
+      "exit_code": 0,
+      "receipt": "previous-phase-verification.json"
+    }
+  ],
+  "limitations": [
+    "No new live evaluation",
+    "No external review, push or PR",
+    "No fabrication approval",
+    "Intermediate source snapshots and some truncated development console output are not fully reconstructable"
+  ]
+}

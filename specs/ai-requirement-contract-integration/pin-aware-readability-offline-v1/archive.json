@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.pin-aware-readability-archive.v1",
+  "archive": "/Users/dshills/Development/projects/KiCadAI/.cache/pin-aware-readability-offline-v1-all-runs.tar.gz",
+  "bytes": 304232946,
+  "sha256": "b7028b8d2656edb083963df01b4e179655f254633c1772279f7039d9c817d064",
+  "manifest_sha256": "7d671d0ba7bc73d10b57e3d874a4a59b945f312f908d9595c6b902edf6266399",
+  "streamed": {
+    "files_verified": 824,
+    "bytes_verified": 6093958068,
+    "appledouble_metadata": [],
+    "full_extraction_created": false,
+    "exact_secret_scan": "absent"
+  },
+  "all_original_files_unchanged": true,
+  "archive_policy": "Created once with COPYFILE_DISABLE=1. All regular data/source files are exact; any supported AppleDouble metadata is separately validated. No full extraction created.",
+  "provider_calls": 0
+}

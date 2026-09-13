@@ -1,0 +1,28 @@
+{
+  "base": "c2ec8c88da11f8cf4aac498775e216ae2baaa34d",
+  "mode": "lint-final",
+  "command": "/Users/dshills/Development/Go/bin/golangci-lint",
+  "args": [
+    "run",
+    "--timeout=12m",
+    "./internal/compositionlowering",
+    "./internal/schematicir",
+    "./internal/schematiclayout"
+  ],
+  "started_utc": "2026-09-12T10:12:46.439Z",
+  "finished_utc": "2026-09-12T10:12:47.138Z",
+  "code": 0,
+  "signal": null,
+  "removed_provider_variables": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "KICADAI_OPENAI_LIVE_TEST"
+  ],
+  "dependency_network": "disabled",
+  "source_snapshot": "/Users/dshills/Development/projects/KiCadAI/.cache/ownership-locality-v2-sources/lint-final.json",
+  "source_snapshot_sha256": "75c750d7389744948da81bef2326378388716ef1025f750c5e8dc95bb2af7375",
+  "source_unchanged": true,
+  "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+}

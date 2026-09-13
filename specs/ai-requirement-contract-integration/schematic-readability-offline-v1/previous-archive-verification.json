@@ -1,0 +1,11 @@
+{
+  "verified_utc": "2026-09-11T18:47:13.175Z",
+  "archive_sha256": "ae2711156c94d77f730ca769cacf66babde1cd3efc0aa8e610e7811b2a33e275",
+  "archive_bytes": 76073202,
+  "fresh_extraction_inventory": {
+    "file_count": 316,
+    "total_bytes": 1527502860,
+    "sha256": "012c5386774cd31a2fdd5769fe6c0523c6646eecec94ea1459817f4f5cfdef85"
+  },
+  "provider_calls": 0
+}
