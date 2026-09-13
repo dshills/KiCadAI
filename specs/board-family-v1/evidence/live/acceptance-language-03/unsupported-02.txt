@@ -1,0 +1,1 @@
+The board must measure both humidity and pressure, with a dedicated humidity sensor on the PCB.

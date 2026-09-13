@@ -1,0 +1,35 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The esp32_bmp280_v1 board family supports only a regulated supply voltage range of 3.2 to 3.4 V. Directly accepting 12 V at J1 without an external converter is not supported.",
+    "clauses": [
+      {
+        "text": "Make the pressure controller accept a regulated 12 V supply directly at J1 without an external converter.",
+        "disposition": "unsupported",
+        "reason": "Whole original request retained; no design is authorized. The esp32_bmp280_v1 board family supports only a regulated supply voltage range of 3.2 to 3.4 V. Directly accepting 12 V at J1 without an external converter is not supported."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "The existing esp32_bmp280_v1 board family only supports an external regulated supply of 3.2–3.4 V. Accepting a regulated 12 V supply directly at J1 without an external converter exceeds the maximum allowed supply voltage and is outside the described family envelope.",
+        "text": "Make the pressure controller accept a regulated 12 V supply directly at J1 without an external converter."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "The esp32_bmp280_v1 board family supports only a regulated supply voltage range of 3.2 to 3.4 V. Directly accepting 12 V at J1 without an external converter is not supported."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0f2ace830334631c016aa6d0c5b8e087d1a58e2542f9b68056",
+  "usage": {
+    "input_tokens": 1138,
+    "output_tokens": 153,
+    "total_tokens": 1291
+  },
+  "ledger_index": 37,
+  "seconds": 2.208451416
+}

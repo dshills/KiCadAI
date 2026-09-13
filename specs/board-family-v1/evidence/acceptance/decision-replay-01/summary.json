@@ -1,0 +1,538 @@
+{
+  "api_requests": 0,
+  "case_count": 16,
+  "cases": [
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Configuration selected for esp32_bmp280_v1 family using the 'standard' profile with published family operating limits. These limits are not sensor measurements but represent operating conditions for the board configuration.",
+        "clauses": [
+          {
+            "text": "Please configure the basic wired pressure-measurement controller from the reviewed family. The published standard defaults are suitable.",
+            "disposition": "supported",
+            "reason": "The user requests the basic wired pressure-measurement controller from the reviewed family with standard defaults, which matches the 'standard' profile for esp32_bmp280_v1 under the fixed envelope and operating limits."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "standard",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 200
+        }
+      },
+      "id": "fresh-01",
+      "ledger_index": 20,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0c989c24ee975b3c016aa6b6f202c087d1a8f14ba9fb6356e8",
+      "source_selection_sha256": "d31c59086616906e7de6afafe8c6e4d4a8f68b4336177b0c253afd35507b32d5"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected the 'fast' profile to meet 400 kHz I2C requirement. All other operating limits are set to family defaults as requested. These limits reflect family operating constraints, not performance measurements.",
+        "clauses": [
+          {
+            "text": "My barometer needs the 400-kilohertz I2C option.",
+            "disposition": "supported",
+            "reason": "User requests 400 kHz I2C option, which matches the 'fast' profile. All other limits are at family defaults, which will be used accordingly."
+          },
+          {
+            "text": " Keep all other operating bounds at the family defaults.",
+            "disposition": "supported",
+            "reason": "User wants all other operating bounds at family defaults, which is standard and supported by their selection of the 'fast' profile."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "fast",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "id": "fresh-02",
+      "ledger_index": 21,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_07ca5c6809f0b07f016aa6b6f7e63087d190767375fa1f53d8",
+      "source_selection_sha256": "5a9251a230324bac37c2548ef2a3dfd90d5a013bbb31b0aaf6a3cfcb7ef92449"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected esp32_bmp280_v1 family version 1 with 'low_current' profile. Operating limits are supply 3.2–3.4 V, current capacity 1000 mA, ambient 10–35 °C, total bus capacitance 100 pF. These are family documented limits, not measured or guaranteed performance.",
+        "clauses": [
+          {
+            "text": "Configure the ESP32/BMP280 family with its low_current option.",
+            "disposition": "supported",
+            "reason": "User explicitly requests the esp32_bmp280_v1 family with the 'low_current' profile which reduces I2C pull-up sink current to 10k ohms, matching documented options."
+          },
+          {
+            "text": " I accept the documented supply, temperature and bus-loading envelope.",
+            "disposition": "supported",
+            "reason": "User accepts the documented supply voltage, current capacity, ambient temperature, and bus capacitance envelope as published for this family and profile, which are not measurements but operating limits."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "low_current",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "id": "fresh-03",
+      "ledger_index": 22,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0a923733da1ea6f0016aa6b6fd8dec87d19e4a3dd886391e00",
+      "source_selection_sha256": "372a762460942cd500014ec012a569553659a036365538e3a41fa739a0d63677"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "The selected configuration matches the 'standard' profile of the esp32_bmp280_v1 board family supporting 100 kHz I2C communication with total bus capacitance up to 200 pF. These operating limits reflect the family specifications and not measured performance.",
+        "clauses": [
+          {
+            "text": "Generate the fixed pressure board for standard 100 kHz communication and a total I2C load no greater than 200 pF.",
+            "disposition": "supported",
+            "reason": "Request for fixed pressure board with standard 100 kHz I2C and total bus capacitance no greater than 200 pF matches the standard profile of the esp32_bmp280_v1 family."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "standard",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 200
+        }
+      },
+      "id": "fresh-04",
+      "ledger_index": 23,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0c43a28e48554596016aa6b7060ae887d1b3646f3b5710ad69",
+      "source_selection_sha256": "7033f5c32fb4f29518f5094a89899c311f1cd948bbf54aa99370e49cfd67167b"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected the 'fast' profile of esp32_bmp280_v1 to meet the requested 2.2k pull-ups and 400 kHz I2C bus speed, using the published default envelope for other parameters.",
+        "clauses": [
+          {
+            "text": "Fit the approved 2.2-kilohm bus pull-ups and run I2C at 400000 Hz on the pressure controller;",
+            "disposition": "supported",
+            "reason": "The request to fit 2.2-kilohm bus pull-ups and run I2C at 400000 Hz matches the 'fast' profile which uses 2.2k pull-ups and supports 400kHz operation."
+          },
+          {
+            "text": " use the published defaults elsewhere.",
+            "disposition": "supported",
+            "reason": "The request to use the published defaults elsewhere is supported by using the 'fast' profile's published operating envelope for other parameters."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "fast",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "id": "fresh-05",
+      "ledger_index": 24,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0d47fe7a7936f8c6016aa6b70baec487d1bcdd5934fb190185",
+      "source_selection_sha256": "ec280bd594d4079d0d226feafcf4ae14d019cb9b86ebf65c1adf7f73809e4305"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected low_current profile as requested for 10k-ohm I2C pull-ups and standard supply and environmental limits from the esp32_bmp280_v1 family version 1.",
+        "clauses": [
+          {
+            "text": "I need 10k-ohm pull-ups on SDA and SCL for the pressure board.",
+            "disposition": "supported",
+            "reason": "User requests 10k pull-ups on SDA and SCL, explicitly matching the low_current profile."
+          },
+          {
+            "text": " No battery operation is being requested,",
+            "disposition": "supported",
+            "reason": "User explicitly excludes battery operation, which is not provided or configured in this family anyway."
+          },
+          {
+            "text": " and the normal family envelope applies.",
+            "disposition": "supported",
+            "reason": "User refers to the normal family envelope, so standard environmental and power supply limits apply."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "low_current",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "id": "fresh-06",
+      "ledger_index": 25,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_01415e319a7fefd3016aa6b712346c87d1a2ebf3d26dd3954c",
+      "source_selection_sha256": "66ecdbb9e2adaf72b58d3f62795526ed4a8082d22d1ee3f2610d7a1524e8a73f"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected 'standard' profile with specified bus capacitance 175 pF and retained family power and temperature limits as requested. These are family operating limits, not measurements.",
+        "clauses": [
+          {
+            "text": "Use the standard pressure-controller option at 100000 Hz with 175 pF of total bus loading.",
+            "disposition": "supported",
+            "reason": "Selecting standard profile (100 kHz I2C) matches 'standard pressure-controller' at 100000 Hz and 175 pF is within 50-200 pF total bus capacitance allowed for standard profile."
+          },
+          {
+            "text": " Retain the family power and temperature limits.",
+            "disposition": "supported",
+            "reason": "Retaining family power and temperature limits means using fixed envelope limits for esp32_bmp280_v1 version 1 as defined."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "standard",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 175
+        }
+      },
+      "id": "fresh-07",
+      "ledger_index": 26,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0e6d220deaeb4006016aa6b717cb2c87d1a8c4a380f42dd92e",
+      "source_selection_sha256": "b2a1683cbb8529553c4a38f44200e1e0b88d3762b5ee6aa793dde2e43a35df1d"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected fast profile for ESP32_BMP280_V1 board family with 75 pF bus capacitance and standard indoor environmental and power conditions. The specified total bus capacitance is within the profile's 50-100 pF limit. Operating limits reflect family published envelope, not measurements.",
+        "clauses": [
+          {
+            "text": "Select fast I2C for this BMP280 board, with 75 pF total capacitance and the usual regulated source and indoor conditions.",
+            "disposition": "supported",
+            "reason": "User requests fast I2C (400 kHz) which corresponds to 'fast' profile with 2.2k pull-ups and 50-100 pF bus capacitance. Total bus capacitance specified as 75 pF fits within profile limit."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "fast",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 75
+        }
+      },
+      "id": "fresh-08",
+      "ledger_index": 27,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_00cd755410e8b59c016aa6b71d905487d1887be0c017a29ea2",
+      "source_selection_sha256": "f78e06c404a392c11d43c17bf991e903127e68c263b2eeeb292edf8b055f9917"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "The configuration applies the low_current profile as explicitly requested by the user, with a total bus capacitance set to 60 pF and other electrical limits at family defaults. This satisfies all user requirements within the family capabilities.",
+        "clauses": [
+          {
+            "text": "Reduce only the current through the I2C pull-up resistors on this board, using the low_current profile.",
+            "disposition": "supported",
+            "reason": "The request explicitly asks to reduce I2C pull-up current, aligning with the 'low_current' profile for this board family."
+          },
+          {
+            "text": " The total bus loading is 60 pF;",
+            "disposition": "supported",
+            "reason": "Total bus capacitance of 60 pF fits within the 'low_current' profile's specified maximum of 100 pF total bus capacitance."
+          },
+          {
+            "text": " other limits stay at family defaults.",
+            "disposition": "supported",
+            "reason": "Other limits remain at family defaults, which is standard and supported behavior."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "low_current",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 60
+        }
+      },
+      "id": "fresh-09",
+      "ledger_index": 28,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0dffb1368a3ed4c0016aa6b724c4dc87d1a6c10d53bc8643b5",
+      "source_selection_sha256": "894fe7e62d936848debf1a85b1791f02b3fa5684931d9a3a65d2b337e3f17ec2"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "supported",
+        "message": "Selected the esp32_bmp280_v1 family with the 'standard' profile per user request and fixed envelope limits. These limits represent family operating bounds, not measured or certified performance.",
+        "clauses": [
+          {
+            "text": "I will supply regulated 3.2 to 3.4 V from a one-amp-capable source.",
+            "disposition": "supported",
+            "reason": "User requests a regulated supply of 3.2 to 3.4 V at one amp source, which is within the family operating limits and default envelope."
+          },
+          {
+            "text": " Build the standard pressure-controller family option with its default bus and environmental bounds.",
+            "disposition": "supported",
+            "reason": "User requests the standard pressure-controller family option with its default bus and environmental bounds, which matches the 'standard' profile defaults per capability context."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "standard",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 200
+        }
+      },
+      "id": "fresh-10",
+      "ledger_index": 29,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0d9840e12fcecbc1016aa6b72a8dfc87d1955442b4b289d4cc",
+      "source_selection_sha256": "f332e1cec5152d6b1618eedaf26a8614efa3aea0b3da022ddcb606592e1612b9"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "unsupported",
+        "message": "Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context.",
+        "clauses": [
+          {
+            "text": "Make this pressure node send measurements over Wi-Fi. Bluetooth support is not needed.",
+            "disposition": "unsupported",
+            "reason": "Whole original request retained; no design is authorized. Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-unsupported-01",
+      "ledger_index": 30,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_0d9fc339ea578d9d016aa6b7304d0c87d1a715cc213f3143e7",
+      "source_selection_sha256": "78f9b31aee65ec4f6bcb61dc7f96eadecbda05a5ab16bfb240ac3731cf2226cc"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family only supports an external regulated power input in the range 3.2 V to 3.4 V. Supplying 5 V DC directly on the power connector is outside the supported voltage envelope and would damage the board or cause malfunction. Please provide a regulated supply in the supported voltage range.",
+        "clauses": [
+          {
+            "text": "The board has to accept 5 V DC directly on its power connector. I do not need USB data.",
+            "disposition": "unsupported",
+            "reason": "Whole original request retained; no design is authorized. The esp32_bmp280_v1 board family only supports an external regulated power input in the range 3.2 V to 3.4 V. Supplying 5 V DC directly on the power connector is outside the supported voltage envelope and would damage the board or cause malfunction. Please provide a regulated supply in the supported voltage range."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-unsupported-02",
+      "ledger_index": 31,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 1,
+      "original_live_passed": false,
+      "passed": true,
+      "run": "acceptance-holdout-01",
+      "source_response_id": "resp_07f89e667ecef197016aa6b731ee7487d19c31d0b811580e2e",
+      "source_selection_sha256": "7158d9af9f7c2fb40d07ffda1fce0e765aae0631e3c29214f7694519c38154c0"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "unsupported",
+        "message": "Adding a humidity sensor alongside the existing pressure sensor on the esp32_bmp280_v1 board family is unsupported, as the board design and family specifications include only the BMP280 pressure sensor and do not provide for adding a humidity sensor.",
+        "clauses": [
+          {
+            "text": "Include a humidity sensor on the PCB alongside the pressure sensor and controller.",
+            "disposition": "unsupported",
+            "reason": "Whole original request retained; no design is authorized. Adding a humidity sensor alongside the existing pressure sensor on the esp32_bmp280_v1 board family is unsupported, as the board design and family specifications include only the BMP280 pressure sensor and do not provide for adding a humidity sensor."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-unsupported-03",
+      "ledger_index": 32,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-02",
+      "source_response_id": "resp_0d18e76e92b6e9c8016aa6b8735dc087d19934d0961a040552",
+      "source_selection_sha256": "223d3e509395e72b7a5547781eedab8b65c87ada4141ea95ff6700772c91e493"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "unsupported",
+        "message": "This family has a fixed 120 by 80 mm outline; the requested dimensions are not supported. No resized board was generated.",
+        "clauses": [
+          {
+            "text": "Keep two copper layers, but make the complete controller board 80 by 60 millimeters.",
+            "disposition": "unsupported",
+            "reason": "This family has a fixed 120 by 80 mm outline; the requested dimensions are not supported. No resized board was generated."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-unsupported-04",
+      "ledger_index": 33,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": false,
+      "passed": true,
+      "run": "acceptance-holdout-02",
+      "source_response_id": "resp_0d1dd74c522bcddd016aa6b8752c3c87d1a2691c519e54dd78",
+      "source_selection_sha256": "b6a041c6b300ef87b87534ad643ce54fbba4e75cf481984080e6bed542d08744"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "clarify",
+        "message": "You have proposed two alternatives for the pressure board configuration: a 'fast' bus speed profile and a 'low_current' bus operation profile. Please clarify which priority you prefer: higher I2C speed (fast) or reduced I2C pull-up current (low_current).",
+        "clauses": [
+          {
+            "text": "For the pressure board, fast bus speed and low-current bus operation are alternatives I have not chosen between. Ask me which priority to use.",
+            "disposition": "clarify",
+            "reason": "Whole original request retained; no design is authorized. You have proposed two alternatives for the pressure board configuration: a 'fast' bus speed profile and a 'low_current' bus operation profile. Please clarify which priority you prefer: higher I2C speed (fast) or reduced I2C pull-up current (low_current)."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-ambiguous-01",
+      "ledger_index": 34,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 1,
+      "original_live_passed": false,
+      "passed": true,
+      "run": "acceptance-holdout-02",
+      "source_response_id": "resp_016e2a908ca4d993016aa6b87aa70487d1bc5178c1507e794b",
+      "source_selection_sha256": "33f205738894fe8e7e5eb37a7c91e90b6de6910eb388194b1086ce4b6a7019ae"
+    },
+    {
+      "api_requests": 0,
+      "current_decision": {
+        "disposition": "clarify",
+        "message": "Please clarify which part of the board's energy consumption is most important to minimize (e.g., overall board power, sensor power, I2C pull-up sink current). Only with this information can an appropriate family profile be selected.",
+        "clauses": [
+          {
+            "text": "For this pressure monitor, minimize energy consumption. I have not specified which part of the board's consumption matters.",
+            "disposition": "clarify",
+            "reason": "Whole original request retained; no design is authorized. Please clarify which part of the board's energy consumption is most important to minimize (e.g., overall board power, sensor power, I2C pull-up sink current). Only with this information can an appropriate family profile be selected."
+          }
+        ],
+        "configuration": null
+      },
+      "id": "fresh-ambiguous-02",
+      "ledger_index": 35,
+      "native_generation_attempted": false,
+      "original_live_exit_code": 0,
+      "original_live_passed": true,
+      "passed": true,
+      "run": "acceptance-holdout-03",
+      "source_response_id": "resp_061f9cca03c81bcd016aa6b9c2a3a087d1b50f64d639a1c495",
+      "source_selection_sha256": "7049759c0827d5807369bbb9058b48465e9ba129ada2602158e8966c9296cd8a"
+    }
+  ],
+  "kind": "offline replay of retained live responses, not a live retry or new first attempt",
+  "passed": true,
+  "spec_sha256": "1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4"
+}

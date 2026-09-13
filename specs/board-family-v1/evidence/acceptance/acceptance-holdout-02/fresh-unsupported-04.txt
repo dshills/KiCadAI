@@ -1,0 +1,1 @@
+Keep two copper layers, but make the complete controller board 80 by 60 millimeters.

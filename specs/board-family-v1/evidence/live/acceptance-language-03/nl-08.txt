@@ -1,0 +1,1 @@
+Configure the existing pressure-controller family for an I2C clock of 400000 Hz. Keep its supported footprint, outline and regulated input.

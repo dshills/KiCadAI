@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected the esp32_bmp280_v1 family with the 'standard' profile per user request and fixed envelope limits. These limits represent family operating bounds, not measured or certified performance.",
+    "clauses": [
+      {
+        "text": "I will supply regulated 3.2 to 3.4 V from a one-amp-capable source.",
+        "disposition": "supported",
+        "reason": "User requests a regulated supply of 3.2 to 3.4 V at one amp source, which is within the family operating limits and default envelope."
+      },
+      {
+        "text": " Build the standard pressure-controller family option with its default bus and environmental bounds.",
+        "disposition": "supported",
+        "reason": "User requests the standard pressure-controller family option with its default bus and environmental bounds, which matches the 'standard' profile defaults per capability context."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "User requests a regulated supply of 3.2 to 3.4 V at one amp source, which is within the family operating limits and default envelope.",
+        "text": "I will supply regulated 3.2 to 3.4 V from a one-amp-capable source."
+      },
+      {
+        "disposition": "supported",
+        "reason": "User requests the standard pressure-controller family option with its default bus and environmental bounds, which matches the 'standard' profile defaults per capability context.",
+        "text": " Build the standard pressure-controller family option with its default bus and environmental bounds."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 200,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected the esp32_bmp280_v1 family with the 'standard' profile per user request and fixed envelope limits. These limits represent family operating bounds, not measured or certified performance."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0d9840e12fcecbc1016aa6b72a8dfc87d1955442b4b289d4cc",
+  "usage": {
+    "input_tokens": 1156,
+    "output_tokens": 238,
+    "total_tokens": 1394
+  },
+  "ledger_index": 29,
+  "seconds": 2.691000083
+}

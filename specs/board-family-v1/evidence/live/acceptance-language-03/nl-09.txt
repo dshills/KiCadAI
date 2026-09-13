@@ -1,0 +1,1 @@
+I only want to save current in the I2C pull-up resistors: choose the low_current profile with 50 pF total bus loading, using the family defaults elsewhere.

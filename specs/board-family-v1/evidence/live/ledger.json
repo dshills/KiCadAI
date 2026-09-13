@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "goal": "board-family-v1-2026-09-13",
+  "entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-13T13:36:30.810789Z",
+      "status": "failed_or_unknown",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000
+    },
+    {
+      "index": 2,
+      "started_utc": "2026-09-13T13:40:50.743095Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0a3bdc0d6674a2b5016aa6a7e30c6c87d1a250256984887a8c",
+      "input_tokens": 1041,
+      "output_tokens": 207,
+      "estimated_micro_usd": 748
+    },
+    {
+      "index": 3,
+      "started_utc": "2026-09-13T13:40:56.806206Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0685b30cdafd4273016aa6a7e90a7887d19a85175b3c070a2b",
+      "input_tokens": 1051,
+      "output_tokens": 190,
+      "estimated_micro_usd": 725
+    },
+    {
+      "index": 4,
+      "started_utc": "2026-09-13T13:41:02.954347Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_005cb91c99088d87016aa6a7ef14e087d19139e3bfd1eb6158",
+      "input_tokens": 1053,
+      "output_tokens": 157,
+      "estimated_micro_usd": 673
+    },
+    {
+      "index": 5,
+      "started_utc": "2026-09-13T13:41:04.879717Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_044dc2593ce5bb50016aa6a7f10c9c87d19291a2254d5ace42",
+      "input_tokens": 1058,
+      "output_tokens": 270,
+      "estimated_micro_usd": 856
+    },
+    {
+      "index": 6,
+      "started_utc": "2026-09-13T13:41:10.676839Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_09a5d20a4650d3a5016aa6a7f6dec087d18492afc268b899e5",
+      "input_tokens": 1055,
+      "output_tokens": 235,
+      "estimated_micro_usd": 798
+    },
+    {
+      "index": 7,
+      "started_utc": "2026-09-13T13:49:08.639018Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_09b0d3f62ac3e807016aa6a9d5759887d1b67e7cd8fcce1cb1",
+      "input_tokens": 1061,
+      "output_tokens": 255,
+      "estimated_micro_usd": 833
+    },
+    {
+      "index": 8,
+      "started_utc": "2026-09-13T13:49:15.955659Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0599f7c2d19c9ac2016aa6a9dc1c1887d1bc269a3c08c7a273",
+      "input_tokens": 1060,
+      "output_tokens": 225,
+      "estimated_micro_usd": 784
+    },
+    {
+      "index": 9,
+      "started_utc": "2026-09-13T13:49:21.532585Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_02eabb76196150f2016aa6a9e1b15c87d1943007519d1f755e",
+      "input_tokens": 1055,
+      "output_tokens": 202,
+      "estimated_micro_usd": 746
+    },
+    {
+      "index": 10,
+      "started_utc": "2026-09-13T13:49:27.835793Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_00996d04abf3bb89016aa6a9e7fb7c87d18f36cc6991de9b15",
+      "input_tokens": 1063,
+      "output_tokens": 272,
+      "estimated_micro_usd": 861
+    },
+    {
+      "index": 11,
+      "started_utc": "2026-09-13T13:49:34.03504Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0fae90dcc129f4d3016aa6a9ee307487d1bb9b9892b287d50f",
+      "input_tokens": 1066,
+      "output_tokens": 230,
+      "estimated_micro_usd": 795
+    },
+    {
+      "index": 12,
+      "started_utc": "2026-09-13T13:49:40.019608Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_05d8a7e8fb77e660016aa6a9f42f7c87d18281a647fe69b897",
+      "input_tokens": 1046,
+      "output_tokens": 118,
+      "estimated_micro_usd": 608
+    },
+    {
+      "index": 13,
+      "started_utc": "2026-09-13T13:49:41.621367Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0a30212afadaeb5a016aa6a9f5c44c87d1942a69ded5bcb5e8",
+      "input_tokens": 1045,
+      "output_tokens": 122,
+      "estimated_micro_usd": 614
+    },
+    {
+      "index": 14,
+      "started_utc": "2026-09-13T13:49:43.0917Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_09c4f8db8f1b653a016aa6a9f7388087d18cc7503287618fc8",
+      "input_tokens": 1044,
+      "output_tokens": 101,
+      "estimated_micro_usd": 580
+    },
+    {
+      "index": 15,
+      "started_utc": "2026-09-13T13:49:45.408725Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_01e29b68e58fd68b016aa6a9f9877087d180140de6ffac5b12",
+      "input_tokens": 1050,
+      "output_tokens": 132,
+      "estimated_micro_usd": 632
+    },
+    {
+      "index": 16,
+      "started_utc": "2026-09-13T13:49:46.911764Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0fb260e7962eed73016aa6a9fb242887d19a5885d820b61646",
+      "input_tokens": 1050,
+      "output_tokens": 147,
+      "estimated_micro_usd": 656
+    },
+    {
+      "index": 17,
+      "started_utc": "2026-09-13T13:49:48.645634Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_099a2bb0f36d8c47016aa6a9fcc7ec87d1b84e96b5e3979416",
+      "input_tokens": 1048,
+      "output_tokens": 239,
+      "estimated_micro_usd": 802
+    }
+  ]
+}

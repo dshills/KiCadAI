@@ -1,0 +1,1 @@
+For my BMP280 controller I need a 400 kHz I2C bus, with the usual family operating limits.

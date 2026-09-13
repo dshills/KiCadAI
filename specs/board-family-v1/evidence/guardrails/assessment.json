@@ -1,0 +1,54 @@
+{
+  "as_of_utc": "2026-09-13T16:39:16.190Z",
+  "targeted_guardrail_followup_passed": true,
+  "unsupported_passes": 4,
+  "unsupported_total": 4,
+  "clarification_passes": 2,
+  "clarification_total": 2,
+  "source_commit": "2b85d7698f2fb5c8550c59621e7f81ce666611e9",
+  "production_base_commit": "faca271b6198d399e3e2e791f40f35df2ac57232",
+  "cap_only_lineage": {
+    "internal/boardfamily/ledger.go": {
+      "before_sha256": "2ed63c04f1150efe8517ece0180eb36a041ca9ced026c65d31fd244dd64fdb75",
+      "after_sha256": "3286a3bde38e9948b8f28ef8b07ea752c9d36e12f210c0897a5b137c073b474f",
+      "replacement": [
+        "const MaxLiveRequests = 35",
+        "const MaxLiveRequests = 41"
+      ]
+    },
+    "cmd/kicadai-board-family/main.go": {
+      "before_sha256": "6f92ab949471246c4cb3b862302bf6e60c6d1b24f2ea23959261402d1e2256b9",
+      "after_sha256": "4fef2614f47333402c9854eb252a4c63513fad73591f871324d4223416ab3b48",
+      "replacement": [
+        "goal's 35-request / $10 limit",
+        "goal's 41-request / $10 limit"
+      ]
+    }
+  },
+  "binary_sha256": "47febeaca39f1834317c499e77d5dc59e96294adcede902264e2377ce647074d",
+  "spec_sha256": "ccd2806424b811d24f13b7e2cb91b4ed92c8673d691096ca3dce64ba338a208a",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "goal_total_requests": 41,
+  "known_responses": 40,
+  "known_input_tokens": 44274,
+  "known_output_tokens": 7704,
+  "known_estimated_micro_usd": 30054,
+  "unknown_reserved_micro_usd": 50000,
+  "conservative_total_micro_usd": 80054,
+  "actual_invoice_checked": false,
+  "original_live_acceptance_passed": false,
+  "earlier_holdout_strict_passed": false,
+  "earlier_holdout_strict_score": "13/16",
+  "evidence_combination": "Ten correct first-attempt supported language boards from the earlier holdout, unchanged current-decoder replay of those requests, ten numerically configured boards plus three native-identical post-integration replays, and this separately approved six-case live refusal/clarification follow-up. Not a newly executed single-binary 16/16 trial.",
+  "semantic_review": {
+    "reviewer": "implementing Codex agent",
+    "checked": "Four refusals explain Bluetooth, 12 V direct supply, relay output and 90x50 mm outline restrictions. Both clarifications ask for missing priorities/loads/measurement interval without assigning a configuration. All six preserve original requests and produce no native files."
+  },
+  "bounded_regression_seconds": 38.144,
+  "limitations": [
+    "Original failed trials and their denominators remain unchanged.",
+    "Small implementing-agent-authored evaluation sets, not an independent benchmark or universal semantic guarantee.",
+    "Local hashes establish integrity/provenance, not third-party signatures or measured hardware performance.",
+    "Inherited repository CI lint failure and skipped dependent quality gate remain separately disclosed."
+  ]
+}

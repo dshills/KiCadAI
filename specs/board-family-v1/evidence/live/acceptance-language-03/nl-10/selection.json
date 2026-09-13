@@ -1,0 +1,55 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected esp32_bmp280_v1 family with standard profile for nominal 3.3 V supply, 100 kHz I2C, and 200 pF bus capacitance as requested. These represent family operating limits, not measured performance.",
+    "clauses": [
+      {
+        "text": "Give me the basic pressure controller for a nominal 3.3-volt source, using standard 100-kHz I2C and a 200-pF total bus-capacitance bound.",
+        "disposition": "supported",
+        "reason": "The prompt requests a basic pressure controller with nominal 3.3 V supply, standard 100 kHz I2C, and 200 pF total bus capacitance, which aligns with the 'standard' profile within the family envelope."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "The prompt requests a basic pressure controller with nominal 3.3 V supply, standard 100 kHz I2C, and 200 pF total bus capacitance, which aligns with the 'standard' profile within the family envelope.",
+        "text": "Give me the basic pressure controller for a nominal 3.3-volt source, using standard 100-kHz I2C and a 200-pF total bus-capacitance bound."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 200,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected esp32_bmp280_v1 family with standard profile for nominal 3.3 V supply, 100 kHz I2C, and 200 pF bus capacitance as requested. These represent family operating limits, not measured performance."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0fae90dcc129f4d3016aa6a9ee307487d1bb9b9892b287d50f",
+  "usage": {
+    "input_tokens": 1066,
+    "output_tokens": 230,
+    "total_tokens": 1296
+  },
+  "ledger_index": 11,
+  "seconds": 2.484327792
+}

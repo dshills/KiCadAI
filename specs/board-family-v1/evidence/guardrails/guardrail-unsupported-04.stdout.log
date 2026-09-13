@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The esp32_bmp280_v1 board family is only available with a fixed 120 x 80 mm outline. The requested 90 x 50 mm outline is not supported.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-04","passed":false}

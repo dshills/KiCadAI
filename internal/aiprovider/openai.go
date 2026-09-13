@@ -141,6 +141,26 @@ type openAIInput struct {
 }
 
 func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request GenerateRequest) (GenerateResult, error) {
+	return provider.generate(ctx, request, DecodeEnvelope)
+}
+
+// GenerateJSON returns the single structured JSON object requested by the
+// caller without assuming the legacy intent-envelope shape. The caller must
+// still validate its domain contract. HTTP, streaming, refusal and usage gates
+// are shared with GenerateIntent; the outgoing request is identical.
+func (provider *OpenAIProvider) GenerateJSON(ctx context.Context, request GenerateRequest) (GenerateResult, error) {
+	return provider.generate(ctx, request, decodeJSONObject)
+}
+
+func decodeJSONObject(data []byte) (json.RawMessage, error) {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > MaxResponseBytes || len(trimmed) == 0 || trimmed[0] != '{' || !json.Valid(trimmed) {
+		return nil, newProviderError(ErrorMalformed, "structured response must be one bounded JSON object", nil)
+	}
+	return append(json.RawMessage(nil), trimmed...), nil
+}
+
+func (provider *OpenAIProvider) generate(ctx context.Context, request GenerateRequest, decode func([]byte) (json.RawMessage, error)) (GenerateResult, error) {
 	if err := ValidateGenerateRequest(request); err != nil {
 		return GenerateResult{}, err
 	}
@@ -221,7 +241,7 @@ func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request Gene
 			return GenerateResult{}, err
 		}
 	}
-	result, err := decodeOpenAIResponse(responseBody, provider.model, maxOutputTokens)
+	result, err := decodeOpenAIResponseWithDecoder(responseBody, provider.model, maxOutputTokens, decode)
 	if err != nil {
 		return GenerateResult{}, err
 	}
@@ -511,6 +531,10 @@ type openAIResponseUsage struct {
 }
 
 func decodeOpenAIResponse(data []byte, fallbackModel string, maxOutputTokens int) (GenerateResult, error) {
+	return decodeOpenAIResponseWithDecoder(data, fallbackModel, maxOutputTokens, DecodeEnvelope)
+}
+
+func decodeOpenAIResponseWithDecoder(data []byte, fallbackModel string, maxOutputTokens int, decode func([]byte) (json.RawMessage, error)) (GenerateResult, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	var response openAIResponse
 	if err := decoder.Decode(&response); err != nil {
@@ -574,8 +598,19 @@ func decodeOpenAIResponse(data []byte, fallbackModel string, maxOutputTokens int
 	if len(outputTexts) != 1 {
 		return GenerateResult{}, newProviderError(ErrorMalformed, fmt.Sprintf("OpenAI response requires exactly one output_text payload, got %d", len(outputTexts)), nil)
 	}
-	intentJSON, err := DecodeEnvelope([]byte(outputTexts[0]))
+	intentJSON, err := decode([]byte(outputTexts[0]))
 	if err != nil {
+		var pe *ProviderError
+		if errors.As(err, &pe) {
+			pe.Provider = "openai"
+			pe.Model = strings.TrimSpace(response.Model)
+			if pe.Model == "" {
+				pe.Model = fallbackModel
+			}
+			pe.ResponseID = strings.TrimSpace(response.ID)
+			pe.Usage = openAIUsage(response.Usage)
+			pe.MaxOutputTokens = maxOutputTokens
+		}
 		return GenerateResult{}, err
 	}
 	model := strings.TrimSpace(response.Model)

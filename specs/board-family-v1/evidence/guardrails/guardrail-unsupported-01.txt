@@ -1,0 +1,1 @@
+I need this BMP280 board to publish pressure readings over Bluetooth. Keep the UART programming header.

@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+const root=process.cwd();const out=path.resolve(process.argv[2]);fs.mkdirSync(out,{recursive:false});
+const env={...process.env,GOROOT:path.join(root,'.cache/go/mod/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64'),GOTOOLCHAIN:'local',GOENV:'off',GOWORK:'off',GOFLAGS:'',GOEXPERIMENT:'',GOMAXPROCS:'4',GOCACHE:path.join(root,'.cache/go/build'),GOMODCACHE:path.join(root,'.cache/go/mod'),GOPROXY:'off',GOSUMDB:'off'};
+for(const key of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY'])delete env[key];
+const cmd=path.join(env.GOROOT,'bin/go');const args=['test','-short','-p=1','-timeout','20m','./...'];
+const fd=fs.openSync(path.join(out,'tests.log'),'wx');const started=new Date();const child=spawn(cmd,args,{env,stdio:['ignore',fd,fd]});
+child.on('error',e=>{console.error(e.message);process.exitCode=1});
+child.on('close',(code,signal)=>{fs.closeSync(fd);const receipt={started_utc:started.toISOString(),finished_utc:new Date().toISOString(),seconds:(Date.now()-started.getTime())/1000,command:cmd,args,provider_keys_removed:true,exit_code:code,signal};fs.writeFileSync(path.join(out,'execution.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt));process.exitCode=code??1});

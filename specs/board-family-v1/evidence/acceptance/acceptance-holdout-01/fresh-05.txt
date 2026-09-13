@@ -1,0 +1,1 @@
+Fit the approved 2.2-kilohm bus pull-ups and run I2C at 400000 Hz on the pressure controller; use the published defaults elsewhere.

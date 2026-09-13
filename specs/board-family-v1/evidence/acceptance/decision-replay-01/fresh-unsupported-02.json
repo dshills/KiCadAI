@@ -1,0 +1,24 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "unsupported",
+    "message": "The esp32_bmp280_v1 board family only supports an external regulated power input in the range 3.2 V to 3.4 V. Supplying 5 V DC directly on the power connector is outside the supported voltage envelope and would damage the board or cause malfunction. Please provide a regulated supply in the supported voltage range.",
+    "clauses": [
+      {
+        "text": "The board has to accept 5 V DC directly on its power connector. I do not need USB data.",
+        "disposition": "unsupported",
+        "reason": "Whole original request retained; no design is authorized. The esp32_bmp280_v1 board family only supports an external regulated power input in the range 3.2 V to 3.4 V. Supplying 5 V DC directly on the power connector is outside the supported voltage envelope and would damage the board or cause malfunction. Please provide a regulated supply in the supported voltage range."
+      }
+    ],
+    "configuration": null
+  },
+  "id": "fresh-unsupported-02",
+  "ledger_index": 31,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 1,
+  "original_live_passed": false,
+  "passed": true,
+  "run": "acceptance-holdout-01",
+  "source_response_id": "resp_07f89e667ecef197016aa6b731ee7487d19c31d0b811580e2e",
+  "source_selection_sha256": "7158d9af9f7c2fb40d07ffda1fce0e765aae0631e3c29214f7694519c38154c0"
+}

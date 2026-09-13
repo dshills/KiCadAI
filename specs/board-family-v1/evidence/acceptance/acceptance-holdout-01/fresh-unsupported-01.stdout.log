@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-unsupported-01","passed":false}

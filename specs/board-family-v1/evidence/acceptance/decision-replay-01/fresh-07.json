@@ -1,0 +1,39 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "supported",
+    "message": "Selected 'standard' profile with specified bus capacitance 175 pF and retained family power and temperature limits as requested. These are family operating limits, not measurements.",
+    "clauses": [
+      {
+        "text": "Use the standard pressure-controller option at 100000 Hz with 175 pF of total bus loading.",
+        "disposition": "supported",
+        "reason": "Selecting standard profile (100 kHz I2C) matches 'standard pressure-controller' at 100000 Hz and 175 pF is within 50-200 pF total bus capacitance allowed for standard profile."
+      },
+      {
+        "text": " Retain the family power and temperature limits.",
+        "disposition": "supported",
+        "reason": "Retaining family power and temperature limits means using fixed envelope limits for esp32_bmp280_v1 version 1 as defined."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 175
+    }
+  },
+  "id": "fresh-07",
+  "ledger_index": 26,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-01",
+  "source_response_id": "resp_0e6d220deaeb4006016aa6b717cb2c87d1a8c4a380f42dd92e",
+  "source_selection_sha256": "b2a1683cbb8529553c4a38f44200e1e0b88d3762b5ee6aa793dde2e43a35df1d"
+}

@@ -1,0 +1,44 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "supported",
+    "message": "The configuration applies the low_current profile as explicitly requested by the user, with a total bus capacitance set to 60 pF and other electrical limits at family defaults. This satisfies all user requirements within the family capabilities.",
+    "clauses": [
+      {
+        "text": "Reduce only the current through the I2C pull-up resistors on this board, using the low_current profile.",
+        "disposition": "supported",
+        "reason": "The request explicitly asks to reduce I2C pull-up current, aligning with the 'low_current' profile for this board family."
+      },
+      {
+        "text": " The total bus loading is 60 pF;",
+        "disposition": "supported",
+        "reason": "Total bus capacitance of 60 pF fits within the 'low_current' profile's specified maximum of 100 pF total bus capacitance."
+      },
+      {
+        "text": " other limits stay at family defaults.",
+        "disposition": "supported",
+        "reason": "Other limits remain at family defaults, which is standard and supported behavior."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "low_current",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 60
+    }
+  },
+  "id": "fresh-09",
+  "ledger_index": 28,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-01",
+  "source_response_id": "resp_0dffb1368a3ed4c0016aa6b724c4dc87d1a6c10d53bc8643b5",
+  "source_selection_sha256": "894fe7e62d936848debf1a85b1791f02b3fa5684931d9a3a65d2b337e3f17ec2"
+}

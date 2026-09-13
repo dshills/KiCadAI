@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected esp32_bmp280_v1 family version 1 with 'low_current' profile. Operating limits are supply 3.2–3.4 V, current capacity 1000 mA, ambient 10–35 °C, total bus capacitance 100 pF. These are family documented limits, not measured or guaranteed performance.",
+    "clauses": [
+      {
+        "text": "Configure the ESP32/BMP280 family with its low_current option.",
+        "disposition": "supported",
+        "reason": "User explicitly requests the esp32_bmp280_v1 family with the 'low_current' profile which reduces I2C pull-up sink current to 10k ohms, matching documented options."
+      },
+      {
+        "text": " I accept the documented supply, temperature and bus-loading envelope.",
+        "disposition": "supported",
+        "reason": "User accepts the documented supply voltage, current capacity, ambient temperature, and bus capacitance envelope as published for this family and profile, which are not measurements but operating limits."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "low_current",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "User explicitly requests the esp32_bmp280_v1 family with the 'low_current' profile which reduces I2C pull-up sink current to 10k ohms, matching documented options.",
+        "text": "Configure the ESP32/BMP280 family with its low_current option."
+      },
+      {
+        "disposition": "supported",
+        "reason": "User accepts the documented supply voltage, current capacity, ambient temperature, and bus capacitance envelope as published for this family and profile, which are not measurements but operating limits.",
+        "text": "I accept the documented supply, temperature and bus-loading envelope."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "low_current",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected esp32_bmp280_v1 family version 1 with 'low_current' profile. Operating limits are supply 3.2–3.4 V, current capacity 1000 mA, ambient 10–35 °C, total bus capacitance 100 pF. These are family documented limits, not measured or guaranteed performance."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0a923733da1ea6f0016aa6b6fd8dec87d19e4a3dd886391e00",
+  "usage": {
+    "input_tokens": 1144,
+    "output_tokens": 273,
+    "total_tokens": 1417
+  },
+  "ledger_index": 22,
+  "seconds": 5.357821125
+}

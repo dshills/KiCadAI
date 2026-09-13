@@ -1,0 +1,1 @@
+Reduce only the current through the I2C pull-up resistors on this board, using the low_current profile. The total bus loading is 60 pF; other limits stay at family defaults.

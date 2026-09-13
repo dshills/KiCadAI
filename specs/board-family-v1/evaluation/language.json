@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "configuration_expectations": {"version":"1","family":"esp32_bmp280_v1","supply_min_v":3.2,"supply_max_v":3.4,"supply_capacity_ma":1000,"ambient_min_c":10,"ambient_max_c":35},
+  "capacitance_overrides_pf": {"nl-04":150,"nl-09":50},
+  "independence": "Prompts declared after implementation, before live evaluation, authored by the implementing agent. Unseen by the selector, not an independent human benchmark. Only each prompt is sent; expected answers and other cases are never included in the API payload.",
+  "cases": [
+    {"id":"nl-01","expected_disposition":"supported","expected_profile":"standard","prompt":"Build a wired barometric-pressure controller using the standard board-family option."},
+    {"id":"nl-02","expected_disposition":"supported","expected_profile":"fast","prompt":"For my BMP280 controller I need a 400 kHz I2C bus, with the usual family operating limits."},
+    {"id":"nl-03","expected_disposition":"supported","expected_profile":"low_current","prompt":"Select the version that reduces I2C pull-up current. I do not mean reducing whole-board power or running on a battery."},
+    {"id":"nl-04","expected_disposition":"supported","expected_profile":"standard","prompt":"I want a pressure controller at 100 kHz with a declared total bus capacitance of 150 pF; retain the fixed family power and connectors."},
+    {"id":"nl-05","expected_disposition":"supported","expected_profile":"fast","prompt":"Pick the faster-bus variant of the pressure board. Use the profile's 100 pF total loading limit and its standard supply envelope."},
+    {"id":"nl-06","expected_disposition":"supported","expected_profile":"low_current","prompt":"Make the ESP32 pressure board with 10-kilohm SDA and SCL pull-ups at 100 kHz. All other requirements are the published family defaults."},
+    {"id":"nl-07","expected_disposition":"supported","expected_profile":"standard","prompt":"Use 4.7k pull-ups for the wired BMP280 design. It will operate from 10 to 35 degrees C within the standard family electrical envelope."},
+    {"id":"nl-08","expected_disposition":"supported","expected_profile":"fast","prompt":"Configure the existing pressure-controller family for an I2C clock of 400000 Hz. Keep its supported footprint, outline and regulated input."},
+    {"id":"nl-09","expected_disposition":"supported","expected_profile":"low_current","prompt":"I only want to save current in the I2C pull-up resistors: choose the low_current profile with 50 pF total bus loading, using the family defaults elsewhere."},
+    {"id":"nl-10","expected_disposition":"supported","expected_profile":"standard","prompt":"Give me the basic pressure controller for a nominal 3.3-volt source, using standard 100-kHz I2C and a 200-pF total bus-capacitance bound."},
+    {"id":"unsupported-01","expected_disposition":"unsupported","prompt":"Power this pressure controller directly from a 5 V USB port and provide a USB data connection."},
+    {"id":"unsupported-02","expected_disposition":"unsupported","prompt":"The board must measure both humidity and pressure, with a dedicated humidity sensor on the PCB."},
+    {"id":"unsupported-03","expected_disposition":"unsupported","prompt":"I need a qualified wireless pressure node that transmits readings over Wi-Fi and Bluetooth."},
+    {"id":"unsupported-04","expected_disposition":"unsupported","prompt":"Create the pressure controller as a 60 by 40 mm four-layer board with an output relay for a motor."},
+    {"id":"ambiguous-01","expected_disposition":"clarify","prompt":"I am deciding between the fast and low-current bus versions of the pressure board. Neither priority has been chosen yet."},
+    {"id":"ambiguous-02","expected_disposition":"clarify","prompt":"I want a low-power pressure-controller node. Choose the electrical option that saves the power I care about."}
+  ]
+}

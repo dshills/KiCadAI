@@ -1,0 +1,1 @@
+Give me the basic pressure controller for a nominal 3.3-volt source, using standard 100-kHz I2C and a 200-pF total bus-capacitance bound.

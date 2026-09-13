@@ -1,0 +1,40 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The board does not support wireless or Bluetooth functionalities as radios must be disabled per design constraints. Therefore, publishing pressure readings over Bluetooth is not supported.",
+    "clauses": [
+      {
+        "text": "I need this BMP280 board to publish pressure readings over Bluetooth. Keep the UART programming header.",
+        "disposition": "unsupported",
+        "reason": "Whole original request retained; no design is authorized. The board does not support wireless or Bluetooth functionalities as radios must be disabled per design constraints. Therefore, publishing pressure readings over Bluetooth is not supported."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "Wireless/RF performance is not qualified and radios must be disabled; publishing pressure readings over Bluetooth is unsupported on this board.",
+        "text": "I need this BMP280 board to publish pressure readings over Bluetooth."
+      },
+      {
+        "disposition": "supported",
+        "reason": "UART programming header is part of the fixed hardware and is retained as required.",
+        "text": "Keep the UART programming header."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "The board does not support wireless or Bluetooth functionalities as radios must be disabled per design constraints. Therefore, publishing pressure readings over Bluetooth is not supported."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_04627c13ac4a4245016aa6d0c3742087d1a3d2cd046a5d297a",
+  "usage": {
+    "input_tokens": 1137,
+    "output_tokens": 126,
+    "total_tokens": 1263
+  },
+  "ledger_index": 36,
+  "seconds": 2.8164615
+}

@@ -1,0 +1,289 @@
+{
+  "started_utc": "2026-09-13T14:45:05.811Z",
+  "source_commit": "b5731a56ae0ac9a14a99a73ae9f0ca940473834f",
+  "run_kind": "corrected_version_holdout",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "spec_sha256": "1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4",
+  "binary_sha256": "19b6a559d4ff3c014a8e5652f1b10e5c2f6c3ec2c9f427fe487e54532ae6402a",
+  "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 19,
+  "planned_case_ids": [
+    "fresh-01",
+    "fresh-02",
+    "fresh-03",
+    "fresh-04",
+    "fresh-05",
+    "fresh-06",
+    "fresh-07",
+    "fresh-08",
+    "fresh-09",
+    "fresh-10",
+    "fresh-unsupported-01",
+    "fresh-unsupported-02",
+    "fresh-unsupported-03",
+    "fresh-unsupported-04",
+    "fresh-ambiguous-01",
+    "fresh-ambiguous-02"
+  ],
+  "independence": "Authored by the implementing agent after the original evaluation and corrective implementation, before any call with these literal prompts. Separate recovery holdout, not a replacement or reclassification of the original failed set. Expected answers are never sent to the model. Not an independently authored benchmark.",
+  "acceptance_policy": "At least 9/10 correct complete first-attempt supported cases, 4/4 refusals, 2/2 clarifications. Timing covers all ten supported attempts. Failed cases are never delivered as successes. Development retries cannot establish acceptance.",
+  "cases": [
+    {
+      "id": "fresh-01",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.898976208,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-01",
+        "generation_seconds": 0.021724167,
+        "validation_seconds": 3.092492875,
+        "total_seconds": 5.892292041
+      },
+      "selection_sha256": "d31c59086616906e7de6afafe8c6e4d4a8f68b4336177b0c253afd35507b32d5",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-02",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.645404624999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-02",
+        "generation_seconds": 0.019539958,
+        "validation_seconds": 3.081912375,
+        "total_seconds": 5.638519458
+      },
+      "selection_sha256": "5a9251a230324bac37c2548ef2a3dfd90d5a013bbb31b0aaf6a3cfcb7ef92449",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-03",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 8.475597291,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-03",
+        "generation_seconds": 0.02000375,
+        "validation_seconds": 3.079837834,
+        "total_seconds": 8.469345291
+      },
+      "selection_sha256": "372a762460942cd500014ec012a569553659a036365538e3a41fa739a0d63677",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-04",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.637278000000002,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-04",
+        "generation_seconds": 0.022785916,
+        "validation_seconds": 3.087617708,
+        "total_seconds": 5.631169291
+      },
+      "selection_sha256": "7033f5c32fb4f29518f5094a89899c311f1cd948bbf54aa99370e49cfd67167b",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-05",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.527490458,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-05",
+        "generation_seconds": 0.021030708,
+        "validation_seconds": 3.113597375,
+        "total_seconds": 6.520933708
+      },
+      "selection_sha256": "ec280bd594d4079d0d226feafcf4ae14d019cb9b86ebf65c1adf7f73809e4305",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-06",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.626066875,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-06",
+        "generation_seconds": 0.024571625,
+        "validation_seconds": 3.156702,
+        "total_seconds": 5.619850125
+      },
+      "selection_sha256": "66ecdbb9e2adaf72b58d3f62795526ed4a8082d22d1ee3f2610d7a1524e8a73f",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-07",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.774665583000002,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-07",
+        "generation_seconds": 0.019514042,
+        "validation_seconds": 3.122854208,
+        "total_seconds": 5.7682414170000005
+      },
+      "selection_sha256": "b2a1683cbb8529553c4a38f44200e1e0b88d3762b5ee6aa793dde2e43a35df1d",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-08",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 7.156107209000002,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-08",
+        "generation_seconds": 0.023142167,
+        "validation_seconds": 3.152269875,
+        "total_seconds": 7.149684792
+      },
+      "selection_sha256": "f78e06c404a392c11d43c17bf991e903127e68c263b2eeeb292edf8b055f9917",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-09",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.726656000000003,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-09",
+        "generation_seconds": 0.021383667,
+        "validation_seconds": 3.113956042,
+        "total_seconds": 5.720536208
+      },
+      "selection_sha256": "894fe7e62d936848debf1a85b1791f02b3fa5684931d9a3a65d2b337e3f17ec2",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-10",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.858316082999998,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-10",
+        "generation_seconds": 0.023806125,
+        "validation_seconds": 3.127175375,
+        "total_seconds": 5.851788916
+      },
+      "selection_sha256": "f332e1cec5152d6b1618eedaf26a8614efa3aea0b3da022ddcb606592e1612b9",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "fresh-unsupported-01",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.574326000000001,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-unsupported-01",
+        "passed": false
+      },
+      "selection_sha256": "78f9b31aee65ec4f6bcb61dc7f96eadecbda05a5ab16bfb240ac3731cf2226cc",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "fresh-unsupported-02",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 2.2137357499999997,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 31,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/fresh-unsupported-02",
+        "passed": false
+      },
+      "selection_sha256": "7158d9af9f7c2fb40d07ffda1fce0e765aae0631e3c29214f7694519c38154c0",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": true
+    }
+  ],
+  "stopped_reason": "execution failure; inspect retained evidence before any further paid work",
+  "metrics": {
+    "supported_first_shot_passes": 10,
+    "supported_first_selection_matches": 10,
+    "supported_latest_passes": 10,
+    "supported_expected_total": 10,
+    "unsupported_passes": 1,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 0,
+    "clarification_expected_total": 2,
+    "completed_supported_timing_count": 10,
+    "median_completed_supported_seconds": 5.816490833,
+    "max_completed_supported_seconds": 8.475597291,
+    "median_all_supported_attempt_seconds": 5.816490833,
+    "max_all_supported_attempt_seconds": 8.475597291
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T14:46:11.937Z",
+  "ledger_sha256": "2e91f3399959439e70844ab5e7e98b1dc4ec843294b6f4fc48a2ebe3e5a2e4e1",
+  "request_count": 31
+}

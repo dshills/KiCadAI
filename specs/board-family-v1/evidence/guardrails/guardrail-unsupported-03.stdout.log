@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"Adding a relay output for a pump is unsupported because the esp32_bmp280_v1 board family design explicitly excludes relays or additional peripherals beyond the specified features.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-03","passed":false}

@@ -1,0 +1,1 @@
+For the pressure board, fast bus speed and low-current bus operation are alternatives I have not chosen between. Ask me which priority to use.

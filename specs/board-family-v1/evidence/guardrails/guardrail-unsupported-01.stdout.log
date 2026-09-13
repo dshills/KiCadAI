@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The board does not support wireless or Bluetooth functionalities as radios must be disabled per design constraints. Therefore, publishing pressure readings over Bluetooth is not supported.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-01","passed":false}

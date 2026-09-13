@@ -1,0 +1,1 @@
+Pick the faster-bus variant of the pressure board. Use the profile's 100 pF total loading limit and its standard supply envelope.

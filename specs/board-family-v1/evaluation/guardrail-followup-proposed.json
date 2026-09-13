@@ -1,0 +1,44 @@
+{
+  "status": "PROPOSED_NOT_AUTHORIZED_NOT_RUN",
+  "purpose": "One targeted live check of repaired rejection/clarification behavior; does not replace original live failures or repeat supported first-attempt scoring.",
+  "requires_user_approval": true,
+  "proposed_goal_total_request_ceiling": 41,
+  "goal_total_usd_ceiling": 10,
+  "additional_physical_requests": 6,
+  "existing_key_and_ledger_only": true,
+  "contract_file": "specs/board-family-v1/evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "policy": "Freeze these prompts before execution. Send only the literal prompt and unchanged approved contract/schema. Exactly one request per case, no retries. Require 4/4 unsupported and 2/2 targeted clarifications with null configurations and no native output. Preserve all previous failures and report this targeted follow-up separately. Do not repeat the ten supported requests or build another full campaign. No security change, other provider, purchase, fabrication or merge.",
+  "cases": [
+    {
+      "id": "guardrail-unsupported-01",
+      "prompt": "I need this BMP280 board to publish pressure readings over Bluetooth. Keep the UART programming header.",
+      "expected_disposition": "unsupported"
+    },
+    {
+      "id": "guardrail-unsupported-02",
+      "prompt": "Make the pressure controller accept a regulated 12 V supply directly at J1 without an external converter.",
+      "expected_disposition": "unsupported"
+    },
+    {
+      "id": "guardrail-unsupported-03",
+      "prompt": "Add a relay output for a pump to the pressure-controller board.",
+      "expected_disposition": "unsupported"
+    },
+    {
+      "id": "guardrail-unsupported-04",
+      "prompt": "Use the standard pressure board, but its outline must be 90 x 50 mm with two copper layers.",
+      "expected_disposition": "unsupported"
+    },
+    {
+      "id": "guardrail-ambiguous-01",
+      "prompt": "I haven't decided whether bus speed or I2C pull-up current matters more. Ask which priority I want before choosing a profile.",
+      "expected_disposition": "clarify"
+    },
+    {
+      "id": "guardrail-ambiguous-02",
+      "prompt": "Build the pressure monitor with the least energy use; I have not set a measurement interval or specified which loads matter.",
+      "expected_disposition": "clarify"
+    }
+  ]
+}

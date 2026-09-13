@@ -1,0 +1,1 @@
+My barometer needs the 400-kilohertz I2C option. Keep all other operating bounds at the family defaults.

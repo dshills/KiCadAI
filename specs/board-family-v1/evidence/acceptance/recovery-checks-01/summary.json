@@ -1,0 +1,82 @@
+{
+  "started_utc": "2026-09-13T14:44:14.518Z",
+  "source_commit": "b5731a56ae0ac9a14a99a73ae9f0ca940473834f",
+  "run_kind": "recorded_development_recovery",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "spec_sha256": "80236e0e24f61779f78bcc8e54b711dfdfd2765951ea8574ac645c5a83cee63c",
+  "binary_sha256": "19b6a559d4ff3c014a8e5652f1b10e5c2f6c3ec2c9f427fe487e54532ae6402a",
+  "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 17,
+  "planned_case_ids": [
+    "nl-03",
+    "ambiguous-02"
+  ],
+  "independence": "Prompts declared after implementation, before live evaluation, authored by the implementing agent. Unseen by the selector, not an independent human benchmark. Only each prompt is sent; expected answers and other cases are never included in the API payload.",
+  "acceptance_policy": "At least 9/10 correct complete first-attempt supported cases, 4/4 refusals, 2/2 clarifications. Timing covers all ten supported attempts. Failed cases are never delivered as successes. Development retries cannot establish acceptance.",
+  "cases": [
+    {
+      "id": "nl-03",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.4397012920000005,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/recovery-checks-01/nl-03",
+        "generation_seconds": 0.010691083,
+        "validation_seconds": 3.5381095,
+        "total_seconds": 6.432767958
+      },
+      "selection_sha256": "b20dc0086b5b8612c11a87f2d080eeb373f7200b40e80c1d2062fd6f642e57e8",
+      "passed": true,
+      "first_attempt": false,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "ambiguous-02",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.5783542910000006,
+      "result": {
+        "disposition": "clarify",
+        "message": "You asked for a low-power pressure-controller node and want to save power. Please clarify which power aspect you want to optimize: do you mean specifically reducing I2C pull-up current by selecting the 'low_current' profile, or overall board/module power consumption? The low_current profile only reduces I2C pull-up current, not total power. Without this clarification, I cannot select an appropriate profile.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/recovery-checks-01/ambiguous-02",
+        "passed": false
+      },
+      "selection_sha256": "e50686de7193c362a07b6152e91fa8478b2304ecff72319418bf28701c5317c9",
+      "passed": true,
+      "first_attempt": false,
+      "no_native_design": true
+    }
+  ],
+  "prior_run": {
+    "summary_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/summary.json",
+    "sha256": "9aa395a1ccbe033714850db9733d26435d72075c2265f4b683048d99e25cc09e",
+    "notice": "Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes."
+  },
+  "metrics": {
+    "supported_first_shot_passes": 7,
+    "supported_first_selection_matches": 8,
+    "supported_latest_passes": 9,
+    "supported_expected_total": 10,
+    "unsupported_passes": 4,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 1,
+    "clarification_expected_total": 2,
+    "completed_supported_timing_count": 9,
+    "median_completed_supported_seconds": 6.1482118329999995,
+    "max_completed_supported_seconds": 7.315477417,
+    "median_all_supported_attempt_seconds": 6.0660676869999985,
+    "max_all_supported_attempt_seconds": 12.327998917
+  },
+  "passed": false,
+  "development_checks_passed": true,
+  "finished_utc": "2026-09-13T14:44:23.544Z",
+  "ledger_sha256": "43aa9aa2f24c95d1ed72701e71d0231d951557aae6f4d9050753af6a00e76f09",
+  "request_count": 19
+}

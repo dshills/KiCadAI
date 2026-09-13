@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The esp32_bmp280_v1 board family supports only a regulated supply voltage range of 3.2 to 3.4 V. Directly accepting 12 V at J1 without an external converter is not supported.","output":"/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-guardrails-01/guardrail-unsupported-02","passed":false}

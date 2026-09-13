@@ -1,0 +1,1 @@
+I will supply regulated 3.2 to 3.4 V from a one-amp-capable source. Build the standard pressure-controller family option with its default bus and environmental bounds.

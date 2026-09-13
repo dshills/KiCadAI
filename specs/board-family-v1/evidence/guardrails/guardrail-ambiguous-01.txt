@@ -1,0 +1,1 @@
+I haven't decided whether bus speed or I2C pull-up current matters more. Ask which priority I want before choosing a profile.

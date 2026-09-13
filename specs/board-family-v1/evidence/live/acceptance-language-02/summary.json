@@ -1,0 +1,130 @@
+{
+  "started_utc": "2026-09-13T13:40:50.730Z",
+  "spec_sha256": "80236e0e24f61779f78bcc8e54b711dfdfd2765951ea8574ac645c5a83cee63c",
+  "binary_sha256": "9ddd9b7d1bdbf9007a6535ae764284111843127dd4b8f5ba73a59f67d93c1612",
+  "runner_sha256": "789dff01f60fa9b3133cc0a12286df16f8b4931b4acb45bd08b0035a312db686",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 1,
+  "independence": "Prompts declared after implementation, before live evaluation, authored by the implementing agent. Unseen by the selector, not an independent human benchmark. Only each prompt is sent; expected answers and other cases are never included in the API payload.",
+  "cases": [
+    {
+      "id": "nl-01",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.062591583,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-01",
+        "generation_seconds": 0.021962041,
+        "validation_seconds": 3.157898875,
+        "total_seconds": 6.055161625
+      },
+      "selection_sha256": "3e2256f8ef758d267c3a0034c7363f36a8c575aab506d428a76a5855cfc171c3",
+      "passed": true,
+      "first_attempt": false,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-02",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.1482118329999995,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-02",
+        "generation_seconds": 0.020160666,
+        "validation_seconds": 3.159058916,
+        "total_seconds": 6.14146275
+      },
+      "selection_sha256": "39b1d2bf36e3b96c7474af8bcb8499018ed5b613a73b8938e0e3d59c11c7b35e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-03",
+      "expected_disposition": "supported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.918831458999999,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Request excludes whole-board power reduction and battery operation explicitly, but these are not part of the configurable profiles. Please clarify if you want a profile with lower I2C pull-up current only, ignoring whole-board power or battery operation considerations.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-03",
+        "passed": false
+      },
+      "selection_sha256": "f6f4142c5538f6af62b7c545b6dcc9473e4cc95860ca9d34feaab13b8c1f614b",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": false,
+      "native_validation_passed": false
+    },
+    {
+      "id": "nl-04",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.802300375000001,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-04",
+        "generation_seconds": 0.019857375,
+        "validation_seconds": 3.21652725,
+        "total_seconds": 5.789652917
+      },
+      "selection_sha256": "5e164a9eac5915e097b554f0bec7c4717d95993469d190fa8f92d92f64a581ed",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-05",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 3.2382506250000005,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 6,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/nl-05",
+        "passed": false
+      },
+      "selection_sha256": "082080f197fae9d861fa446d73280f89cff52f9ef11295fb5dd7280b02b4c153",
+      "passed": false,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": false
+    }
+  ],
+  "prior_run": {
+    "summary_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-01/summary.json",
+    "sha256": "d91049021cc46abd38c3968c13cf3b851d6f5f0c565efe61cb76125b401cf184",
+    "notice": "Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes."
+  },
+  "stopped_reason": "execution failure; inspect retained evidence before any further paid work",
+  "metrics": {
+    "supported_first_shot_passes": 2,
+    "supported_current_run_passes": 3,
+    "supported_expected_total": 10,
+    "unsupported_passes": 0,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 0,
+    "clarification_expected_total": 2,
+    "median_supported_seconds": null,
+    "max_supported_seconds": 6.1482118329999995
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T13:41:13.910Z",
+  "ledger_sha256": "8d3cabf823280f7d9c8b76960241ab37252669792945ab5612a27e26e57d3738",
+  "request_count": 6
+}

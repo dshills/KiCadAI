@@ -1,0 +1,34 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "supported",
+    "message": "Selected fast profile for ESP32_BMP280_V1 board family with 75 pF bus capacitance and standard indoor environmental and power conditions. The specified total bus capacitance is within the profile's 50-100 pF limit. Operating limits reflect family published envelope, not measurements.",
+    "clauses": [
+      {
+        "text": "Select fast I2C for this BMP280 board, with 75 pF total capacitance and the usual regulated source and indoor conditions.",
+        "disposition": "supported",
+        "reason": "User requests fast I2C (400 kHz) which corresponds to 'fast' profile with 2.2k pull-ups and 50-100 pF bus capacitance. Total bus capacitance specified as 75 pF fits within profile limit."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 75
+    }
+  },
+  "id": "fresh-08",
+  "ledger_index": 27,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-01",
+  "source_response_id": "resp_00cd755410e8b59c016aa6b71d905487d1887be0c017a29ea2",
+  "source_selection_sha256": "f78e06c404a392c11d43c17bf991e903127e68c263b2eeeb292edf8b055f9917"
+}

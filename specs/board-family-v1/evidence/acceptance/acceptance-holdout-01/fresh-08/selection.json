@@ -1,0 +1,55 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected fast profile for ESP32_BMP280_V1 board family with 75 pF bus capacitance and standard indoor environmental and power conditions. The specified total bus capacitance is within the profile's 50-100 pF limit. Operating limits reflect family published envelope, not measurements.",
+    "clauses": [
+      {
+        "text": "Select fast I2C for this BMP280 board, with 75 pF total capacitance and the usual regulated source and indoor conditions.",
+        "disposition": "supported",
+        "reason": "User requests fast I2C (400 kHz) which corresponds to 'fast' profile with 2.2k pull-ups and 50-100 pF bus capacitance. Total bus capacitance specified as 75 pF fits within profile limit."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 75
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "User requests fast I2C (400 kHz) which corresponds to 'fast' profile with 2.2k pull-ups and 50-100 pF bus capacitance. Total bus capacitance specified as 75 pF fits within profile limit.",
+        "text": "Select fast I2C for this BMP280 board, with 75 pF total capacitance and the usual regulated source and indoor conditions."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 75,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected fast profile for ESP32_BMP280_V1 board family with 75 pF bus capacitance and standard indoor environmental and power conditions. The specified total bus capacitance is within the profile's 50-100 pF limit. Operating limits reflect family published envelope, not measurements."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_00cd755410e8b59c016aa6b71d905487d1887be0c017a29ea2",
+  "usage": {
+    "input_tokens": 1146,
+    "output_tokens": 231,
+    "total_tokens": 1377
+  },
+  "ledger_index": 27,
+  "seconds": 3.965601667
+}

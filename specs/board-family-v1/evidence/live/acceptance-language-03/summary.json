@@ -1,0 +1,255 @@
+{
+  "started_utc": "2026-09-13T13:49:08.619Z",
+  "spec_sha256": "80236e0e24f61779f78bcc8e54b711dfdfd2765951ea8574ac645c5a83cee63c",
+  "binary_sha256": "fdd418ca8d47f9d3ce1b949999a63faacc9ce9f6836d83c78444da816fa40567",
+  "runner_sha256": "9467ca12be3550f19e7582b03478f452c00d0caa4260e4b48918feb42f270857",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 6,
+  "planned_case_ids": [
+    "nl-06",
+    "nl-07",
+    "nl-08",
+    "nl-09",
+    "nl-10",
+    "unsupported-01",
+    "unsupported-02",
+    "unsupported-03",
+    "unsupported-04",
+    "ambiguous-01",
+    "ambiguous-02"
+  ],
+  "independence": "Prompts declared after implementation, before live evaluation, authored by the implementing agent. Unseen by the selector, not an independent human benchmark. Only each prompt is sent; expected answers and other cases are never included in the API payload.",
+  "cases": [
+    {
+      "id": "nl-06",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 7.315477417,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-06",
+        "generation_seconds": 0.014162167,
+        "validation_seconds": 3.245997917,
+        "total_seconds": 7.308856208
+      },
+      "selection_sha256": "99d452870bdf26523bafeed2ede76d4a925588e29c2a0888004afc5a5c928b4c",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-07",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.576437124999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-07",
+        "generation_seconds": 0.027151875,
+        "validation_seconds": 3.337657916,
+        "total_seconds": 5.5658741670000005
+      },
+      "selection_sha256": "d2e558cefe94a10093c637f934aed696613aaa7bd6c7926335e9cacffa179b01",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-08",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.3025308340000015,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-08",
+        "generation_seconds": 0.009907583,
+        "validation_seconds": 3.26529675,
+        "total_seconds": 6.295972625
+      },
+      "selection_sha256": "781a1b339c17fe6e57ada3d659a3b8ca96fbd935392a1677b7fc37def534d60e",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-09",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.199198874999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-09",
+        "generation_seconds": 0.010990834,
+        "validation_seconds": 3.398178916,
+        "total_seconds": 6.191828291
+      },
+      "selection_sha256": "6fa906779bf4e3d47b656b2d35a45b227e7cd5014b797438f3a52350073ad544",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "nl-10",
+      "expected_disposition": "supported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.983923540999997,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/nl-10",
+        "generation_seconds": 0.010084375,
+        "validation_seconds": 3.4770425,
+        "total_seconds": 5.977002167
+      },
+      "selection_sha256": "a279ccef0042aa4813ad3ddd4d1112285572edf45574230bb214cce7fd69228d",
+      "passed": true,
+      "first_attempt": true,
+      "configuration_matches": true,
+      "native_validation_passed": true
+    },
+    {
+      "id": "unsupported-01",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5939575000000004,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 board family does not support a USB interface or USB data connection. It only supports an external regulated 3.2–3.4 V supply and does not include USB power or data functionality.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-01",
+        "passed": false
+      },
+      "selection_sha256": "9c5c17c67bfe8597808971c52685ecaa9911be550348ad08186eff050aa02243",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "unsupported-02",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.477144500000002,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The esp32_bmp280_v1 family board does not support a dedicated humidity sensor on the PCB. It only includes the BMP280 sensor for pressure and die temperature measurement, not ambient temperature or humidity.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-02",
+        "passed": false
+      },
+      "selection_sha256": "0f02fabd0f5f4445f74555f001c06dac3735921fac5ac5bceda2c23c66d63682",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "unsupported-03",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.3169029169999993,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Wireless capabilities including Wi-Fi and Bluetooth transmission are not supported on the esp32_bmp280_v1 board family; radios must be disabled per capability context.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-03",
+        "passed": false
+      },
+      "selection_sha256": "bd4c41d01fe905e8757a5994fea00eb84476b7cdf03c907e4cfab13895dc0d01",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "unsupported-04",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.5026921660000008,
+      "result": {
+        "disposition": "unsupported",
+        "message": "The existing esp32_bmp280_v1 board family supports only a 120x80 mm two-layer board; it does not support a 60x40 mm four-layer board or an output relay for a motor as requested.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/unsupported-04",
+        "passed": false
+      },
+      "selection_sha256": "25c405e7c42171cac55ccc7db166d5c6dbedf9e96c6318bcef16aff0f2e3ba76",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "ambiguous-01",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.7336206669999956,
+      "result": {
+        "disposition": "clarify",
+        "message": "You mentioned choosing between 'fast' and 'low_current' profiles for the esp32_bmp280_v1 board family but did not specify which to prioritize. Please clarify which profile should be selected or if further guidance is needed.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-01",
+        "passed": false
+      },
+      "selection_sha256": "bfd5d80ab198d7799f62b5a47174f74f4837a75477f6ddbf24bf6844f537e92c",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "ambiguous-02",
+      "expected_disposition": "clarify",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 6.060243417000005,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-03/ambiguous-02",
+        "generation_seconds": 0.010375459,
+        "validation_seconds": 3.2910100829999998,
+        "total_seconds": 6.053895042
+      },
+      "selection_sha256": "f324c7024981bba78fbb18df624943cd249404056830ea21bb98dd6426bad405",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": false
+    }
+  ],
+  "prior_run": {
+    "summary_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-language-02/summary.json",
+    "sha256": "ac95757a0986bab9f2ded3fa74f0bb2205c684d6d6aa0b15948a0baa7a54b9d8",
+    "notice": "Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes."
+  },
+  "metrics": {
+    "supported_first_shot_passes": 7,
+    "supported_first_selection_matches": 8,
+    "supported_latest_passes": 8,
+    "supported_expected_total": 10,
+    "unsupported_passes": 4,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 1,
+    "clarification_expected_total": 2,
+    "completed_supported_timing_count": 8,
+    "median_completed_supported_seconds": 6.105401708,
+    "max_completed_supported_seconds": 7.315477417
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T13:49:54.700Z",
+  "ledger_sha256": "e7d86d1f8ead239f459a10fbb9ab8d5a66d46b50c6fe44ddaec17668c8ccea09",
+  "request_count": 17
+}

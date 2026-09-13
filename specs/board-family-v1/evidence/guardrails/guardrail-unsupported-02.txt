@@ -1,0 +1,1 @@
+Make the pressure controller accept a regulated 12 V supply directly at J1 without an external converter.

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "declared_before_execution": true,
+  "defaults": {"version":"1","family":"esp32_bmp280_v1","supply_min_v":3.2,"supply_max_v":3.4,"supply_capacity_ma":1000,"ambient_min_c":10,"ambient_max_c":35},
+  "cases": [
+    {"id":"standard-boundaries","profile":"standard","total_bus_capacitance_pf":200},
+    {"id":"standard-min-bus","profile":"standard","total_bus_capacitance_pf":50},
+    {"id":"standard-cool","profile":"standard","total_bus_capacitance_pf":150,"ambient_min_c":10,"ambient_max_c":10},
+    {"id":"standard-warm-high-supply","profile":"standard","total_bus_capacitance_pf":200,"supply_min_v":3.4,"supply_max_v":3.4,"ambient_min_c":35,"ambient_max_c":35},
+    {"id":"fast-boundaries","profile":"fast","total_bus_capacitance_pf":100},
+    {"id":"fast-min-bus","profile":"fast","total_bus_capacitance_pf":50},
+    {"id":"fast-narrow-supply","profile":"fast","total_bus_capacitance_pf":80,"supply_min_v":3.25,"supply_max_v":3.35,"ambient_min_c":20,"ambient_max_c":30},
+    {"id":"low-current-boundaries","profile":"low_current","total_bus_capacitance_pf":100},
+    {"id":"low-current-min-bus","profile":"low_current","total_bus_capacitance_pf":50},
+    {"id":"low-current-nominal","profile":"low_current","total_bus_capacitance_pf":80,"supply_min_v":3.3,"supply_max_v":3.3,"ambient_min_c":25,"ambient_max_c":25}
+  ],
+  "replay_cases": ["standard-boundaries","fast-boundaries","low-current-boundaries"]
+}

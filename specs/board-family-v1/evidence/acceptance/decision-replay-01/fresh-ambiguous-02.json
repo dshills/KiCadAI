@@ -1,0 +1,24 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "clarify",
+    "message": "Please clarify which part of the board's energy consumption is most important to minimize (e.g., overall board power, sensor power, I2C pull-up sink current). Only with this information can an appropriate family profile be selected.",
+    "clauses": [
+      {
+        "text": "For this pressure monitor, minimize energy consumption. I have not specified which part of the board's consumption matters.",
+        "disposition": "clarify",
+        "reason": "Whole original request retained; no design is authorized. Please clarify which part of the board's energy consumption is most important to minimize (e.g., overall board power, sensor power, I2C pull-up sink current). Only with this information can an appropriate family profile be selected."
+      }
+    ],
+    "configuration": null
+  },
+  "id": "fresh-ambiguous-02",
+  "ledger_index": 35,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-03",
+  "source_response_id": "resp_061f9cca03c81bcd016aa6b9c2a3a087d1b50f64d639a1c495",
+  "source_selection_sha256": "7049759c0827d5807369bbb9058b48465e9ba129ada2602158e8966c9296cd8a"
+}

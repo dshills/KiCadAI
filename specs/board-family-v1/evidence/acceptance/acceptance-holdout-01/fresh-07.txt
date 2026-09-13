@@ -1,0 +1,1 @@
+Use the standard pressure-controller option at 100000 Hz with 175 pF of total bus loading. Retain the family power and temperature limits.

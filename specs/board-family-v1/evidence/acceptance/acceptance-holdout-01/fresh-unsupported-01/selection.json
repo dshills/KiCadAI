@@ -1,0 +1,45 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context.",
+    "clauses": [
+      {
+        "text": "Make this pressure node send measurements over Wi-Fi.",
+        "disposition": "unsupported",
+        "reason": "The request to send measurements over Wi-Fi requires enabling the ESP32 radio, but wireless/RF performance is not qualified and radios must be disabled in this board family."
+      },
+      {
+        "text": " Bluetooth support is not needed.",
+        "disposition": "supported",
+        "reason": "Bluetooth support is explicitly not needed, which does not conflict with any board capabilities, so it is supported as an exclusion."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "The request to send measurements over Wi-Fi requires enabling the ESP32 radio, but wireless/RF performance is not qualified and radios must be disabled in this board family.",
+        "text": "Make this pressure node send measurements over Wi-Fi."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Bluetooth support is explicitly not needed, which does not conflict with any board capabilities, so it is supported as an exclusion.",
+        "text": "Bluetooth support is not needed."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "Sending measurements over Wi-Fi is unsupported because the radios must be disabled in the esp32_bmp280_v1 board family as per the capability context."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0d9fc339ea578d9d016aa6b7304d0c87d1a715cc213f3143e7",
+  "usage": {
+    "input_tokens": 1134,
+    "output_tokens": 142,
+    "total_tokens": 1276
+  },
+  "ledger_index": 30,
+  "seconds": 1.555399583
+}

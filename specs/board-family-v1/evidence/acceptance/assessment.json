@@ -1,0 +1,491 @@
+{
+  "as_of_utc": "2026-09-13T15:07:47.513Z",
+  "strict_live_acceptance_passed": false,
+  "original_acceptance_passed": false,
+  "goal_complete": false,
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "holdout_sha256": "1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4",
+  "runs": [
+    {
+      "run": "recovery-checks-01",
+      "source_commit": "b5731a56ae0ac9a14a99a73ae9f0ca940473834f",
+      "binary_sha256": "19b6a559d4ff3c014a8e5652f1b10e5c2f6c3ec2c9f427fe487e54532ae6402a",
+      "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945"
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "source_commit": "b5731a56ae0ac9a14a99a73ae9f0ca940473834f",
+      "binary_sha256": "19b6a559d4ff3c014a8e5652f1b10e5c2f6c3ec2c9f427fe487e54532ae6402a",
+      "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945"
+    },
+    {
+      "run": "acceptance-holdout-02",
+      "source_commit": "2bf37fdbaf63609d7ad7a33be5bfcd21916cfabc",
+      "binary_sha256": "7283670a1dd83f49dd9561a7b13e731dfbc223ab59e286fb4cc3d167b5eb980f",
+      "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945"
+    },
+    {
+      "run": "acceptance-holdout-03",
+      "source_commit": "0e791b14cbb28320e2756834018dbaed855cf6ac",
+      "binary_sha256": "3095fa8592d91a8751755e74d8df7d6c6ad12b8489447ddc6cd80c8e878f2194",
+      "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945"
+    }
+  ],
+  "development_checks_passed": 2,
+  "supported_first_selection_matches": 10,
+  "supported_first_completed_boards": 10,
+  "supported_denominator": 10,
+  "unsupported_first_passes": 2,
+  "unsupported_denominator": 4,
+  "clarification_first_passes": 1,
+  "clarification_denominator": 2,
+  "strict_live_passes": 13,
+  "strict_live_denominator": 16,
+  "corrected_offline_decision_replays_passed": 16,
+  "offline_replay_api_requests": 0,
+  "corrected_source_commit": "0e791b14cbb28320e2756834018dbaed855cf6ac",
+  "corrected_binary_sha256": "3095fa8592d91a8751755e74d8df7d6c6ad12b8489447ddc6cd80c8e878f2194",
+  "corrected_source_sha256": {
+    "internal/boardfamily/interpret.go": "98cb828d2d69e9cca6e0186025912a64c0c966a5933fff48a82d91a10df5685b",
+    "internal/boardfamily/interpret_test.go": "86087480d6196ccb9f363f3fe0bd4232d1f86596dd4cd361bf3734e6a3e9c1d0",
+    "specs/board-family-v1/development/replay-decisions/main.go": "994a8fba90ffcb0d975c1a6881e82f9ee45399ddcef8eb67390094ea26074957"
+  },
+  "reused_unchanged_qualification_source_sha256": {
+    "internal/boardfamily/config.go": "2cb0f63195a0625ac7b0274e926e02c921af471de010e0109d64389ae289711e",
+    "internal/boardfamily/native.go": "709b4ba1fd8ca051d99a47e978675a55b507a107ee06a2ccc6fe71a9375cb2c3",
+    "internal/boardfamily/reference/board.kicad_pcb": "ce633e4fbe766d3d11db38ccfb00f46fbe5cdf87dd57fecc436dff90fb9d1bae",
+    "internal/boardfamily/reference/board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+    "internal/boardfamily/reference/board.kicad_sch": "16159b91ed2f2a2d6f1c4ff73740711913f80692d5e8d7255436854b15bba793",
+    "internal/boardfamily/reference/footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+    "internal/boardfamily/reference/footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+    "internal/boardfamily/reference/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+    "internal/boardfamily/reference/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+    "internal/boardfamily/reference/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+    "internal/boardfamily/reference/footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+    "internal/boardfamily/reference/footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+    "internal/boardfamily/reference/footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+    "internal/boardfamily/reference/fp-lib-table": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5",
+    "internal/boardfamily/reference/lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+    "internal/boardfamily/reference/lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+    "internal/boardfamily/reference/lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+    "internal/boardfamily/reference/lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+    "internal/boardfamily/reference/sym-lib-table": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff",
+    "internal/boardfamily/validate.go": "20c2ac9d62654ba58b7a80fe9e5fe65e36a0d46684c40f4a64204bbf9e58b085"
+  },
+  "timing_count": 10,
+  "median_end_to_end_seconds": 5.816490833,
+  "max_end_to_end_seconds": 8.475597291,
+  "median_generation_seconds": 0.021553917,
+  "median_validation_seconds": 3.1137767084999997,
+  "goal_total_requests": 35,
+  "authorized_request_ceiling": 35,
+  "authorized_micro_usd_ceiling": 10000000,
+  "known_input_tokens": 37443,
+  "known_output_tokens": 6883,
+  "known_estimated_micro_usd": 26006,
+  "unknown_reserved_micro_usd": 50000,
+  "conservative_total_micro_usd": 76006,
+  "actual_invoice_checked": false,
+  "native_projects": [
+    {
+      "run": "recovery-checks-01",
+      "id": "nl-03",
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-01",
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-02",
+      "profile": "fast",
+      "native_sha256": {
+        "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-03",
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-04",
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-05",
+      "profile": "fast",
+      "native_sha256": {
+        "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-06",
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-07",
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-08",
+      "profile": "fast",
+      "native_sha256": {
+        "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-09",
+      "profile": "low_current",
+      "native_sha256": {
+        "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-10",
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": true,
+      "deliverable": true
+    },
+    {
+      "run": "acceptance-holdout-02",
+      "id": "fresh-unsupported-04",
+      "profile": "standard",
+      "native_sha256": {
+        "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+      },
+      "matches_reviewed_example": true,
+      "request_accepted": false,
+      "deliverable": false
+    }
+  ],
+  "cases": [
+    {
+      "run": "recovery-checks-01",
+      "id": "nl-03",
+      "expected": "supported",
+      "first_attempt": false,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 18,
+      "wall_seconds": 6.4397012920000005,
+      "generation_seconds": 0.010691083,
+      "validation_seconds": 3.5381095
+    },
+    {
+      "run": "recovery-checks-01",
+      "id": "ambiguous-02",
+      "expected": "clarify",
+      "first_attempt": false,
+      "selection_match": false,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 19,
+      "wall_seconds": 2.5783542910000006,
+      "generation_seconds": null,
+      "validation_seconds": null
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-01",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 20,
+      "wall_seconds": 5.898976208,
+      "generation_seconds": 0.021724167,
+      "validation_seconds": 3.092492875
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-02",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 21,
+      "wall_seconds": 5.645404624999999,
+      "generation_seconds": 0.019539958,
+      "validation_seconds": 3.081912375
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-03",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 22,
+      "wall_seconds": 8.475597291,
+      "generation_seconds": 0.02000375,
+      "validation_seconds": 3.079837834
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-04",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 23,
+      "wall_seconds": 5.637278000000002,
+      "generation_seconds": 0.022785916,
+      "validation_seconds": 3.087617708
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-05",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 24,
+      "wall_seconds": 6.527490458,
+      "generation_seconds": 0.021030708,
+      "validation_seconds": 3.113597375
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-06",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 25,
+      "wall_seconds": 5.626066875,
+      "generation_seconds": 0.024571625,
+      "validation_seconds": 3.156702
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-07",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 26,
+      "wall_seconds": 5.774665583000002,
+      "generation_seconds": 0.019514042,
+      "validation_seconds": 3.122854208
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-08",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 27,
+      "wall_seconds": 7.156107209000002,
+      "generation_seconds": 0.023142167,
+      "validation_seconds": 3.152269875
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-09",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 28,
+      "wall_seconds": 5.726656000000003,
+      "generation_seconds": 0.021383667,
+      "validation_seconds": 3.113956042
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-10",
+      "expected": "supported",
+      "first_attempt": true,
+      "selection_match": true,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 29,
+      "wall_seconds": 5.858316082999998,
+      "generation_seconds": 0.023806125,
+      "validation_seconds": 3.127175375
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-unsupported-01",
+      "expected": "unsupported",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 30,
+      "wall_seconds": 1.574326000000001,
+      "generation_seconds": null,
+      "validation_seconds": null
+    },
+    {
+      "run": "acceptance-holdout-01",
+      "id": "fresh-unsupported-02",
+      "expected": "unsupported",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": false,
+      "exit_code": 1,
+      "ledger_index": 31,
+      "wall_seconds": 2.2137357499999997,
+      "generation_seconds": null,
+      "validation_seconds": null
+    },
+    {
+      "run": "acceptance-holdout-02",
+      "id": "fresh-unsupported-03",
+      "expected": "unsupported",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 32,
+      "wall_seconds": 1.9507514160000001,
+      "generation_seconds": null,
+      "validation_seconds": null
+    },
+    {
+      "run": "acceptance-holdout-02",
+      "id": "fresh-unsupported-04",
+      "expected": "unsupported",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": false,
+      "exit_code": 0,
+      "ledger_index": 33,
+      "wall_seconds": 5.423523416999999,
+      "generation_seconds": 0.010550416,
+      "validation_seconds": 3.214648959
+    },
+    {
+      "run": "acceptance-holdout-02",
+      "id": "fresh-ambiguous-01",
+      "expected": "clarify",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": false,
+      "exit_code": 1,
+      "ledger_index": 34,
+      "wall_seconds": 3.232913792,
+      "generation_seconds": null,
+      "validation_seconds": null
+    },
+    {
+      "run": "acceptance-holdout-03",
+      "id": "fresh-ambiguous-02",
+      "expected": "clarify",
+      "first_attempt": true,
+      "selection_match": false,
+      "passed": true,
+      "exit_code": 0,
+      "ledger_index": 35,
+      "wall_seconds": 2.023523208,
+      "generation_seconds": null,
+      "validation_seconds": null
+    }
+  ],
+  "limitations": [
+    "Implementing-agent authorship/self-review, not an independent benchmark or engineering review.",
+    "Live evaluation spans three source/binary versions; all ten supported cases used the initial holdout version.",
+    "Offline replay proves corrected handling of retained responses, not fresh model accuracy or a changed live score.",
+    "One wrongly accepted resize generated an unchanged board; retained as rejected evidence, not a successful deliverable.",
+    "Local hashes establish integrity/provenance, not independent authentication, firmware execution or hardware performance.",
+    "Native default-ignored categories and readability/assembly limitations remain disclosed in FAMILY.md."
+  ]
+}

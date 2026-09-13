@@ -1,0 +1,1 @@
+Generate the fixed pressure board for standard 100 kHz communication and a total I2C load no greater than 200 pF.
