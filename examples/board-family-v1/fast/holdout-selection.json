@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected the 'fast' profile to meet 400 kHz I2C requirement. All other operating limits are set to family defaults as requested. These limits reflect family operating constraints, not performance measurements.",
+    "clauses": [
+      {
+        "text": "My barometer needs the 400-kilohertz I2C option.",
+        "disposition": "supported",
+        "reason": "User requests 400 kHz I2C option, which matches the 'fast' profile. All other limits are at family defaults, which will be used accordingly."
+      },
+      {
+        "text": " Keep all other operating bounds at the family defaults.",
+        "disposition": "supported",
+        "reason": "User wants all other operating bounds at family defaults, which is standard and supported by their selection of the 'fast' profile."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "User requests 400 kHz I2C option, which matches the 'fast' profile. All other limits are at family defaults, which will be used accordingly.",
+        "text": "My barometer needs the 400-kilohertz I2C option."
+      },
+      {
+        "disposition": "supported",
+        "reason": "User wants all other operating bounds at family defaults, which is standard and supported by their selection of the 'fast' profile.",
+        "text": "Keep all other operating bounds at the family defaults."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected the 'fast' profile to meet 400 kHz I2C requirement. All other operating limits are set to family defaults as requested. These limits reflect family operating constraints, not performance measurements."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_07ca5c6809f0b07f016aa6b6f7e63087d190767375fa1f53d8",
+  "usage": {
+    "input_tokens": 1144,
+    "output_tokens": 227,
+    "total_tokens": 1371
+  },
+  "ledger_index": 21,
+  "seconds": 2.528202042
+}

@@ -1,45 +1,32 @@
-# Results — deterministic lane passes; language acceptance does not
+# Results — supported boards pass; live refusal/clarification acceptance remains open
 
-September 13, 2026. This family generates useful native boards quickly, but the original language evaluation **does not meet the goal**. All failures remain in the denominator. No final PR has been opened and the goal is not complete. This does not replace the historical practical-board corpus.
+September 13, 2026. The deterministic-family strategy produced ten correct complete boards from ten fresh supported language requests, with a **5.816 s median** end-to-end runtime. The strict live suite nevertheless **failed**: two unsupported cases and one ambiguous case failed acceptance. Current decision-code replay passes all sixteen recorded responses offline; this does not change the live scores or complete the goal. The single scoped PR remains a draft; no merge or manufactured-hardware claim is authorized.
 
 | Criterion | Evidence-backed result |
 |---|---|
-| Complete supported configuration projects | **10/10** passed without output repair |
+| Supported numerical configurations | **10/10** complete projects; no manual output repair |
 | Meaningful electrical profiles | **3**: 4.7 kΩ/100 kHz, 2.2 kΩ/400 kHz, 10 kΩ/100 kHz |
-| Clean native/config/BOM replays | **3/3 byte-identical** |
-| End-to-end offline wall time | Median **3.273 s**, maximum **3.564 s** |
-| Native validation | All 13 original/replay runs passed electrical contract, reference/BOM, writers, connectivity, KiCad 10.0.3 ERC, strict DRC/parity, round trips and unchanged-native-input hashes |
-| Correct first-attempt language selections | **8/10**; target ≥9/10 — **fail** |
-| First-attempt completed language projects | **7/10**; one additional correct selection failed decoding |
-| Latest complete supported language projects | **8/10**, including the explicit `nl-01` recovery |
-| Unsupported / ambiguous requests | **4/4 refused / 1/2 clarified** — ambiguity target **failed** |
-| Completed supported language timing | **8 cases only:** median **6.105 s**, maximum **7.315 s** |
-| Generation / validation time | For those 8 completions: median **0.017 s / 3.256 s** |
-| Live usage | **17/20 physical requests**, 16 known usage records plus 1 unknown |
-| Conservative API accounting | **$0.011711** estimated known usage + **$0.05** unknown reserve = **$0.061711**; not an invoice |
-| Review | Implementing-agent code/reference/readability review; no independent hardware reviewer or bench testing |
-| Final PR | Not opened; final live evidence/review still required |
+| Clean deterministic replays | **3/3 byte-identical** native/config/BOM outputs |
+| Offline end-to-end runtime | Median **3.273 s**, maximum **3.564 s** |
+| Fresh supported first selections / completed boards | **10/10 / 10/10** |
+| Fresh unsupported / ambiguous clean command passes | **2/4 / 1/2** — acceptance failed |
+| Strict fresh live suite | **13/16**; failures remain in their denominators |
+| Corrected offline decision replay | **16/16** retained real responses; **0 API calls**, no native generation |
+| Fresh supported end-to-end runtime | All ten: median **5.816 s**, maximum **8.476 s** |
+| Fresh supported generation / validation | Median **0.021554 s / 3.113777 s**, measured separately |
+| Native validation | Electrical/reference/BOM, writers, connectivity, KiCad 10.0.3 ERC, strict DRC/parity, round trips, previews and unchanged-input checks passed for every accepted project |
+| Full bounded repository regression | Passed in **33.535 s** after final decision-code corrections; unchanged packages may use Go test cache |
+| Goal-wide physical API requests | **35/35** approved requests; no slots remain |
+| Conservative API accounting | **$0.026006** known estimate + **$0.05** unknown reserve = **$0.076006** |
+| Review identity | Implementing Codex agent; no independent engineer, external provider review or bench testing |
 
-[The offline summary](evidence/offline/summary.json) records the Apple M4 Pro / ARM64 machine, source/base/binary/runner hashes, all ten configurations and three replays. Its timing includes generation, installed-KiCad validation and subprocess startup, but not AI inference. The generator, reference geometry, numerical checks and native validator have not changed since this acceptance run; that evidence is reused under its original identities, not represented as testing later language corrections.
+## Evidence and reproducibility
 
-[The manifest](evidence/offline/manifest.json) verifies unchanged copies of the run evidence and [three example projects](../../examples/board-family-v1/README.md). These hashes establish local integrity and provenance, not third-party authentication. Original absolute execution paths in KiCad reports are preserved honestly. The remaining seven original projects and three replay projects are retained in the local source-run directory; their check records and complete artifact hashes are included here.
+The [offline summary](evidence/offline/summary.json) identifies the Apple M4 Pro / ARM64 machine, base/binary/runner/source hashes, ten configuration cases and three clean replays. Offline timing includes generation, installed-KiCad validation and process startup, but not AI inference. The current generator, reference assets, electrical calculations and native validator match the relevant original source hashes; reused qualification is identified explicitly in the [final assessment](evidence/acceptance/assessment.json).
 
-Repository integration uses the complete **bounded** tier (`go test -short -p=1 -timeout 20m ./...`), matching `make test` / `make test-bounded`. The initial run took 996.634 s; after provider changes it passed in 74.174 s. Subsequent unchanged packages used the test cache. Current-source focused tests, recorded-response replays and `go vet` pass. Integration receipts are under `evidence/regression/`. The exhaustive release tier is not implied.
+The [final manifest](evidence/acceptance/manifest.json) contains **221 file hashes**, supplementing the unchanged **382** original offline/live hashes. It retains all eighteen new calls, source/binary identities per run, stdout/stderr, raw decisions, response IDs, native reports, the complete 35-entry ledger, corrected offline replay and final regression. Three [delivered examples](../../examples/board-family-v1/README.md) include byte-identical representative language and holdout records. Every newly generated supported project's native files and BOM match the reviewed profile example; its numerical configuration and electrical calculation are separately retained.
 
-The implementing agent checked actual rendered schematics for all profiles and the revised PCB. [Family limits and review caveats](FAMILY.md) cover crowded ground-pin labels, incomplete assembly silkscreen, electrical assumptions, assembly/firmware obligations and absent hardware-performance proof.
-
-## Original language failures and corrections
-
-The sixteen literal prompts and expected values were declared before the first call. They were authored by the implementing agent and unseen by the selector, not an independent benchmark. Expected answers, other cases, geometry and source files were never model input. All live runs used the same approved contract/schema and pinned model; local code changed between interrupted runs, so this is not a single-binary reliability trial.
-
-- **`nl-01`, original attempt:** the provider returned a response, but the decoder expected a legacy intent envelope instead of the requested decision object. Selection and usage were lost. The unknown first attempt retains its full reserve. A separate structured-object decoding path fixed the integration without changing the outgoing payload. The explicit recovery passed in 6.063 s, not a new first-shot success.
-- **`nl-03`:** the model incorrectly refused an explicit exclusion of whole-board power/battery requirements. No board was produced. Revised instructions distinguish exclusions from positive requirements; that change is **not live-tested**.
-- **`nl-05`:** correct fast configuration, but a missing space between otherwise verbatim clauses caused local rejection before generation. The decoder now restores only original boundary whitespace, never words or punctuation. Offline replay of this recorded response passes decoding; the original failure remains.
-- **`ambiguous-02`:** a general low-power goal was wrongly substituted with reduced I²C pull-up current, and a board was generated. It passed native checks but failed request acceptance. Its output is retained as rejected evidence, not a successful example. A deterministic gate now requires explicit low-current/pull-up scope; offline replay of the original response becomes a targeted clarification. Fresh live accuracy remains unmeasured.
-
-## Evidence audit and limitations
-
-The [live assessment](evidence/live/assessment.json), [raw-run manifest](evidence/live/manifest.json), and [ledger snapshot](evidence/live/ledger.json) retain all seventeen attempts, available response IDs/usage, original stdout/stderr, native reports and first/latest outcomes. All eight successful supported projects passed thirteen checks and match the reviewed profile examples' native hashes. Three examples include unchanged `language-selection.json` and `language-validation.json` from successful language runs. Hashes establish local integrity/provenance, not independent authentication or hardware performance.
+Hashes establish local integrity and provenance, **not third-party authentication**. Original execution paths in native reports are preserved. The incorrectly generated resize is recorded as rejected, not offered as a successful request. No evaluated native output was manually repaired.
 
 Run the read-only audit from the repository root:
 
@@ -47,14 +34,28 @@ Run the read-only audit from the repository root:
 node specs/board-family-v1/evaluation/verify-evidence.mjs
 ```
 
-It recomputes selection/acceptance counts from original selections, reconciles request indices and usage with the ledger, and verifies **382 file hashes**. A first-selection match means exact numerical configuration agreement; complete-board acceptance additionally requires a successful command and full validation. Unknown initial selection is conservatively a miss. All ten supported requests remain in reliability denominators. Only actual successful completions enter the explicitly conditional timing statistics; these exclude debugging and cannot establish the all-ten-case timing target.
+The audit checks original and new manifests, response/ledger bindings, configuration/disposition counts, costs and replay provenance. Its successful exit means **the evidence reconciles**, not that live acceptance passed. `development/replay-decisions` also reproduces the current decoder test offline from retained local raw runs; it is not a provider accuracy measurement.
 
-Known usage is **16,846 input / 3,102 output tokens** across sixteen calls. Estimates use full input price, ignore cache discounts, and round each call upward to a micro-dollar at [published model pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini). The other call's usage is unknown. The ledger does not monitor other applications or account-level spend; provider billing is authoritative.
+## Live attempts, failures and repairs
 
-Native checks use all severities, all track errors and schematic parity, without adding per-finding exclusions. Reports still list **four default-ignored ERC and five default-ignored DRC categories**; [FAMILY.md](FAMILY.md) names them. Earlier absolute wording that no check was disabled was too broad and is corrected. No manufactured hardware, firmware, assembly approval or general semantic guarantee is inferred.
+The implementing agent authored each evaluation set before its first call. Literal prompts were unseen by the selector; expected answers, other cases, native geometry and source files were never sent. This is not an independently authored benchmark and does not replace the historical practical-board corpus.
 
-## Remaining authority and acceptance barrier
+The original set consumed seventeen calls including an explicit recovery. It remains **8/10 correct first selections, 7/10 first complete boards, 4/4 refusals and 1/2 clarifications**. Failures were a legacy-envelope integration error, an incorrect refusal of an excluded requirement, clause-boundary whitespace rejection, and a whole-board energy request incorrectly treated as pull-up-current optimization. Eight supported projects ultimately completed; conditional median/max time was 6.105/7.315 s. The first call lost selection/usage metadata and retains its entire reserve. See the unchanged [original assessment](evidence/live/assessment.json).
 
-Only **three requests** remain under the original ceiling. Retrying the same ten prompts cannot repair their first-attempt result, and that set has no unseen cases left.
+The [approved extension](evaluation/AUTHORIZATION.md) allowed two recorded development checks and sixteen fresh cases with the exact revised contract and holdout. Both development checks passed but do not count as unseen attempts. All ten fresh supported boards passed under source `b5731a56`; later local corrections mean the entire live suite is **not a single-binary trial**.
 
-Proposed next validation: up to **two recorded development checks** (`nl-03`, `ambiguous-02`), followed by **one fresh 16-case holdout** (10 supported, 4 unsupported, 2 ambiguous), using the [revised instructions](evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json) and [proposed prompts](evaluation/language-holdout-proposed.json). This requires a **35-request total ceiling**, retaining **$10 total**, the existing key, the same ledger and every original failure. These calls are **not authorized or executed**. No other provider, firewall change, fabrication or purchase is proposed. The one final PR remains pending successful acceptance and final review.
+- **`fresh-unsupported-02`:** correct overall refusal of direct 5 V power, null configuration, but inconsistent clause tags caused a local command error. No board was generated. Null-configuration refusal/clarification responses now preserve the whole original request in code, while retaining raw model annotations separately.
+- **`fresh-unsupported-04`:** the model falsely accepted an 80×60 mm resize and generated the unchanged 120×80 mm reference. Native validity did not establish request validity. A deterministic guard now rejects common explicit conflicting dimension/layer forms. This is not a general natural-language parser; unusual paraphrases can escape the guard and negated dimensions may be conservatively refused.
+- **`fresh-ambiguous-01`:** correct targeted clarification, null configuration, but omitted request text caused a local command error. Whole-request preservation fixes this without inventing a design or asserting that every raw model clause was correct.
+
+The final unseen ambiguous request passed under source `0e791b14`. Replaying all sixteen actual responses through that source passes **10 supported configurations, 4 refusals and 2 clarifications offline**. Supported configurations remain identical to those originally generated. The replay neither regenerates/repairs native boards nor retroactively converts the three live failures into passes. A fresh live test of the repaired rejection/clarification handling remains outstanding.
+
+## Cost, review and remaining barrier
+
+Known usage across 34 responses is **37,443 input / 6,883 output tokens**. Estimates use full input price, ignore cache discounts and round each call upward to a micro-dollar at [published model pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini). One response remains unknown with a $0.05 reserve. **$0.076006 is conservative goal accounting, not an invoice or account-wide spend.** The request ceiling, not the dollar ceiling, is exhausted. No further call or replacement ledger is authorized.
+
+The complete bounded integration tier (`go test -short -p=1 -timeout 20m ./...`) passed; this matches `make test` / `make test-bounded`, not the exhaustive release tier. [Review](REVIEW.md) records source review, focused tests, recorded-response regression and actual schematic/PCB readability review. [Family limits](FAMILY.md) disclose four default-ignored ERC and five default-ignored DRC categories, crowded grouped-ground labels, incomplete assembly silkscreen, electrical assumptions and missing firmware/hardware measurements.
+
+Unaffected implementation, documentation, examples and review are ready in the draft PR. Completion still needs a passing live rejection/clarification check under the repaired implementation or an **explicit user decision** to accept the disclosed mixed live/offline evidence. Neither is silently assumed. Original failures remain permanently recorded; the goal is not complete merely because this report or the PR exists.
+
+The smallest proposed follow-up is [six new rejection/clarification prompts](evaluation/guardrail-followup-proposed.json): four unsupported and two ambiguous, exactly one call each, unchanged contract/key/ledger, no rerun of the successful ten supported cases. This would require **41 total requests, still $10 total**. It is **not authorized or executed**. Only the request cap and targeted runner would change; decision/generation behavior remains frozen for that check.

@@ -1,0 +1,75 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected low_current profile as requested for 10k-ohm I2C pull-ups and standard supply and environmental limits from the esp32_bmp280_v1 family version 1.",
+    "clauses": [
+      {
+        "text": "I need 10k-ohm pull-ups on SDA and SCL for the pressure board.",
+        "disposition": "supported",
+        "reason": "User requests 10k pull-ups on SDA and SCL, explicitly matching the low_current profile."
+      },
+      {
+        "text": " No battery operation is being requested,",
+        "disposition": "supported",
+        "reason": "User explicitly excludes battery operation, which is not provided or configured in this family anyway."
+      },
+      {
+        "text": " and the normal family envelope applies.",
+        "disposition": "supported",
+        "reason": "User refers to the normal family envelope, so standard environmental and power supply limits apply."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "low_current",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "User requests 10k pull-ups on SDA and SCL, explicitly matching the low_current profile.",
+        "text": "I need 10k-ohm pull-ups on SDA and SCL for the pressure board."
+      },
+      {
+        "disposition": "supported",
+        "reason": "User explicitly excludes battery operation, which is not provided or configured in this family anyway.",
+        "text": "No battery operation is being requested,"
+      },
+      {
+        "disposition": "supported",
+        "reason": "User refers to the normal family envelope, so standard environmental and power supply limits apply.",
+        "text": "and the normal family envelope applies."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "low_current",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected low_current profile as requested for 10k-ohm I2C pull-ups and standard supply and environmental limits from the esp32_bmp280_v1 family version 1."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_01415e319a7fefd3016aa6b712346c87d1a2ebf3d26dd3954c",
+  "usage": {
+    "input_tokens": 1151,
+    "output_tokens": 238,
+    "total_tokens": 1389
+  },
+  "ledger_index": 25,
+  "seconds": 2.428420208
+}

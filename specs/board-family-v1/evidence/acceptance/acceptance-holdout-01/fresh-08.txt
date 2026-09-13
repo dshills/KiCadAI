@@ -1,0 +1,1 @@
+Select fast I2C for this BMP280 board, with 75 pF total capacitance and the usual regulated source and indoor conditions.

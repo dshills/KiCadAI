@@ -1,0 +1,1 @@
+Please configure the basic wired pressure-measurement controller from the reviewed family. The published standard defaults are suitable.

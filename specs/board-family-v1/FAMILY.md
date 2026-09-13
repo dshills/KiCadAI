@@ -1,6 +1,6 @@
 # ESP32/BMP280 wired pressure-controller family
 
-Review owner: the implementing Codex agent, September 13, 2026. Reference engineering is disclosed assistance. This is a bounded **software-validated design**, not an independently certified or bench-validated product. Original live-language acceptance failed; offline-tested corrections still need fresh acceptance evidence.
+Review owner: the implementing Codex agent, September 13, 2026. Reference engineering is disclosed assistance. This is a bounded **software-validated design**, not an independently certified or bench-validated product. Ten fresh supported language requests passed; the strict live rejection/clarification gates remain unmet. Current offline decision replay passes, but is not fresh live acceptance. See [results](RESULTS.md).
 
 ## Fixed integrated design
 

@@ -1,0 +1,1 @@
+I need 10k-ohm pull-ups on SDA and SCL for the pressure board. No battery operation is being requested, and the normal family envelope applies.

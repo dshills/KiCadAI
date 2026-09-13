@@ -1,0 +1,34 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "supported",
+    "message": "The selected configuration matches the 'standard' profile of the esp32_bmp280_v1 board family supporting 100 kHz I2C communication with total bus capacitance up to 200 pF. These operating limits reflect the family specifications and not measured performance.",
+    "clauses": [
+      {
+        "text": "Generate the fixed pressure board for standard 100 kHz communication and a total I2C load no greater than 200 pF.",
+        "disposition": "supported",
+        "reason": "Request for fixed pressure board with standard 100 kHz I2C and total bus capacitance no greater than 200 pF matches the standard profile of the esp32_bmp280_v1 family."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "id": "fresh-04",
+  "ledger_index": 23,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-01",
+  "source_response_id": "resp_0c43a28e48554596016aa6b7060ae887d1b3646f3b5710ad69",
+  "source_selection_sha256": "7033f5c32fb4f29518f5094a89899c311f1cd948bbf54aa99370e49cfd67167b"
+}

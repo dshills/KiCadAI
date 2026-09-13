@@ -1,0 +1,24 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "unsupported",
+    "message": "This family has a fixed 120 by 80 mm outline; the requested dimensions are not supported. No resized board was generated.",
+    "clauses": [
+      {
+        "text": "Keep two copper layers, but make the complete controller board 80 by 60 millimeters.",
+        "disposition": "unsupported",
+        "reason": "This family has a fixed 120 by 80 mm outline; the requested dimensions are not supported. No resized board was generated."
+      }
+    ],
+    "configuration": null
+  },
+  "id": "fresh-unsupported-04",
+  "ledger_index": 33,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": false,
+  "passed": true,
+  "run": "acceptance-holdout-02",
+  "source_response_id": "resp_0d1dd74c522bcddd016aa6b8752c3c87d1a2691c519e54dd78",
+  "source_selection_sha256": "b6a041c6b300ef87b87534ad643ce54fbba4e75cf481984080e6bed542d08744"
+}

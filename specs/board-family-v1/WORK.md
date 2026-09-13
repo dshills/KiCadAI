@@ -1,6 +1,6 @@
 # Board-family v1 — autonomous implementation
 
-Authority: user-supplied goal, September 13, 2026. Build one reviewed low-voltage sensor/controller board family with three meaningful configurations, deterministic generation before AI, 10 configuration passes, >=9/10 unseen language selections, 4 refusals, 2 clarifications, native/electrical/readability checks and three representative deterministic replays. Runtime target: median <5 minutes, each supported case <10 minutes. One reviewed PR; no merge or fabrication. Existing-key reuse: at most 20 live requests and USD 10 total for this new goal, recorded conservatively. No paid calls until deterministic readiness.
+Authority: user-supplied goal, September 13, 2026. Build one reviewed low-voltage sensor/controller board family with three meaningful configurations, deterministic generation before AI, 10 configuration passes, >=9/10 unseen language selections, 4 refusals, 2 clarifications, native/electrical/readability checks and three representative deterministic replays. Runtime target: median <5 minutes, each supported case <10 minutes. One reviewed PR; no merge or fabrication. Original existing-key ceiling: 20 live requests and USD 10; subsequently extended to **35 total requests, same USD 10**, per `evaluation/AUTHORIZATION.md`. Earlier entries below describe historical checkpoints, not current permission or usage.
 
 Base: `7076c6529e978477d73e2c22c81ef930b2f35036`. PR #12 was open at the initial checkpoint; it is now verified merged into main (`b5565763`, September 13). Branch `codex/board-family-v1` is a separate continuation; historical files and results remain unchanged.
 
@@ -69,3 +69,16 @@ The user explicitly approved the concrete original contract and sixteen literal 
 - Complete bounded regression after shared provider changes passed in 74.174 s; final post-correction integration passed in 6.820 s with unchanged packages cached. Focused tests, recorded-response regression and vet pass.
 
 Remaining barrier: the original first-attempt targets cannot be repaired by retries, and only three requests remain. Proposed up to two development checks plus one new sixteen-case holdout would require **35 total requests**, keeping **$10 total** and the same ledger/key. Proposed files are `evaluation/LIVE_CONTRACT_REVISED_PROPOSED.json` and `evaluation/language-holdout-proposed.json`. No revised request has executed, the ceiling remains 20, and the goal/final PR are not complete.
+
+## Authorized continuation and final local review
+
+- User approved exactly the proposed 35-request ceiling, unchanged $10 limit, revised contract and fresh prompts. Approved file hashes remain unchanged.
+- `recovery-checks-01`, indices 18–19: both explicitly recorded development checks passed. Neither is new first-shot evidence.
+- `acceptance-holdout-01`, indices 20–31, source `b5731a56`: all ten fresh supported requests generated correct complete native boards; first unsupported passed; second had a correct overall refusal but inconsistent clause tags caused a local command failure.
+- `acceptance-holdout-02`, indices 32–34, source `2bf37fdb`: third unsupported passed; requested 80×60 mm resize wrongly generated the unchanged 120×80 mm board; first ambiguous request correctly asked a question but omitted a sentence in clause transcription and failed locally. The wrong resize is rejected evidence despite passing native checks.
+- Added deterministic fixed-size/layer guards and whole-input preservation for null-configuration non-design decisions. No native generator, electrical model, embedded reference or validator changed; no generated output was repaired.
+- `acceptance-holdout-03`, index 35, source `0e791b14`: last unseen ambiguous request clarified correctly. Strict cumulative live result remains **10/10 supported, 2/4 unsupported, 1/2 ambiguous (13/16)** across three versions.
+- `decision-replay-01`: all sixteen retained real provider decisions passed current decoding offline, with zero calls and zero native generation. This is targeted correction evidence, not replacement live scoring.
+- Final bounded full-repository regression passed in **33.535 s**, provider keys removed; current source retained. Native/BOM hashes for all twelve newly generated boards (eleven accepted supported including development, one rejected resize) match the reviewed profiles. Final publication keeps acceptance flags separate from native validity.
+- Total **35/35 physical calls**; 34 known responses: 37,443 input / 6,883 output tokens, estimated **$0.026006** plus the original unknown **$0.05** reserve = **$0.076006**. No new provider, security change, fabrication, invoice claim or further request is authorized.
+- Unaffected implementation, evidence and self-review are finalized for the single scoped draft PR. Live rejection/clarification acceptance remains open; the goal is not complete. Do not erase scores, reset the ledger or silently broaden the evidence standard.

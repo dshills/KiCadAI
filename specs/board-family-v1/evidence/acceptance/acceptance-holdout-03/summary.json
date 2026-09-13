@@ -1,0 +1,60 @@
+{
+  "started_utc": "2026-09-13T14:57:06.267Z",
+  "source_commit": "0e791b14cbb28320e2756834018dbaed855cf6ac",
+  "run_kind": "corrected_version_holdout",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "spec_sha256": "1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4",
+  "binary_sha256": "3095fa8592d91a8751755e74d8df7d6c6ad12b8489447ddc6cd80c8e878f2194",
+  "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 34,
+  "planned_case_ids": [
+    "fresh-ambiguous-02"
+  ],
+  "independence": "Authored by the implementing agent after the original evaluation and corrective implementation, before any call with these literal prompts. Separate recovery holdout, not a replacement or reclassification of the original failed set. Expected answers are never sent to the model. Not an independently authored benchmark.",
+  "acceptance_policy": "At least 9/10 correct complete first-attempt supported cases, 4/4 refusals, 2/2 clarifications. Timing covers all ten supported attempts. Failed cases are never delivered as successes. Development retries cannot establish acceptance.",
+  "cases": [
+    {
+      "id": "fresh-ambiguous-02",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 2.023523208,
+      "result": {
+        "disposition": "clarify",
+        "message": "Please clarify which part of the board's energy consumption is most important to minimize (e.g., overall board power, sensor power, I2C pull-up sink current). Only with this information can an appropriate family profile be selected.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-03/fresh-ambiguous-02",
+        "passed": false
+      },
+      "selection_sha256": "7049759c0827d5807369bbb9058b48465e9ba129ada2602158e8966c9296cd8a",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    }
+  ],
+  "prior_run": {
+    "summary_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-02/summary.json",
+    "sha256": "7a4f7a9c966cbde63ca108c49951ed4acf65c2e61f8c97c18e0b11bc5b69d720",
+    "notice": "Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes."
+  },
+  "metrics": {
+    "supported_first_shot_passes": 10,
+    "supported_first_selection_matches": 10,
+    "supported_latest_passes": 10,
+    "supported_expected_total": 10,
+    "unsupported_passes": 2,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 1,
+    "clarification_expected_total": 2,
+    "completed_supported_timing_count": 10,
+    "median_completed_supported_seconds": 5.816490833,
+    "max_completed_supported_seconds": 8.475597291,
+    "median_all_supported_attempt_seconds": 5.816490833,
+    "max_all_supported_attempt_seconds": 8.475597291
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T14:57:08.303Z",
+  "ledger_sha256": "3a90e509d6a6ee37fc0a657f51d2f086004cb62ce9807632d08c02f0cc18b3d6",
+  "request_count": 35
+}

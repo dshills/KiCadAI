@@ -1,0 +1,1 @@
+Configure the ESP32/BMP280 family with its low_current option. I accept the documented supply, temperature and bus-loading envelope.

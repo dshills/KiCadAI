@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected 'standard' profile with specified bus capacitance 175 pF and retained family power and temperature limits as requested. These are family operating limits, not measurements.",
+    "clauses": [
+      {
+        "text": "Use the standard pressure-controller option at 100000 Hz with 175 pF of total bus loading.",
+        "disposition": "supported",
+        "reason": "Selecting standard profile (100 kHz I2C) matches 'standard pressure-controller' at 100000 Hz and 175 pF is within 50-200 pF total bus capacitance allowed for standard profile."
+      },
+      {
+        "text": " Retain the family power and temperature limits.",
+        "disposition": "supported",
+        "reason": "Retaining family power and temperature limits means using fixed envelope limits for esp32_bmp280_v1 version 1 as defined."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 175
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Selecting standard profile (100 kHz I2C) matches 'standard pressure-controller' at 100000 Hz and 175 pF is within 50-200 pF total bus capacitance allowed for standard profile.",
+        "text": "Use the standard pressure-controller option at 100000 Hz with 175 pF of total bus loading."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Retaining family power and temperature limits means using fixed envelope limits for esp32_bmp280_v1 version 1 as defined.",
+        "text": "Retain the family power and temperature limits."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 175,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected 'standard' profile with specified bus capacitance 175 pF and retained family power and temperature limits as requested. These are family operating limits, not measurements."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0e6d220deaeb4006016aa6b717cb2c87d1a8c4a380f42dd92e",
+  "usage": {
+    "input_tokens": 1148,
+    "output_tokens": 236,
+    "total_tokens": 1384
+  },
+  "ledger_index": 26,
+  "seconds": 2.615351875
+}

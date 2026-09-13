@@ -1,0 +1,101 @@
+{
+  "started_utc": "2026-09-13T14:51:31.065Z",
+  "source_commit": "2bf37fdbaf63609d7ad7a33be5bfcd21916cfabc",
+  "run_kind": "corrected_version_holdout",
+  "contract_sha256": "76cf6b0a3965c18b81504ac67a1e5dbf3b9eec86b10e4a8ba8581da2e7229a9c",
+  "spec_sha256": "1b2daa0c91e8a76ce1c6cb2524d247696af3ef7f0033da9a5bf4b403588f97e4",
+  "binary_sha256": "7283670a1dd83f49dd9561a7b13e731dfbc223ab59e286fb4cc3d167b5eb980f",
+  "runner_sha256": "f121d72ab519d7a6841a2d944476ffc83485f4a15d74b190699f4315c2267945",
+  "ledger_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/live-ledger.json",
+  "prior_request_count": 31,
+  "planned_case_ids": [
+    "fresh-unsupported-03",
+    "fresh-unsupported-04",
+    "fresh-ambiguous-01",
+    "fresh-ambiguous-02"
+  ],
+  "independence": "Authored by the implementing agent after the original evaluation and corrective implementation, before any call with these literal prompts. Separate recovery holdout, not a replacement or reclassification of the original failed set. Expected answers are never sent to the model. Not an independently authored benchmark.",
+  "acceptance_policy": "At least 9/10 correct complete first-attempt supported cases, 4/4 refusals, 2/2 clarifications. Timing covers all ten supported attempts. Failed cases are never delivered as successes. Development retries cannot establish acceptance.",
+  "cases": [
+    {
+      "id": "fresh-unsupported-03",
+      "expected_disposition": "unsupported",
+      "disposition": "unsupported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 1.9507514160000001,
+      "result": {
+        "disposition": "unsupported",
+        "message": "Adding a humidity sensor alongside the existing pressure sensor on the esp32_bmp280_v1 board family is unsupported, as the board design and family specifications include only the BMP280 pressure sensor and do not provide for adding a humidity sensor.",
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-02/fresh-unsupported-03",
+        "passed": false
+      },
+      "selection_sha256": "223d3e509395e72b7a5547781eedab8b65c87ada4141ea95ff6700772c91e493",
+      "passed": true,
+      "first_attempt": true,
+      "no_native_design": true
+    },
+    {
+      "id": "fresh-unsupported-04",
+      "expected_disposition": "unsupported",
+      "disposition": "supported",
+      "exit_code": 0,
+      "signal": null,
+      "wall_seconds": 5.423523416999999,
+      "result": {
+        "passed": true,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-02/fresh-unsupported-04",
+        "generation_seconds": 0.010550416,
+        "validation_seconds": 3.214648959,
+        "total_seconds": 5.416841709
+      },
+      "selection_sha256": "b6a041c6b300ef87b87534ad643ce54fbba4e75cf481984080e6bed542d08744",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": false
+    },
+    {
+      "id": "fresh-ambiguous-01",
+      "expected_disposition": "clarify",
+      "disposition": "clarify",
+      "exit_code": 1,
+      "signal": null,
+      "wall_seconds": 3.232913792,
+      "result": {
+        "disposition": "failed",
+        "ledger_index": 34,
+        "output": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-02/fresh-ambiguous-01",
+        "passed": false
+      },
+      "selection_sha256": "33f205738894fe8e7e5eb37a7c91e90b6de6910eb388194b1086ce4b6a7019ae",
+      "passed": false,
+      "first_attempt": true,
+      "no_native_design": true
+    }
+  ],
+  "prior_run": {
+    "summary_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v1/acceptance-holdout-01/summary.json",
+    "sha256": "e037ab6a7f8c03946b43e21071cf7d927b2dcd515c91076c480381604c793a60",
+    "notice": "Earlier first-shot outcomes are retained. Repeated cases in this run are explicit recovery attempts, not new first-shot successes."
+  },
+  "stopped_reason": "execution failure; inspect retained evidence before any further paid work",
+  "metrics": {
+    "supported_first_shot_passes": 10,
+    "supported_first_selection_matches": 10,
+    "supported_latest_passes": 10,
+    "supported_expected_total": 10,
+    "unsupported_passes": 2,
+    "unsupported_expected_total": 4,
+    "clarification_passes": 0,
+    "clarification_expected_total": 2,
+    "completed_supported_timing_count": 10,
+    "median_completed_supported_seconds": 5.816490833,
+    "max_completed_supported_seconds": 8.475597291,
+    "median_all_supported_attempt_seconds": 5.816490833,
+    "max_all_supported_attempt_seconds": 8.475597291
+  },
+  "passed": false,
+  "finished_utc": "2026-09-13T14:51:41.681Z",
+  "ledger_sha256": "af1b72ad077318aa6c0148a91a064af1d9e99b7147449d614352f84a6bd37171",
+  "request_count": 34
+}

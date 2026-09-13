@@ -1,0 +1,24 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "unsupported",
+    "message": "Adding a humidity sensor alongside the existing pressure sensor on the esp32_bmp280_v1 board family is unsupported, as the board design and family specifications include only the BMP280 pressure sensor and do not provide for adding a humidity sensor.",
+    "clauses": [
+      {
+        "text": "Include a humidity sensor on the PCB alongside the pressure sensor and controller.",
+        "disposition": "unsupported",
+        "reason": "Whole original request retained; no design is authorized. Adding a humidity sensor alongside the existing pressure sensor on the esp32_bmp280_v1 board family is unsupported, as the board design and family specifications include only the BMP280 pressure sensor and do not provide for adding a humidity sensor."
+      }
+    ],
+    "configuration": null
+  },
+  "id": "fresh-unsupported-03",
+  "ledger_index": 32,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 0,
+  "original_live_passed": true,
+  "passed": true,
+  "run": "acceptance-holdout-02",
+  "source_response_id": "resp_0d18e76e92b6e9c8016aa6b8735dc087d19934d0961a040552",
+  "source_selection_sha256": "223d3e509395e72b7a5547781eedab8b65c87ada4141ea95ff6700772c91e493"
+}

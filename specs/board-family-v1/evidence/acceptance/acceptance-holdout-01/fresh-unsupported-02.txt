@@ -1,0 +1,1 @@
+The board has to accept 5 V DC directly on its power connector. I do not need USB data.

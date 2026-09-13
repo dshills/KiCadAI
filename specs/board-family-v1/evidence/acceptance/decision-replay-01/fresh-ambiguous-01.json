@@ -1,0 +1,24 @@
+{
+  "api_requests": 0,
+  "current_decision": {
+    "disposition": "clarify",
+    "message": "You have proposed two alternatives for the pressure board configuration: a 'fast' bus speed profile and a 'low_current' bus operation profile. Please clarify which priority you prefer: higher I2C speed (fast) or reduced I2C pull-up current (low_current).",
+    "clauses": [
+      {
+        "text": "For the pressure board, fast bus speed and low-current bus operation are alternatives I have not chosen between. Ask me which priority to use.",
+        "disposition": "clarify",
+        "reason": "Whole original request retained; no design is authorized. You have proposed two alternatives for the pressure board configuration: a 'fast' bus speed profile and a 'low_current' bus operation profile. Please clarify which priority you prefer: higher I2C speed (fast) or reduced I2C pull-up current (low_current)."
+      }
+    ],
+    "configuration": null
+  },
+  "id": "fresh-ambiguous-01",
+  "ledger_index": 34,
+  "native_generation_attempted": false,
+  "original_live_exit_code": 1,
+  "original_live_passed": false,
+  "passed": true,
+  "run": "acceptance-holdout-02",
+  "source_response_id": "resp_016e2a908ca4d993016aa6b87aa70487d1bc5178c1507e794b",
+  "source_selection_sha256": "33f205738894fe8e7e5eb37a7c91e90b6de6910eb388194b1086ce4b6a7019ae"
+}

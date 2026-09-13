@@ -1,0 +1,1 @@
+For this pressure monitor, minimize energy consumption. I have not specified which part of the board's consumption matters.

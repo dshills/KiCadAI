@@ -1,0 +1,55 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "The selected configuration matches the 'standard' profile of the esp32_bmp280_v1 board family supporting 100 kHz I2C communication with total bus capacitance up to 200 pF. These operating limits reflect the family specifications and not measured performance.",
+    "clauses": [
+      {
+        "text": "Generate the fixed pressure board for standard 100 kHz communication and a total I2C load no greater than 200 pF.",
+        "disposition": "supported",
+        "reason": "Request for fixed pressure board with standard 100 kHz I2C and total bus capacitance no greater than 200 pF matches the standard profile of the esp32_bmp280_v1 family."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Request for fixed pressure board with standard 100 kHz I2C and total bus capacitance no greater than 200 pF matches the standard profile of the esp32_bmp280_v1 family.",
+        "text": "Generate the fixed pressure board for standard 100 kHz communication and a total I2C load no greater than 200 pF."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 200,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "The selected configuration matches the 'standard' profile of the esp32_bmp280_v1 board family supporting 100 kHz I2C communication with total bus capacitance up to 200 pF. These operating limits reflect the family specifications and not measured performance."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0c43a28e48554596016aa6b7060ae887d1b3646f3b5710ad69",
+  "usage": {
+    "input_tokens": 1145,
+    "output_tokens": 214,
+    "total_tokens": 1359
+  },
+  "ledger_index": 23,
+  "seconds": 2.5110029579999997
+}

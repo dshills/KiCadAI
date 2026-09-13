@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected the 'fast' profile of esp32_bmp280_v1 to meet the requested 2.2k pull-ups and 400 kHz I2C bus speed, using the published default envelope for other parameters.",
+    "clauses": [
+      {
+        "text": "Fit the approved 2.2-kilohm bus pull-ups and run I2C at 400000 Hz on the pressure controller;",
+        "disposition": "supported",
+        "reason": "The request to fit 2.2-kilohm bus pull-ups and run I2C at 400000 Hz matches the 'fast' profile which uses 2.2k pull-ups and supports 400kHz operation."
+      },
+      {
+        "text": " use the published defaults elsewhere.",
+        "disposition": "supported",
+        "reason": "The request to use the published defaults elsewhere is supported by using the 'fast' profile's published operating envelope for other parameters."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "The request to fit 2.2-kilohm bus pull-ups and run I2C at 400000 Hz matches the 'fast' profile which uses 2.2k pull-ups and supports 400kHz operation.",
+        "text": "Fit the approved 2.2-kilohm bus pull-ups and run I2C at 400000 Hz on the pressure controller;"
+      },
+      {
+        "disposition": "supported",
+        "reason": "The request to use the published defaults elsewhere is supported by using the 'fast' profile's published operating envelope for other parameters.",
+        "text": "use the published defaults elsewhere."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "Selected the 'fast' profile of esp32_bmp280_v1 to meet the requested 2.2k pull-ups and 400 kHz I2C bus speed, using the published default envelope for other parameters."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0d47fe7a7936f8c6016aa6b70baec487d1bcdd5934fb190185",
+  "usage": {
+    "input_tokens": 1153,
+    "output_tokens": 256,
+    "total_tokens": 1409
+  },
+  "ledger_index": 24,
+  "seconds": 3.375903084
+}

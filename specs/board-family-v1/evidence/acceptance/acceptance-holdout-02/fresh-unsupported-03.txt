@@ -1,0 +1,1 @@
+Include a humidity sensor on the PCB alongside the pressure sensor and controller.
