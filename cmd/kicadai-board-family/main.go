@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -92,8 +93,7 @@ func run() error {
 				return me
 			}
 			if e != nil {
-				json.NewEncoder(os.Stdout).Encode(map[string]any{"passed": false, "disposition": "failed", "output": *out, "ledger_index": s.LedgerIndex})
-				return e
+				return errors.Join(e, json.NewEncoder(os.Stdout).Encode(map[string]any{"passed": false, "disposition": "failed", "output": *out, "ledger_index": s.LedgerIndex}))
 			}
 			return json.NewEncoder(os.Stdout).Encode(map[string]any{"passed": false, "disposition": s.Decision.Disposition, "message": s.Decision.Message, "output": *out})
 		}
@@ -136,9 +136,8 @@ func readPrompt(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, 2001))
-	if err != nil {
+	if err = errors.Join(err, f.Close()); err != nil {
 		return nil, err
 	}
 	if len(b) == 0 || len(b) > 2000 {

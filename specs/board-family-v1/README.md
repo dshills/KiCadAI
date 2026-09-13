@@ -4,6 +4,8 @@ This new lane configures one engineered ESP32-WROOM-32E-N4 / BMP280 wired pressu
 
 **Status: 10/10 configuration cases and 10/10 fresh supported language requests generated complete validated boards. The fresh strict live suite still failed rejection/clarification gates (2/4 and 1/2). Current decision-code replay passes all 16 retained responses offline; this does not change live scores.** The autonomous goal is not complete. The one scoped PR is a draft pending acceptance; no hardware-performance claim is made.
 
+Review and integration: [draft PR #13](https://github.com/dshills/KiCadAI/pull/13), branch `codex/board-family-v1`, base `main`. No merge is authorized.
+
 ## Use the deterministic command
 
 Run from the repository root with its pinned Go toolchain and KiCad **10.0.3** installed:

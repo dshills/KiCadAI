@@ -92,15 +92,14 @@ func Validate(ctx context.Context, dir, cli string) (Validation, error) {
 		if e != nil {
 			return e
 		}
-		defer b.Close()
 		c, e := Decode(b)
-		if e != nil {
+		if e = errors.Join(e, b.Close()); e != nil {
 			return e
 		}
 		_, e = Check(c)
 		return e
 	})
-	check("reference_and_bom_integrity", func() error {
+	check("reference_and_bom_integrity", func() (err error) {
 		f, e := os.Open(filepath.Join(dir, "configuration.json"))
 		if e != nil {
 			return e
@@ -117,7 +116,7 @@ func Validate(ctx context.Context, dir, cli string) (Validation, error) {
 		if e != nil {
 			return e
 		}
-		defer os.RemoveAll(tmp)
+		defer func() { err = errors.Join(err, os.RemoveAll(tmp)) }()
 		expected := filepath.Join(tmp, "project")
 		if _, e = Generate(c, expected); e != nil {
 			return e

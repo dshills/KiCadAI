@@ -7,6 +7,32 @@ import (
 	"testing"
 )
 
+func TestLedgerCleanupFailurePreservesHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ledger.json")
+	err := ledgerChange(path, func(l *Ledger) error {
+		l.HaltReason = "test marker"
+		// Simulate a lock directory that cannot be removed by a file removal.
+		return os.WriteFile(filepath.Join(path+".lock", "unexpected"), []byte("test"), 0600)
+	})
+	if err == nil {
+		t.Fatal("cleanup failure was not reported")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Ledger
+	if err = json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.HaltReason != "test marker" {
+		t.Fatal("cleanup failure discarded committed ledger state")
+	}
+	if _, err = reserve(path); err == nil {
+		t.Fatal("a locked ledger allowed another reservation")
+	}
+}
+
 func TestUsageAnomalyPersistsHalt(t *testing.T) {
 	for _, tokens := range []int{200_000, -1, 2_000_000} {
 		path := filepath.Join(t.TempDir(), "ledger.json")

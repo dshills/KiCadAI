@@ -11,6 +11,7 @@ import (
 )
 
 const SelectionModel = "gpt-4.1-mini-2025-04-14"
+
 // Increased from 20 to 35 by explicit user approval on September 13, 2026.
 // The same ledger and every prior reservation remain in force; USD cap unchanged.
 const MaxLiveRequests = 35
@@ -37,7 +38,7 @@ type Ledger struct {
 
 const ledgerGoal = "board-family-v1-2026-09-13"
 
-func ledgerChange(path string, f func(*Ledger) error) error {
+func ledgerChange(path string, f func(*Ledger) error) (err error) {
 	if path == "" {
 		return errors.New("a persistent --ledger path is required for live requests")
 	}
@@ -48,7 +49,7 @@ func ledgerChange(path string, f func(*Ledger) error) error {
 	if e := os.Mkdir(lock, 0700); e != nil {
 		return errors.New("ledger locked; no request sent (inspect previous process before recovery)")
 	}
-	defer os.Remove(lock)
+	defer func() { err = errors.Join(err, os.Remove(lock)) }()
 	l := Ledger{Version: 1, Goal: ledgerGoal, Entries: []LedgerEntry{}}
 	b, e := os.ReadFile(path)
 	if e == nil {
@@ -78,14 +79,17 @@ func ledgerChange(path string, f func(*Ledger) error) error {
 		return e
 	}
 	name := tmp.Name()
-	defer os.Remove(name)
+	defer func() {
+		// A successful rename already removed the temporary path.
+		if cleanupErr := os.Remove(name); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			err = errors.Join(err, cleanupErr)
+		}
+	}()
 	if _, e = tmp.Write(append(b, '\n')); e != nil {
-		tmp.Close()
-		return e
+		return errors.Join(e, tmp.Close())
 	}
 	if e = tmp.Sync(); e != nil {
-		tmp.Close()
-		return e
+		return errors.Join(e, tmp.Close())
 	}
 	if e = tmp.Close(); e != nil {
 		return e
