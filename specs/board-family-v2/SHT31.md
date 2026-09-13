@@ -1,6 +1,6 @@
 # SHT31 reference — development qualification notes
 
-Status: shared generation and all 14 native/export checks pass for both profiles; full electrical/assembly review, manufacturing-data visual review and final live acceptance remain pending. Reviewer: implementing Codex agent, not an independent engineer. No fabricated or measured hardware.
+Status: shared generation and all 14 native/export checks pass for both profiles in two fresh runs. [Manufacturing-data visual review](MANUFACTURING_REVIEW.md) and deterministic export replay are recorded with limitations. Full consolidated electrical/assembly review and final live acceptance remain pending. Reviewer: implementing Codex agent, not an independent engineer. No fabricated or measured hardware.
 
 The second board reuses the ESP32-WROOM-32E-N4, external regulated 3.3 V input, reset/boot, UART and fixed headers/outline/stack of [the first family](../board-family-v1/FAMILY.md). It replaces pressure measurement with an SHT31-DIS-B temperature/humidity sensor, changes the sensor footprint and wiring, removes C6 and relocates the local C5 bypass. U2 is at (100,15) mm and C5 at (103.875,16.5) mm. Reference routes are engineered once; production generation must not route or repair them.
 

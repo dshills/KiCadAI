@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -94,20 +93,12 @@ func exportManufacturing(ctx context.Context, dir, cli string) error {
 func verifyManufacturing(dir string) error {
 	out := filepath.Join(dir, "manufacturing")
 	for name, function := range gerberFunctions {
-		// KiCad's Gerber job JSON uses SolderPaste/SolderMask, whereas the
-		// RS-274X X2 file attributes use Paste/Soldermask.
-		function = strings.Replace(function, "SolderPaste,", "Paste,", 1)
-		function = strings.Replace(function, "SolderMask,", "Soldermask,", 1)
 		b, err := os.ReadFile(filepath.Join(out, "gerbers", name))
 		if err != nil {
 			return err
 		}
-		s := string(b)
-		if !strings.Contains(s, "%TF.FileFunction,"+function+"*%") && !strings.Contains(s, "%TF.FileFunction,"+function+",") {
-			return fmt.Errorf("wrong Gerber identity: %s", name)
-		}
-		if !strings.Contains(s, "%MOMM*%") || !strings.Contains(s, "%FSLAX46Y46*%") || !strings.HasSuffix(strings.TrimSpace(s), "M02*") {
-			return fmt.Errorf("incomplete Gerber or unsupported units: %s", name)
+		if err := verifyGerberFraming(string(b), function); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
 	b, err := os.ReadFile(filepath.Join(out, "gerbers", "board-job.gbrjob"))
@@ -230,9 +221,6 @@ func verifyPlacement(path string, board nativeNode) error {
 	return nil
 }
 
-var drillTool = regexp.MustCompile(`^T([0-9]+)C([0-9]+(?:\.[0-9]+)?)$`)
-var drillPoint = regexp.MustCompile(`^X(-?[0-9]+(?:\.[0-9]+)?)Y(-?[0-9]+(?:\.[0-9]+)?)$`)
-
 type drillHit struct{ x, y, diameter float64 }
 
 func compareDrillHits(expected, got []drillHit) (missing, unexpected []string) {
@@ -309,43 +297,9 @@ func verifyDrills(dir string, board nativeNode) error {
 		if err != nil {
 			return err
 		}
-		s := string(b)
-		plating := "Plated,1,2,PTH"
-		if kind == "NPTH" {
-			plating = "NonPlated,1,2,NPTH"
-		}
-		if !strings.Contains(s, "; #@! TF.FileFunction,"+plating+"\n") {
-			return errors.New("wrong drill plating identity")
-		}
-		if !strings.HasPrefix(s, "M48\n") || !strings.Contains(s, "\nMETRIC\n") || !strings.Contains(s, "\nG90\n") || !strings.HasSuffix(strings.TrimSpace(s), "M30") {
-			return errors.New("invalid Excellon framing/units")
-		}
-		tools := map[string]float64{}
-		selected := ""
-		got := []drillHit{}
-		for _, line := range strings.Split(s, "\n") {
-			if m := drillTool.FindStringSubmatch(line); m != nil {
-				diameter, err := strconv.ParseFloat(m[2], 64)
-				if err != nil {
-					return err
-				}
-				tools["T"+m[1]] = diameter
-			} else if strings.HasPrefix(line, "T") {
-				selected = line
-			} else if m := drillPoint.FindStringSubmatch(line); m != nil {
-				diameter, ok := tools[selected]
-				if !ok {
-					return errors.New("undefined drill tool")
-				}
-				x, ex := strconv.ParseFloat(m[1], 64)
-				y, ey := strconv.ParseFloat(m[2], 64)
-				if ex != nil || ey != nil {
-					return errors.New("invalid drill coordinate")
-				}
-				got = append(got, drillHit{x, y, diameter})
-			} else if strings.HasPrefix(line, "X") || strings.HasPrefix(line, "Y") || strings.HasPrefix(line, "G85") {
-				return errors.New("unsupported drill coordinate/slot command")
-			}
+		got, err := parseKiCadDrills(string(b), kind)
+		if err != nil {
+			return fmt.Errorf("%s: %w", kind, err)
 		}
 		if missing, unexpected := compareDrillHits(expected, got); len(missing) != 0 || len(unexpected) != 0 {
 			return fmt.Errorf("%s drill positions/diameters differ from native pads/vias: missing=%v unexpected=%v", kind, missing, unexpected)

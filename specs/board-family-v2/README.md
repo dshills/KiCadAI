@@ -32,6 +32,6 @@ go run ./cmd/kicadai-board-family \
 
 No live requests are authorized for this milestone yet. The old 41-request budget is exhausted and its ledger must not be reset or reused as new authority. A new, small final evaluation requires a separately approved request/dollar budget after offline review.
 
-See [work log](WORK.md), [SHT31 restrictions](SHT31.md) and the [offline integration checkpoint](evidence/integration-checkpoint-01.json). Final visual/electrical review, manufacturing replay, examples and live acceptance remain incomplete.
+See [work log](WORK.md), [SHT31 restrictions](SHT31.md), [manufacturing visual review](MANUFACTURING_REVIEW.md) and [deterministic replay](evidence/deterministic-replay-01.json). All five configurations pass two fresh rounds of native/export validation. Manufacturing-data review and timestamp-normalized replay are recorded, with explicit limitations. Consolidated electrical/assembly review, published examples, live acceptance and updated PR CI remain incomplete.
 
 The schema uses closed objects and family-specific nested alternatives following [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs). The existing pinned GPT-4.1-mini model, transport and retry/accounting policy were not migrated. Export options were checked against the installed executable and [KiCad 10 CLI documentation](https://docs.kicad.org/10.0/en/cli/cli.html).
