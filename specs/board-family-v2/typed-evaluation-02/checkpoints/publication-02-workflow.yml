@@ -23,18 +23,6 @@ jobs:
           env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
             node --test specs/board-family-v2/typed-evaluation-02/authenticate-final.test.mjs
           env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
-            node specs/board-family-v2/typed-evaluation-02/authenticate-publication-03.mjs --check
-          # Match standard CI: this fixture is exhausted and copied only into a fresh runner.
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import crypto from 'node:crypto';
-          if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('CI fixture only');
-          const source='specs/board-family-v1/evidence/guardrails/ledger-after.json';
-          const bytes=fs.readFileSync(source);
-          if (crypto.createHash('sha256').update(bytes).digest('hex') !== 'e074e37858576b6487e8f738025156d881f8f7bc80276e21117b76e6828d822f') throw new Error('historical ledger changed');
-          if (JSON.parse(bytes).entries.length !== 41) throw new Error('expected exhausted historical ledger');
-          fs.mkdirSync('.cache/board-family-v1', { recursive: true });
-          fs.copyFileSync(source, '.cache/board-family-v1/live-ledger.json', fs.constants.COPYFILE_EXCL);
-          NODE
+            node specs/board-family-v2/typed-evaluation-02/authenticate-final.mjs --check
           env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
             node specs/board-family-v2/evaluation/audit-final.mjs --check
