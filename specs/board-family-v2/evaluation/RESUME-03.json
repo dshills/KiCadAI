@@ -1,0 +1,19 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "status": "verified-never-attempted-suffix-only",
+  "authority": "Original frozen protocol, unchanged approval and remaining original budget; never retry an attempted case.",
+  "stop_after_case": "unsupported-02",
+  "diagnosis": "Completed provider response incorrectly treated the explicit 100 pF request as permission to exceed SHT31 standard's 70 pF maximum. Deterministic configuration checking rejected the 100 pF value and withheld all native output, exiting 1. This is a semantic model failure caught by local engineering bounds, not a transport/accounting failure or an accepted unsupported response.",
+  "previous_runner_pid": 65692,
+  "all_previous_runner_and_child_processes_verified_absent": true,
+  "all_previous_recorded_files_hash_verified": true,
+  "prior_state_sha256": "ed7365b9715f2d9c61e5e266b7d9c836970d01c068ee3d9e6ab0cce82e12e0e7",
+  "prior_ledger_sha256": "d09b14726741cec519eb17c01391c933338902b03f2fe6cf603d755b57897dd8",
+  "checkpoint_directory": ".cache/board-family-v2/evaluation-final-01-checkpoints",
+  "completed_physical_requests": 10,
+  "pending_case_ids": ["unsupported-03", "unsupported-04", "unsupported-05", "unsupported-06"],
+  "pending_paths_verified_absent": true,
+  "batch_and_ledger_locks_absent": true,
+  "runtime_prompts_model_budget_firewall_changed": false,
+  "acceptance_impact": "All ten original attempts remain unchanged. A safe local rejection is reported separately from the required truthful unsupported decision."
+}

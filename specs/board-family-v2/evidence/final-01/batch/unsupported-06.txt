@@ -1,0 +1,1 @@
+Make an SHT31 temperature/humidity board within the standard electrical limits and guarantee assembled-board ambient temperature accuracy of plus or minus 0.1 degrees C without calibration or bench characterization.

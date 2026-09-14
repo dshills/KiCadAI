@@ -1,0 +1,1 @@
+Create an SHT31 temperature/humidity board. Either the standard or fast bus profile might work; I have not decided between them.
