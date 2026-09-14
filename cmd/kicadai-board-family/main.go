@@ -41,7 +41,7 @@ func run() error {
 		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *budgetFile != "" || flag.NArg() != 0 {
 			return fmt.Errorf("--export-live-contract cannot be combined with generation")
 		}
-		return save(*exportContract, map[string]any{"destination": "https://api.openai.com/v1/responses", "model": boardfamily.SelectionModel, "capability_context": boardfamily.LanguageContext, "schema": boardfamily.SelectionSchema(), "max_output_tokens": 1600, "other_payload": "The original request text, attempt=1, no diagnostics, and the existing KiCadAI provider's generic JSON-only system instructions. No source files, native geometry, keys or environment variables are included as model input. The existing key is sent only in the HTTPS Authorization header."})
+		return save(*exportContract, map[string]any{"admission_version": boardfamily.IntentAdmissionVersion, "destination": "https://api.openai.com/v1/responses", "model": boardfamily.SelectionModel, "capability_context": boardfamily.IntentLanguageContext(), "schema_name": boardfamily.IntentSchemaName, "schema": boardfamily.IntentSchema(), "max_output_tokens": 1600, "other_payload": "A JSON object containing the original request and application-numbered source clauses, attempt=1, no diagnostics, and the existing KiCadAI provider's generic JSON-only system instructions. No source files, native geometry, keys or environment variables are included as model input. The existing key is sent only in the HTTPS Authorization header. This typed-requirement payload is a successor contract, not the frozen final-01 payload."})
 	}
 	modes := 0
 	for _, s := range []string{*config, *prompt, *promptFile} {

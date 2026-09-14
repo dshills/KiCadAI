@@ -40,7 +40,12 @@ type Decision struct {
 	Configuration *Config  `json:"configuration"`
 }
 type Selection struct {
-	Decision         Decision         `json:"decision"`
+	Decision        Decision        `json:"decision"`
+	OriginalRequest string          `json:"original_request,omitempty"`
+	RequestClauses  []RequestClause `json:"request_clauses,omitempty"`
+	RawIntent       json.RawMessage `json:"raw_intent,omitempty"`
+	// RawDecision is retained for historical evidence decoding only. Successor
+	// requests extract requirements into RawIntent, never a provider verdict.
 	RawDecision      json.RawMessage  `json:"raw_decision,omitempty"`
 	AdmissionVersion string           `json:"admission_version,omitempty"`
 	Model            string           `json:"model"`
@@ -189,29 +194,42 @@ func Interpret(ctx context.Context, prompt, ledgerPath string) (Selection, error
 	return InterpretWithPolicy(ctx, prompt, ledgerPath, legacyLedgerPolicy())
 }
 
-// InterpretWithPolicy uses a separate immutable goal budget without changing
-// the model payload, transport restrictions or native generation behavior.
+// InterpretWithPolicy uses typed intent extraction under an immutable goal
+// budget. Model, transport restrictions and native generation remain unchanged;
+// the successor payload is explicitly versioned by IntentAdmissionVersion.
 func InterpretWithPolicy(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy) (Selection, error) {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.Proxy = nil
+	defer base.CloseIdleConnections()
+	return interpretWithTransport(ctx, prompt, ledgerPath, policy, base)
+}
+
+// The private seam permits a fully in-memory provider/ledger integration test.
+// Public callers cannot replace or weaken the restricted production transport.
+func interpretWithTransport(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper) (Selection, error) {
 	start := time.Now()
-	var result Selection
+	result := Selection{OriginalRequest: prompt, AdmissionVersion: IntentAdmissionVersion, Model: SelectionModel,
+		Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)}
 	policy = policy.effective()
 	if err := policy.validate(); err != nil {
 		return result, err
 	}
-	if strings.TrimSpace(prompt) == "" || len(prompt) > 2000 {
-		return result, errors.New("prompt must contain 1–2000 bytes")
+	request, clauses, err := prepareIntentRequest(prompt)
+	if err != nil {
+		return result, err
 	}
-	base := http.DefaultTransport.(*http.Transport).Clone()
-	base.Proxy = nil
-	defer base.CloseIdleConnections()
+	result.RequestClauses = clauses
 	transport := &reservedTransport{Path: ledgerPath, Policy: policy, Base: base}
 	client := &http.Client{Transport: transport, Timeout: 45 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirects forbidden") }}
 	p, e := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: os.Getenv("OPENAI_API_KEY"), Model: SelectionModel, HTTPClient: client, Background: false, MaxOutputTokens: 1600})
 	if e != nil {
 		return result, e
 	}
-	r, e := p.GenerateJSON(ctx, aiprovider.GenerateRequest{Prompt: prompt, CapabilityContext: LanguageContext, OutputSchemaName: "board_family_selection_v2", OutputSchema: SelectionSchema(), SchemaVersion: aiprovider.EnvelopeSchemaV1, Attempt: 1, MaxOutputTokens: 1600})
-	result = Selection{Model: r.Model, ResponseID: r.ResponseID, Usage: r.Usage, LedgerIndex: transport.Index, Seconds: time.Since(start).Seconds()}
+	r, e := p.GenerateJSON(ctx, aiprovider.GenerateRequest{Prompt: request, CapabilityContext: IntentLanguageContext(), OutputSchemaName: IntentSchemaName, OutputSchema: IntentSchema(), SchemaVersion: aiprovider.EnvelopeSchemaV1, Attempt: 1, MaxOutputTokens: 1600})
+	result.ResponseID, result.Usage, result.LedgerIndex, result.Seconds = r.ResponseID, r.Usage, transport.Index, time.Since(start).Seconds()
+	if r.Model != "" {
+		result.Model = r.Model
+	}
 	if e != nil {
 		var pe *aiprovider.ProviderError
 		if errors.As(e, &pe) {
@@ -231,8 +249,10 @@ func InterpretWithPolicy(ctx context.Context, prompt, ledgerPath string, policy 
 	if e = finishReservationWithPolicy(ledgerPath, policy, transport.Index, "completed", r.ResponseID, r.Usage.InputTokens, r.Usage.OutputTokens); e != nil {
 		return result, e
 	}
-	result.RawDecision = append(json.RawMessage(nil), r.IntentJSON...)
-	result.AdmissionVersion = AdmissionVersion
-	result.Decision, e = DecodeDecision(prompt, r.IntentJSON)
+	result.RawIntent = append(json.RawMessage(nil), r.IntentJSON...)
+	if result.Model != SelectionModel {
+		return result, errors.New("provider returned a model other than the pinned selector model")
+	}
+	result.Decision, e = DecodeIntent(prompt, r.IntentJSON)
 	return result, e
 }

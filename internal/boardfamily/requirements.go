@@ -125,7 +125,7 @@ var requirementRules = []requirementRule{
 	rule(`wired|esp32|shared|fixed|board|controller|sensor|monitoring|indoor|project|node|bus|i2c|profile's|profile|variant|pull-ups|total|capacitance|loading|limit|external regulated|ambient`, nil),
 }
 
-func assessRequirements(prompt string) Decision {
+func scanRequestConstraints(prompt string) requirements {
 	r := requirements{families: map[string]bool{}, profiles: map[string]bool{}, values: map[string]float64{}}
 	s := strings.ToLower(strings.NewReplacer("–", "-", "—", "-", "‑", "-", "’", "'").Replace(prompt))
 	s = strings.Join(strings.Fields(s), " ")
@@ -156,6 +156,11 @@ func assessRequirements(prompt string) Decision {
 			s = s[n:]
 		}
 	}
+	return r
+}
+
+func assessRequirements(prompt string) Decision {
+	r := scanRequestConstraints(prompt)
 	if reason := fixedGeometryConflict(prompt); reason != "" {
 		r.conflicts = append(r.conflicts, reason)
 	}

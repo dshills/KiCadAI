@@ -1,13 +1,38 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"kicadai/internal/boardfamily"
 )
+
+func TestExportTypedContractOffline(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	path := filepath.Join(t.TempDir(), "contract.json")
+	if err := runForTest(t, "--export-live-contract", path); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c map[string]any
+	if err := json.Unmarshal(b, &c); err != nil {
+		t.Fatal(err)
+	}
+	if c["admission_version"] != boardfamily.IntentAdmissionVersion || c["model"] != boardfamily.SelectionModel || c["schema_name"] != boardfamily.IntentSchemaName || c["max_output_tokens"] != float64(1600) || c["capability_context"] != boardfamily.IntentLanguageContext() {
+		t.Fatal("exported contract differs from production typed intent")
+	}
+	if !strings.Contains(c["other_payload"].(string), "successor contract") {
+		t.Fatal("new contract not distinguished from frozen history")
+	}
+}
 
 func runForTest(t *testing.T, args ...string) error {
 	t.Helper()
