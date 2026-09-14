@@ -66,6 +66,8 @@ jobs:
           NODE
           env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
             node --test specs/board-family-v2/evaluation/acceptance.test.mjs specs/board-family-v2/development/replay-normalization.test.mjs
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node specs/board-family-v2/evaluation/audit-final.mjs --check
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0

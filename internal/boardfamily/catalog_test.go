@@ -81,7 +81,7 @@ func TestTwoFamilyDecisionAdmission(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := DecodeDecision(d.Clauses[0].Text, b); err == nil {
+		if got, err := DecodeDecision(d.Clauses[0].Text, b); err == nil && got.Configuration != nil {
 			t.Fatal("invalid two-family selection escaped", bad)
 		}
 	}

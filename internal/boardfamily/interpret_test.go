@@ -11,24 +11,37 @@ import (
 )
 
 func TestDecisionRequirementPreservation(t *testing.T) {
-	prompt := "A pressure board with low I2C pull-up current."
+	prompt := "A BMP280 pressure board with the low_current profile."
 	c := testConfig()
 	c.Profile = "low_current"
 	c.TotalBusCapacitancePF = 100
 	d := Decision{"supported", "Using the low-current I2C profile and its declared family envelope.", []Clause{{prompt, "supported", "Selects low_current bus profile."}}, &c}
 	b, _ := json.Marshal(d)
-	if _, e := DecodeDecision(prompt, b); e != nil {
-		t.Fatal(e)
+	if got, e := DecodeDecision(prompt, b); e != nil || got.Configuration == nil || *got.Configuration != c {
+		t.Fatalf("explicit request rejected: %+v %v", got, e)
 	}
-	for _, change := range []func(*Decision){func(d *Decision) { d.Clauses[0].Text = "A pressure board." }, func(d *Decision) { d.Clauses[0].Disposition = "unsupported" }, func(d *Decision) { d.Configuration.SupplyMaxV = 5 }, func(d *Decision) { d.Configuration = nil }} {
+	// Model-owned copied text and annotations are no longer the admission
+	// authority. The entire ORIGINAL request is independently parsed instead.
+	for _, change := range []func(*Decision){func(d *Decision) { d.Clauses[0].Text = "A pressure board." }, func(d *Decision) { d.Clauses[0].Disposition = "unsupported" }} {
+		local := d
+		local.Clauses = append([]Clause(nil), d.Clauses...)
+		change(&local)
+		b, _ = json.Marshal(local)
+		got, e := DecodeDecision(prompt, b)
+		assertAdmission(t, prompt, got, e)
+		if e != nil || got.Configuration == nil || *got.Configuration != c {
+			t.Fatalf("local proof lost: %+v %v", got, e)
+		}
+	}
+	for _, change := range []func(*Decision){func(d *Decision) { d.Configuration.SupplyMaxV = 5 }, func(d *Decision) { d.Configuration = nil }} {
 		local := d
 		local.Clauses = append([]Clause(nil), d.Clauses...)
 		copyC := c
 		local.Configuration = &copyC
 		change(&local)
 		b, _ = json.Marshal(local)
-		if _, e := DecodeDecision(prompt, b); e == nil {
-			t.Fatal("accepted dropped/unsupported requirement")
+		if got, e := DecodeDecision(prompt, b); e == nil && got.Configuration != nil {
+			t.Fatal("accepted dropped/unsupported configuration")
 		}
 	}
 }
@@ -42,28 +55,28 @@ func TestNonSupportedNeverHasConfiguration(t *testing.T) {
 		c := testConfig()
 		d.Configuration = &c
 		b, _ = json.Marshal(d)
-		if _, e := DecodeDecision("prompt", b); e == nil {
+		if got, e := DecodeDecision("prompt", b); e == nil && got.Configuration != nil {
 			t.Fatal("non-supported board escaped")
 		}
 	}
 }
 
-func TestDecisionRestoresOnlyBoundaryWhitespace(t *testing.T) {
+func TestDecisionOwnsOriginalPrompt(t *testing.T) {
 	c := testConfig()
 	for _, tc := range []struct {
 		name, prompt string
 		clauses      []string
-		valid        bool
+		wellFormed   bool
 	}{
 		{"sentence space", "First request. Second request.", []string{"First request.", "Second request."}, true},
 		{"unicode boundary", "\tFirst.\n\u2003Second. \n", []string{"First.", "Second."}, true},
 		{"already exact", "First. Second.", []string{"First. ", "Second."}, true},
-		{"dropped negation", "First. Not battery powered.", []string{"First.", "battery powered."}, false},
-		{"dropped punctuation", "3.3 V; 100 kHz", []string{"3.3 V", "100 kHz"}, false},
-		{"changed internal spacing", "100 kHz", []string{"100kHz"}, false},
-		{"trailing requirement", "First. Add relay.", []string{"First."}, false},
-		{"reordered", "First. Second.", []string{"Second.", "First."}, false},
-		{"duplicated", "First. Second.", []string{"First.", "First.", "Second."}, false},
+		{"dropped negation", "First. Not battery powered.", []string{"First.", "battery powered."}, true},
+		{"dropped punctuation", "3.3 V; 100 kHz", []string{"3.3 V", "100 kHz"}, true},
+		{"changed internal spacing", "100 kHz", []string{"100kHz"}, true},
+		{"trailing requirement", "First. Add relay.", []string{"First."}, true},
+		{"reordered", "First. Second.", []string{"Second.", "First."}, true},
+		{"duplicated", "First. Second.", []string{"First.", "First.", "Second."}, true},
 		{"empty clause", "First. ", []string{"First.", " "}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,8 +86,12 @@ func TestDecisionRestoresOnlyBoundaryWhitespace(t *testing.T) {
 			}
 			b, _ := json.Marshal(d)
 			got, err := DecodeDecision(tc.prompt, b)
-			if (err == nil) != tc.valid {
-				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			if (err == nil) != tc.wellFormed {
+				t.Fatalf("wellFormed=%v error=%v", tc.wellFormed, err)
+			}
+			assertAdmission(t, tc.prompt, got, err)
+			if got.Configuration != nil {
+				t.Fatal("incomplete or unrecognized original request authorized a board")
 			}
 			if err == nil {
 				var joined string
@@ -89,9 +106,7 @@ func TestDecisionRestoresOnlyBoundaryWhitespace(t *testing.T) {
 	}
 }
 
-func TestLowCurrentRequiresExplicitUserScope(t *testing.T) {
-	c := testConfig()
-	c.Profile, c.TotalBusCapacitancePF = "low_current", 100
+func TestLowCurrentScopeRecognition(t *testing.T) {
 	for _, tc := range []struct {
 		prompt    string
 		supported bool
@@ -110,20 +125,10 @@ func TestLowCurrentRequiresExplicitUserScope(t *testing.T) {
 		{"Use 110k pullups to save power.", false},
 	} {
 		t.Run(tc.prompt, func(t *testing.T) {
-			d := Decision{"supported", "Model chose low_current.", []Clause{{tc.prompt, "supported", "Model interpretation."}}, &c}
-			b, _ := json.Marshal(d)
-			got, err := DecodeDecision(tc.prompt, b)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if tc.supported {
-				if got.Disposition != "supported" || got.Configuration == nil {
-					t.Fatal("explicit scope rejected")
-				}
-			} else {
-				if got.Disposition != "clarify" || got.Configuration != nil || got.Clauses[0].Disposition != "clarify" || got.Clauses[0].Text != tc.prompt {
-					t.Fatal("unspecified energy goal escaped clarification")
-				}
+			// This helper recognizes explicit scope only. Full admission also
+			// requires family selection and complete grammar coverage.
+			if got := explicitLowCurrentScope(tc.prompt); got != tc.supported {
+				t.Fatalf("got %v want %v", got, tc.supported)
 			}
 		})
 	}
@@ -186,8 +191,8 @@ func TestConservativeOverallRefusal(t *testing.T) {
 		cfg := testConfig()
 		d.Configuration = &cfg
 		b, _ = json.Marshal(d)
-		if _, err = DecodeDecision("Use 5 V.", b); err == nil {
-			t.Fatal("refusal with a configuration must still fail")
+		if got, err = DecodeDecision("Use 5 V.", b); err != nil || got.Configuration != nil || got.Disposition != "unsupported" {
+			t.Fatal("refusal with a configuration must still withhold a board")
 		}
 	}
 }
@@ -228,6 +233,8 @@ func TestExplicitMechanicalRequirementsCannotBeDropped(t *testing.T) {
 		{"Use a 120.0 by 80.0 millimetre board.", true},
 	} {
 		t.Run(tc.prompt, func(t *testing.T) {
+			// Mechanical compatibility alone must not silently pick a sensor.
+			tc.prompt = "Use BMP280. " + tc.prompt
 			c := testConfig()
 			d := Decision{"supported", "Model claimed support.", []Clause{{tc.prompt, "supported", "Model claimed support."}}, &c}
 			b, _ := json.Marshal(d)

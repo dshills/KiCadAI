@@ -40,13 +40,14 @@ type Decision struct {
 	Configuration *Config  `json:"configuration"`
 }
 type Selection struct {
-	Decision    Decision         `json:"decision"`
-	RawDecision json.RawMessage  `json:"raw_decision,omitempty"`
-	Model       string           `json:"model"`
-	ResponseID  string           `json:"response_id"`
-	Usage       aiprovider.Usage `json:"usage"`
-	LedgerIndex int              `json:"ledger_index"`
-	Seconds     float64          `json:"seconds"`
+	Decision         Decision         `json:"decision"`
+	RawDecision      json.RawMessage  `json:"raw_decision,omitempty"`
+	AdmissionVersion string           `json:"admission_version,omitempty"`
+	Model            string           `json:"model"`
+	ResponseID       string           `json:"response_id"`
+	Usage            aiprovider.Usage `json:"usage"`
+	LedgerIndex      int              `json:"ledger_index"`
+	Seconds          float64          `json:"seconds"`
 }
 
 func objectSchema(props map[string]any) map[string]any {
@@ -84,92 +85,55 @@ func SelectionSchema() map[string]any {
 }
 
 func DecodeDecision(prompt string, b []byte) (Decision, error) {
+	// Provider annotations are untrusted proposals. They are retained verbatim
+	// in Selection.RawDecision, never used as proof of request satisfaction.
+	if strings.TrimSpace(prompt) == "" || len(prompt) > 2000 {
+		return Decision{}, errors.New("prompt must contain 1–2000 bytes")
+	}
 	var d Decision
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if e := dec.Decode(&d); e != nil {
-		return d, e
+		return Decision{}, e
 	}
 	var extra any
 	if e := dec.Decode(&extra); e != io.EOF {
-		return d, errors.New("multiple decision objects")
+		return Decision{}, errors.New("multiple decision objects")
 	}
 	if strings.TrimSpace(d.Message) == "" || len(d.Clauses) == 0 || len(d.Clauses) > 32 {
-		return d, errors.New("decision lacks explanation or complete clauses")
+		return Decision{}, errors.New("decision lacks explanation or complete clauses")
 	}
-	if (d.Disposition == "unsupported" || d.Disposition == "clarify") && d.Configuration == nil {
-		// A non-design response cannot authorize a board. Preserve the original
-		// request in code instead of trusting the model to copy every sentence.
-		// RawDecision retains its original annotations, including omissions.
-		d.Clauses = []Clause{{prompt, d.Disposition, "Whole original request retained; no design is authorized. " + d.Message}}
-		return d, nil
+	if d.Disposition != "supported" && d.Disposition != "unsupported" && d.Disposition != "clarify" {
+		return Decision{}, errors.New("invalid decision disposition")
 	}
-	remaining := prompt
-	hasUnsupported, hasClarify := false, false
-	for i := range d.Clauses {
-		c := &d.Clauses[i]
+	for _, c := range d.Clauses {
 		if strings.TrimSpace(c.Text) == "" || strings.TrimSpace(c.Reason) == "" {
-			return d, errors.New("empty requirement clause")
+			return Decision{}, errors.New("empty requirement clause")
 		}
-		// Models sometimes omit whitespace BETWEEN verbatim clauses. Restore
-		// only that exact original prefix, never words, punctuation or internal
-		// whitespace. RawDecision retains the unmodified provider object.
-		if !strings.HasPrefix(remaining, c.Text) {
-			trimmed := strings.TrimLeftFunc(remaining, unicode.IsSpace)
-			if !strings.HasPrefix(trimmed, c.Text) {
-				return d, errors.New("decision omitted or altered original request text")
-			}
-			c.Text = remaining[:len(remaining)-len(trimmed)] + c.Text
-		}
-		remaining = remaining[len(c.Text):]
-		switch c.Disposition {
-		case "supported":
-		case "unsupported":
-			hasUnsupported = true
-		case "clarify":
-			hasClarify = true
-		default:
-			return d, errors.New("invalid requirement disposition")
+		if c.Disposition != "supported" && c.Disposition != "unsupported" && c.Disposition != "clarify" {
+			return Decision{}, errors.New("invalid requirement disposition")
 		}
 	}
-	if strings.TrimSpace(remaining) != "" {
-		return d, errors.New("decision omitted or altered original request text")
+	local := assessRequirements(prompt)
+	if local.Disposition == "unsupported" {
+		return local, nil
 	}
-	d.Clauses[len(d.Clauses)-1].Text += remaining
-	switch d.Disposition {
-	case "supported":
-		if hasUnsupported || hasClarify || d.Configuration == nil {
-			return d, errors.New("unsupported or ambiguous requirement cannot generate a board")
-		}
-		if _, e := Check(*d.Configuration); e != nil {
-			return d, e
-		}
-		if reason := fixedGeometryConflict(prompt); reason != "" {
-			d.Disposition, d.Message, d.Configuration = "unsupported", reason, nil
-			d.Clauses = []Clause{{prompt, "unsupported", reason}}
-			return d, nil
-		}
-		if d.Configuration.Profile == "low_current" && !explicitLowCurrentScope(prompt) {
-			// A disclaimer cannot turn an unspecified whole-board energy goal
-			// into permission to optimize just two resistors. Fail closed with
-			// a targeted question even when the model labels it supported.
-			d.Disposition = "clarify"
-			d.Configuration = nil
-			d.Message = "Do you mean reducing only I2C pull-up current, or reducing whole-board power/battery use? This family supports only the former; please choose explicitly."
-			d.Clauses = []Clause{{prompt, "clarify", "The requested scope does not explicitly authorize the low_current pull-up profile."}}
-		}
-	case "unsupported":
-		if d.Configuration != nil {
-			return d, errors.New("invalid unsupported disposition")
-		}
-	case "clarify":
-		if !hasClarify || hasUnsupported || d.Configuration != nil {
-			return d, errors.New("invalid clarification disposition")
-		}
-	default:
-		return d, errors.New("invalid decision disposition")
+	// Never promote an overall provider refusal to a design. A contradictory
+	// configuration on a non-design response is discarded, not dereferenced.
+	if d.Disposition == "unsupported" {
+		return localDecision(prompt, "unsupported", d.Message, nil), nil
 	}
-	return d, nil
+	if local.Disposition != "supported" {
+		return local, nil
+	}
+	if d.Disposition == "clarify" {
+		return localDecision(prompt, "clarify", d.Message, nil), nil
+	}
+	if d.Configuration == nil || *d.Configuration != *local.Configuration {
+		expected, _ := json.Marshal(local.Configuration) // Config contains only checked finite values.
+		return localDecision(prompt, "clarify", "The proposed configuration does not exactly match the independently checked request. Please confirm these requested family/profile and operating limits: "+string(expected)+". No alternative configuration was generated.", nil), nil
+	}
+	return local, nil
 }
 
 var requestedDimensions = regexp.MustCompile(`(?i)\b([0-9]+(?:\.[0-9]+)?)\s*(?:mm\s*)?(?:x|×|by)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters?|millimetres?)\b`)
@@ -268,6 +232,7 @@ func InterpretWithPolicy(ctx context.Context, prompt, ledgerPath string, policy 
 		return result, e
 	}
 	result.RawDecision = append(json.RawMessage(nil), r.IntentJSON...)
+	result.AdmissionVersion = AdmissionVersion
 	result.Decision, e = DecodeDecision(prompt, r.IntentJSON)
 	return result, e
 }
