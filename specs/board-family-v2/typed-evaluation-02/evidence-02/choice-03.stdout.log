@@ -1,0 +1,1 @@
+{"disposition":"clarify","message":"Which I2C profile do you require: standard, fast, or BMP280-only low_current?","output":".cache/board-family-v2/typed-evaluation-02-final/choice-03","passed":false}

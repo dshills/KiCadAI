@@ -1,0 +1,1 @@
+Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.

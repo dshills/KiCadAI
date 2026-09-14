@@ -1,0 +1,59 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "Board outline, thickness, layers, placement and routing are fixed, not AI-configurable.",
+    "clauses": [
+      {
+        "text": "Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+        "disposition": "unsupported",
+        "reason": "Board outline, thickness, layers, placement and routing are fixed, not AI-configurable."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Hello, I'd like a sensor controller for an indoor project."
+    },
+    {
+      "id": 1,
+      "text": " Can you make one?"
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "indoor project",
+            "state": "required",
+            "value": "custom_geometry"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "none"
+          }
+        ],
+        "id": 1
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_01cba8e5280ecf37016aa816ba1fc887d187f4c827c1619abc",
+  "usage": {
+    "input_tokens": 2424,
+    "output_tokens": 50,
+    "total_tokens": 2474
+  },
+  "ledger_index": 6,
+  "seconds": 1.121825417
+}
