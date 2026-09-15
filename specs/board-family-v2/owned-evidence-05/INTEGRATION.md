@@ -4,6 +4,9 @@ Status on 2026-09-15: **integrated and tested offline, not live-evaluated or
 promoted**. This work follows prototype commit `168a6c23` on the isolated local
 branch `codex/owned-evidence-05`. It is not a new AI evaluation result.
 
+The subsequent [collection checkpoint](COLLECTION.md) adds the versioned,
+offline-only rehearsal package and retained 14-case native-process evidence.
+
 ## What now works
 
 The existing `kicadai-board-family` command has an explicit `--intent-protocol
