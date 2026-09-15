@@ -1,0 +1,3 @@
+# Captured HTTP bodies are exact-byte evidence, including SSE blank delimiters.
+batch/useful-01/journal/request/body.bin -text -diff
+batch/useful-01/journal/response.bin -text -diff

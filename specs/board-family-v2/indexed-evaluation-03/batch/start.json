@@ -1,0 +1,26 @@
+{
+  "version": "indexed-collector-1",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "mode": "live",
+  "manifest_sha256": "429f02b613038d22adaacc1cc9ef054e8b18703afe748312c3e925b59c977023",
+  "approval_sha256": "b4115545407b786c7cde7de89bd10e46294e61d6e79100e273424c97a2fef688",
+  "planned_case_ids": [
+    "useful-01",
+    "useful-02",
+    "useful-03",
+    "useful-04",
+    "useful-05",
+    "choice-01",
+    "choice-02",
+    "choice-03",
+    "refuse-01",
+    "refuse-02",
+    "refuse-03",
+    "refuse-04",
+    "refuse-05",
+    "refuse-06"
+  ],
+  "owner_pid": 81621,
+  "started_utc": "2026-09-15T09:45:28.309Z",
+  "status": "started-not-complete"
+}
