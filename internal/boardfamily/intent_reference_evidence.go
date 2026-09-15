@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -155,8 +156,8 @@ func inspectReferencedEvidence(e *ReferencedProviderEvidence) (referencedTermina
 	if err != nil {
 		return terminal, err
 	}
-	if err := validateIntentJSON(raw); err != nil {
-		return terminal, errors.New("terminal response JSON is ambiguous or invalid")
+	if err := validateReferencedEnvelopeJSON(raw); err != nil {
+		return terminal, fmt.Errorf("terminal response JSON is ambiguous or invalid: %w", err)
 	}
 	if err := json.Unmarshal(raw, &terminal); err != nil {
 		return terminal, errors.New("terminal response metadata is malformed")
@@ -173,6 +174,15 @@ func inspectReferencedEvidence(e *ReferencedProviderEvidence) (referencedTermina
 
 // Validate every event's JSON before the shared framing parser can apply
 // encoding/json's last-value-wins behavior to duplicate event fields.
+// OpenAI echoes the output schema inside an envelope, adding nesting that is
+// absent from the model-authored intent. The full body remains byte-bounded by
+// the recording transport; only envelope JSON receives this separate bound.
+const maxReferencedEnvelopeJSONDepth = 64
+
+func validateReferencedEnvelopeJSON(raw []byte) error {
+	return validateJSONDepth(raw, maxReferencedEnvelopeJSONDepth, "provider envelope")
+}
+
 func checkReferencedStreamJSON(body []byte) error {
 	scanner := bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(make([]byte, 4096), len(body)+1)
@@ -183,8 +193,8 @@ func checkReferencedStreamJSON(body []byte) error {
 		if payload == "" || payload == "[DONE]" {
 			return nil
 		}
-		if err := validateIntentJSON([]byte(payload)); err != nil {
-			return errors.New("recorded stream event JSON is ambiguous or invalid")
+		if err := validateReferencedEnvelopeJSON([]byte(payload)); err != nil {
+			return fmt.Errorf("recorded stream event JSON is ambiguous or invalid: %w", err)
 		}
 		return nil
 	}

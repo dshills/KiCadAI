@@ -162,14 +162,20 @@ func exactFields(raw json.RawMessage, fields ...string) bool {
 // encoding/json otherwise accepts duplicate keys by keeping the last value.
 // Reject that ambiguity before interpreting any provider-controlled fact.
 func validateIntentJSON(raw []byte) error {
+	return validateJSONDepth(raw, 12, "intent")
+}
+
+// Transport envelopes and intent outputs have different structural bounds.
+// Both must reject duplicate keys before encoding/json can discard ambiguity.
+func validateJSONDepth(raw []byte, maxDepth int, kind string) error {
 	if !utf8.Valid(raw) {
-		return errors.New("intent is not valid UTF-8")
+		return fmt.Errorf("%s is not valid UTF-8", kind)
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	var walk func(int) error
 	walk = func(depth int) error {
-		if depth > 12 {
-			return errors.New("intent nesting exceeds the contract")
+		if depth > maxDepth {
+			return fmt.Errorf("%s nesting exceeds the contract", kind)
 		}
 		token, err := d.Token()
 		if err != nil {
@@ -185,7 +191,7 @@ func validateIntentJSON(raw []byte) error {
 				}
 				name, ok := key.(string)
 				if !ok || seen[name] {
-					return errors.New("invalid or duplicate intent key")
+					return fmt.Errorf("invalid or duplicate %s key", kind)
 				}
 				seen[name] = true
 				if err := walk(depth + 1); err != nil {
@@ -207,7 +213,7 @@ func validateIntentJSON(raw []byte) error {
 		return err
 	}
 	if _, err := d.Token(); err != io.EOF {
-		return errors.New("trailing intent content")
+		return fmt.Errorf("trailing %s content", kind)
 	}
 	return nil
 }
