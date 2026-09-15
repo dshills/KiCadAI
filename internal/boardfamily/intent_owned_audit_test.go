@@ -11,16 +11,25 @@ import (
 )
 
 func TestOwnedJournalAuditRejectsTampering(t *testing.T) {
+	testRequestEvidenceJournalTampering(t, ownedProtocol)
+}
+
+func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtocol) {
+	t.Helper()
 	for _, mode := range []string{"unchanged", "invented-decision", "invented-outcome", "coherent-request-rehash", "duplicate-json", "public-file", "extra-file", "missing-file", "symlink"} {
 		t.Run(mode, func(t *testing.T) {
-			t.Setenv("OPENAI_API_KEY", "offline-owned-placeholder")
+			key, check, raw := "offline-owned-placeholder", checkOwnedProviderRequest, ownedRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"))
+			if protocol == connectionProtocol {
+				key, check, raw = "offline-connection-placeholder", checkConnectionProviderRequest, connectionRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"))
+			}
+			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
 			ledger := filepath.Join(dir, "ledger.json")
-			s, err := InterpretOwnedWithJournal(context.Background(), journalTestPrompt, ledger, journalTestPolicy, roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-				checkOwnedProviderRequest(t, r, journalTestPrompt)
-				return referencedProviderResponse(t, ownedRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0")), "complete", "offline-owned-audit"), nil
-			}), root)
+			s, err := interpretProtocolJournal(context.Background(), journalTestPrompt, ledger, journalTestPolicy, roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				check(t, r, journalTestPrompt)
+				return referencedProviderResponse(t, raw, "complete", "offline-owned-audit"), nil
+			}), root, protocol)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,12 +97,21 @@ func TestOwnedJournalAuditRejectsTampering(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			audit, err := InspectOwnedJournal(root)
+			audit, err := inspectProtocolJournal(root, protocol)
 			if (err == nil) != (mode == "unchanged") {
 				t.Fatalf("wrong tamper result %s: %v", mode, err)
 			}
 			if mode == "unchanged" && (audit.Outcome != "decision" || len(audit.FilesSHA256) != 8 || audit.Selection.ResponseID != s.ResponseID) {
 				t.Fatal("incomplete verified audit")
+			}
+			if mode == "unchanged" {
+				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol} {
+					if other != protocol {
+						if _, err := inspectProtocolJournal(root, other); err == nil {
+							t.Fatal("another protocol accepted this journal")
+						}
+					}
+				}
 			}
 		})
 	}

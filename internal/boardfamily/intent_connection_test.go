@@ -44,7 +44,11 @@ func TestConnectionSyntheticPositiveWording(t *testing.T) {
 		for _, polite := range []string{"Use", "Could you use", "Please use"} {
 			prompt := polite + " BMP280 standard, " + wording + "."
 			t.Run(prompt, func(t *testing.T) {
-				raw := connectionRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"), ownedFact("connection", "wired", "required", "c0"))
+				connection := ownedFact("connection", "wired", "required", "c0")
+				if wording == "non-radio" {
+					connection = ownedFact("connection", "wireless", "forbidden", "c0")
+				}
+				raw := connectionRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"), connection)
 				before := bytes.Clone(raw)
 				schema, err := ConnectionEvidenceSchema(prompt)
 				if err != nil {
@@ -182,7 +186,7 @@ func TestConnectionStillRequiresSemanticEvaluation(t *testing.T) {
 
 func FuzzConnectionEvidenceDoesNotPanic(f *testing.F) {
 	f.Add("Use BMP280 standard with a wired connection.", string(connectionRaw(f, ownedFact("connection", "wired", "required", "c0"))))
-	f.Add("Use SHT31 with 100 pF.", `{"version":"5-connection-evidence-offline","facts":[]}`)
+	f.Add("Use SHT31 with 100 pF.", string(connectionRaw(f)))
 	f.Fuzz(func(t *testing.T, prompt, raw string) {
 		if len(prompt) > 2500 || len(raw) > 70000 {
 			t.Skip()

@@ -13,9 +13,13 @@ type extractionProtocol uint8
 const (
 	indexedProtocol extractionProtocol = iota
 	ownedProtocol
+	connectionProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == connectionProtocol {
+		return ConnectionEvidenceVersion
+	}
 	if p == ownedProtocol {
 		return OwnedEvidenceVersion
 	}
@@ -23,6 +27,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == connectionProtocol {
+		return "connection-evidence-journal-1"
+	}
 	if p == ownedProtocol {
 		return "owned-evidence-journal-1"
 	}
@@ -30,6 +37,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == connectionProtocol {
+		return "connection-journal-audit-1"
+	}
 	if p == ownedProtocol {
 		return "owned-journal-audit-1"
 	}
@@ -42,6 +52,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return 24000
 	case ownedProtocol:
 		return OwnedEvidenceMaxRequestBytes
+	case connectionProtocol:
+		return ConnectionEvidenceMaxRequestBytes
 	default:
 		return 0
 	}
@@ -53,6 +65,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareReferencedGenerateRequest(prompt)
 	case ownedProtocol:
 		return prepareOwnedGenerateRequest(prompt)
+	case connectionProtocol:
+		return prepareConnectionGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -64,6 +78,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeReferencedIntent(prompt, raw)
 	case ownedProtocol:
 		return DecodeOwnedEvidenceIntent(prompt, raw)
+	case connectionProtocol:
+		return DecodeConnectionEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}

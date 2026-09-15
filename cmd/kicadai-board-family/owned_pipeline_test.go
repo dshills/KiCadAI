@@ -20,11 +20,19 @@ import (
 // an in-memory provider and, unless explicitly requested, a validation stub.
 // The actual generator runs; no stub result is called native qualification.
 func ownedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, false)
+}
+
+func connectionCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, true)
+}
+
+func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string, connection bool) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
 	counts := &indexedCommandCounts{}
 	pipeline := defaultCommandPipeline()
 	var journalRoot string
-	pipeline.interpretOwned = func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
+	interpret := func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
 		transport := indexedCommandTransport(func(r *http.Request) (*http.Response, error) {
 			counts.requests++
 			if counts.requests != 1 || r.Method != "POST" || r.URL.String() != "https://api.openai.com/v1/responses" {
@@ -34,7 +42,11 @@ func ownedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (com
 			if err = errors.Join(err, r.Body.Close()); err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Contains(body, []byte(boardfamily.OwnedEvidenceSchemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
+			schemaName := boardfamily.OwnedEvidenceSchemaName
+			if connection {
+				schemaName = boardfamily.ConnectionEvidenceSchemaName
+			}
+			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
 				t.Fatal("wrong contract or credential in request body")
 			}
 			content := []any{map[string]any{"type": "output_text", "text": string(raw)}}
@@ -55,11 +67,23 @@ func ownedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (com
 			if mode == "broken-stream" {
 				wire = "data: {\"type\":\"response.created\"}\n\n"
 			}
+			if mode == "server-error" {
+				wire = "event: error\ndata: {\"type\":\"error\",\"error\":{\"code\":\"server_error\",\"message\":\"Synthetic provider failure\"}}\n\n"
+			}
 			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil
 		})
 		journalRoot = journal
-		s, err := boardfamily.InterpretOwnedWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
+		selectWithJournal := boardfamily.InterpretOwnedWithJournal
+		if connection {
+			selectWithJournal = boardfamily.InterpretConnectionWithJournal
+		}
+		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
+	}
+	if connection {
+		pipeline.interpretConnection = interpret
+	} else {
+		pipeline.interpretOwned = interpret
 	}
 	checkCleared := func() {
 		t.Helper()

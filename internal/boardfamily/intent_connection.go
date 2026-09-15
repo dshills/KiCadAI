@@ -6,10 +6,10 @@ import (
 	"fmt"
 )
 
-// ConnectionEvidenceVersion is an offline-only expressiveness experiment.
-// There is deliberately no provider, journal, or CLI entry point. It does not
-// change or reinterpret owned-v4, its runtime, or its recorded live results.
-const ConnectionEvidenceVersion = "5-connection-evidence-offline"
+// ConnectionEvidenceVersion is a separately selected experimental protocol.
+// It does not change or reinterpret owned-v4, its runtime, or live results.
+// The offline prototype's distinct version is intentionally not accepted here.
+const ConnectionEvidenceVersion = "5-connection-evidence-experimental"
 
 // ConnectionEvidenceSchema gives wired and wireless symmetric representations.
 // Wired means the reviewed non-radio connection mode, not a promise of an
@@ -54,7 +54,7 @@ func ConnectionEvidenceSchema(prompt string) (map[string]any, error) {
 	return schema, nil
 }
 
-// DecodeConnectionEvidenceIntent performs pure admission of synthetic v5
+// DecodeConnectionEvidenceIntent performs pure admission of v5
 // inputs. The ephemeral lowering is an internal program, never provider output
 // or a migration of historical evidence. Original caller bytes are untouched.
 // All non-connection constraints use unchanged owned-v4 validation/admission.
