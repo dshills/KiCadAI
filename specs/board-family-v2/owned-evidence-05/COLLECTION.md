@@ -2,6 +2,9 @@
 
 Status: **offline rehearsal passed; the project goal remains active**.
 
+The subsequent [scoring checkpoint](SCORING.md) adds raw-v4 assessment and a
+separately bound review without rerunning this collection or native generation.
+
 This extends the integrated route in [INTEGRATION.md](INTEGRATION.md). It does
 not change the production extractor, model, admission rules, circuit templates
 or historical evaluation. The only Go change extends a test-only subprocess
@@ -102,4 +105,3 @@ qualification still requires the pinned macOS KiCad installation.
 Zero live requests, external model reviews, firewall changes, fabrication or
 bench actions occurred at this checkpoint. Prior batch04 authority remains
 exhausted. The primary checkout and PR are unchanged.
-
