@@ -79,6 +79,10 @@ func TestReferencedEnvelopeJSONLimits(t *testing.T) {
 }
 
 func TestReferencedEnvelopeCapturedReplay(t *testing.T) {
+	// Feed the unchanged saved response to a newly generated offline request.
+	// The request contract may evolve; this is fault injection, not a rerun or
+	// faithful request/response pair from a new model trial. The separate schema
+	// regression proves the captured invented sensor is no longer permitted.
 	t.Setenv("OPENAI_API_KEY", "offline-captured-envelope-placeholder")
 	e, prompt := capturedIndexedEnvelope(t)
 	ledger := filepath.Join(t.TempDir(), "ledger.json")
@@ -110,5 +114,5 @@ func TestReferencedEnvelopeCapturedReplay(t *testing.T) {
 	if len(l.Entries) != 1 || l.Entries[0].Status != "completed" || l.Entries[0].InputTokens != 2596 || l.Entries[0].OutputTokens != 100 {
 		t.Fatalf("fresh offline accounting mismatch: %+v", l)
 	}
-	t.Logf("offline-only replay outcome=%s disposition=%s error=%v; historical batch is unchanged", s.Outcome, s.Decision.Disposition, err)
+	t.Logf("offline-only saved-response injection into request revision %s: outcome=%s disposition=%s error=%v; historical batch is unchanged", ReferenceIntentRequestRevision, s.Outcome, s.Decision.Disposition, err)
 }

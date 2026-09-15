@@ -18,6 +18,12 @@ func member(value string, values ...string) bool {
 	return false
 }
 
+// Keep the literal identity rule shared by admission and the request schema.
+// A mention permits extraction; it does not prove requirement state or scope.
+func sensorIdentityGrounded(value, source string) bool {
+	return member(value, "BMP280", "SHT31") && regexp.MustCompile(`(?i)\b`+regexp.QuoteMeta(value)+`\b`).MatchString(source)
+}
+
 func validateFact(f RequirementFact, raw []byte, source string) error {
 	fields := []string{"kind", "value", "state", "quote"}
 	switch f.Kind {
@@ -45,7 +51,7 @@ func validateFact(f RequirementFact, raw []byte, source string) error {
 	}
 	switch f.Kind {
 	case "sensor":
-		if !member(f.Value, "BMP280", "SHT31") || !regexp.MustCompile(`(?i)\b`+regexp.QuoteMeta(f.Value)+`\b`).MatchString(f.Quote) {
+		if !sensorIdentityGrounded(f.Value, f.Quote) {
 			return errors.New("sensor identity is not grounded in the quoted request")
 		}
 	case "measurement":

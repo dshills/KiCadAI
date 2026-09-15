@@ -29,6 +29,9 @@ func TestExportIndexedContractOffline(t *testing.T) {
 	if err != nil || json.Unmarshal(b, &c) != nil || c["admission_version"] != boardfamily.ReferenceIntentVersion || c["schema_name"] != boardfamily.ReferenceIntentSchemaName || c["capability_context"] != boardfamily.ReferencedIntentLanguageContext() || c["experimental"] != true {
 		t.Fatal("wrong experimental contract", err)
 	}
+	if c["request_revision"] != boardfamily.ReferenceIntentRequestRevision {
+		t.Fatal("exported request revision differs from the model-facing contract")
+	}
 	want, _ := json.Marshal(boardfamily.ReferencedIntentSchema())
 	got, _ := json.Marshal(c["schema"])
 	if !bytes.Equal(want, got) || c["schema_scope"] == "" {

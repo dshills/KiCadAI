@@ -13,8 +13,13 @@ import (
 // proof of server acceptance. Unknown keywords fail rather than being ignored.
 func checkReferencedSchemaValue(schema map[string]any, value any) error {
 	for key := range schema {
-		if !member(key, "type", "enum", "properties", "required", "additionalProperties", "items", "minItems", "maxItems", "minimum", "maximum", "anyOf") {
+		if !member(key, "type", "enum", "properties", "required", "additionalProperties", "items", "minItems", "maxItems", "minimum", "maximum", "anyOf", "description") {
 			return fmt.Errorf("unhandled schema keyword %q", key)
+		}
+	}
+	if description, ok := schema["description"]; ok {
+		if _, ok := description.(string); !ok {
+			return fmt.Errorf("schema description is not a string")
 		}
 	}
 	if union, ok := schema["anyOf"].([]any); ok {
