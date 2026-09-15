@@ -84,6 +84,11 @@ ledger bytes, raw response and native output, plus missing/extra/symlink evidenc
 The ledger-whitespace mutation initially exposed a missing byte-level pin in the
 new publication checker; the checker was corrected and all tests rerun. This
 post-run checker correction did not alter the frozen evaluator or any evidence.
+The first publication CI also caught an attempted status update to the older
+`specs/board-family-v2/README.md`, which is bound by a historical typed-evaluation
+receipt. That overview was restored byte-for-byte; this separate report is the
+request-04 result. No historical receipt or expected hash was changed to excuse
+the edit, and the original typed publication check was rerun.
 The evidence-quality and validation checks keep format validity, semantic
 correctness, safe withholding and useful board delivery separate.
 
