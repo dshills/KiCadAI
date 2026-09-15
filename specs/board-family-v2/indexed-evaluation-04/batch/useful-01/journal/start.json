@@ -1,0 +1,11 @@
+{
+  "admission_version": "3-indexed-quantities-experimental",
+  "original_request": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+  "policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "status": "prepared-not-transport-authority",
+  "version": "indexed-evidence-journal-1"
+}
