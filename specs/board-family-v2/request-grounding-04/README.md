@@ -69,6 +69,11 @@ byte. Actual encoded request bodies were 14,334–16,966 bytes, below the unchan
 The schema and test-only validator both understand description annotations; no
 validation keyword is silently ignored.
 
+The runtime preparer explicitly includes the four files read by the saved-response
+regressions (prompt, request body, response body and selection). Go's compiler
+inventory does not discover arbitrary `os.ReadFile` fixtures. This adds those
+inputs to any new qualification; no earlier frozen manifest is rewritten.
+
 Native circuitry, geometry and export code are unchanged. Existing complete
 native/export qualification is reused rather than claimed as a new live-board
 result. The implementing agent reviewed the diff and these boundaries; this is

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {assessQualification,verifyQualification,qualificationVersion,requiredCommands} from './runtime-qualification.mjs';
-import {selectedDependencies,preparationEnvironment,prepareRuntime} from './prepare-runtime.mjs';
+import {selectedDependencies,preparationEnvironment,prepareRuntime,capturedRegressionFiles} from './prepare-runtime.mjs';
 
 // Pure synthetic receipts only; no live approval, build or provider call here.
 function fixture() {
@@ -23,6 +23,11 @@ test('filesystem verifier never accepts a missing qualification binding',()=>ass
 test('compiler closure includes selected source, assembly, embed and test paths exactly once',()=>{
   const root=process.cwd(),dir=path.join(root,'internal/example');
   assert.deepEqual(selectedDependencies(`${dir}|main.go,helper.go|entry.s|fixture.json|main_test.go\n${dir}|main.go`,root),['internal/example/entry.s','internal/example/fixture.json','internal/example/helper.go','internal/example/main.go','internal/example/main_test.go']);
+});
+test('captured regression fixtures are explicit qualification inputs',()=>{
+  const prefix='specs/board-family-v2/indexed-evaluation-03/batch/useful-01/';
+  assert.deepEqual(capturedRegressionFiles.map(file=>file.slice(prefix.length)),['prompt.txt','journal/request/body.bin','journal/response.bin','journal/selection/selection.json']);
+  assert.ok(capturedRegressionFiles.every(file=>file.startsWith(prefix)));
 });
 for(const value of ['', 'relative|main.go','/outside-workspace|main.go'])test(`invalid compiler inventory fails: ${value||'empty'}`,()=>assert.throws(()=>selectedDependencies(value)));
 test('preparation environment strips credentials, live fixtures and auto-download settings',()=>{

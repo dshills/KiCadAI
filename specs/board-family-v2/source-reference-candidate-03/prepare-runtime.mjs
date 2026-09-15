@@ -16,6 +16,10 @@ const go=path.resolve(toolchain,'bin/go');
 const cli='/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli';
 const fields=['GoFiles','CgoFiles','CFiles','CXXFiles','MFiles','HFiles','FFiles','SFiles','SwigFiles','SwigCXXFiles','SysoFiles','EmbedFiles'];
 const testFields=['TestGoFiles','XTestGoFiles','TestEmbedFiles','XTestEmbedFiles'];
+// Runtime os.ReadFile fixtures are not in Go's compiler/embed inventory.
+// Bind every retained input used by the envelope/grounding regression tests.
+export const capturedRegressionFiles=['prompt.txt','journal/request/body.bin','journal/response.bin','journal/selection/selection.json']
+  .map(file=>`specs/board-family-v2/indexed-evaluation-03/batch/useful-01/${file}`);
 
 export function preparationEnvironment() {
   const env={...offlineEnvironment(),PATH:`${path.dirname(go)}:${process.env.PATH}`,GOROOT:path.resolve(toolchain),GOTOOLCHAIN:'local',GOENV:'off',GOWORK:'off',GOFLAGS:'',GOEXPERIMENT:'',GOPROXY:'off',GOSUMDB:'off',GOMAXPROCS:'4',GOCACHE:path.resolve('.cache/go/build'),GOMODCACHE:path.resolve('.cache/go/mod'),GOLANGCI_LINT_CACHE:path.resolve('.cache/golangci-lint')};
@@ -50,7 +54,7 @@ export async function prepareRuntime(output) {
   assert.equal(listed.error,undefined);assert.equal(listed.signal,null);assert.equal(listed.status,0,listed.stderr);
   const selected=new Set([...selectedDependencies(listed.stdout),'go.mod','go.sum',`${toolchain}/bin/go`,`${toolchain}/VERSION`,
     ...['compile','asm','link','cgo'].map(f=>`${toolchain}/pkg/tool/darwin_arm64/${f}`),
-    ...scoringDependencies,planFile,plan.cases_source.path,`${dir}/prepare-runtime.mjs`,`${dir}/runtime-qualification.mjs`,`${dir}/runtime-qualification.test.mjs`,`${dir}/collector.test.mjs`,`${dir}/collector.integration.test.mjs`,`${dir}/scoring.test.mjs`,`${dir}/scoring.integration.test.mjs`,`${dir}/fixtures/collector-child.mjs`,'.github/workflows/indexed-intent-evaluation.yml','.golangci.yml']);
+    ...scoringDependencies,...capturedRegressionFiles,planFile,plan.cases_source.path,`${dir}/prepare-runtime.mjs`,`${dir}/runtime-qualification.mjs`,`${dir}/runtime-qualification.test.mjs`,`${dir}/collector.test.mjs`,`${dir}/collector.integration.test.mjs`,`${dir}/scoring.test.mjs`,`${dir}/scoring.integration.test.mjs`,`${dir}/fixtures/collector-child.mjs`,'.github/workflows/indexed-intent-evaluation.yml','.golangci.yml']);
   const sourceHashes=Object.fromEntries([...selected].sort().map(f=>[f,hash(f)]));
   const examples=authenticateExamples().receipt.cases;
   fs.mkdirSync(output,{mode:0o700});
