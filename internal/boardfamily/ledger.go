@@ -192,10 +192,11 @@ func finishReservationWithPolicy(path string, policy LedgerPolicy, index int, st
 }
 
 type reservedTransport struct {
-	Path   string
-	Policy LedgerPolicy
-	Index  int
-	Base   http.RoundTripper
+	protocol extractionProtocol
+	Path     string
+	Policy   LedgerPolicy
+	Index    int
+	Base     http.RoundTripper
 }
 
 func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -206,8 +207,9 @@ func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("only the approved OpenAI Responses endpoint is permitted")
 	}
 	// Even treating every request byte as a token is below the $0.05 reserve at
-	// the recorded prices: 24k input bytes + 1600 output tokens + ample overhead.
-	if r.ContentLength <= 0 || r.ContentLength > 24000 {
+	// the recorded prices: 24k legacy input bytes (64KiB for owned-v4 only)
+	// plus 1600 output tokens and ample overhead. No policy limit is increased.
+	if r.ContentLength <= 0 || r.ContentLength > t.protocol.requestLimit() {
 		return nil, fmt.Errorf("request size %d is outside the accounted bound", r.ContentLength)
 	}
 	index, e := reserveWithPolicy(t.Path, t.Policy)

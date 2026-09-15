@@ -71,6 +71,10 @@ func sameReferencedJSON(a, b any) bool {
 // recorded HTTP bytes through an in-memory transport. It neither reads a key nor
 // performs network I/O. Failed/unknown transport or persistence cannot pass it.
 func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
+	return inspectProtocolJournal(root, indexedProtocol)
+}
+
+func inspectProtocolJournal(root string, protocol extractionProtocol) (ReferencedJournalAudit, error) {
 	var audit ReferencedJournalAudit
 	info, err := os.Lstat(root)
 	if err != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
@@ -127,14 +131,14 @@ func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
 	if err := decodeReferencedAuditJSON(data["start.json"], &start); err != nil {
 		return audit, err
 	}
-	if start.Version != referencedJournalVersion || start.AdmissionVersion != ReferenceIntentVersion || start.Status != "prepared-not-transport-authority" || start.Policy.validate() != nil {
+	if start.Version != protocol.journalVersion() || start.AdmissionVersion != protocol.admissionVersion() || start.Status != "prepared-not-transport-authority" || start.Policy.validate() != nil {
 		return audit, errors.New("journal start contract differs")
 	}
 	var s ReferencedSelection
 	if err := decodeReferencedAuditJSON(data["selection/selection.json"], &s); err != nil {
 		return audit, err
 	}
-	if s.AdmissionVersion != ReferenceIntentVersion || s.OriginalRequest != start.OriginalRequest || s.LedgerIndex < 1 {
+	if s.AdmissionVersion != protocol.admissionVersion() || s.OriginalRequest != start.OriginalRequest || s.LedgerIndex < 1 {
 		return audit, errors.New("journal selection identity differs")
 	}
 	source, err := PrepareReferencedRequest(s.OriginalRequest)
@@ -149,11 +153,11 @@ func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
 	if !bytes.Equal(data["request/body.bin"], e.RequestBody) || !bytes.Equal(data["response.bin"], e.Body) || s.ResponseID != terminal.ID || s.Model != terminal.Model || s.Usage.InputTokens != *terminal.Usage.Input || s.Usage.OutputTokens != *terminal.Usage.Output || s.Usage.TotalTokens != *terminal.Usage.Total {
 		return audit, errors.New("journal response/selection bytes or metadata differ")
 	}
-	request, _, err := prepareReferencedGenerateRequest(s.OriginalRequest)
+	request, _, err := protocol.prepare(s.OriginalRequest)
 	if err != nil {
 		return audit, err
 	}
-	replay := &referencedAuditReplay{evidence: e}
+	replay := &referencedAuditReplay{evidence: e, protocol: protocol}
 	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: "offline-journal-replay", Model: SelectionModel, HTTPClient: &http.Client{Transport: replay}, MaxOutputTokens: 1600})
 	if err != nil {
 		return audit, err
@@ -174,7 +178,7 @@ func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
 			return audit, errors.New("recorded response cannot be safely replayed")
 		}
 	} else {
-		decision, err = DecodeReferencedIntent(s.OriginalRequest, response.IntentJSON)
+		decision, err = protocol.decode(s.OriginalRequest, response.IntentJSON)
 		if err != nil {
 			outcome = "invalid_extraction"
 		}
@@ -201,9 +205,9 @@ func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
 		ids[entry.ResponseID] = true
 	}
 	receipts := map[string]map[string]any{
-		"request/receipt.json":   {"version": referencedJournalVersion, "bytes": len(e.RequestBody), "sha256": e.RequestSHA256},
-		"response/receipt.json":  {"version": referencedJournalVersion, "bytes": len(e.Body), "sha256": e.BodySHA256, "request_sha256": e.RequestSHA256, "http_status": e.StatusCode, "content_type": e.ContentType, "eof_observed": e.EOFObserved, "truncated": e.Truncated, "transport_started": e.TransportStarted, "transport_error": e.TransportError, "read_error": e.ReadError, "close_error": e.CloseError},
-		"selection/receipt.json": {"version": referencedJournalVersion, "outcome": s.Outcome, "ledger_index": s.LedgerIndex, "ledger_sha256": referencedDigest(ledger), "ledger_joined": true, "ledger_snapshot_error": false, "status": "selection-recorded-not-process-terminal"},
+		"request/receipt.json":   {"version": protocol.journalVersion(), "bytes": len(e.RequestBody), "sha256": e.RequestSHA256},
+		"response/receipt.json":  {"version": protocol.journalVersion(), "bytes": len(e.Body), "sha256": e.BodySHA256, "request_sha256": e.RequestSHA256, "http_status": e.StatusCode, "content_type": e.ContentType, "eof_observed": e.EOFObserved, "truncated": e.Truncated, "transport_started": e.TransportStarted, "transport_error": e.TransportError, "read_error": e.ReadError, "close_error": e.CloseError},
+		"selection/receipt.json": {"version": protocol.journalVersion(), "outcome": s.Outcome, "ledger_index": s.LedgerIndex, "ledger_sha256": referencedDigest(ledger), "ledger_joined": true, "ledger_snapshot_error": false, "status": "selection-recorded-not-process-terminal"},
 	}
 	for name, want := range receipts {
 		var got map[string]any
@@ -211,11 +215,12 @@ func InspectReferencedJournal(root string) (ReferencedJournalAudit, error) {
 			return audit, fmt.Errorf("journal receipt differs: %s", name)
 		}
 	}
-	audit.Version, audit.Outcome, audit.Selection, audit.Policy = "indexed-journal-audit-1", s.Outcome, s.Selection, start.Policy
+	audit.Version, audit.Outcome, audit.Selection, audit.Policy = protocol.auditVersion(), s.Outcome, s.Selection, start.Policy
 	return audit, nil
 }
 
 type referencedAuditReplay struct {
+	protocol extractionProtocol
 	evidence *ReferencedProviderEvidence
 	matched  bool
 }
@@ -224,11 +229,14 @@ func (r *referencedAuditReplay) RoundTrip(request *http.Request) (*http.Response
 	if r.matched {
 		return nil, errors.New("journal replay cannot retry")
 	}
-	body, err := io.ReadAll(io.LimitReader(request.Body, 24001))
+	if request.ContentLength <= 0 || request.ContentLength > r.protocol.requestLimit() {
+		return nil, errors.Join(errors.New("journal replay request exceeds protocol bound"), request.Body.Close())
+	}
+	body, err := io.ReadAll(io.LimitReader(request.Body, r.protocol.requestLimit()+1))
 	if err = errors.Join(err, request.Body.Close()); err != nil {
 		return nil, err
 	}
-	if request.Method != "POST" || request.URL.String() != "https://api.openai.com/v1/responses" || !bytes.Equal(body, r.evidence.RequestBody) {
+	if int64(len(body)) != request.ContentLength || request.Method != "POST" || request.URL.String() != "https://api.openai.com/v1/responses" || !bytes.Equal(body, r.evidence.RequestBody) {
 		return nil, errors.New("journal request contract mismatch")
 	}
 	r.matched = true

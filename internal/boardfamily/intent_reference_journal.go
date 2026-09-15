@@ -26,6 +26,7 @@ type referencedJournalFile interface {
 // Journal files are never resumed, replaced or automatically removed. Atomic
 // publication is only used for immutable checkpoints, never for the raw spool.
 type referencedJournal struct {
+	protocol      extractionProtocol
 	root          string
 	owner         os.FileInfo
 	policy        LedgerPolicy
@@ -40,6 +41,10 @@ type referencedJournal struct {
 }
 
 func newReferencedJournal(path, prompt string, policy LedgerPolicy) (*referencedJournal, error) {
+	return newProtocolJournal(path, prompt, policy, indexedProtocol)
+}
+
+func newProtocolJournal(path, prompt string, policy LedgerPolicy, protocol extractionProtocol) (*referencedJournal, error) {
 	if path == "" {
 		return nil, errors.New("a new evidence-journal directory is required")
 	}
@@ -55,7 +60,7 @@ func newReferencedJournal(path, prompt string, policy LedgerPolicy) (*referenced
 		return nil, err
 	}
 	abs = filepath.Join(parent, filepath.Base(abs))
-	initial := map[string]any{"version": referencedJournalVersion, "admission_version": ReferenceIntentVersion,
+	initial := map[string]any{"version": protocol.journalVersion(), "admission_version": protocol.admissionVersion(),
 		"original_request": prompt, "policy": policy, "status": "prepared-not-transport-authority"}
 	if err := atomicdir.Publish(abs, func(staging string) error {
 		return writeReferencedJournalJSON(filepath.Join(staging, "start.json"), initial)
@@ -69,7 +74,7 @@ func newReferencedJournal(path, prompt string, policy LedgerPolicy) (*referenced
 	if err != nil {
 		return nil, err
 	}
-	return &referencedJournal{root: abs, owner: owner, policy: policy, publish: atomicdir.Publish,
+	return &referencedJournal{root: abs, owner: owner, policy: policy, protocol: protocol, publish: atomicdir.Publish,
 		open: func(path string) (referencedJournalFile, error) {
 			return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		}}, nil
@@ -92,7 +97,7 @@ func writeReferencedJournalJSON(path string, value any) error {
 }
 
 func (j *referencedJournal) prepareRequest(body []byte) error {
-	if j.err != nil || j.response != nil || j.finished || len(body) == 0 || len(body) > 24000 {
+	if j.err != nil || j.response != nil || j.finished || len(body) == 0 || int64(len(body)) > j.protocol.requestLimit() {
 		return errors.New("journal request is invalid or already attempted")
 	}
 	if err := j.checkOwner(); err != nil {
@@ -115,7 +120,7 @@ func (j *referencedJournal) prepareRequest(body []byte) error {
 				return err
 			}
 			return writeReferencedJournalJSON(filepath.Join(staging, "receipt.json"), map[string]any{
-				"version": referencedJournalVersion, "bytes": len(body), "sha256": referencedDigest(body)})
+				"version": j.protocol.journalVersion(), "bytes": len(body), "sha256": referencedDigest(body)})
 		})
 	}
 	// The publication syncs the journal directory, including the empty response
@@ -174,7 +179,7 @@ func (j *referencedJournal) finishCapture(e *ReferencedProviderEvidence) error {
 	}
 	return j.publish(filepath.Join(j.root, "response"), func(staging string) error {
 		return writeReferencedJournalJSON(filepath.Join(staging, "receipt.json"), map[string]any{
-			"version": referencedJournalVersion, "bytes": len(b), "sha256": referencedDigest(b),
+			"version": j.protocol.journalVersion(), "bytes": len(b), "sha256": referencedDigest(b),
 			"request_sha256": e.RequestSHA256, "http_status": e.StatusCode, "content_type": e.ContentType,
 			"eof_observed": e.EOFObserved, "truncated": e.Truncated, "transport_started": e.TransportStarted,
 			"transport_error": e.TransportError, "read_error": e.ReadError, "close_error": e.CloseError})
@@ -254,7 +259,7 @@ func (j *referencedJournal) saveSelection(s *ReferencedSelection, ledgerPath str
 			}
 		}
 		return writeReferencedJournalJSON(filepath.Join(staging, "receipt.json"), map[string]any{
-			"version": referencedJournalVersion, "outcome": s.Outcome, "ledger_index": s.LedgerIndex,
+			"version": j.protocol.journalVersion(), "outcome": s.Outcome, "ledger_index": s.LedgerIndex,
 			"ledger_sha256": referencedDigest(ledger), "ledger_joined": s.LedgerIndex != 0 && joinErr == nil,
 			"ledger_snapshot_error": joinErr != nil, "status": "selection-recorded-not-process-terminal"})
 	})
@@ -266,7 +271,11 @@ func (j *referencedJournal) saveSelection(s *ReferencedSelection, ledgerPath str
 // tests and an explicit experimental CLI mode, never by the CLI default. The caller
 // must not start native generation unless this returns without error.
 func InterpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journalPath string) (ReferencedSelection, error) {
-	failure := ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: ReferenceIntentVersion,
+	return interpretProtocolJournal(ctx, prompt, ledgerPath, policy, base, journalPath, indexedProtocol)
+}
+
+func interpretProtocolJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journalPath string, protocol extractionProtocol) (ReferencedSelection, error) {
+	failure := ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: protocol.admissionVersion(),
 		Model: SelectionModel, Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)},
 		SourceQuantities: []SourceQuantity{}, Outcome: "no_request"}
 	policy = policy.effective()
@@ -279,12 +288,12 @@ func InterpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath stri
 	if base == nil {
 		return failure, errors.New("experimental extraction requires an explicit transport")
 	}
-	if _, err := PrepareReferencedRequest(prompt); err != nil {
+	if _, _, err := protocol.prepare(prompt); err != nil {
 		return failure, err
 	}
-	j, err := newReferencedJournal(journalPath, prompt, policy)
+	j, err := newProtocolJournal(journalPath, prompt, policy, protocol)
 	if err != nil {
 		return failure, fmt.Errorf("prepare evidence journal: %w", err)
 	}
-	return interpretReferencedWithJournal(ctx, prompt, ledgerPath, policy, base, j)
+	return interpretProtocolWithJournal(ctx, prompt, ledgerPath, policy, base, j, protocol)
 }

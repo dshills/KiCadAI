@@ -146,8 +146,12 @@ func interpretReferencedWithTransport(ctx context.Context, prompt, ledgerPath st
 }
 
 func interpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journal *referencedJournal) (result ReferencedSelection, err error) {
+	return interpretProtocolWithJournal(ctx, prompt, ledgerPath, policy, base, journal, indexedProtocol)
+}
+
+func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journal *referencedJournal, protocol extractionProtocol) (result ReferencedSelection, err error) {
 	start := time.Now()
-	result = ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: ReferenceIntentVersion, Model: SelectionModel,
+	result = ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: protocol.admissionVersion(), Model: SelectionModel,
 		Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)},
 		SourceQuantities: []SourceQuantity{}, Outcome: "no_request"}
 	defer func() {
@@ -177,13 +181,13 @@ func interpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath stri
 	if base == nil {
 		return result, errors.New("experimental extraction requires an explicit transport")
 	}
-	request, source, err := prepareReferencedGenerateRequest(prompt)
+	request, source, err := protocol.prepare(prompt)
 	if err != nil {
 		return result, err
 	}
 	result.RequestClauses, result.SourceQuantities = source.Clauses, source.Quantities
-	recorder := &referencedRecordingTransport{base: base, journal: journal}
-	transport := &reservedTransport{Path: ledgerPath, Policy: policy, Base: recorder}
+	recorder := &referencedRecordingTransport{base: base, journal: journal, protocol: protocol}
+	transport := &reservedTransport{Path: ledgerPath, Policy: policy, Base: recorder, protocol: protocol}
 	client := &http.Client{Transport: transport, Timeout: 45 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirects forbidden") }}
 	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: os.Getenv("OPENAI_API_KEY"), Model: SelectionModel,
@@ -260,7 +264,7 @@ func interpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath stri
 		}
 		return result, providerErr
 	}
-	result.Decision, err = DecodeReferencedIntent(prompt, result.RawIntent)
+	result.Decision, err = protocol.decode(prompt, result.RawIntent)
 	result.Outcome = "decision"
 	if err != nil {
 		result.Outcome = "invalid_extraction"

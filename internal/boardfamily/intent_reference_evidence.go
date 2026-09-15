@@ -37,6 +37,7 @@ type ReferencedProviderEvidence struct {
 }
 
 type referencedRecordingTransport struct {
+	protocol extractionProtocol
 	base     http.RoundTripper
 	evidence *ReferencedProviderEvidence
 	journal  *referencedJournal
@@ -54,9 +55,9 @@ func (t *referencedRecordingTransport) RoundTrip(r *http.Request) (*http.Respons
 	if err != nil {
 		return nil, errors.New("request body could not be opened for recording")
 	}
-	request, readErr := io.ReadAll(io.LimitReader(body, 24001))
+	request, readErr := io.ReadAll(io.LimitReader(body, t.protocol.requestLimit()+1))
 	closeErr := body.Close()
-	if readErr != nil || closeErr != nil || len(request) == 0 || len(request) > 24000 || int64(len(request)) != r.ContentLength {
+	if readErr != nil || closeErr != nil || len(request) == 0 || int64(len(request)) > t.protocol.requestLimit() || int64(len(request)) != r.ContentLength {
 		return nil, errors.New("request body could not be recorded within its bound")
 	}
 	t.evidence.RequestBody, t.evidence.RequestSHA256 = request, referencedDigest(request)

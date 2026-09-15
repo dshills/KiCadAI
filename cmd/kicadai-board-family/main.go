@@ -34,6 +34,7 @@ func run() error {
 type commandPipeline struct {
 	interpret        func(context.Context, string, string, boardfamily.LedgerPolicy) (boardfamily.Selection, any, error)
 	interpretIndexed func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
+	interpretOwned   func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	generate         func(boardfamily.Config, string) (boardfamily.Electrical, error)
 	validate         func(context.Context, string, string) (boardfamily.Validation, error)
 }
@@ -46,6 +47,10 @@ func defaultCommandPipeline() commandPipeline {
 		},
 		interpretIndexed: func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
 			s, err := boardfamily.InterpretReferencedWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
+			return s.Selection, s, err
+		},
+		interpretOwned: func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
+			s, err := boardfamily.InterpretOwnedWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
 			return s.Selection, s, err
 		},
 		generate: boardfamily.Generate,
@@ -62,29 +67,35 @@ func runWithPipeline(pipeline commandPipeline) error {
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
 	ledger := flag.String("ledger", "", "persistent ledger required with a prompt; legacy limits unless --live-budget supplies a separate approved goal")
 	budgetFile := flag.String("live-budget", "", "JSON goal/request/microdollar policy for a separately approved new goal; not spending authorization")
-	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default) or indexed-v3 (experimental, requires separate approval and evidence journal)")
-	journal := flag.String("evidence-journal", "", "new private evidence directory outside output; required only for experimental indexed-v3 prompts")
+	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3 or owned-v4 (experimental; requires separate approval and evidence journal)")
+	journal := flag.String("evidence-journal", "", "new private evidence directory outside output; required for experimental indexed-v3 or owned-v4 prompts")
 	inspectJournal := flag.String("inspect-indexed-journal", "", "verify an existing indexed journal by local byte replay; no key or API request")
+	inspectOwnedJournal := flag.String("inspect-owned-journal", "", "verify an existing owned-v4 journal by local byte replay; no key or API request")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
-	if *inspectJournal != "" {
-		if *protocol != "typed-v2" || *journal != "" || *config != "" || *prompt != "" || *promptFile != "" || *ledger != "" || *budgetFile != "" || *exportContract != "" || *listFamilies || *out != "" || flag.NArg() != 0 {
-			return errors.New("--inspect-indexed-journal cannot be combined with other modes")
+	if *inspectJournal != "" || *inspectOwnedJournal != "" {
+		if (*inspectJournal != "" && *inspectOwnedJournal != "") || *protocol != "typed-v2" || *journal != "" || *config != "" || *prompt != "" || *promptFile != "" || *ledger != "" || *budgetFile != "" || *exportContract != "" || *listFamilies || *out != "" || flag.NArg() != 0 {
+			return errors.New("journal inspection cannot be combined with other modes")
 		}
-		audit, err := boardfamily.InspectReferencedJournal(*inspectJournal)
+		inspect, path := boardfamily.InspectReferencedJournal, *inspectJournal
+		if *inspectOwnedJournal != "" {
+			inspect, path = boardfamily.InspectOwnedJournal, *inspectOwnedJournal
+		}
+		audit, err := inspect(path)
 		if err != nil {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(audit)
 	}
-	if *protocol != "typed-v2" && *protocol != "indexed-v3" {
-		return errors.New("unknown --intent-protocol; expected typed-v2 or indexed-v3")
+	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" {
+		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3 or owned-v4")
 	}
-	if *journal != "" && (*protocol != "indexed-v3" || *listFamilies || *exportContract != "" || *config != "") {
-		return errors.New("--evidence-journal is only valid for indexed-v3 prompt generation")
+	experimental := *protocol == "indexed-v3" || *protocol == "owned-v4"
+	if *journal != "" && (!experimental || *listFamilies || *exportContract != "" || *config != "") {
+		return errors.New("--evidence-journal is only valid for experimental prompt generation")
 	}
 	if *listFamilies {
 		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *ledger != "" || *budgetFile != "" || *exportContract != "" || *protocol != "typed-v2" || flag.NArg() != 0 {
@@ -93,8 +104,25 @@ func runWithPipeline(pipeline commandPipeline) error {
 		return json.NewEncoder(os.Stdout).Encode(boardfamily.Catalog())
 	}
 	if *exportContract != "" {
-		if *config != "" || *prompt != "" || *promptFile != "" || *out != "" || *budgetFile != "" || flag.NArg() != 0 {
+		if *config != "" || (*protocol != "owned-v4" && (*prompt != "" || *promptFile != "")) || *out != "" || *budgetFile != "" || flag.NArg() != 0 {
 			return fmt.Errorf("--export-live-contract cannot be combined with generation")
+		}
+		if *protocol == "owned-v4" {
+			if (*prompt == "") == (*promptFile == "") || *ledger != "" {
+				return errors.New("owned-v4 contract export requires exactly one --prompt or --prompt-file and no ledger")
+			}
+			if *promptFile != "" {
+				b, err := readPrompt(*promptFile)
+				if err != nil {
+					return err
+				}
+				*prompt = string(b)
+			}
+			contract, err := boardfamily.OwnedEvidenceContract(*prompt)
+			if err != nil {
+				return err
+			}
+			return save(*exportContract, contract)
 		}
 		if *protocol == "indexed-v3" {
 			return save(*exportContract, map[string]any{"admission_version": boardfamily.ReferenceIntentVersion, "destination": "https://api.openai.com/v1/responses", "model": boardfamily.SelectionModel,
@@ -117,9 +145,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 	if *budgetFile != "" && (*config != "" || *ledger == "") {
 		return errors.New("--live-budget requires a prompt and a separate --ledger")
 	}
-	if *protocol == "indexed-v3" {
-		if *config != "" || *ledger == "" || *budgetFile == "" || *journal == "" || pipeline.interpretIndexed == nil {
-			return errors.New("indexed-v3 requires a prompt, a separate --live-budget, --ledger and --evidence-journal")
+	if experimental {
+		if *config != "" || *ledger == "" || *budgetFile == "" || *journal == "" || (*protocol == "indexed-v3" && pipeline.interpretIndexed == nil) || (*protocol == "owned-v4" && pipeline.interpretOwned == nil) {
+			return fmt.Errorf("%s requires a prompt, a separate --live-budget, --ledger and --evidence-journal", *protocol)
 		}
 		if err := separateEvidenceOutput(*journal, *out); err != nil {
 			return err
@@ -172,7 +200,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		var s boardfamily.Selection
 		var record any
 		var e error
-		if *protocol == "indexed-v3" {
+		if *protocol == "owned-v4" {
+			s, record, e = pipeline.interpretOwned(ctx, *prompt, *ledger, policy, *journal)
+		} else if *protocol == "indexed-v3" {
 			s, record, e = pipeline.interpretIndexed(ctx, *prompt, *ledger, policy, *journal)
 		} else {
 			s, record, e = pipeline.interpret(ctx, *prompt, *ledger, policy)

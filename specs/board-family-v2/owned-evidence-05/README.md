@@ -1,6 +1,8 @@
 # Owned-evidence protocol: offline prototype 05
 
-Status: **offline prototype, not a live-evaluated or production-ready route**.
+This records the initial prototype checkpoint at commit `168a6c23`.
+See [the subsequent offline integration](INTEGRATION.md) for the current route.
+Initial status: **offline prototype, not a live-evaluated or production-ready route**.
 Developed on `codex/owned-evidence-05`, based on
 `87d05b352dfffd96ca6b951ce6b195a2c6463fbd`, on 2026-09-15.
 The primary working tree, PR #14, frozen evaluator, prior provider responses,

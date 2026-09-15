@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// OwnedEvidenceVersion is an offline prototype. No provider, CLI default,
-// journal, ledger, or historical extraction is routed through this protocol.
+// OwnedEvidenceVersion is an experimental opt-in wire protocol. It is never
+// selected by the CLI default or inferred from historical extraction bytes.
 const OwnedEvidenceVersion = "4-owned-evidence-experimental"
 
 // OwnedNumericChoice binds one occurrence, field, converted value and owning

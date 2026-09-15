@@ -108,7 +108,68 @@ func TestOwnedCorpusSyntheticAdmissionParity(t *testing.T) {
 			if c.Disposition != "supported" && after.Configuration != nil {
 				t.Fatal("non-supported request produced a configuration")
 			}
+			dir := t.TempDir()
+			output, ledger, budget, journal := filepath.Join(dir, "output"), filepath.Join(dir, "ledger.json"), filepath.Join(dir, "budget.json"), filepath.Join(dir, "evidence")
+			if err := save(budget, boardfamily.LedgerPolicy{Goal: "offline-owned-" + c.ID, MaxRequests: 1, MaxMicroUSD: 50000}); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("OPENAI_API_KEY", "offline-command-placeholder")
+			pipeline, counts := ownedCommandPipeline(t, raw, "", "")
+			if _, err := runIndexedCommand(t, pipeline, "--intent-protocol", "owned-v4", "--prompt", c.Prompt, "--live-budget", budget, "--ledger", ledger, "--evidence-journal", journal, "--output", output); err != nil {
+				t.Fatal("owned command orchestration failed", err)
+			}
+			wantNativeCalls := 0
+			if c.Disposition == "supported" {
+				wantNativeCalls = 1
+				compareOwnedGeneratedFiles(t, output, c.Family, c.Profile)
+			}
+			if counts.requests != 1 || counts.generate != wantNativeCalls || counts.validate != wantNativeCalls {
+				t.Fatalf("wrong command boundaries: %+v", counts)
+			}
+			audit, err := boardfamily.InspectOwnedJournal(journal)
+			if err != nil || !reflect.DeepEqual(audit.Selection.Decision, after) || audit.Selection.AdmissionVersion != boardfamily.OwnedEvidenceVersion || len(audit.FilesSHA256) != 8 || len(audit.Ledger.Entries) != 1 {
+				t.Fatalf("owned journal replay lost the full decision/accounting: %+v %v", audit, err)
+			}
+			if _, err := boardfamily.InspectReferencedJournal(journal); err == nil {
+				t.Fatal("legacy inspector accepted an owned-v4 journal")
+			}
 			t.Logf("synthetic parity only: old response=%d bytes, owned response=%d bytes", len(old), len(raw))
 		})
 	}
+}
+
+func compareOwnedGeneratedFiles(t testing.TB, output, family, profile string) {
+	t.Helper()
+	name := "bmp280"
+	if family == boardfamily.FamilySHT31 {
+		name = "sht31"
+	}
+	published := filepath.Join("..", "..", "examples", "board-family-v2", name+"-"+profile)
+	compared := 0
+	err := filepath.WalkDir(output, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() {
+			return walkErr
+		}
+		rel, err := filepath.Rel(output, path)
+		if err != nil || rel == "selection.json" {
+			return err
+		}
+		got, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		want, err := os.ReadFile(filepath.Join(published, rel))
+		if err != nil {
+			return err
+		}
+		if string(got) != string(want) {
+			return fmt.Errorf("owned command changed reviewed generated file %s/%s", name+"-"+profile, rel)
+		}
+		compared++
+		return nil
+	})
+	if err != nil || compared == 0 {
+		t.Fatalf("generated file comparison failed: compared=%d err=%v", compared, err)
+	}
+	t.Logf("all %d newly generated files match reviewed %s-%s; validation stub is not a new native qualification", compared, name, profile)
 }
