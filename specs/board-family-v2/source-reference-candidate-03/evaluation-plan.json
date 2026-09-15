@@ -1,0 +1,27 @@
+{
+  "version": "indexed-evaluation-plan-1",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "status": "preparation-no-live-approval",
+  "cases_source": {
+    "path": "specs/board-family-v2/typed-evaluation-02/cases-02.json",
+    "sha256": "90bbc1f728374a9d3ba55d1fa7ff5583ede74bf6107f833eb51758ae5ebee867"
+  },
+  "corpus_status": "Reuse the same 14 known regression prompts and gold requirements unchanged. These cases were seen during development; this is not an independent holdout or representative traffic sample. Historical response bytes and scores remain typed-v2 and are never migrated or rescored as indexed-v3.",
+  "proposed_policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "acceptance": {
+    "planned_cases": 14,
+    "useful_cases": 5,
+    "all_raw_extractions_correct": true,
+    "all_application_decisions_correct": true,
+    "all_required_native_bundles_verified": true,
+    "source_bound_review_required": true,
+    "median_all_useful_seconds_below": 60,
+    "maximum_all_useful_seconds_below": 120
+  },
+  "numeric_review_rule": "A numeric gold requirement without an explicit state means required. Match its value through the application-owned quantity table, never a model-authored magnitude. Matching numbers and source IDs do not prove the field's semantic role or polarity.",
+  "authorization": "No request or dollar authority is granted by this plan. Freeze and qualify a production runtime, bind the complete review/scoring inputs, then obtain actual new user approval. No retries, probes, recovery baseline, firewall changes, Gemini review, fabrication or bench work are included."
+}

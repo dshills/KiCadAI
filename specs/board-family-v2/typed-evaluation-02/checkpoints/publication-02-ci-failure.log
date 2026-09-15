@@ -1,0 +1,103 @@
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	﻿2026-09-14T16:00:09.6432271Z ##[group]Run set -euo pipefail
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6432697Z ^[[36;1mset -euo pipefail^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6433237Z ^[[36;1menv -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6433960Z ^[[36;1m  node --test specs/board-family-v2/typed-evaluation-02/authenticate-final.test.mjs^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6434681Z ^[[36;1menv -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6435359Z ^[[36;1m  node specs/board-family-v2/typed-evaluation-02/authenticate-final.mjs --check^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6436035Z ^[[36;1menv -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6436638Z ^[[36;1m  node specs/board-family-v2/evaluation/audit-final.mjs --check^[[0m
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6478065Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.6478455Z ##[endgroup]
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:09.9338978Z TAP version 13
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5607396Z # Subtest: complete failed batch authenticates without changing its conclusion
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5612790Z ok 1 - complete failed batch authenticates without changing its conclusion
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5613963Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5614868Z   duration_ms: 138.646894
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5615891Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5616523Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5618729Z # Subtest: changed prompt is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5630921Z ok 2 - changed prompt is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5631716Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5632383Z   duration_ms: 61.925531
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5633182Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5633817Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5634524Z # Subtest: changed selection is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5635358Z ok 3 - changed selection is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5636690Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5637399Z   duration_ms: 96.805439
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5638089Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5638711Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5639395Z # Subtest: removed failed record is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5640652Z ok 4 - removed failed record is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5641467Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5642109Z   duration_ms: 41.678265
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5642824Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5736889Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5737468Z # Subtest: ledger reset is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5737974Z ok 5 - ledger reset is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5738391Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5738715Z   duration_ms: 48.613095
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5739130Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5739473Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5740091Z # Subtest: unobserved terminal child is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5740736Z ok 6 - unobserved terminal child is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5741256Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5741597Z   duration_ms: 42.595318
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5741991Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5742356Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5742729Z # Subtest: changed native artifact is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5743310Z ok 7 - changed native artifact is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5743780Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5744092Z   duration_ms: 44.048198
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5744469Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5744789Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5745134Z # Subtest: extra hidden outcome is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5745656Z ok 8 - extra hidden outcome is rejected
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5746110Z   ---
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5746422Z   duration_ms: 79.603379
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5746797Z   type: 'test'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5747165Z   ...
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5796298Z 1..8
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5796694Z # tests 8
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5797251Z # suites 0
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5797756Z # pass 8
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5798223Z # fail 0
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5798734Z # cancelled 0
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5799222Z # skipped 0
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5799925Z # todo 0
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.5800593Z # duration_ms 672.894778
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7247869Z {
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7248668Z   "status": "published-evidence-authenticated",
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7250951Z   "acceptance": "complete-acceptance-not-met",
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7251904Z   "attempts": 14,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7252510Z   "raw_passes": 5,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7252866Z   "application_passes": 7,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7253119Z   "complete_passes": 5,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7253340Z   "native_bundles": 2,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7253572Z   "compared_deliverables": 81,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7253822Z   "estimated_micro_usd": 17016,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7254063Z   "reserved_micro_usd": 700000,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7254293Z   "evidence_files": 177,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7254518Z   "published_files": 203
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7254725Z }
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7711017Z node:fs:560
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7711317Z   return binding.open(
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7711592Z                  ^
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7711747Z 
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7712054Z Error: ENOENT: no such file or directory, open '.cache/board-family-v1/live-ledger.json'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7712705Z     at Object.openSync (node:fs:560:18)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7713091Z     at Object.readFileSync (node:fs:444:35)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7713845Z     at hash (file:///home/runner/work/KiCadAI/KiCadAI/specs/board-family-v2/evaluation/acceptance-lib.mjs:16:42)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7714944Z     at authenticateFrozen (file:///home/runner/work/KiCadAI/KiCadAI/specs/board-family-v2/evaluation/acceptance-lib.mjs:61:16)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7715987Z     at file:///home/runner/work/KiCadAI/KiCadAI/specs/board-family-v2/evaluation/audit-final.mjs:20:26
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7716728Z     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7717382Z     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7718153Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7718743Z   errno: -2,
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7718994Z   code: 'ENOENT',
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7719736Z   syscall: 'open',
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7720069Z   path: '.cache/board-family-v1/live-ledger.json'
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7720470Z }
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7720595Z 
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7720706Z Node.js v22.23.2
+Authenticate complete typed-intent evidence (offline)	Verify immutable publication and negative controls without credentials	2026-09-14T16:00:10.7766981Z ##[error]Process completed with exit code 1.

@@ -1,0 +1,108 @@
+{
+  "status": "complete-acceptance-not-met",
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "planned_cases": 14,
+  "attempted_cases": 14,
+  "recorded_outcomes": 14,
+  "raw_automatic_passes": 10,
+  "application_automatic_passes": 7,
+  "median_all_useful_seconds": 5.239305542,
+  "maximum_all_useful_seconds": 6.644406792,
+  "timing_target_met": true,
+  "acceptance": "not-established-by-automatic-scores",
+  "semantic_review": "checked",
+  "semantic_cases": [
+    {
+      "id": "useful-01",
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "useful-02",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "useful-03",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "useful-04",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "useful-05",
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "choice-01",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "choice-02",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "choice-03",
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-01",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-02",
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-03",
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-04",
+      "raw_pass": false,
+      "application_pass": true,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-05",
+      "raw_pass": false,
+      "application_pass": true,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-06",
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    }
+  ],
+  "reserved_micro_usd": 700000,
+  "estimated_micro_usd": 17016,
+  "usage_accounting_complete": true,
+  "unknown_or_failed_outcome_entries": 0,
+  "input_tokens": 34614,
+  "output_tokens": 1978,
+  "original_batch_scores": "unchanged",
+  "evidence_notice": "Local source/byte integrity, not provider signatures, independent review or physical certification."
+}

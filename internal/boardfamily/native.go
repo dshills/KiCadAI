@@ -14,7 +14,11 @@ import (
 	"kicadai/internal/kicadfiles/sexpr"
 )
 
-//go:embed reference
+// Embed design assets explicitly: KiCad GUI lock/settings files must never enter
+// a build just because someone opened a reference in the local checkout.
+//
+//go:embed reference/board.kicad_sch reference/board.kicad_pcb reference/board.kicad_pro reference/sym-lib-table reference/fp-lib-table reference/lib/*.kicad_sym reference/footprints/*/*.kicad_mod
+//go:embed reference-sht31/board.kicad_sch reference-sht31/board.kicad_pcb reference-sht31/board.kicad_pro reference-sht31/sym-lib-table reference-sht31/fp-lib-table reference-sht31/lib/*.kicad_sym reference-sht31/footprints/*/*.kicad_mod
 var reference embed.FS
 
 type Part struct {
@@ -79,6 +83,26 @@ func parts(p Profile) []Part {
 	}
 }
 
+func partsFor(family string, p Profile) []Part {
+	ps := parts(p)
+	if family != FamilySHT31 {
+		return ps
+	}
+	result := make([]Part, 0, len(ps)-1)
+	for _, part := range ps {
+		if part.Reference == "C6" {
+			continue
+		}
+		if part.Reference == "U2" {
+			part.Value = "SHT31-DIS-B 0x44"
+			part.Manufacturer = "Sensirion"
+			part.MPN = "SHT31-DIS-B2.5kS"
+		}
+		result = append(result, part)
+	}
+	return result
+}
+
 // Generate writes an exclusively-created output. Native geometry comes only from
 // the engineered reference. All native/round-trip validation is a separate gate.
 func Generate(c Config, dir string) (Electrical, error) {
@@ -92,11 +116,15 @@ func Generate(c Config, dir string) (Electrical, error) {
 	if err = os.Mkdir(dir, 0755); err != nil {
 		return e, fmt.Errorf("output must be new: %w", err)
 	}
-	err = fs.WalkDir(reference, "reference", func(p string, d fs.DirEntry, err error) error {
+	rootDir, componentPrefix, componentSource := "reference", "boardfamily.v1.", "board-family-v1 reviewed BOM"
+	if c.Family == FamilySHT31 {
+		rootDir, componentPrefix, componentSource = "reference-sht31", "boardfamily.v2.", "board-family-v2 engineered BOM"
+	}
+	err = fs.WalkDir(reference, rootDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		r := strings.TrimPrefix(p, "reference")
+		r := strings.TrimPrefix(p, rootDir)
 		r = strings.TrimPrefix(r, "/")
 		dest := filepath.Join(dir, filepath.FromSlash(r))
 		if d.IsDir() {
@@ -111,7 +139,7 @@ func Generate(c Config, dir string) (Electrical, error) {
 	if err != nil {
 		return e, err
 	}
-	ps := parts(e.Profile)
+	ps := partsFor(c.Family, e.Profile)
 	byRef := map[string]*Part{}
 	for i := range ps {
 		byRef[ps[i].Reference] = &ps[i]
@@ -138,7 +166,7 @@ func Generate(c Config, dir string) (Electrical, error) {
 				continue
 			}
 			seen[r] = true
-			for _, kv := range [][2]string{{"Value", p.Value}, {"Manufacturer", p.Manufacturer}, {"MPN", p.MPN}, {"KiCadAI Component ID", "boardfamily.v1." + p.MPN}, {"Component Source", "board-family-v1 reviewed BOM"}, {"Component Confidence", "application_reviewed_not_bench_tested"}} {
+			for _, kv := range [][2]string{{"Value", p.Value}, {"Manufacturer", p.Manufacturer}, {"MPN", p.MPN}, {"KiCadAI Component ID", componentPrefix + p.MPN}, {"Component Source", componentSource}, {"Component Confidence", "application_reviewed_not_bench_tested"}} {
 				if err = setProperty(n, kv[0], kv[1], ext == "kicad_pcb"); err != nil {
 					return e, err
 				}

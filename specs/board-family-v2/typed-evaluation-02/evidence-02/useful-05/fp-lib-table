@@ -1,0 +1,53 @@
+(fp_lib_table
+  (version 7)
+  (lib
+    (name "Connector_PinHeader_2.54mm")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Connector_PinHeader_2.54mm.pretty")
+    (options "")
+    (descr "Generated footprints for Connector_PinHeader_2.54mm")
+  )
+  (lib
+    (name "RF_Module")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/RF_Module.pretty")
+    (options "")
+    (descr "Generated footprints for RF_Module")
+  )
+  (lib
+    (name "Button_Switch_SMD")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Button_Switch_SMD.pretty")
+    (options "")
+    (descr "Generated footprints for Button_Switch_SMD")
+  )
+  (lib
+    (name "Capacitor_SMD")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Capacitor_SMD.pretty")
+    (options "")
+    (descr "Generated footprints for Capacitor_SMD")
+  )
+  (lib
+    (name "Resistor_SMD")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Resistor_SMD.pretty")
+    (options "")
+    (descr "Generated footprints for Resistor_SMD")
+  )
+  (lib
+    (name "Package_LGA")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Package_LGA.pretty")
+    (options "")
+    (descr "Generated footprints for Package_LGA")
+  )
+  (lib
+    (name "Sensor_Humidity")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/footprints/Sensor_Humidity.pretty")
+    (options "")
+    (descr "")
+  )
+)
+

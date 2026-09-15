@@ -1,0 +1,68 @@
+{
+  "decision": {
+    "disposition": "clarify",
+    "message": "Which I2C profile do you require: standard, fast, or BMP280-only low_current?",
+    "clauses": [
+      {
+        "text": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+        "disposition": "clarify",
+        "reason": "Which I2C profile do you require: standard, fast, or BMP280-only low_current?"
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Please use SHT31."
+    },
+    {
+      "id": 1,
+      "text": " I am deciding between the standard profile and the fast profile, and I don't have a preference yet."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "Please use SHT31",
+            "state": "required",
+            "value": "SHT31"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "profile",
+            "quote": "deciding between the standard profile and the fast profile",
+            "state": "uncertain",
+            "value": "standard"
+          },
+          {
+            "kind": "profile",
+            "quote": "deciding between the standard profile and the fast profile",
+            "state": "uncertain",
+            "value": "fast"
+          }
+        ],
+        "id": 1
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0e4ec252554e61e3016aa816fd9be887d1be9610307c63e605",
+  "usage": {
+    "input_tokens": 2442,
+    "output_tokens": 101,
+    "total_tokens": 2543
+  },
+  "ledger_index": 8,
+  "seconds": 1.823514584
+}

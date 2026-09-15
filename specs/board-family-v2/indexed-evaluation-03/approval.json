@@ -1,0 +1,23 @@
+{
+  "status": "explicit-user-approved",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "manifest_sha256": "429f02b613038d22adaacc1cc9ef054e8b18703afe748312c3e925b59c977023",
+  "max_physical_requests": 14,
+  "max_micro_usd": 1000000,
+  "existing_key_only": true,
+  "user_message": "approved",
+  "recorded_utc": "2026-09-15T09:42:06Z",
+  "approval_context": "The user approved the preceding explicit request for one final evaluation using the existing OpenAI API key, maximum 14 physical requests and USD 1 total, no retries or probes, plus a LuLu rule allowing only the frozen indexed-runtime-03-01 evaluator to access api.openai.com:443.",
+  "no_retry": true,
+  "no_extra_probes": true,
+  "no_recovery_batch": true,
+  "firewall": {
+    "executable": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/indexed-runtime-03-01/kicadai-board-family",
+    "hostname": "api.openai.com",
+    "port": "443",
+    "restriction": "exact executable path, hostname and port; regex disabled; no separate TCP-only selector",
+    "rule_uuid": "FA816772-77D6-4D41-8CC3-20837488847E",
+    "saved_and_read_back": true
+  },
+  "exclusions": "No Gemini review, extra API attempts, broader firewall change, fabrication, or bench work is authorized. Existing frozen inputs and historical exhausted budgets remain unchanged. This record transcribes the actual user approval; it is not provider attestation."
+}

@@ -1,0 +1,55 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The request cannot guarantee assembled-board ambient temperature accuracy of ±0.1°C without calibration or bench characterization, which is explicitly unsupported for the esp32_sht31_v1 family. The SHT31 sensor requires bench characterization for ambient accuracy guarantees. The requested accuracy is beyond the software qualification limits.",
+    "clauses": [
+      {
+        "text": "Make an SHT31 temperature/humidity board within the standard electrical limits and guarantee assembled-board ambient temperature accuracy of plus or minus 0.1 degrees C without calibration or bench characterization.",
+        "disposition": "supported",
+        "reason": "Request is for an SHT31 temperature/humidity board within standard electrical limits with ±0.1°C ambient temperature measurement accuracy without calibration or bench characterization."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_sht31_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 70
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Request is for an SHT31 temperature/humidity board within standard electrical limits with ±0.1°C ambient temperature measurement accuracy without calibration or bench characterization.",
+        "text": "Make an SHT31 temperature/humidity board within the standard electrical limits and guarantee assembled-board ambient temperature accuracy of plus or minus 0.1 degrees C without calibration or bench characterization."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_sht31_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 70,
+      "version": "1"
+    },
+    "disposition": "unsupported",
+    "message": "The request cannot guarantee assembled-board ambient temperature accuracy of ±0.1°C without calibration or bench characterization, which is explicitly unsupported for the esp32_sht31_v1 family. The SHT31 sensor requires bench characterization for ambient accuracy guarantees. The requested accuracy is beyond the software qualification limits."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0b8b09335e05acba016aa7de7a7ac487d1b4c50fffd2d06642",
+  "usage": {
+    "input_tokens": 1568,
+    "output_tokens": 220,
+    "total_tokens": 1788
+  },
+  "ledger_index": 14,
+  "seconds": 2.920100875
+}

@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"No USB interface or direct USB power is supported; use external regulated 3.2–3.4 V and 3.3 V UART. Wireless operation is unsupported; radios must remain disabled.","output":".cache/board-family-v2/typed-evaluation-02-final/refuse-05","passed":false}

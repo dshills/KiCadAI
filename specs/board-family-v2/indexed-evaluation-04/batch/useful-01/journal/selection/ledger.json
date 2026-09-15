@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "goal": "board-family-v2-indexed-final-03",
+  "max_requests": 14,
+  "max_micro_usd": 1000000,
+  "entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-15T11:15:31.824249Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b49cd7b3cc1db3d016aa928d4d86487d18dcf011189fef085",
+      "input_tokens": 2822,
+      "output_tokens": 79,
+      "estimated_micro_usd": 1256
+    }
+  ]
+}

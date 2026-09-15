@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "goal": "board-family-v2-indexed-final-03",
+  "max_requests": 14,
+  "max_micro_usd": 1000000,
+  "entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-15T11:15:31.824249Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b49cd7b3cc1db3d016aa928d4d86487d18dcf011189fef085",
+      "input_tokens": 2822,
+      "output_tokens": 79,
+      "estimated_micro_usd": 1256
+    },
+    {
+      "index": 2,
+      "started_utc": "2026-09-15T11:15:35.145482Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_06d4fb400ca5015d016aa928d756bc87d185a0c89fbc80e4a3",
+      "input_tokens": 3312,
+      "output_tokens": 156,
+      "estimated_micro_usd": 1575
+    },
+    {
+      "index": 3,
+      "started_utc": "2026-09-15T11:15:43.989705Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b9d51a71e7e8e08016aa928e030b087d19593be7536cd1592",
+      "input_tokens": 3307,
+      "output_tokens": 183,
+      "estimated_micro_usd": 1616
+    },
+    {
+      "index": 4,
+      "started_utc": "2026-09-15T11:15:48.067782Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b795550e29b3a34016aa928e43d4887d1b17c28020ca52f89",
+      "input_tokens": 3053,
+      "output_tokens": 124,
+      "estimated_micro_usd": 1420
+    }
+  ]
+}

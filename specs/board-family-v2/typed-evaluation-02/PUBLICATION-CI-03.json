@@ -1,0 +1,14 @@
+{
+  "status": "ci-fixture-correction-only",
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "failed_publication_commit": "b0735ebf5ea1fa7100daac2460019cf6e7186358",
+  "failed_run": 34865770709,
+  "original_publication_sha256": "b86ce35764f63447e20d659fc5b62adacd24492fc72396b0e31bfb9c2944238d",
+  "files_sha256": {
+    ".github/workflows/typed-intent-final-evidence.yml": "7958386ccb87ee7f5547263a60a986561f350a98eac4c57336ce6aee9c924e77",
+    "specs/board-family-v2/typed-evaluation-02/authenticate-publication-03.mjs": "85e1d8fe95d4889d7d30f164b5704b5198c644043db8311e0b31e3e067b01e0a",
+    "specs/board-family-v2/typed-evaluation-02/PUBLICATION-CI-03.md": "5f5dafb07354f0419ba971ee9d6696157b54bbb24b378da6b2e47fe0bafd5606",
+    "specs/board-family-v2/typed-evaluation-02/checkpoints/publication-02-workflow.yml": "85de3342de242a10545fe7ae07c3f978162208229353ab710e728b1fd9c9f938",
+    "specs/board-family-v2/typed-evaluation-02/checkpoints/publication-02-ci-failure.log": "4ba97a119e14d912f876bee255ab20560fd2d70895458d1700473f0aadf9fe00"
+  }
+}
