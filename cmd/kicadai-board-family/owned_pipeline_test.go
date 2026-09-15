@@ -20,15 +20,22 @@ import (
 // an in-memory provider and, unless explicitly requested, a validation stub.
 // The actual generator runs; no stub result is called native qualification.
 func ownedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
-	return evidenceCommandPipeline(t, raw, mode, nativeCLI, false)
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, "owned-v4")
 }
 
 func connectionCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
-	return evidenceCommandPipeline(t, raw, mode, nativeCLI, true)
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, "connection-v5")
 }
 
-func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string, connection bool) (commandPipeline, *indexedCommandCounts) {
+func directCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, "direct-v6")
+}
+
+func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol string) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
+	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" {
+		t.Fatal("unknown offline evidence protocol")
+	}
 	counts := &indexedCommandCounts{}
 	pipeline := defaultCommandPipeline()
 	var journalRoot string
@@ -43,8 +50,11 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string, c
 				t.Fatal(err)
 			}
 			schemaName := boardfamily.OwnedEvidenceSchemaName
-			if connection {
+			if protocol == "connection-v5" {
 				schemaName = boardfamily.ConnectionEvidenceSchemaName
+			}
+			if protocol == "direct-v6" {
+				schemaName = boardfamily.DirectEvidenceSchemaName
 			}
 			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
 				t.Fatal("wrong contract or credential in request body")
@@ -74,13 +84,18 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string, c
 		})
 		journalRoot = journal
 		selectWithJournal := boardfamily.InterpretOwnedWithJournal
-		if connection {
+		if protocol == "connection-v5" {
 			selectWithJournal = boardfamily.InterpretConnectionWithJournal
+		}
+		if protocol == "direct-v6" {
+			selectWithJournal = boardfamily.InterpretDirectWithJournal
 		}
 		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
 	}
-	if connection {
+	if protocol == "direct-v6" {
+		pipeline.interpretDirect = interpret
+	} else if protocol == "connection-v5" {
 		pipeline.interpretConnection = interpret
 	} else {
 		pipeline.interpretOwned = interpret

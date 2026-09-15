@@ -22,6 +22,9 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 			if protocol == connectionProtocol {
 				key, check, raw = "offline-connection-placeholder", checkConnectionProviderRequest, connectionRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"))
 			}
+			if protocol == directProtocol {
+				key, check, raw = "offline-direct-placeholder", checkDirectProviderRequest, directRaw(t, ownedFact("sensor", "BMP280", "required", "c0"), ownedFact("profile", "standard", "required", "c0"))
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
