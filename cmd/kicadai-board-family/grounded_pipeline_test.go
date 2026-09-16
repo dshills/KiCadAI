@@ -12,23 +12,33 @@ import (
 )
 
 func TestGroundedCommandSyntheticCorpus(t *testing.T) {
-	testGroundedCommandSyntheticCorpus(t, false)
+	testGroundedCommandSyntheticCorpus(t, "partitioned-v7")
 }
 
 func TestGroundedFullCommandSyntheticCorpus(t *testing.T) {
-	testGroundedCommandSyntheticCorpus(t, true)
+	testGroundedCommandSyntheticCorpus(t, "partitioned-full-v7")
 }
 
-func groundedCommandMode(full bool) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
-	if full {
+func groundedCommandMode(protocol string) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
+	if protocol == "source-eligible-v8" {
+		return protocol, "--inspect-source-eligible-journal", boardfamily.InspectSourceEligibleJournal
+	}
+	if protocol == "partitioned-full-v7" {
 		return "partitioned-full-v7", "--inspect-partitioned-full-journal", boardfamily.InspectGroundedFullJournal
 	}
 	return "partitioned-v7", "--inspect-partitioned-journal", boardfamily.InspectGroundedJournal
 }
 
-func testGroundedCommandSyntheticCorpus(t *testing.T, full bool) {
+func testGroundedCommandSyntheticCorpus(t *testing.T, mode string) {
 	t.Helper()
-	protocol, inspectFlag, inspect := groundedCommandMode(full)
+	protocol, inspectFlag, inspect := groundedCommandMode(mode)
+	full := protocol != "partitioned-v7"
+	version, profile := boardfamily.GroundedEvidenceVersion, boardfamily.GroundedFullAccountingProfile
+	fixture, decode := groundedCorpusFixture, boardfamily.DecodeGroundedEvidenceIntent
+	if protocol == "source-eligible-v8" {
+		version, profile = boardfamily.SourceEligibleVersion, boardfamily.SourceEligibleAccountingProfile
+		fixture, decode = eligibleCorpusFixture, boardfamily.DecodeSourceEligibleEvidenceIntent
+	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "specs", "board-family-v2", "typed-evaluation-02", "cases-02.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -47,9 +57,9 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, full bool) {
 	}
 	for _, c := range spec.Cases {
 		t.Run(c.ID, func(t *testing.T) {
-			raw := groundedCorpusFixture(t, c.ID, c.Prompt)
+			raw := fixture(t, c.ID, c.Prompt)
 			before := bytes.Clone(raw)
-			decision, err := boardfamily.DecodeGroundedEvidenceIntent(c.Prompt, raw)
+			decision, err := decode(c.Prompt, raw)
 			if err != nil || decision.Disposition != c.Disposition {
 				t.Fatal("incorrect synthetic admission", decision, err)
 			}
@@ -75,10 +85,10 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, full bool) {
 				t.Fatal("incorrect execution boundary", counts)
 			}
 			a, err := inspect(journal)
-			if err != nil || !reflect.DeepEqual(a.Selection.Decision, decision) || a.Selection.AdmissionVersion != boardfamily.GroundedEvidenceVersion || len(a.FilesSHA256) != 8 || len(a.Ledger.Entries) != 1 {
+			if err != nil || !reflect.DeepEqual(a.Selection.Decision, decision) || a.Selection.AdmissionVersion != version || len(a.FilesSHA256) != 8 || len(a.Ledger.Entries) != 1 {
 				t.Fatal("journal mismatch", err)
 			}
-			if full && (a.Selection.Model != boardfamily.GroundedFullModel || a.Ledger.Version != 3 || a.Ledger.AccountingProfile != boardfamily.GroundedFullAccountingProfile || a.Ledger.Entries[0].EstimatedMicroUSD != 1800) {
+			if full && (a.Selection.Model != boardfamily.GroundedFullModel || a.Ledger.Version != 3 || a.Ledger.AccountingProfile != profile || a.Ledger.Entries[0].EstimatedMicroUSD != 1800) {
 				t.Fatal("full-model identity/accounting differs")
 			}
 			// The JSON selection is indented on disk; the original transport
@@ -104,21 +114,24 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, full bool) {
 }
 
 func TestGroundedCommandFailureGates(t *testing.T) {
-	testGroundedCommandFailureGates(t, false)
+	testGroundedCommandFailureGates(t, "partitioned-v7")
 }
 
 func TestGroundedFullCommandFailureGates(t *testing.T) {
-	testGroundedCommandFailureGates(t, true)
+	testGroundedCommandFailureGates(t, "partitioned-full-v7")
 }
 
-func testGroundedCommandFailureGates(t *testing.T, full bool) {
+func testGroundedCommandFailureGates(t *testing.T, protocolMode string) {
 	t.Helper()
-	protocol, _, inspect := groundedCommandMode(full)
+	protocol, _, inspect := groundedCommandMode(protocolMode)
 	for _, mode := range []string{"invalid-extraction", "malformed-output", "refusal", "server-error", "missing-model", "broken-stream", "token-limit", "generation-failure", "validation-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("OPENAI_API_KEY", "offline-command-placeholder")
 			prompt := "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you."
 			raw := groundedCorpusFixture(t, "useful-01", prompt)
+			if protocol == "source-eligible-v8" {
+				raw = eligibleCorpusFixture(t, "useful-01", prompt)
+			}
 			if mode == "invalid-extraction" {
 				raw = []byte(`{"version":"wrong","facts":[]}`)
 			}
@@ -174,16 +187,16 @@ func testGroundedCommandFailureGates(t *testing.T, full bool) {
 }
 
 func TestGroundedFlagsAndContract(t *testing.T) {
-	testGroundedFlagsAndContract(t, false)
+	testGroundedFlagsAndContract(t, "partitioned-v7")
 }
 
 func TestGroundedFullFlagsAndContract(t *testing.T) {
-	testGroundedFlagsAndContract(t, true)
+	testGroundedFlagsAndContract(t, "partitioned-full-v7")
 }
 
-func testGroundedFlagsAndContract(t *testing.T, full bool) {
+func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 	t.Helper()
-	protocol, inspectFlag, _ := groundedCommandMode(full)
+	protocol, inspectFlag, _ := groundedCommandMode(protocolMode)
 	for _, mode := range []string{"export", "export-file", "missing-prompt", "both-prompts", "no-journal", "no-budget", "no-ledger", "overlap", "mixed-inspect", "inspect-generation", "config", "nil-selector"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("OPENAI_API_KEY", "")
@@ -220,7 +233,9 @@ func testGroundedFlagsAndContract(t *testing.T, full bool) {
 			case "config":
 				args = append(args, "--config", "never-read.json")
 			case "nil-selector":
-				if full {
+				if protocol == "source-eligible-v8" {
+					p.interpretEligible = nil
+				} else if protocol == "partitioned-full-v7" {
 					p.interpretGroundedFull = nil
 				} else {
 					p.interpretGrounded = nil
@@ -242,8 +257,11 @@ func testGroundedFlagsAndContract(t *testing.T, full bool) {
 				t.Fatal(err)
 			}
 			export := boardfamily.GroundedEvidenceContract
-			if full {
+			if protocol == "partitioned-full-v7" {
 				export = boardfamily.GroundedFullEvidenceContract
+			}
+			if protocol == "source-eligible-v8" {
+				export = boardfamily.SourceEligibleEvidenceContract
 			}
 			want, err := export(prompt)
 			if err != nil {

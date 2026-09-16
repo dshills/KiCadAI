@@ -39,6 +39,7 @@ type commandPipeline struct {
 	interpretDirect       func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretGrounded     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretGroundedFull func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
+	interpretEligible     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	generate              func(boardfamily.Config, string) (boardfamily.Electrical, error)
 	validate              func(context.Context, string, string) (boardfamily.Validation, error)
 }
@@ -73,6 +74,10 @@ func defaultCommandPipeline() commandPipeline {
 			s, err := boardfamily.InterpretGroundedFullWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
 			return s.Selection, s, err
 		},
+		interpretEligible: func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
+			s, err := boardfamily.InterpretSourceEligibleWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
+			return s.Selection, s, err
+		},
 		generate: boardfamily.Generate,
 		validate: boardfamily.Validate,
 	}
@@ -87,7 +92,7 @@ func runWithPipeline(pipeline commandPipeline) error {
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
 	ledger := flag.String("ledger", "", "persistent ledger required with a prompt; legacy limits unless --live-budget supplies a separate approved goal")
 	budgetFile := flag.String("live-budget", "", "JSON goal/request/microdollar policy for a separately approved new goal; not spending authorization")
-	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7 or partitioned-full-v7 (experimental; requires separate approval and evidence journal)")
+	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7 or source-eligible-v8 (experimental; requires separate approval and evidence journal)")
 	journal := flag.String("evidence-journal", "", "new private evidence directory outside output; required for experimental prompts")
 	inspectJournal := flag.String("inspect-indexed-journal", "", "verify an existing indexed journal by local byte replay; no key or API request")
 	inspectOwnedJournal := flag.String("inspect-owned-journal", "", "verify an existing owned-v4 journal by local byte replay; no key or API request")
@@ -95,13 +100,14 @@ func runWithPipeline(pipeline commandPipeline) error {
 	inspectDirectJournal := flag.String("inspect-direct-journal", "", "verify an existing direct-v6 journal by local byte replay; no key or API request")
 	inspectGroundedJournal := flag.String("inspect-partitioned-journal", "", "verify an existing partitioned-v7 journal by local byte replay; no key or API request")
 	inspectGroundedFullJournal := flag.String("inspect-partitioned-full-journal", "", "verify an existing full-model partitioned-v7 journal by local byte replay; no key or API request")
+	inspectEligibleJournal := flag.String("inspect-source-eligible-journal", "", "verify an existing source-eligible-v8 journal by local byte replay; no key or API request")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
 	inspectModes := 0
-	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal} {
+	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal, *inspectEligibleJournal} {
 		if value != "" {
 			inspectModes++
 		}
@@ -126,16 +132,19 @@ func runWithPipeline(pipeline commandPipeline) error {
 		if *inspectGroundedFullJournal != "" {
 			inspect, path = boardfamily.InspectGroundedFullJournal, *inspectGroundedFullJournal
 		}
+		if *inspectEligibleJournal != "" {
+			inspect, path = boardfamily.InspectSourceEligibleJournal, *inspectEligibleJournal
+		}
 		audit, err := inspect(path)
 		if err != nil {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(audit)
 	}
-	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" {
-		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7 or partitioned-full-v7")
+	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" && *protocol != "source-eligible-v8" {
+		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7 or source-eligible-v8")
 	}
-	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7"
+	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7" || *protocol == "source-eligible-v8"
 	experimental := *protocol == "indexed-v3" || requestSpecific
 	if *journal != "" && (!experimental || *listFamilies || *exportContract != "" || *config != "") {
 		return errors.New("--evidence-journal is only valid for experimental prompt generation")
@@ -174,6 +183,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 			if *protocol == "partitioned-full-v7" {
 				export = boardfamily.GroundedFullEvidenceContract
 			}
+			if *protocol == "source-eligible-v8" {
+				export = boardfamily.SourceEligibleEvidenceContract
+			}
 			contract, err := export(*prompt)
 			if err != nil {
 				return err
@@ -202,7 +214,7 @@ func runWithPipeline(pipeline commandPipeline) error {
 		return errors.New("--live-budget requires a prompt and a separate --ledger")
 	}
 	if experimental {
-		if *config != "" || *ledger == "" || *budgetFile == "" || *journal == "" || (*protocol == "indexed-v3" && pipeline.interpretIndexed == nil) || (*protocol == "owned-v4" && pipeline.interpretOwned == nil) || (*protocol == "connection-v5" && pipeline.interpretConnection == nil) || (*protocol == "direct-v6" && pipeline.interpretDirect == nil) || (*protocol == "partitioned-v7" && pipeline.interpretGrounded == nil) || (*protocol == "partitioned-full-v7" && pipeline.interpretGroundedFull == nil) {
+		if *config != "" || *ledger == "" || *budgetFile == "" || *journal == "" || (*protocol == "indexed-v3" && pipeline.interpretIndexed == nil) || (*protocol == "owned-v4" && pipeline.interpretOwned == nil) || (*protocol == "connection-v5" && pipeline.interpretConnection == nil) || (*protocol == "direct-v6" && pipeline.interpretDirect == nil) || (*protocol == "partitioned-v7" && pipeline.interpretGrounded == nil) || (*protocol == "partitioned-full-v7" && pipeline.interpretGroundedFull == nil) || (*protocol == "source-eligible-v8" && pipeline.interpretEligible == nil) {
 			return fmt.Errorf("%s requires a prompt, a separate --live-budget, --ledger and --evidence-journal", *protocol)
 		}
 		if err := separateEvidenceOutput(*journal, *out); err != nil {
@@ -256,7 +268,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		var s boardfamily.Selection
 		var record any
 		var e error
-		if *protocol == "partitioned-full-v7" {
+		if *protocol == "source-eligible-v8" {
+			s, record, e = pipeline.interpretEligible(ctx, *prompt, *ledger, policy, *journal)
+		} else if *protocol == "partitioned-full-v7" {
 			s, record, e = pipeline.interpretGroundedFull(ctx, *prompt, *ledger, policy, *journal)
 		} else if *protocol == "partitioned-v7" {
 			s, record, e = pipeline.interpretGrounded(ctx, *prompt, *ledger, policy, *journal)

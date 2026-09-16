@@ -12,14 +12,22 @@ const GroundedFullModel = "gpt-4.1-2025-04-14"
 const GroundedFullAccountingProfile = "gpt-4.1-full-standard-2026-09-16"
 const GroundedFullMaxRequestBytes = 16000
 
+// Closed selection: never derive pricing or halt behavior from provider output.
+func (p extractionProtocol) fullModelAccounting() bool {
+	return p == groundedFullProtocol || p == sourceEligibleProtocol
+}
+
 func (p extractionProtocol) model() string {
-	if p == groundedFullProtocol {
+	if p.fullModelAccounting() {
 		return GroundedFullModel
 	}
 	return SelectionModel
 }
 
 func (p extractionProtocol) accountingProfile() string {
+	if p == sourceEligibleProtocol {
+		return SourceEligibleAccountingProfile
+	}
 	if p == groundedFullProtocol {
 		return GroundedFullAccountingProfile
 	}
@@ -31,7 +39,7 @@ func (p extractionProtocol) estimatedMicroUSD(input, output int) int64 {
 	// tokens. Mini: $0.40/$1.60; retain its exact historical rounding.
 	// Source: https://developers.openai.com/api/docs/models/gpt-4.1
 	// Checked 2026-09-16. New rates require a new profile, never an in-place edit.
-	if p == groundedFullProtocol {
+	if p.fullModelAccounting() {
 		return int64(input)*2 + int64(output)*8
 	}
 	return (int64(input)*4 + int64(output)*16 + 9) / 10
@@ -41,16 +49,16 @@ func (p extractionProtocol) validatePolicy(policy LedgerPolicy) error {
 	if err := policy.validate(); err != nil {
 		return err
 	}
-	if p == groundedFullProtocol && policy == legacyLedgerPolicy() {
+	if p.fullModelAccounting() && policy == legacyLedgerPolicy() {
 		return errors.New("full-model comparison requires an explicit separate budget")
 	}
 	return nil
 }
 
-func validGroundedFullHistory(entries []LedgerEntry) bool {
+func (p extractionProtocol) validFullModelHistory(entries []LedgerEntry) bool {
 	ids := map[string]bool{}
 	for _, e := range entries {
-		if e.Status != "completed" || e.ResponseID == "" || ids[e.ResponseID] || e.InputTokens < 0 || e.InputTokens > 1_000_000 || e.OutputTokens < 0 || e.OutputTokens > 1600 || e.EstimatedMicroUSD != groundedFullProtocol.estimatedMicroUSD(e.InputTokens, e.OutputTokens) || e.EstimatedMicroUSD > e.ReserveMicroUSD {
+		if e.Status != "completed" || e.ResponseID == "" || ids[e.ResponseID] || e.InputTokens < 0 || e.InputTokens > 1_000_000 || e.OutputTokens < 0 || e.OutputTokens > 1600 || e.EstimatedMicroUSD != p.estimatedMicroUSD(e.InputTokens, e.OutputTokens) || e.EstimatedMicroUSD > e.ReserveMicroUSD {
 			return false
 		}
 		ids[e.ResponseID] = true
@@ -63,7 +71,7 @@ func (p extractionProtocol) ledgerMatchesPolicy(l Ledger, policy LedgerPolicy) b
 	if l.Goal != policy.Goal || l.AccountingProfile != p.accountingProfile() {
 		return false
 	}
-	if p == groundedFullProtocol {
+	if p.fullModelAccounting() {
 		return l.Version == 3 && l.MaxRequests == policy.MaxRequests && l.MaxMicroUSD == policy.MaxMicroUSD
 	}
 	if policy == legacyLedgerPolicy() {

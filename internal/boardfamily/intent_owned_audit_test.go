@@ -31,6 +31,9 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 			if protocol == groundedFullProtocol {
 				key, check, raw = "offline-grounded-placeholder", checkGroundedFullProviderRequest, groundedRaw(t, []map[string]any{ownedFact("sensor", "BMP280", "requested", "c0"), ownedFact("profile", "standard", "requested", "c0")}, nil)
 			}
+			if protocol == sourceEligibleProtocol {
+				key, check, raw = "offline-eligible-placeholder", checkSourceEligibleProviderRequest, eligibleRaw(t, []map[string]any{ownedFact("sensor", "BMP280", "requested", "c0"), ownedFact("profile", "standard", "requested", "c0")}, nil)
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
@@ -114,7 +117,7 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 				t.Fatal("incomplete verified audit")
 			}
 			if mode == "unchanged" {
-				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol} {
+				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol} {
 					if other != protocol {
 						if _, err := inspectProtocolJournal(root, other); err == nil {
 							t.Fatal("another protocol accepted this journal")

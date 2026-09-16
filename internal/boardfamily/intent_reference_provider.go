@@ -228,7 +228,7 @@ func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string
 		if terminal.Status == "completed" {
 			ledgerStatus = "completed"
 		}
-		if protocol == groundedFullProtocol && terminal.Model != protocol.model() {
+		if protocol.fullModelAccounting() && terminal.Model != protocol.model() {
 			// A different returned model has disputed prices as well as identity.
 			// Preserve its evidence, but never settle it as reusable full-model history.
 			ledgerStatus = "model_mismatch"

@@ -17,9 +17,13 @@ const (
 	directProtocol
 	groundedProtocol
 	groundedFullProtocol
+	sourceEligibleProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == sourceEligibleProtocol {
+		return SourceEligibleVersion
+	}
 	if p == groundedProtocol || p == groundedFullProtocol {
 		return GroundedEvidenceVersion
 	}
@@ -36,6 +40,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == sourceEligibleProtocol {
+		return "source-eligible-evidence-journal-1"
+	}
 	if p == groundedFullProtocol {
 		return "partitioned-full-evidence-journal-1"
 	}
@@ -55,6 +62,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == sourceEligibleProtocol {
+		return "source-eligible-journal-audit-1"
+	}
 	if p == groundedFullProtocol {
 		return "partitioned-full-journal-audit-1"
 	}
@@ -87,6 +97,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return GroundedEvidenceMaxRequestBytes
 	case groundedFullProtocol:
 		return GroundedFullMaxRequestBytes
+	case sourceEligibleProtocol:
+		return SourceEligibleMaxRequestBytes
 	default:
 		return 0
 	}
@@ -104,6 +116,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareDirectGenerateRequest(prompt)
 	case groundedProtocol, groundedFullProtocol:
 		return prepareGroundedGenerateRequest(prompt)
+	case sourceEligibleProtocol:
+		return prepareSourceEligibleGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -121,6 +135,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeDirectEvidenceIntent(prompt, raw)
 	case groundedProtocol, groundedFullProtocol:
 		return DecodeGroundedEvidenceIntent(prompt, raw)
+	case sourceEligibleProtocol:
+		return DecodeSourceEligibleEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}

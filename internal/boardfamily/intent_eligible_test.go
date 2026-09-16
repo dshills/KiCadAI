@@ -228,7 +228,7 @@ func TestSourceEligibleEnvelopeAndHistoricalSeparation(t *testing.T) {
 		t.Fatal(err)
 	}
 	contract, err := SourceEligibleEvidenceContract(prompt)
-	if err != nil || contract["offline_only"] != true || contract["admission_version"] != SourceEligibleVersion {
+	if err != nil || contract["live_authorization_granted"] != false || contract["admission_version"] != SourceEligibleVersion {
 		t.Fatal(contract, err)
 	}
 	after, err := GroundedEvidenceContract(prompt)

@@ -69,7 +69,7 @@ func ledgerChangeForProtocol(path string, policy LedgerPolicy, protocol extracti
 	if policy != legacyLedgerPolicy() {
 		l.Version, l.MaxRequests, l.MaxMicroUSD = 2, policy.MaxRequests, policy.MaxMicroUSD
 	}
-	if protocol == groundedFullProtocol {
+	if protocol.fullModelAccounting() {
 		l.Version, l.AccountingProfile = 3, protocol.accountingProfile()
 	}
 	if info, e := os.Lstat(path); e == nil && !info.Mode().IsRegular() {
@@ -150,7 +150,7 @@ func reserveForProtocol(path string, policy LedgerPolicy, protocol extractionPro
 		if l.HaltReason != "" {
 			return fmt.Errorf("goal API ledger halted: %s; no request sent", l.HaltReason)
 		}
-		if protocol == groundedFullProtocol && !validGroundedFullHistory(l.Entries) {
+		if protocol.fullModelAccounting() && !protocol.validFullModelHistory(l.Entries) {
 			return errors.New("full-model ledger has unresolved or disputed history; no request sent")
 		}
 		var spent int64
@@ -189,7 +189,7 @@ func finishReservationForProtocol(path string, policy LedgerPolicy, protocol ext
 		e.ResponseID = id
 		e.InputTokens = input
 		e.OutputTokens = output
-		if protocol == groundedFullProtocol && status == "model_mismatch" {
+		if protocol.fullModelAccounting() && status == "model_mismatch" {
 			// Keep the permanent reservation and reported token counts, but do not
 			// price an unidentified model or allow another request from this ledger.
 			l.HaltReason = "returned model does not match full-model accounting profile"

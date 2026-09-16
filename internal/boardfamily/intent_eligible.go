@@ -7,11 +7,10 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 )
 
-// This offline candidate is deliberately not registered with a live provider.
-// v7, its recorded responses, and its admission rules remain unchanged.
+// This explicitly selected experimental candidate leaves v7, its recorded
+// responses, and its admission rules unchanged. Integration grants no API spend.
 const SourceEligibleVersion = "8-source-eligible-evidence-experimental"
 const SourceEligibleSchemaName = "board_family_source_eligible_requirements_v8"
 
@@ -211,26 +210,4 @@ func DecodeSourceEligibleEvidenceIntent(prompt string, raw []byte) (Decision, er
 		return localDecision(prompt, "clarify", "The source-eligible extraction could not be validated; no board was generated.", nil), err
 	}
 	return decodeConnectionEvidenceWithLimit(prompt, compiled, groundedMaxAssertions)
-}
-
-// SourceEligibleEvidenceContract exports a development payload only. No CLI
-// selector, live provider, ledger profile or journal can yet dispatch this v8.
-func SourceEligibleEvidenceContract(prompt string) (map[string]any, error) {
-	source, eligibility, err := eligibleSource(prompt)
-	if err != nil {
-		return nil, err
-	}
-	schema, err := SourceEligibleEvidenceSchema(prompt)
-	if err != nil {
-		return nil, err
-	}
-	context := strings.ReplaceAll(GroundedEvidenceLanguageContext(), GroundedEvidenceRequestRevision, "source-eligible-request-11") + `
-Feature labels require a source-compatible anchor. Copy anchor from that feature's feature_anchors and include it in evidence. An eligible mention is not proof that the feature is requested: determine state and scope from the whole request. Do not infer firmware from USB power, or a general peripheral ban from a ban on an external adapter. Preserve an unfamiliar requirement exactly as other rather than dropping it or forcing a feature label.
-quantity_roles narrows dimensional fields when an explicit precision/tolerance phrase is attached to that exact quantity. Empty roles requires other with the precise requested meaning, or unclear for genuine ambiguity. For example, temperature accuracy within 0.2 C is a tolerance, not an operating range; operating at 15 to 30 C and accuracy within 0.2 C has two different quantities. Do not discard either.
-`
-	return map[string]any{"admission_version": SourceEligibleVersion, "request_revision": "source-eligible-request-11",
-		"schema_name": SourceEligibleSchemaName, "schema": schema, "source": source, "eligibility": eligibility,
-		"capability_context": context, "model": GroundedFullModel, "max_output_tokens": 1600,
-		"experimental": true, "offline_only": true,
-		"limitations": "Lexical eligibility is a necessary guard, not a semantic entailment or completeness proof. Unknown wording uses other/unclear. No live integration or authorization exists for this candidate."}, nil
 }

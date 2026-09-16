@@ -11,6 +11,27 @@ import (
 	"kicadai/internal/boardfamily"
 )
 
+func eligibleCorpusFixture(t testing.TB, id, prompt string) []byte {
+	t.Helper()
+	// Only adapt hand-authored test fixtures, never captured provider output.
+	var raw map[string]any
+	if err := json.Unmarshal(groundedCorpusFixture(t, id, prompt), &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range raw["requirements"].([]any) {
+		fact := item.(map[string]any)
+		if fact["kind"] == "feature" {
+			fact["anchor"] = fact["evidence"].([]any)[0]
+		}
+	}
+	raw["version"] = boardfamily.SourceEligibleVersion
+	current, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return current
+}
+
 func TestSourceEligibleSyntheticCorpusPreservesAdmission(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "specs", "board-family-v2", "typed-evaluation-02", "cases-02.json"))
 	if err != nil {
@@ -25,21 +46,7 @@ func TestSourceEligibleSyntheticCorpusPreservesAdmission(t *testing.T) {
 			// Representation test only. These are pre-existing hand-authored
 			// synthetic fixtures, never modified captured provider responses.
 			old := groundedCorpusFixture(t, c.ID, c.Prompt)
-			var raw map[string]any
-			if err := json.Unmarshal(old, &raw); err != nil {
-				t.Fatal(err)
-			}
-			for _, item := range raw["requirements"].([]any) {
-				fact := item.(map[string]any)
-				if fact["kind"] == "feature" {
-					fact["anchor"] = fact["evidence"].([]any)[0]
-				}
-			}
-			raw["version"] = boardfamily.SourceEligibleVersion
-			current, err := json.Marshal(raw)
-			if err != nil {
-				t.Fatal(err)
-			}
+			current := eligibleCorpusFixture(t, c.ID, c.Prompt)
 			before := bytes.Clone(current)
 			got, err := boardfamily.CompileSourceEligibleEvidence(c.Prompt, current)
 			if err != nil {

@@ -234,7 +234,7 @@ func (j *referencedJournal) ledgerSnapshot(s *ReferencedSelection, path string) 
 	if evidenceErr == nil && terminal.Status == "completed" {
 		expectedStatus = "completed"
 	}
-	if j.protocol == groundedFullProtocol && evidenceErr == nil && terminal.Model != j.protocol.model() {
+	if j.protocol.fullModelAccounting() && evidenceErr == nil && terminal.Model != j.protocol.model() {
 		if s.Outcome != "model_mismatch" {
 			return b, errors.New("disputed model must remain a failed selection")
 		}

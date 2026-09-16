@@ -37,7 +37,7 @@ func groundedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (
 
 func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol string) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
-	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" && protocol != "partitioned-full-v7" {
+	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" && protocol != "partitioned-full-v7" && protocol != "source-eligible-v8" {
 		t.Fatal("unknown offline evidence protocol")
 	}
 	counts := &indexedCommandCounts{}
@@ -63,6 +63,9 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			if protocol == "partitioned-v7" || protocol == "partitioned-full-v7" {
 				schemaName = boardfamily.GroundedEvidenceSchemaName
 			}
+			if protocol == "source-eligible-v8" {
+				schemaName = boardfamily.SourceEligibleSchemaName
+			}
 			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
 				t.Fatal("wrong contract or credential in request body")
 			}
@@ -73,7 +76,7 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			response := map[string]any{"id": "offline-command-response", "status": "completed", "model": boardfamily.SelectionModel, "error": nil,
 				"output": []any{map[string]any{"type": "message", "status": "completed", "content": content}},
 				"usage":  map[string]any{"input_tokens": 100, "output_tokens": 200, "total_tokens": 300}}
-			if protocol == "partitioned-full-v7" {
+			if protocol == "partitioned-full-v7" || protocol == "source-eligible-v8" {
 				response["model"] = boardfamily.GroundedFullModel
 				if !bytes.Contains(body, []byte(`"model":"`+boardfamily.GroundedFullModel+`"`)) || len(body) > boardfamily.GroundedFullMaxRequestBytes {
 					t.Fatal("full-model request identity or bound differs")
@@ -116,10 +119,15 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 		if protocol == "partitioned-full-v7" {
 			selectWithJournal = boardfamily.InterpretGroundedFullWithJournal
 		}
+		if protocol == "source-eligible-v8" {
+			selectWithJournal = boardfamily.InterpretSourceEligibleWithJournal
+		}
 		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
 	}
-	if protocol == "partitioned-full-v7" {
+	if protocol == "source-eligible-v8" {
+		pipeline.interpretEligible = interpret
+	} else if protocol == "partitioned-full-v7" {
 		pipeline.interpretGroundedFull = interpret
 	} else if protocol == "partitioned-v7" {
 		pipeline.interpretGrounded = interpret

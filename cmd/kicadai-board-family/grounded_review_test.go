@@ -72,11 +72,22 @@ func TestGroundedOfflineReviewFixtures(t *testing.T) {
 }
 
 func TestGroundedCandidateCommandNative(t *testing.T) {
+	testPartitionedCandidateCommandNative(t, "partitioned-v7")
+}
+
+func testPartitionedCandidateCommandNative(t *testing.T, protocol string) {
+	t.Helper()
 	cli := os.Getenv("KICADAI_OFFLINE_NATIVE_CLI")
 	if testing.Short() || cli == "" {
 		t.Skip("requires explicit offline KiCad CLI; never a live model test")
 	}
-	root := groundedReviewDirectory(t, "native")
+	name := "native"
+	fixture, inspect := groundedCorpusFixture, boardfamily.InspectGroundedJournal
+	if protocol == "source-eligible-v8" {
+		name = "source-eligible-native"
+		fixture, inspect = eligibleCorpusFixture, boardfamily.InspectSourceEligibleJournal
+	}
+	root := groundedReviewDirectory(t, name)
 	useful := 0
 	for _, c := range groundedReviewCases(t) {
 		if c.Disposition != "supported" {
@@ -93,8 +104,8 @@ func TestGroundedCandidateCommandNative(t *testing.T) {
 			if err := save(budget, boardfamily.LedgerPolicy{Goal: "offline-partitioned-native-" + c.ID, MaxRequests: 1, MaxMicroUSD: 50000}); err != nil {
 				t.Fatal(err)
 			}
-			pipeline, counts := groundedCommandPipeline(t, groundedCorpusFixture(t, c.ID, c.Prompt), "", cli)
-			stdout, err := runIndexedCommand(t, pipeline, "--intent-protocol", "partitioned-v7", "--prompt", c.Prompt, "--output", output, "--ledger", ledger, "--live-budget", budget, "--evidence-journal", journal, "--kicad-cli", cli)
+			pipeline, counts := evidenceCommandPipeline(t, fixture(t, c.ID, c.Prompt), "", cli, protocol)
+			stdout, err := runIndexedCommand(t, pipeline, "--intent-protocol", protocol, "--prompt", c.Prompt, "--output", output, "--ledger", ledger, "--live-budget", budget, "--evidence-journal", journal, "--kicad-cli", cli)
 			if err != nil || counts.requests != 1 || counts.generate != 1 || counts.validate != 1 {
 				t.Fatalf("offline native command failed: %v counts=%+v stdout=%s", err, counts, stdout)
 			}
@@ -124,7 +135,7 @@ func TestGroundedCandidateCommandNative(t *testing.T) {
 					t.Fatal("required gate missing or failed", check)
 				}
 			}
-			audit, err := boardfamily.InspectGroundedJournal(journal)
+			audit, err := inspect(journal)
 			if err != nil || audit.Selection.Decision.Configuration == nil || audit.Selection.Decision.Configuration.Family != c.Family || audit.Selection.Decision.Configuration.Profile != c.Profile || !strings.Contains(audit.Selection.ResponseID, "offline") {
 				t.Fatal("native handoff lost synthetic provenance", err)
 			}
