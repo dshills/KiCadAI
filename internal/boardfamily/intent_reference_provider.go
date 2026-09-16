@@ -151,7 +151,7 @@ func interpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath stri
 
 func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journal *referencedJournal, protocol extractionProtocol) (result ReferencedSelection, err error) {
 	start := time.Now()
-	result = ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: protocol.admissionVersion(), Model: SelectionModel,
+	result = ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: protocol.admissionVersion(), Model: protocol.model(),
 		Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)},
 		SourceQuantities: []SourceQuantity{}, Outcome: "no_request"}
 	defer func() {
@@ -172,7 +172,7 @@ func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string
 		}
 	}()
 	policy = policy.effective()
-	if err := policy.validate(); err != nil {
+	if err := protocol.validatePolicy(policy); err != nil {
 		return result, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -190,7 +190,7 @@ func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string
 	transport := &reservedTransport{Path: ledgerPath, Policy: policy, Base: recorder, protocol: protocol}
 	client := &http.Client{Transport: transport, Timeout: 45 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirects forbidden") }}
-	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: os.Getenv("OPENAI_API_KEY"), Model: SelectionModel,
+	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: os.Getenv("OPENAI_API_KEY"), Model: protocol.model(),
 		HTTPClient: client, Background: false, MaxOutputTokens: 1600})
 	if err != nil {
 		return result, err
@@ -233,7 +233,7 @@ func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string
 		// response/prefix remains available for later investigation.
 		result.Model, result.ResponseID, result.Usage = "", "", aiprovider.Usage{}
 	}
-	if err := finishReservationWithPolicy(ledgerPath, policy, transport.Index, ledgerStatus, result.ResponseID, result.Usage.InputTokens, result.Usage.OutputTokens); err != nil {
+	if err := finishReservationForProtocol(ledgerPath, policy, protocol, transport.Index, ledgerStatus, result.ResponseID, result.Usage.InputTokens, result.Usage.OutputTokens); err != nil {
 		result.Outcome = "accounting_failure"
 		return result, errors.Join(providerErr, evidenceErr, captureErr, fmt.Errorf("ledger settlement failed: %w", err))
 	}
@@ -248,7 +248,7 @@ func interpretProtocolWithJournal(ctx context.Context, prompt, ledgerPath string
 		}
 		return result, errors.Join(providerErr, evidenceErr)
 	}
-	if result.Model != SelectionModel {
+	if result.Model != protocol.model() {
 		result.Outcome = "model_mismatch"
 		return result, errors.New("provider returned a model other than the pinned selector model")
 	}

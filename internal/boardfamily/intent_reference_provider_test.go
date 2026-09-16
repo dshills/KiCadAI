@@ -141,8 +141,12 @@ func checkReferencedProviderRequest(t testing.TB, r *http.Request, prompt string
 }
 
 func referencedProviderResponse(t testing.TB, raw []byte, mode, id string) *http.Response {
+	return referencedProviderResponseForModel(t, raw, mode, id, SelectionModel)
+}
+
+func referencedProviderResponseForModel(t testing.TB, raw []byte, mode, id, model string) *http.Response {
 	t.Helper()
-	status, model := "completed", SelectionModel
+	status := "completed"
 	var incomplete any
 	content := []any{map[string]any{"type": "output_text", "text": string(raw)}}
 	inputTokens := 100

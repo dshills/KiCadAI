@@ -12,6 +12,23 @@ import (
 )
 
 func TestGroundedCommandSyntheticCorpus(t *testing.T) {
+	testGroundedCommandSyntheticCorpus(t, false)
+}
+
+func TestGroundedFullCommandSyntheticCorpus(t *testing.T) {
+	testGroundedCommandSyntheticCorpus(t, true)
+}
+
+func groundedCommandMode(full bool) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
+	if full {
+		return "partitioned-full-v7", "--inspect-partitioned-full-journal", boardfamily.InspectGroundedFullJournal
+	}
+	return "partitioned-v7", "--inspect-partitioned-journal", boardfamily.InspectGroundedJournal
+}
+
+func testGroundedCommandSyntheticCorpus(t *testing.T, full bool) {
+	t.Helper()
+	protocol, inspectFlag, inspect := groundedCommandMode(full)
 	data, err := os.ReadFile(filepath.Join("..", "..", "specs", "board-family-v2", "typed-evaluation-02", "cases-02.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -45,8 +62,8 @@ func TestGroundedCommandSyntheticCorpus(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Setenv("OPENAI_API_KEY", "offline-command-placeholder")
-			p, counts := groundedCommandPipeline(t, raw, "", "")
-			if _, err := runIndexedCommand(t, p, "--intent-protocol", "partitioned-v7", "--prompt", c.Prompt, "--live-budget", budget, "--ledger", ledger, "--evidence-journal", journal, "--output", out); err != nil {
+			p, counts := evidenceCommandPipeline(t, raw, "", "", protocol)
+			if _, err := runIndexedCommand(t, p, "--intent-protocol", protocol, "--prompt", c.Prompt, "--live-budget", budget, "--ledger", ledger, "--evidence-journal", journal, "--output", out); err != nil {
 				t.Fatal(err)
 			}
 			want := 0
@@ -57,9 +74,12 @@ func TestGroundedCommandSyntheticCorpus(t *testing.T) {
 			if counts.requests != 1 || counts.generate != want || counts.validate != want {
 				t.Fatal("incorrect execution boundary", counts)
 			}
-			a, err := boardfamily.InspectGroundedJournal(journal)
+			a, err := inspect(journal)
 			if err != nil || !reflect.DeepEqual(a.Selection.Decision, decision) || a.Selection.AdmissionVersion != boardfamily.GroundedEvidenceVersion || len(a.FilesSHA256) != 8 || len(a.Ledger.Entries) != 1 {
 				t.Fatal("journal mismatch", err)
+			}
+			if full && (a.Selection.Model != boardfamily.GroundedFullModel || a.Ledger.Version != 3 || a.Ledger.AccountingProfile != boardfamily.GroundedFullAccountingProfile || a.Ledger.Entries[0].EstimatedMicroUSD != 1800) {
+				t.Fatal("full-model identity/accounting differs")
 			}
 			// The JSON selection is indented on disk; the original transport
 			// stream is retained separately and replayed by the inspector.
@@ -76,7 +96,7 @@ func TestGroundedCommandSyntheticCorpus(t *testing.T) {
 				}
 			}
 			// Inspector uses the real CLI dispatch and must never call the provider.
-			if _, err := runIndexedCommand(t, p, "--inspect-partitioned-journal", journal); err != nil || counts.requests != 1 {
+			if _, err := runIndexedCommand(t, p, inspectFlag, journal); err != nil || counts.requests != 1 {
 				t.Fatal("inspection called provider", err)
 			}
 		})
@@ -84,6 +104,16 @@ func TestGroundedCommandSyntheticCorpus(t *testing.T) {
 }
 
 func TestGroundedCommandFailureGates(t *testing.T) {
+	testGroundedCommandFailureGates(t, false)
+}
+
+func TestGroundedFullCommandFailureGates(t *testing.T) {
+	testGroundedCommandFailureGates(t, true)
+}
+
+func testGroundedCommandFailureGates(t *testing.T, full bool) {
+	t.Helper()
+	protocol, _, inspect := groundedCommandMode(full)
 	for _, mode := range []string{"invalid-extraction", "malformed-output", "refusal", "server-error", "missing-model", "broken-stream", "token-limit", "generation-failure", "validation-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("OPENAI_API_KEY", "offline-command-placeholder")
@@ -100,8 +130,8 @@ func TestGroundedCommandFailureGates(t *testing.T) {
 			if err := save(budget, boardfamily.LedgerPolicy{Goal: "offline-partitioned-failure", MaxRequests: 1, MaxMicroUSD: 50000}); err != nil {
 				t.Fatal(err)
 			}
-			p, counts := groundedCommandPipeline(t, raw, mode, "")
-			_, err := runIndexedCommand(t, p, "--intent-protocol", "partitioned-v7", "--prompt", prompt, "--live-budget", budget, "--ledger", ledger, "--evidence-journal", journal, "--output", out)
+			p, counts := evidenceCommandPipeline(t, raw, mode, "", protocol)
+			_, err := runIndexedCommand(t, p, "--intent-protocol", protocol, "--prompt", prompt, "--live-budget", budget, "--ledger", ledger, "--evidence-journal", journal, "--output", out)
 			if err == nil || counts.requests != 1 {
 				t.Fatal("failure succeeded or retried", err, counts)
 			}
@@ -121,7 +151,7 @@ func TestGroundedCommandFailureGates(t *testing.T) {
 			if mode == "token-limit" {
 				// A failed/incomplete journal is retained but must NOT be
 				// certified by the completed-response replay inspector.
-				if _, err := boardfamily.InspectGroundedJournal(journal); err == nil {
+				if _, err := inspect(journal); err == nil {
 					t.Fatal("incomplete response authenticated as complete")
 				}
 				read := func(path string, value any) {
@@ -144,17 +174,27 @@ func TestGroundedCommandFailureGates(t *testing.T) {
 }
 
 func TestGroundedFlagsAndContract(t *testing.T) {
+	testGroundedFlagsAndContract(t, false)
+}
+
+func TestGroundedFullFlagsAndContract(t *testing.T) {
+	testGroundedFlagsAndContract(t, true)
+}
+
+func testGroundedFlagsAndContract(t *testing.T, full bool) {
+	t.Helper()
+	protocol, inspectFlag, _ := groundedCommandMode(full)
 	for _, mode := range []string{"export", "export-file", "missing-prompt", "both-prompts", "no-journal", "no-budget", "no-ledger", "overlap", "mixed-inspect", "inspect-generation", "config", "nil-selector"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("OPENAI_API_KEY", "")
 			root := t.TempDir()
 			out, journal, ledger, budget := filepath.Join(root, "out"), filepath.Join(root, "journal"), filepath.Join(root, "ledger.json"), filepath.Join(root, "budget.json")
 			prompt := "Use SHT31 standard with a wired connection."
-			p, counts := groundedCommandPipeline(t, []byte(`{}`), "", "")
-			args := []string{"--intent-protocol", "partitioned-v7", "--prompt", prompt, "--output", out, "--ledger", ledger, "--live-budget", budget, "--evidence-journal", journal}
+			p, counts := evidenceCommandPipeline(t, []byte(`{}`), "", "", protocol)
+			args := []string{"--intent-protocol", protocol, "--prompt", prompt, "--output", out, "--ledger", ledger, "--live-budget", budget, "--evidence-journal", journal}
 			switch mode {
 			case "export", "export-file", "missing-prompt", "both-prompts":
-				args = []string{"--intent-protocol", "partitioned-v7", "--export-live-contract", out}
+				args = []string{"--intent-protocol", protocol, "--export-live-contract", out}
 				if mode == "export" || mode == "both-prompts" {
 					args = append(args, "--prompt", prompt)
 				}
@@ -174,13 +214,17 @@ func TestGroundedFlagsAndContract(t *testing.T) {
 			case "overlap":
 				args[11] = filepath.Join(out, "journal")
 			case "mixed-inspect":
-				args = []string{"--inspect-partitioned-journal", journal, "--inspect-owned-journal", journal}
+				args = []string{inspectFlag, journal, "--inspect-owned-journal", journal}
 			case "inspect-generation":
-				args = append(args, "--inspect-partitioned-journal", journal)
+				args = append(args, inspectFlag, journal)
 			case "config":
 				args = append(args, "--config", "never-read.json")
 			case "nil-selector":
-				p.interpretGrounded = nil
+				if full {
+					p.interpretGroundedFull = nil
+				} else {
+					p.interpretGrounded = nil
+				}
 			}
 			stdout, err := runIndexedCommand(t, p, args...)
 			valid := mode == "export" || mode == "export-file"
@@ -197,7 +241,11 @@ func TestGroundedFlagsAndContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want, err := boardfamily.GroundedEvidenceContract(prompt)
+			export := boardfamily.GroundedEvidenceContract
+			if full {
+				export = boardfamily.GroundedFullEvidenceContract
+			}
+			want, err := export(prompt)
 			if err != nil {
 				t.Fatal(err)
 			}

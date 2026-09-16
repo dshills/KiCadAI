@@ -131,7 +131,7 @@ func inspectProtocolJournal(root string, protocol extractionProtocol) (Reference
 	if err := decodeReferencedAuditJSON(data["start.json"], &start); err != nil {
 		return audit, err
 	}
-	if start.Version != protocol.journalVersion() || start.AdmissionVersion != protocol.admissionVersion() || start.Status != "prepared-not-transport-authority" || start.Policy.validate() != nil {
+	if start.Version != protocol.journalVersion() || start.AdmissionVersion != protocol.admissionVersion() || start.Status != "prepared-not-transport-authority" || protocol.validatePolicy(start.Policy) != nil {
 		return audit, errors.New("journal start contract differs")
 	}
 	var s ReferencedSelection
@@ -147,7 +147,7 @@ func inspectProtocolJournal(root string, protocol extractionProtocol) (Reference
 	}
 	e := s.ProviderEvidence
 	terminal, err := inspectReferencedEvidence(e)
-	if err != nil || e.PersistenceError || !e.TransportStarted || terminal.Status != "completed" || terminal.Model != SelectionModel || *terminal.Usage.Input > 1_000_000 {
+	if err != nil || e.PersistenceError || !e.TransportStarted || terminal.Status != "completed" || terminal.Model != protocol.model() || *terminal.Usage.Input > 1_000_000 {
 		return audit, errors.New("journal has no complete verified pinned response")
 	}
 	if !bytes.Equal(data["request/body.bin"], e.RequestBody) || !bytes.Equal(data["response.bin"], e.Body) || s.ResponseID != terminal.ID || s.Model != terminal.Model || s.Usage.InputTokens != *terminal.Usage.Input || s.Usage.OutputTokens != *terminal.Usage.Output || s.Usage.TotalTokens != *terminal.Usage.Total {
@@ -158,7 +158,7 @@ func inspectProtocolJournal(root string, protocol extractionProtocol) (Reference
 		return audit, err
 	}
 	replay := &referencedAuditReplay{evidence: e, protocol: protocol}
-	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: "offline-journal-replay", Model: SelectionModel, HTTPClient: &http.Client{Transport: replay}, MaxOutputTokens: 1600})
+	provider, err := aiprovider.NewOpenAIProvider(aiprovider.OpenAIOptions{APIKey: "offline-journal-replay", Model: protocol.model(), HTTPClient: &http.Client{Transport: replay}, MaxOutputTokens: 1600})
 	if err != nil {
 		return audit, err
 	}
@@ -186,7 +186,7 @@ func inspectProtocolJournal(root string, protocol extractionProtocol) (Reference
 	if s.Outcome != outcome || !sameReferencedJSON(s.RawIntent, response.IntentJSON) || !sameReferencedJSON(s.Decision, decision) {
 		return audit, errors.New("journal extraction outcome differs from byte replay")
 	}
-	j := referencedJournal{policy: start.Policy}
+	j := referencedJournal{policy: start.Policy, protocol: protocol}
 	ledger, err := j.ledgerSnapshot(&s, filepath.Join(root, "selection/ledger.json"))
 	if err != nil || !bytes.Equal(ledger, data["selection/ledger.json"]) {
 		return audit, errors.New("journal ledger does not join")
@@ -199,7 +199,7 @@ func inspectProtocolJournal(root string, protocol extractionProtocol) (Reference
 	}
 	ids := map[string]bool{}
 	for i, entry := range audit.Ledger.Entries {
-		if entry.Index != i+1 || entry.Status != "completed" || entry.Model != SelectionModel || entry.ReserveMicroUSD != RequestReserveMicroUSD || entry.ResponseID == "" || ids[entry.ResponseID] || entry.InputTokens < 0 || entry.InputTokens > 1_000_000 || entry.OutputTokens < 0 || entry.OutputTokens > 1600 || entry.EstimatedMicroUSD != (int64(entry.InputTokens)*4+int64(entry.OutputTokens)*16+9)/10 || entry.EstimatedMicroUSD > RequestReserveMicroUSD {
+		if entry.Index != i+1 || entry.Status != "completed" || entry.Model != protocol.model() || entry.ReserveMicroUSD != RequestReserveMicroUSD || entry.ResponseID == "" || ids[entry.ResponseID] || entry.InputTokens < 0 || entry.InputTokens > 1_000_000 || entry.OutputTokens < 0 || entry.OutputTokens > 1600 || entry.EstimatedMicroUSD != protocol.estimatedMicroUSD(entry.InputTokens, entry.OutputTokens) || entry.EstimatedMicroUSD > RequestReserveMicroUSD {
 			return audit, errors.New("journal ledger history is disputed")
 		}
 		ids[entry.ResponseID] = true

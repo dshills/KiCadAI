@@ -37,7 +37,7 @@ func groundedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (
 
 func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol string) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
-	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" {
+	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" && protocol != "partitioned-full-v7" {
 		t.Fatal("unknown offline evidence protocol")
 	}
 	counts := &indexedCommandCounts{}
@@ -60,7 +60,7 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			if protocol == "direct-v6" {
 				schemaName = boardfamily.DirectEvidenceSchemaName
 			}
-			if protocol == "partitioned-v7" {
+			if protocol == "partitioned-v7" || protocol == "partitioned-full-v7" {
 				schemaName = boardfamily.GroundedEvidenceSchemaName
 			}
 			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
@@ -73,6 +73,12 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			response := map[string]any{"id": "offline-command-response", "status": "completed", "model": boardfamily.SelectionModel, "error": nil,
 				"output": []any{map[string]any{"type": "message", "status": "completed", "content": content}},
 				"usage":  map[string]any{"input_tokens": 100, "output_tokens": 200, "total_tokens": 300}}
+			if protocol == "partitioned-full-v7" {
+				response["model"] = boardfamily.GroundedFullModel
+				if !bytes.Contains(body, []byte(`"model":"`+boardfamily.GroundedFullModel+`"`)) || len(body) > boardfamily.GroundedFullMaxRequestBytes {
+					t.Fatal("full-model request identity or bound differs")
+				}
+			}
 			if mode == "missing-model" {
 				delete(response, "model")
 			}
@@ -107,10 +113,15 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 		if protocol == "partitioned-v7" {
 			selectWithJournal = boardfamily.InterpretGroundedWithJournal
 		}
+		if protocol == "partitioned-full-v7" {
+			selectWithJournal = boardfamily.InterpretGroundedFullWithJournal
+		}
 		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
 	}
-	if protocol == "partitioned-v7" {
+	if protocol == "partitioned-full-v7" {
+		pipeline.interpretGroundedFull = interpret
+	} else if protocol == "partitioned-v7" {
 		pipeline.interpretGrounded = interpret
 	} else if protocol == "direct-v6" {
 		pipeline.interpretDirect = interpret

@@ -14,6 +14,14 @@ import (
 )
 
 func checkGroundedProviderRequest(t testing.TB, r *http.Request, prompt string) int {
+	return checkGroundedProviderRequestForModel(t, r, prompt, SelectionModel)
+}
+
+func checkGroundedFullProviderRequest(t testing.TB, r *http.Request, prompt string) int {
+	return checkGroundedProviderRequestForModel(t, r, prompt, GroundedFullModel)
+}
+
+func checkGroundedProviderRequestForModel(t testing.TB, r *http.Request, prompt, model string) int {
 	t.Helper()
 	if r.Method != "POST" || r.URL.String() != "https://api.openai.com/v1/responses" || r.ContentLength <= 0 || r.ContentLength > GroundedEvidenceMaxRequestBytes {
 		t.Fatal("endpoint or request bounds changed")
@@ -44,7 +52,7 @@ func checkGroundedProviderRequest(t testing.TB, r *http.Request, prompt string) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if payload.Model != SelectionModel || payload.MaxOutputTokens != 1600 || payload.Store || payload.Background || !payload.Stream ||
+	if payload.Model != model || payload.MaxOutputTokens != 1600 || payload.Store || payload.Background || !payload.Stream ||
 		!payload.Text.Format.Strict || payload.Text.Format.Type != "json_schema" || payload.Text.Format.Name != GroundedEvidenceSchemaName {
 		t.Fatal("pinned transport contract changed")
 	}

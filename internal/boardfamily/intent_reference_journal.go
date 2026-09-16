@@ -223,7 +223,7 @@ func (j *referencedJournal) ledgerSnapshot(s *ReferencedSelection, path string) 
 	if err := json.Unmarshal(b, &l); err != nil || len(l.Entries) != s.LedgerIndex || l.Goal != j.policy.Goal || l.HaltReason != "" {
 		return b, errors.New("ledger snapshot does not end at this selection and policy")
 	}
-	if (j.policy == legacyLedgerPolicy() && l.Version != 1) || (j.policy != legacyLedgerPolicy() && (l.Version != 2 || l.MaxRequests != j.policy.MaxRequests || l.MaxMicroUSD != j.policy.MaxMicroUSD)) {
+	if !j.protocol.ledgerMatchesPolicy(l, j.policy) {
 		return b, errors.New("journal ledger policy differs")
 	}
 	e := l.Entries[s.LedgerIndex-1]
@@ -231,7 +231,7 @@ func (j *referencedJournal) ledgerSnapshot(s *ReferencedSelection, path string) 
 	if terminal, err := inspectReferencedEvidence(s.ProviderEvidence); err == nil && terminal.Status == "completed" {
 		expectedStatus = "completed"
 	}
-	if e.Index != s.LedgerIndex || e.Model != SelectionModel || e.ReserveMicroUSD != RequestReserveMicroUSD || e.Status != expectedStatus || e.ResponseID != s.ResponseID || e.InputTokens != s.Usage.InputTokens || e.OutputTokens != s.Usage.OutputTokens || e.EstimatedMicroUSD != (int64(e.InputTokens)*4+int64(e.OutputTokens)*16+9)/10 {
+	if e.Index != s.LedgerIndex || e.Model != j.protocol.model() || e.ReserveMicroUSD != RequestReserveMicroUSD || e.Status != expectedStatus || e.ResponseID != s.ResponseID || e.InputTokens != s.Usage.InputTokens || e.OutputTokens != s.Usage.OutputTokens || e.EstimatedMicroUSD != j.protocol.estimatedMicroUSD(e.InputTokens, e.OutputTokens) {
 		return b, errors.New("journal ledger and selection do not join")
 	}
 	return b, nil
@@ -276,10 +276,10 @@ func InterpretReferencedWithJournal(ctx context.Context, prompt, ledgerPath stri
 
 func interpretProtocolJournal(ctx context.Context, prompt, ledgerPath string, policy LedgerPolicy, base http.RoundTripper, journalPath string, protocol extractionProtocol) (ReferencedSelection, error) {
 	failure := ReferencedSelection{Selection: Selection{OriginalRequest: prompt, AdmissionVersion: protocol.admissionVersion(),
-		Model: SelectionModel, Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)},
+		Model: protocol.model(), Decision: localDecision(prompt, "clarify", "No validated requirement extraction is available; no board was generated.", nil)},
 		SourceQuantities: []SourceQuantity{}, Outcome: "no_request"}
 	policy = policy.effective()
-	if err := policy.validate(); err != nil {
+	if err := protocol.validatePolicy(policy); err != nil {
 		return failure, err
 	}
 	if err := ctx.Err(); err != nil {

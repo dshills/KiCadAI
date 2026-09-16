@@ -28,13 +28,16 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 			if protocol == groundedProtocol {
 				key, check, raw = "offline-grounded-placeholder", checkGroundedProviderRequest, groundedRaw(t, []map[string]any{ownedFact("sensor", "BMP280", "requested", "c0"), ownedFact("profile", "standard", "requested", "c0")}, nil)
 			}
+			if protocol == groundedFullProtocol {
+				key, check, raw = "offline-grounded-placeholder", checkGroundedFullProviderRequest, groundedRaw(t, []map[string]any{ownedFact("sensor", "BMP280", "requested", "c0"), ownedFact("profile", "standard", "requested", "c0")}, nil)
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
 			ledger := filepath.Join(dir, "ledger.json")
 			s, err := interpretProtocolJournal(context.Background(), journalTestPrompt, ledger, journalTestPolicy, roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 				check(t, r, journalTestPrompt)
-				return referencedProviderResponse(t, raw, "complete", "offline-owned-audit"), nil
+				return referencedProviderResponseForModel(t, raw, "complete", "offline-owned-audit", protocol.model()), nil
 			}), root, protocol)
 			if err != nil {
 				t.Fatal(err)

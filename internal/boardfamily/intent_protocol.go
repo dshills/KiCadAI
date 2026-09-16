@@ -16,10 +16,11 @@ const (
 	connectionProtocol
 	directProtocol
 	groundedProtocol
+	groundedFullProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
-	if p == groundedProtocol {
+	if p == groundedProtocol || p == groundedFullProtocol {
 		return GroundedEvidenceVersion
 	}
 	if p == directProtocol {
@@ -35,6 +36,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == groundedFullProtocol {
+		return "partitioned-full-evidence-journal-1"
+	}
 	if p == groundedProtocol {
 		return "partitioned-evidence-journal-1"
 	}
@@ -51,6 +55,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == groundedFullProtocol {
+		return "partitioned-full-journal-audit-1"
+	}
 	if p == groundedProtocol {
 		return "partitioned-journal-audit-1"
 	}
@@ -78,6 +85,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return DirectEvidenceMaxRequestBytes
 	case groundedProtocol:
 		return GroundedEvidenceMaxRequestBytes
+	case groundedFullProtocol:
+		return GroundedFullMaxRequestBytes
 	default:
 		return 0
 	}
@@ -93,7 +102,7 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareConnectionGenerateRequest(prompt)
 	case directProtocol:
 		return prepareDirectGenerateRequest(prompt)
-	case groundedProtocol:
+	case groundedProtocol, groundedFullProtocol:
 		return prepareGroundedGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
@@ -110,7 +119,7 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeConnectionEvidenceIntent(prompt, raw)
 	case directProtocol:
 		return DecodeDirectEvidenceIntent(prompt, raw)
-	case groundedProtocol:
+	case groundedProtocol, groundedFullProtocol:
 		return DecodeGroundedEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
