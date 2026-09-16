@@ -189,6 +189,12 @@ func finishReservationForProtocol(path string, policy LedgerPolicy, protocol ext
 		e.ResponseID = id
 		e.InputTokens = input
 		e.OutputTokens = output
+		if protocol == groundedFullProtocol && status == "model_mismatch" {
+			// Keep the permanent reservation and reported token counts, but do not
+			// price an unidentified model or allow another request from this ledger.
+			l.HaltReason = "returned model does not match full-model accounting profile"
+			return nil
+		}
 		// Persist a halt even when accounting cannot be trusted. Returning an
 		// error from the mutation itself would discard this safety state.
 		if input < 0 || output < 0 || input > 1_000_000 || output > 1_000_000 {

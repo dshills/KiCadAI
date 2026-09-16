@@ -220,7 +220,7 @@ func (j *referencedJournal) ledgerSnapshot(s *ReferencedSelection, path string) 
 	if err := validateIntentJSON(b); err != nil {
 		return b, errors.New("ledger snapshot JSON is ambiguous or invalid")
 	}
-	if err := json.Unmarshal(b, &l); err != nil || len(l.Entries) != s.LedgerIndex || l.Goal != j.policy.Goal || l.HaltReason != "" {
+	if err := json.Unmarshal(b, &l); err != nil || len(l.Entries) != s.LedgerIndex || l.Goal != j.policy.Goal {
 		return b, errors.New("ledger snapshot does not end at this selection and policy")
 	}
 	if !j.protocol.ledgerMatchesPolicy(l, j.policy) {
@@ -228,10 +228,20 @@ func (j *referencedJournal) ledgerSnapshot(s *ReferencedSelection, path string) 
 	}
 	e := l.Entries[s.LedgerIndex-1]
 	expectedStatus := "failed_or_unknown"
-	if terminal, err := inspectReferencedEvidence(s.ProviderEvidence); err == nil && terminal.Status == "completed" {
+	expectedCost := j.protocol.estimatedMicroUSD(e.InputTokens, e.OutputTokens)
+	expectedHalt := ""
+	terminal, evidenceErr := inspectReferencedEvidence(s.ProviderEvidence)
+	if evidenceErr == nil && terminal.Status == "completed" {
 		expectedStatus = "completed"
 	}
-	if e.Index != s.LedgerIndex || e.Model != j.protocol.model() || e.ReserveMicroUSD != RequestReserveMicroUSD || e.Status != expectedStatus || e.ResponseID != s.ResponseID || e.InputTokens != s.Usage.InputTokens || e.OutputTokens != s.Usage.OutputTokens || e.EstimatedMicroUSD != j.protocol.estimatedMicroUSD(e.InputTokens, e.OutputTokens) {
+	if j.protocol == groundedFullProtocol && evidenceErr == nil && terminal.Model != j.protocol.model() {
+		if s.Outcome != "model_mismatch" {
+			return b, errors.New("disputed model must remain a failed selection")
+		}
+		expectedStatus, expectedCost = "model_mismatch", 0
+		expectedHalt = "returned model does not match full-model accounting profile"
+	}
+	if l.HaltReason != expectedHalt || e.Index != s.LedgerIndex || e.Model != j.protocol.model() || e.ReserveMicroUSD != RequestReserveMicroUSD || e.Status != expectedStatus || e.ResponseID != s.ResponseID || e.InputTokens != s.Usage.InputTokens || e.OutputTokens != s.Usage.OutputTokens || e.EstimatedMicroUSD != expectedCost {
 		return b, errors.New("journal ledger and selection do not join")
 	}
 	return b, nil

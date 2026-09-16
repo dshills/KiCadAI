@@ -213,6 +213,52 @@ func TestGroundedFullJournalTampering(t *testing.T) {
 	testRequestEvidenceJournalTampering(t, groundedFullProtocol)
 }
 
+func TestGroundedFullModelMismatchHaltsNextInvocation(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "offline-grounded-placeholder")
+	root := t.TempDir()
+	ledger := filepath.Join(root, "ledger.json")
+	policy := LedgerPolicy{"offline-full-model-mismatch", 2, 100000}
+	calls := 0
+	transport := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		calls++
+		checkGroundedFullProviderRequest(t, r, "Use BMP280 standard.")
+		return referencedProviderResponseForModel(t, groundedRaw(t, nil, nil), "wrong-model", "offline-wrong-model", GroundedFullModel), nil
+	})
+	s, err := InterpretGroundedFullWithJournal(context.Background(), "Use BMP280 standard.", ledger, policy, transport, filepath.Join(root, "first-journal"))
+	if err == nil || s.Outcome != "model_mismatch" || s.Model == GroundedFullModel || calls != 1 || s.Decision.Configuration != nil {
+		t.Fatal("model mismatch not preserved", s.Outcome, s.Model, calls, err)
+	}
+	receipt, err := os.ReadFile(filepath.Join(root, "first-journal", "selection", "receipt.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recorded struct {
+		Outcome      string `json:"outcome"`
+		LedgerJoined bool   `json:"ledger_joined"`
+	}
+	if err := json.Unmarshal(receipt, &recorded); err != nil || recorded.Outcome != "model_mismatch" || !recorded.LedgerJoined {
+		t.Fatal("model mismatch journal lost its accounting join", recorded, err)
+	}
+	l := readReferencedTestLedger(t, ledger)
+	if l.HaltReason == "" || len(l.Entries) != 1 || l.Entries[0].Status != "model_mismatch" || l.Entries[0].EstimatedMicroUSD != 0 || l.Entries[0].ReserveMicroUSD != RequestReserveMicroUSD {
+		t.Fatal("disputed model was priced or left reusable", l)
+	}
+	before, err := os.ReadFile(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InspectGroundedFullJournal(filepath.Join(root, "first-journal")); err == nil {
+		t.Fatal("model mismatch audited as complete")
+	}
+	if _, err := InterpretGroundedFullWithJournal(context.Background(), "Use BMP280 standard.", ledger, policy, transport, filepath.Join(root, "second-journal")); err == nil || calls != 1 {
+		t.Fatal("model mismatch allowed another invocation", calls, err)
+	}
+	after, err := os.ReadFile(ledger)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("blocked invocation changed disputed ledger", err)
+	}
+}
+
 func TestGroundedFullAccountingTampering(t *testing.T) {
 	for _, mode := range []string{"profile-absent", "profile-other", "version", "cost", "model", "reserve", "budget"} {
 		t.Run(mode, func(t *testing.T) {
