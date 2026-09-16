@@ -49,6 +49,8 @@ The subsequent `.cache/partitioned-08-integration-checks/verification.json` reco
 
 ## Limitations and review findings
 
+A subsequent [offline review](REVIEW.md) closes the real native-handoff gap: all five synthetic supported selections now run the actual KiCad 10.0.3 validation/export path, pass 14 gates each and match 201 reviewed deliverables. It authenticates all 256 published example files and checks the 14 schemas with Ajv plus 58 negative controls. Exact synthetic JSON sizes are recorded, but no provider token count or live accuracy result is claimed. The earlier stubbed-integration checkpoint remains unchanged as historical evidence.
+
 Mandatory quantity slots prove inventory presence, not meaning. The model can still assign the wrong eligible role, use an inaccurate free-text description, omit a nonnumeric requirement, or claim a forbidden state when the source says merely unnecessary. An explicit test preserves a schema-valid synthetic wired-to-wireless false refusal. Do not call these tests an accuracy improvement, independent review or general reliability estimate.
 
 The 1,600-output-token cap is unchanged. A source inventory can be valid and fit the request-size and internal assertion bounds while requiring too many output tokens to complete. Dense synthetic compiler tests prove representation only, not provider completion at that cap. Output-token feasibility for the proposed live corpus still needs explicit review; no token or spending increase is implied.
@@ -57,10 +59,10 @@ The test-only schema checker expands local acyclic definitions; it is not a gene
 
 ## Remaining work toward the original goal
 
-1. Review the complete candidate and its source-bound extraction fixtures, preserving the original criteria and historical failed results.
-2. Establish output-token feasibility for the proposed live corpus and document residual semantic/schema risks. Do not infer reliability from synthetic fixtures or silently raise limits.
-3. Reuse authenticated unchanged native qualification; inspect the new command's complete output handoff without conflating stubbed validation with a fresh engineering qualification.
-4. Only then consider a separately authorized fixed live evaluation. No additional request allowance or budget exists for this candidate.
+1. Prepare and freeze a separate candidate-08 runtime and runner with the unchanged 14-case acceptance criteria, accounting boundaries and no-retry policy. Do not reuse or relabel candidate-07 evidence.
+2. Preserve the completed offline review, size-screen limitations and native-equivalence evidence. Exact fixture sizes do not bound free-form model output or prove reliability; do not silently raise limits.
+3. Request explicit authority for the frozen bounded evaluation and any genuinely required executable-specific network rule. No additional request allowance or budget exists for this candidate.
+4. Assess full raw fidelity and complete native outcomes honestly; obtain separate publication authority for candidate-head CI and updated PR results. The goal remains open until its original gates are satisfied.
 
 The full goal remains two distinct reviewed board families through a reliable natural-language workflow, complete native/manufacturing bundles, no manual output repair, and the original complete acceptance gate. Fabrication and physical bring-up remain separate.
 
