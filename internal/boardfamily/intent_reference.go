@@ -34,6 +34,12 @@ type ReferencedIntent struct {
 // generator, or native output is touched. Historical provider bytes must remain
 // version 2 and be replayed with DecodeIntent, never silently migrated here.
 func DecodeReferencedIntent(prompt string, raw []byte) (Decision, error) {
+	return decodeReferencedIntentWithLimit(prompt, raw, 64)
+}
+
+// Only a separately validated successor envelope may use a larger internal
+// inventory. The public historical decoder retains its original 64-fact cap.
+func decodeReferencedIntentWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
 	failure := localDecision(prompt, "clarify", "The source-referenced extraction could not be validated; no board was generated.", nil)
 	request, err := PrepareReferencedRequest(prompt)
 	if err != nil {
@@ -52,7 +58,7 @@ func DecodeReferencedIntent(prompt string, raw []byte) (Decision, error) {
 	if err := d.Decode(&intent); err != nil {
 		return failure, err
 	}
-	if !exactFields(raw, "version", "facts") || intent.Version != ReferenceIntentVersion || len(intent.Facts) > 64 {
+	if !exactFields(raw, "version", "facts") || intent.Version != ReferenceIntentVersion || len(intent.Facts) > maxFacts {
 		return failure, errors.New("invalid referenced intent version or fact inventory")
 	}
 	var envelope struct {

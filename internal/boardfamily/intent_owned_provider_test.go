@@ -242,10 +242,10 @@ func TestOwnedProviderDoesNotRewriteIndexedRequestContract(t *testing.T) {
 }
 
 func TestOwnedProtocolLegacyGuardsStaySeparate(t *testing.T) {
-	for _, p := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, 99} {
+	for _, p := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, 99} {
 		t.Run(fmt.Sprint(p), func(t *testing.T) {
 			limit := p.requestLimit()
-			if (p == indexedProtocol && limit != 24000) || (p == ownedProtocol && limit != 65536) || (p == connectionProtocol && limit != 65536) || (p == directProtocol && limit != 65536) || (p == 99 && limit != 0) {
+			if (p == indexedProtocol && limit != 24000) || (p == ownedProtocol && limit != 65536) || (p == connectionProtocol && limit != 65536) || (p == directProtocol && limit != 65536) || (p == groundedProtocol && limit != 65536) || (p == 99 && limit != 0) {
 				t.Fatal("wrong fixed limit")
 			}
 			calls := 0

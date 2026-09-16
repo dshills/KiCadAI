@@ -59,6 +59,10 @@ func ConnectionEvidenceSchema(prompt string) (map[string]any, error) {
 // or a migration of historical evidence. Original caller bytes are untouched.
 // All non-connection constraints use unchanged owned-v4 validation/admission.
 func DecodeConnectionEvidenceIntent(prompt string, raw []byte) (Decision, error) {
+	return decodeConnectionEvidenceWithLimit(prompt, raw, 64)
+}
+
+func decodeConnectionEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
 	failure := localDecision(prompt, "clarify", "The connection extraction could not be validated; no board was generated.", nil)
 	if len(raw) > 65536 {
 		return failure, errors.New("connection evidence exceeds 65536 bytes")
@@ -73,7 +77,7 @@ func DecodeConnectionEvidenceIntent(prompt string, raw []byte) (Decision, error)
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return failure, err
 	}
-	if !exactFields(raw, "version", "facts") || envelope.Version != ConnectionEvidenceVersion || envelope.Facts == nil || len(envelope.Facts) > 64 {
+	if !exactFields(raw, "version", "facts") || envelope.Version != ConnectionEvidenceVersion || envelope.Facts == nil || len(envelope.Facts) > maxFacts {
 		return failure, errors.New("invalid connection evidence version or fact inventory")
 	}
 	request, err := PrepareOwnedEvidenceRequest(prompt)
@@ -133,5 +137,5 @@ func DecodeConnectionEvidenceIntent(prompt string, raw []byte) (Decision, error)
 	if err != nil {
 		return failure, err
 	}
-	return DecodeOwnedEvidenceIntent(prompt, encoded)
+	return decodeOwnedEvidenceWithLimit(prompt, encoded, maxFacts)
 }

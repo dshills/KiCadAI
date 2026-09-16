@@ -31,9 +31,13 @@ func directCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (co
 	return evidenceCommandPipeline(t, raw, mode, nativeCLI, "direct-v6")
 }
 
+func groundedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (commandPipeline, *indexedCommandCounts) {
+	return evidenceCommandPipeline(t, raw, mode, nativeCLI, "partitioned-v7")
+}
+
 func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol string) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
-	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" {
+	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" {
 		t.Fatal("unknown offline evidence protocol")
 	}
 	counts := &indexedCommandCounts{}
@@ -56,6 +60,9 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			if protocol == "direct-v6" {
 				schemaName = boardfamily.DirectEvidenceSchemaName
 			}
+			if protocol == "partitioned-v7" {
+				schemaName = boardfamily.GroundedEvidenceSchemaName
+			}
 			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
 				t.Fatal("wrong contract or credential in request body")
 			}
@@ -69,11 +76,18 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			if mode == "missing-model" {
 				delete(response, "model")
 			}
-			b, err := json.Marshal(map[string]any{"type": "response.completed", "response": response})
+			event := "response.completed"
+			if mode == "token-limit" {
+				event = "response.incomplete"
+				response["status"] = "incomplete"
+				response["incomplete_details"] = map[string]any{"reason": "max_output_tokens"}
+				response["usage"] = map[string]any{"input_tokens": 100, "output_tokens": 1600, "total_tokens": 1700}
+			}
+			b, err := json.Marshal(map[string]any{"type": event, "response": response})
 			if err != nil {
 				t.Fatal(err)
 			}
-			wire := "event: response.completed\ndata: " + string(b) + "\n\n"
+			wire := "event: " + event + "\ndata: " + string(b) + "\n\n"
 			if mode == "broken-stream" {
 				wire = "data: {\"type\":\"response.created\"}\n\n"
 			}
@@ -90,10 +104,15 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 		if protocol == "direct-v6" {
 			selectWithJournal = boardfamily.InterpretDirectWithJournal
 		}
+		if protocol == "partitioned-v7" {
+			selectWithJournal = boardfamily.InterpretGroundedWithJournal
+		}
 		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
 	}
-	if protocol == "direct-v6" {
+	if protocol == "partitioned-v7" {
+		pipeline.interpretGrounded = interpret
+	} else if protocol == "direct-v6" {
 		pipeline.interpretDirect = interpret
 	} else if protocol == "connection-v5" {
 		pipeline.interpretConnection = interpret

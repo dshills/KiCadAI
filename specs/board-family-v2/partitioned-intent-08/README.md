@@ -1,4 +1,4 @@
-# Partitioned requirement extraction: offline prototype
+# Partitioned requirement extraction: experimental candidate
 
 Candidate 08 is **not a completed goal, release, live-tested improvement, or spending authorization**. Candidate 07 remains a completed failed evaluation: 8/14 complete passes and 4/5 useful native boards. Its source, runtime, provider responses, judgments and evidence remain unchanged.
 
@@ -8,9 +8,15 @@ The experimental version `7-partitioned-evidence-experimental` separates nonnume
 
 Requirement states use explicit wire labels: `requested`, `unnecessary_but_allowed`, `must_not_occur`, and `unresolved_choice`. Compilation maps these one-to-one to the existing states without correcting model output. Quantity roles without a faithful supported field use a precise `other` description or a genuinely targeted `unclear` question; they are not forced into a feature enum. The application remains responsible for engineering feasibility.
 
-Shared JSON Schema definitions keep the schema bounded even at 32 clauses and 128 quantity occurrences. Source preparation preserves the complete request and clause/quantity tables. Model selection, direct JSON framing, attempt 1, 1600 output tokens, engineering admission, native geometry and operating limits are unchanged. This prototype has no production CLI, journal or live-transport dispatch path yet.
+Shared JSON Schema definitions keep the schema bounded even at 32 clauses and 128 quantity occurrences. Source preparation preserves the complete request and clause/quantity tables. Model selection, direct JSON framing, attempt 1, 1600 output tokens, engineering rules, native geometry and operating limits are unchanged.
+
+The opt-in CLI flag is `--intent-protocol partitioned-v7`; the default remains `typed-v2`. Experimental generation requires a separately approved budget, ledger and new private evidence journal. `--inspect-partitioned-journal` replays completed evidence locally without a key or request. The journal and audit have distinct version identifiers; legacy inspectors reject these journals, and the new inspector rejects legacy journals. Contract export is key-free and grants no sending or spending authority.
+
+The new internal assertion ceiling is bounded at 320: at most 64 ordinary requirements and two endpoint roles for each of 128 source quantities. Historical public decoders still enforce their original 64-fact ceiling. This fixes an offline-reproduced regression where a valid 128-quantity request could never be admitted. It does **not** increase source limits, byte limits, the output-token cap, or any electrical limit. Schema alternatives also prevent mixing numeric and free-text roles within one quantity slot; duplicate numeric fields are still rejected locally.
 
 ## Offline checks completed
+
+### Initial prototype checkpoint
 
 Using the repository-pinned Go 1.26.8 toolchain and local dependency cache, with provider secrets removed and Go network fetching disabled:
 
@@ -26,20 +32,35 @@ Using the repository-pinned Go 1.26.8 toolchain and local dependency cache, with
 
 The local `.cache/partitioned-08-checks/verification.json` retains exact commands, timings, source hashes, result counts and output hashes. Logs and the offline runner are beside it. Early environment setup failures are not passing checks: the default Go cache was sandbox-restricted, the default module cache lacked pinned dependencies, and mixing the installed Go 1.27.1 with the pinned GOROOT caused version errors. The recorded final checks use the matching Go 1.26.8 binary, GOROOT and local modules. Lint also required that pinned binary first in PATH.
 
+### Integrated candidate checkpoint
+
+The subsequent `.cache/partitioned-08-integration-checks/verification.json` records the new source snapshot and checks, again with credentials removed and Go dependency fetching disabled. It supersedes the initial checkpoint for the integrated source; the earlier receipt is preserved unchanged.
+
+- Three-package short regression: 1,639 test/subtest pass events, three package passes, zero failures.
+- Candidate tests under the race detector: 141 test/subtest pass events, two package passes, zero failures.
+- Five-second bounded fuzz test, three-package `go vet`, and three-package repository lint all passed.
+- The complete frozen 14-case inventory is now covered by hand-authored **synthetic** responses: all 47 original gold assertions and all 15 source quantity occurrences are represented, with the expected dispositions and all five supported configurations. This is format/engineering expressiveness, not model accuracy.
+- The same synthetic corpus exercises the actual CLI selection, in-memory provider, journal persistence/replay and deterministic generation. Validation is stubbed in these orchestration tests and is not new native qualification.
+- Nine failure modes cover invalid/malformed extraction, refusal, server error, missing model, broken stream, output-token exhaustion, generation failure and validation failure. They retain evidence, do not retry and do not cross inappropriate native-execution boundaries.
+- A terminal output-token-limit failure records all 1,600 synthetic output tokens and one ledger entry, produces no board, and is deliberately rejected by the completed-response inspector. Retention is not certification as a complete response.
+- Nine journal cases include an unchanged control and rejection of forged decisions/outcomes, coherent request rehashing, duplicate JSON, public permissions, extra/missing files and symlinks. Cross-version rejection is checked in both directions.
+- Twenty-one in-memory provider/journal fixtures span 6,833–54,116 request bytes under the unchanged 65,536-byte ceiling. The simultaneous maximum inventory still uses 108 enum members and 171 object properties.
+- Dense synthetic inventories retain 130 assertions and the full 320-assertion maximum; a 65th ordinary requirement is rejected. Historical decoder limits and over-size transport/replay guards remain enforced.
+
 ## Limitations and review findings
 
 Mandatory quantity slots prove inventory presence, not meaning. The model can still assign the wrong eligible role, use an inaccurate free-text description, omit a nonnumeric requirement, or claim a forbidden state when the source says merely unnecessary. An explicit test preserves a schema-valid synthetic wired-to-wireless false refusal. Do not call these tests an accuracy improvement, independent review or general reliability estimate.
 
-The existing 64-assertion admission bound remains enforced after compilation. A source inventory can be valid and fit the request-size limit yet require too many assertions to admit; dense quantity requests therefore need explicit expressiveness/budget review before live integration. No source input limits were reduced to make the size fixtures pass, and no admission limit was increased to hide that issue.
+The 1,600-output-token cap is unchanged. A source inventory can be valid and fit the request-size and internal assertion bounds while requiring too many output tokens to complete. Dense synthetic compiler tests prove representation only, not provider completion at that cap. Output-token feasibility for the proposed live corpus still needs explicit review; no token or spending increase is implied.
 
-The test-only schema checker expands local acyclic definitions; it is not a general JSON Schema validator and does not prove that the provider will accept the schema. Native outputs were not regenerated because generation and admission code are unchanged; this turn does not claim new complete-board qualification.
+The test-only schema checker expands local acyclic definitions; it is not a general JSON Schema validator and does not prove that the provider will accept the schema. Existing engineering rules are reused through private bounded decoder helpers; historical public entry points retain their limits. Deterministic outputs are regenerated by synthetic CLI tests and compared with reviewed examples, but complete KiCad validation is not rerun here. This checkpoint is an implementing-agent review, not independent semantic or engineering certification, and these package checks are not a whole-repository CI run.
 
 ## Remaining work toward the original goal
 
-1. Complete a source-bound synthetic audit of all 14 acceptance cases and additional adversarial wording, checking full extraction fidelity and truthful decisions separately. Preserve the original criteria and historical failed results.
-2. Resolve dense-inventory expressiveness, output-token feasibility, and schema/decoder mismatch risks before selecting this protocol for a live path.
-3. Add explicit CLI selection, isolated journal versioning, replay authentication and in-memory end-to-end tests, retaining the existing default and all transport/accounting safeguards.
-4. Review the complete candidate and reuse unchanged native qualification. Only then consider a separately authorized fixed live evaluation. No additional request allowance or budget exists for this candidate.
+1. Review the complete candidate and its source-bound extraction fixtures, preserving the original criteria and historical failed results.
+2. Establish output-token feasibility for the proposed live corpus and document residual semantic/schema risks. Do not infer reliability from synthetic fixtures or silently raise limits.
+3. Reuse authenticated unchanged native qualification; inspect the new command's complete output handoff without conflating stubbed validation with a fresh engineering qualification.
+4. Only then consider a separately authorized fixed live evaluation. No additional request allowance or budget exists for this candidate.
 
 The full goal remains two distinct reviewed board families through a reliable natural-language workflow, complete native/manufacturing bundles, no manual output repair, and the original complete acceptance gate. Fabrication and physical bring-up remain separate.
 

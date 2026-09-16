@@ -15,9 +15,13 @@ const (
 	ownedProtocol
 	connectionProtocol
 	directProtocol
+	groundedProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == groundedProtocol {
+		return GroundedEvidenceVersion
+	}
 	if p == directProtocol {
 		return DirectEvidenceVersion
 	}
@@ -31,6 +35,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == groundedProtocol {
+		return "partitioned-evidence-journal-1"
+	}
 	if p == directProtocol {
 		return "direct-evidence-journal-1"
 	}
@@ -44,6 +51,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == groundedProtocol {
+		return "partitioned-journal-audit-1"
+	}
 	if p == directProtocol {
 		return "direct-journal-audit-1"
 	}
@@ -66,6 +76,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return ConnectionEvidenceMaxRequestBytes
 	case directProtocol:
 		return DirectEvidenceMaxRequestBytes
+	case groundedProtocol:
+		return GroundedEvidenceMaxRequestBytes
 	default:
 		return 0
 	}
@@ -81,6 +93,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareConnectionGenerateRequest(prompt)
 	case directProtocol:
 		return prepareDirectGenerateRequest(prompt)
+	case groundedProtocol:
+		return prepareGroundedGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -96,6 +110,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeConnectionEvidenceIntent(prompt, raw)
 	case directProtocol:
 		return DecodeDirectEvidenceIntent(prompt, raw)
+	case groundedProtocol:
+		return DecodeGroundedEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}

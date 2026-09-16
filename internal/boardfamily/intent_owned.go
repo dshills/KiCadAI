@@ -135,6 +135,10 @@ func OwnedEvidenceSchema(prompt string) (map[string]any, error) {
 // an internal admission input, not a model response or historical v3 evidence.
 // It establishes reference ownership/dimensions, not semantic correctness.
 func CompileOwnedEvidenceIntent(prompt string, raw []byte) (ReferencedIntent, error) {
+	return compileOwnedEvidenceWithLimit(prompt, raw, 64)
+}
+
+func compileOwnedEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (ReferencedIntent, error) {
 	compiled := ReferencedIntent{Version: ReferenceIntentVersion, Facts: []ReferencedFact{}}
 	request, err := PrepareOwnedEvidenceRequest(prompt)
 	if err != nil {
@@ -153,7 +157,7 @@ func CompileOwnedEvidenceIntent(prompt string, raw []byte) (ReferencedIntent, er
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return compiled, err
 	}
-	if !exactFields(raw, "version", "facts") || envelope.Version != OwnedEvidenceVersion || envelope.Facts == nil || len(envelope.Facts) > 64 {
+	if !exactFields(raw, "version", "facts") || envelope.Version != OwnedEvidenceVersion || envelope.Facts == nil || len(envelope.Facts) > maxFacts {
 		return compiled, errors.New("invalid owned evidence version or fact inventory")
 	}
 	clauses, all := ownedReferences(request)
@@ -263,7 +267,11 @@ func CompileOwnedEvidenceIntent(prompt string, raw []byte) (ReferencedIntent, er
 // deterministic admission engine. Raw v4 bytes remain authoritative; callers
 // must not present the internal compiled form as captured provider evidence.
 func DecodeOwnedEvidenceIntent(prompt string, raw []byte) (Decision, error) {
-	compiled, err := CompileOwnedEvidenceIntent(prompt, raw)
+	return decodeOwnedEvidenceWithLimit(prompt, raw, 64)
+}
+
+func decodeOwnedEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
+	compiled, err := compileOwnedEvidenceWithLimit(prompt, raw, maxFacts)
 	if err != nil {
 		return localDecision(prompt, "clarify", "The owned-evidence extraction could not be validated; no board was generated.", nil), err
 	}
@@ -271,5 +279,5 @@ func DecodeOwnedEvidenceIntent(prompt string, raw []byte) (Decision, error) {
 	if err != nil {
 		return Decision{}, err
 	}
-	return DecodeReferencedIntent(prompt, encoded)
+	return decodeReferencedIntentWithLimit(prompt, encoded, maxFacts)
 }
