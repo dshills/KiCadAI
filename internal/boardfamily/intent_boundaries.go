@@ -9,9 +9,9 @@ import (
 	"strings"
 )
 
-// SemanticBoundaryVersion is a pure OFFLINE prototype. No provider, journal,
-// CLI flag or accounting profile accepts it. Historical v9 bytes stay v9.
-const SemanticBoundaryVersion = "10-semantic-boundaries-offline"
+// SemanticBoundaryVersion identifies the opt-in successor. Historical v9 and
+// earlier offline-prototype bytes are never reinterpreted as this version.
+const SemanticBoundaryVersion = "10-semantic-boundaries-experimental"
 
 // SourceControl is an application-understood span of the original request.
 // It cannot consume a quantity or hide the residual of a compound sentence.
@@ -128,7 +128,12 @@ func SemanticBoundarySchema(prompt string) (map[string]any, error) {
 		return nil, err
 	}
 	props := schema["properties"].(map[string]any)
+	defs := schema["$defs"].(map[string]any)
 	props["version"] = enumSchema(SemanticBoundaryVersion)
+	defs["quantity_other"] = objectSchema(map[string]any{
+		"kind": enumSchema("other"), "state": map[string]any{"$ref": "#/$defs/state"},
+		"context": map[string]any{"$ref": "#/$defs/context"},
+	})
 	additional := props["additional"].(map[string]any)["properties"].(map[string]any)
 	for _, clause := range input.Source.Clauses {
 		additional["c"+strconv.Itoa(clause.ID)] = boundaryAdditionalSchema(input, clause.ID)
@@ -145,7 +150,7 @@ func SemanticBoundarySchema(prompt string) (map[string]any, error) {
 }
 
 func semanticBoundaryContext() string {
-	return sourceAddressedContext() + `Offline successor rules override v9 only for application-owned controls, residuals and required_state. controls cover exact original UTF-8 byte ranges: reviewed defaults fill only unspecified values; preserve_explicit_requirements forbids substitution or weakened bounds. Control spans are already represented and are not unsupported other facts. residuals retain EVERY byte outside controls, including the rest of a compound sentence. Each additional fact requires a span rN from its own clause. Preserve every substantive residual constraint, including unfamiliar hardware and no-adapter restrictions; use context for other clauses when needed. Only clauses with no residual span must have an empty additional array. Never infer a named profile, numeric value or hardware capability from a defaults control. required_state fixes an unambiguous local mention state; use exactly that one state with empty context. Controls never erase mention or quantity slots and cannot cancel a later heater requirement. This prototype has no provider dispatch.
+	return "Request contract: " + SemanticBoundaryRequestRevision + ".\n" + sourceAddressedContext() + `The following rules govern application-owned controls, residuals, required_state and OTHER text. controls cover exact original UTF-8 byte ranges: reviewed defaults fill only unspecified values; preserve_explicit_requirements forbids substitution or weakened bounds. Control spans are already represented and are not unsupported other facts. residuals retain EVERY byte outside controls, including the rest of a compound sentence. Each additional fact requires a span rN from its own clause. For kind other, output only the source reference, state and context, never a detail or paraphrase: the application retains the complete residual text; for an other quantity, it retains qN's original clause and numeric occurrence. Do not narrow either/both conditions or invent a substitute constraint. Kind unclear still requires a precise targeted question for genuine ambiguity. Preserve every substantive residual constraint, including unfamiliar hardware and no-adapter restrictions; use context for other clauses when needed. Only clauses with no residual span must have an empty additional array. Never infer a named profile, numeric value or hardware capability from a defaults control. required_state fixes an unambiguous local mention state; use exactly that one state with empty context. Controls never erase mention or quantity slots and cannot cancel a later heater requirement.
 `
 }
 
@@ -154,12 +159,22 @@ func semanticBoundaryContext() string {
 // Recognized controls require no additional hardware fact: their semantics are
 // already enforced by the unchanged catalog selector and explicit-value checks.
 func DecodeSemanticBoundaryIntent(prompt string, raw []byte) (Decision, error) {
-	failure := localDecision(prompt, "clarify", "The semantic-boundary extraction could not be validated; no board was generated.", nil)
+	compiled, err := CompileSemanticBoundaryEvidence(prompt, raw)
+	if err != nil {
+		return localDecision(prompt, "clarify", "The semantic-boundary extraction could not be validated; no board was generated.", nil), err
+	}
+	return decodeConnectionEvidenceWithLimit(prompt, compiled, groundedMaxAssertions)
+}
+
+// CompileSemanticBoundaryEvidence returns a structurally checked internal v5
+// object for admission, never replacement provider output. It fills only the
+// source-owned text explicitly defined by this new contract, not model facts.
+func CompileSemanticBoundaryEvidence(prompt string, raw []byte) ([]byte, error) {
 	if len(raw) > 65536 {
-		return failure, errors.New("semantic-boundary evidence exceeds 65536 bytes")
+		return nil, errors.New("semantic-boundary evidence exceeds 65536 bytes")
 	}
 	if err := validateIntentJSON(raw); err != nil {
-		return failure, err
+		return nil, err
 	}
 	var envelope struct {
 		Version    string                       `json:"version"`
@@ -168,17 +183,20 @@ func DecodeSemanticBoundaryIntent(prompt string, raw []byte) (Decision, error) {
 		Quantities map[string][]json.RawMessage `json:"quantities"`
 	}
 	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return failure, err
+		return nil, err
 	}
 	if !exactFields(raw, "version", "mentions", "additional", "quantities") || envelope.Version != SemanticBoundaryVersion {
-		return failure, errors.New("invalid semantic-boundary envelope")
+		return nil, errors.New("invalid semantic-boundary envelope")
 	}
 	input, err := PrepareSemanticBoundaryRequest(prompt)
 	if err != nil {
-		return failure, err
+		return nil, err
 	}
 	if err := lowerBoundaryAdditional(input, envelope.Additional); err != nil {
-		return failure, err
+		return nil, err
+	}
+	if err := lowerBoundaryOtherQuantities(input, envelope.Quantities); err != nil {
+		return nil, err
 	}
 	// Iterate in source order, not map order, for stable first-error diagnostics.
 	for _, mention := range input.Mentions {
@@ -188,17 +206,17 @@ func DecodeSemanticBoundaryIntent(prompt string, raw []byte) (Decision, error) {
 		}
 		entries := envelope.Mentions[mention.ID]
 		if len(entries) != 1 {
-			return failure, fmt.Errorf("mention %s requires exactly one source-bound state", mention.ID)
+			return nil, fmt.Errorf("mention %s requires exactly one source-bound state", mention.ID)
 		}
 		var entry struct {
 			State   string   `json:"state"`
 			Context []string `json:"context"`
 		}
 		if err := json.Unmarshal(entries[0], &entry); err != nil {
-			return failure, err
+			return nil, err
 		}
 		if entry.State != state || entry.Context == nil || len(entry.Context) != 0 {
-			return failure, fmt.Errorf("mention %s in c%d requires %s with local scope", mention.ID, mention.ClauseID, state)
+			return nil, fmt.Errorf("mention %s in c%d requires %s with local scope", mention.ID, mention.ClauseID, state)
 		}
 	}
 	// An ephemeral internal program, not amended provider output. Old decoders
@@ -206,7 +224,7 @@ func DecodeSemanticBoundaryIntent(prompt string, raw []byte) (Decision, error) {
 	envelope.Version = SourceAddressedVersion
 	lowered, err := json.Marshal(envelope)
 	if err != nil {
-		return failure, err
+		return nil, err
 	}
-	return DecodeSourceAddressedEvidenceIntent(prompt, lowered)
+	return CompileSourceAddressedEvidence(prompt, lowered)
 }

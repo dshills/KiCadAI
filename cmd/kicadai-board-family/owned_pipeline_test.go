@@ -37,7 +37,7 @@ func groundedCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI string) (
 
 func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol string) (commandPipeline, *indexedCommandCounts) {
 	t.Helper()
-	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" && protocol != "partitioned-full-v7" && protocol != "source-eligible-v8" && protocol != "source-addressed-v9" {
+	if protocol != "owned-v4" && protocol != "connection-v5" && protocol != "direct-v6" && protocol != "partitioned-v7" && protocol != "partitioned-full-v7" && protocol != "source-eligible-v8" && protocol != "source-addressed-v9" && protocol != "semantic-boundaries-v10" {
 		t.Fatal("unknown offline evidence protocol")
 	}
 	counts := &indexedCommandCounts{}
@@ -69,6 +69,9 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			if protocol == "source-addressed-v9" {
 				schemaName = boardfamily.SourceAddressedSchemaName
 			}
+			if protocol == "semantic-boundaries-v10" {
+				schemaName = boardfamily.SemanticBoundarySchemaName
+			}
 			if !bytes.Contains(body, []byte(schemaName)) || bytes.Contains(body, []byte("offline-command-placeholder")) {
 				t.Fatal("wrong contract or credential in request body")
 			}
@@ -79,7 +82,7 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 			response := map[string]any{"id": "offline-command-response", "status": "completed", "model": boardfamily.SelectionModel, "error": nil,
 				"output": []any{map[string]any{"type": "message", "status": "completed", "content": content}},
 				"usage":  map[string]any{"input_tokens": 100, "output_tokens": 200, "total_tokens": 300}}
-			if protocol == "partitioned-full-v7" || protocol == "source-eligible-v8" || protocol == "source-addressed-v9" {
+			if protocol == "partitioned-full-v7" || protocol == "source-eligible-v8" || protocol == "source-addressed-v9" || protocol == "semantic-boundaries-v10" {
 				response["model"] = boardfamily.GroundedFullModel
 				if !bytes.Contains(body, []byte(`"model":"`+boardfamily.GroundedFullModel+`"`)) || len(body) > boardfamily.GroundedFullMaxRequestBytes {
 					t.Fatal("full-model request identity or bound differs")
@@ -128,10 +131,15 @@ func evidenceCommandPipeline(t *testing.T, raw []byte, mode, nativeCLI, protocol
 		if protocol == "source-addressed-v9" {
 			selectWithJournal = boardfamily.InterpretSourceAddressedWithJournal
 		}
+		if protocol == "semantic-boundaries-v10" {
+			selectWithJournal = boardfamily.InterpretSemanticBoundaryWithJournal
+		}
 		s, err := selectWithJournal(ctx, prompt, ledger, policy, transport, journalRoot)
 		return s.Selection, s, err
 	}
-	if protocol == "source-addressed-v9" {
+	if protocol == "semantic-boundaries-v10" {
+		pipeline.interpretBoundary = interpret
+	} else if protocol == "source-addressed-v9" {
 		pipeline.interpretAddressed = interpret
 	} else if protocol == "source-eligible-v8" {
 		pipeline.interpretEligible = interpret

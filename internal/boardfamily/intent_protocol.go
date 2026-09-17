@@ -19,9 +19,13 @@ const (
 	groundedFullProtocol
 	sourceEligibleProtocol
 	sourceAddressedProtocol
+	semanticBoundaryProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == semanticBoundaryProtocol {
+		return SemanticBoundaryVersion
+	}
 	if p == sourceAddressedProtocol {
 		return SourceAddressedVersion
 	}
@@ -44,6 +48,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == semanticBoundaryProtocol {
+		return "semantic-boundary-evidence-journal-1"
+	}
 	if p == sourceAddressedProtocol {
 		return "source-addressed-evidence-journal-1"
 	}
@@ -69,6 +76,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == semanticBoundaryProtocol {
+		return "semantic-boundary-journal-audit-1"
+	}
 	if p == sourceAddressedProtocol {
 		return "source-addressed-journal-audit-1"
 	}
@@ -111,6 +121,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return SourceEligibleMaxRequestBytes
 	case sourceAddressedProtocol:
 		return SourceAddressedMaxRequestBytes
+	case semanticBoundaryProtocol:
+		return SemanticBoundaryMaxRequestBytes
 	default:
 		return 0
 	}
@@ -132,6 +144,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareSourceEligibleGenerateRequest(prompt)
 	case sourceAddressedProtocol:
 		return prepareSourceAddressedGenerateRequest(prompt)
+	case semanticBoundaryProtocol:
+		return prepareSemanticBoundaryGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -153,6 +167,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeSourceEligibleEvidenceIntent(prompt, raw)
 	case sourceAddressedProtocol:
 		return DecodeSourceAddressedEvidenceIntent(prompt, raw)
+	case semanticBoundaryProtocol:
+		return DecodeSemanticBoundaryIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}

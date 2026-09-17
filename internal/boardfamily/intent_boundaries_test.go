@@ -104,11 +104,11 @@ func TestSemanticBoundaryDoesNotSwallowCompoundOrUnsupportedWording(t *testing.T
 			}
 			_, f := boundaryFixture(t, clause)
 			f["additional"].(map[string]any)["c0"] = []any{map[string]any{
-				"kind": "other", "detail": clause, "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID,
+				"kind": "other", "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID,
 			}}
 			for _, q := range input.Source.Quantities {
 				f["quantities"].(map[string]any)["q"+strconv.Itoa(q.ID)] = []any{map[string]any{
-					"kind": "other", "detail": "Retain the explicit constraint containing " + q.Text, "state": "requested", "context": []string{},
+					"kind": "other", "state": "requested", "context": []string{},
 				}}
 			}
 			// A remaining requirement still traverses the unknown-requirement gate.
@@ -138,7 +138,7 @@ func TestSemanticBoundaryDefaultsNeverOverwriteExplicitValues(t *testing.T) {
 			case "wrong-supply":
 				f["quantities"] = map[string]any{"q0": []any{groundedNumber("supply_min_v", "requested"), groundedNumber("supply_max_v", "requested")}}
 			case "unknown":
-				f["additional"].(map[string]any)["c2"] = []any{map[string]any{"kind": "other", "detail": "galvanic isolation", "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID}}
+				f["additional"].(map[string]any)["c2"] = []any{map[string]any{"kind": "other", "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID}}
 			}
 			d := checkBoundary(t, tc.prompt, f, tc.want)
 			if tc.reason != "" && !strings.Contains(strings.ToLower(d.Message), tc.reason) {
@@ -408,8 +408,8 @@ func TestSemanticBoundarySourceAndHistoricalIsolation(t *testing.T) {
 	if _, err := CompileSourceAddressedEvidence(prompt, addressedJSON(t, f)); err != nil {
 		t.Fatal("historical compiler changed", err)
 	}
-	if !strings.Contains(semanticBoundaryContext(), "no provider dispatch") {
-		t.Fatal("offline instructions missing")
+	if !strings.Contains(semanticBoundaryContext(), SemanticBoundaryRequestRevision) {
+		t.Fatal("request identity missing")
 	}
 }
 

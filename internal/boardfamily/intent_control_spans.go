@@ -118,22 +118,27 @@ func boundaryAdditionalSchema(input SemanticBoundaryRequest, clauseID int) map[s
 		if kind == "unclear" {
 			state = "uncertain"
 		}
-		variants = append(variants, objectSchema(map[string]any{
-			"kind": enumSchema(kind), "detail": map[string]any{"type": "string"},
+		properties := map[string]any{
+			"kind":    enumSchema(kind),
 			"state":   map[string]any{"$ref": "#/$defs/" + state},
 			"context": map[string]any{"$ref": "#/$defs/context"}, "span": enumSchema(ids...),
-		}))
+		}
+		if kind == "unclear" {
+			properties["detail"] = map[string]any{"type": "string"}
+		}
+		variants = append(variants, objectSchema(properties))
 	}
 	return map[string]any{"type": "array", "maxItems": 64, "items": map[string]any{"anyOf": variants}}
 }
 
-// Validate residual ownership before internal lowering. Removing a span label
-// is not dropping a fact: the complete original fact retains its clause anchor
-// through v9 admission. The caller's provider bytes are never modified.
+// Validate residual ownership before internal lowering. An other fact's detail
+// is application-owned original text, never a model paraphrase of its scope.
+// Unclear facts keep their model-authored question. Both retain source anchors.
+// The caller's provider bytes are never modified.
 func lowerBoundaryAdditional(input SemanticBoundaryRequest, additional map[string][]json.RawMessage) error {
-	owners := map[string]int{}
+	residuals := map[string]SourceResidual{}
 	for _, residual := range input.Residuals {
-		owners[residual.ID] = residual.ClauseID
+		residuals[residual.ID] = residual
 	}
 	for _, clause := range input.Source.Clauses {
 		id := "c" + strconv.Itoa(clause.ID)
@@ -150,9 +155,24 @@ func lowerBoundaryAdditional(input SemanticBoundaryRequest, additional map[strin
 			if err := json.Unmarshal(fact["span"], &span); err != nil {
 				return fmt.Errorf("additional %s[%d] requires a residual span", id, i)
 			}
-			owner, exists := owners[span]
-			if !exists || owner != clause.ID || !exactFields(entry, "kind", "detail", "state", "context", "span") {
+			var kind string
+			if err := json.Unmarshal(fact["kind"], &kind); err != nil {
+				return err
+			}
+			fields := []string{"kind", "state", "context", "span"}
+			if kind == "unclear" {
+				fields = append(fields, "detail")
+			}
+			residual, exists := residuals[span]
+			if !exists || residual.ClauseID != clause.ID || !member(kind, "other", "unclear") || !exactFields(entry, fields...) {
 				return fmt.Errorf("additional %s[%d] has an invalid residual anchor or fields", id, i)
+			}
+			if kind == "other" {
+				encoded, err := json.Marshal(residual.Text)
+				if err != nil {
+					return err
+				}
+				fact["detail"] = encoded
 			}
 			delete(fact, "span")
 			lowered, err := json.Marshal(fact)
@@ -160,6 +180,44 @@ func lowerBoundaryAdditional(input SemanticBoundaryRequest, additional map[strin
 				return err
 			}
 			entries[i] = lowered
+		}
+	}
+	return nil
+}
+
+// Non-field numeric constraints likewise retain their complete original clause.
+// The qN key still identifies the numeric occurrence being classified; no value,
+// role, guarantee or narrower subject is fabricated by the application.
+func lowerBoundaryOtherQuantities(input SemanticBoundaryRequest, quantities map[string][]json.RawMessage) error {
+	for _, q := range input.Source.Quantities {
+		id := "q" + strconv.Itoa(q.ID)
+		for i, entry := range quantities[id] {
+			var fact map[string]json.RawMessage
+			if err := json.Unmarshal(entry, &fact); err != nil {
+				return err
+			}
+			var kind string
+			if err := json.Unmarshal(fact["kind"], &kind); err != nil {
+				return err
+			}
+			if kind != "other" {
+				continue // Number/unclear entries retain unchanged v9 validation.
+			}
+			if !exactFields(entry, "kind", "state", "context") {
+				return fmt.Errorf("quantity %s other detail is application-owned", id)
+			}
+			clause := input.Source.Clauses[q.ClauseID]
+			detail := "Source quantity " + id + " (" + q.Text + ") in original clause: " + clause.Text
+			encoded, err := json.Marshal(detail)
+			if err != nil {
+				return err
+			}
+			fact["detail"] = encoded
+			lowered, err := json.Marshal(fact)
+			if err != nil {
+				return err
+			}
+			quantities[id][i] = lowered
 		}
 	}
 	return nil

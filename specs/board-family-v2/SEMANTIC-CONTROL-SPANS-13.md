@@ -1,5 +1,10 @@
 # Compound control spans: offline follow-up
 
+Historical prototype checkpoint. The subsequent source-owned-text correction
+and command integration are recorded in
+[the integrated candidate checkpoint](SEMANTIC-BOUNDARIES-INTEGRATION-13.md).
+The verification below describes this earlier prototype, not live acceptance.
+
 Status: **locally verified prototype, not live acceptance**. Parent checkpoint:
 `be49235d09af5261752a3dc34111a6220942d995` on
 `codex/semantic-boundaries-13`. The unfrozen `10-semantic-boundaries-offline`

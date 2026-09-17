@@ -20,6 +20,9 @@ func TestGroundedFullCommandSyntheticCorpus(t *testing.T) {
 }
 
 func groundedCommandMode(protocol string) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
+	if protocol == "semantic-boundaries-v10" {
+		return protocol, "--inspect-semantic-boundary-journal", boardfamily.InspectSemanticBoundaryJournal
+	}
 	if protocol == "source-addressed-v9" {
 		return protocol, "--inspect-source-addressed-journal", boardfamily.InspectSourceAddressedJournal
 	}
@@ -45,6 +48,10 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, mode string) {
 	if protocol == "source-addressed-v9" {
 		version, profile = boardfamily.SourceAddressedVersion, boardfamily.SourceAddressedAccountingProfile
 		fixture, decode = addressedCorpusFixture, boardfamily.DecodeSourceAddressedEvidenceIntent
+	}
+	if protocol == "semantic-boundaries-v10" {
+		version, profile = boardfamily.SemanticBoundaryVersion, boardfamily.SemanticBoundaryAccountingProfile
+		fixture, decode = boundaryCorpusFixture, boardfamily.DecodeSemanticBoundaryIntent
 	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "specs", "board-family-v2", "typed-evaluation-02", "cases-02.json"))
 	if err != nil {
@@ -141,6 +148,9 @@ func testGroundedCommandFailureGates(t *testing.T, protocolMode string) {
 			}
 			if protocol == "source-addressed-v9" {
 				raw = addressedCorpusFixture(t, "useful-01", prompt)
+			}
+			if protocol == "semantic-boundaries-v10" {
+				raw = boundaryCorpusFixture(t, "useful-01", prompt)
 			}
 			if mode == "invalid-extraction" {
 				raw = []byte(`{"version":"wrong","facts":[]}`)
@@ -243,7 +253,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			case "config":
 				args = append(args, "--config", "never-read.json")
 			case "nil-selector":
-				if protocol == "source-addressed-v9" {
+				if protocol == "semantic-boundaries-v10" {
+					p.interpretBoundary = nil
+				} else if protocol == "source-addressed-v9" {
 					p.interpretAddressed = nil
 				} else if protocol == "source-eligible-v8" {
 					p.interpretEligible = nil
@@ -277,6 +289,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			}
 			if protocol == "source-addressed-v9" {
 				export = boardfamily.SourceAddressedEvidenceContract
+			}
+			if protocol == "semantic-boundaries-v10" {
+				export = boardfamily.SemanticBoundaryEvidenceContract
 			}
 			want, err := export(prompt)
 			if err != nil {

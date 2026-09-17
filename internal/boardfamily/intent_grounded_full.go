@@ -14,7 +14,7 @@ const GroundedFullMaxRequestBytes = 16000
 
 // Closed selection: never derive pricing or halt behavior from provider output.
 func (p extractionProtocol) fullModelAccounting() bool {
-	return p == groundedFullProtocol || p == sourceEligibleProtocol || p == sourceAddressedProtocol
+	return p == groundedFullProtocol || p == sourceEligibleProtocol || p == sourceAddressedProtocol || p == semanticBoundaryProtocol
 }
 
 func (p extractionProtocol) model() string {
@@ -25,6 +25,9 @@ func (p extractionProtocol) model() string {
 }
 
 func (p extractionProtocol) accountingProfile() string {
+	if p == semanticBoundaryProtocol {
+		return SemanticBoundaryAccountingProfile
+	}
 	if p == sourceAddressedProtocol {
 		return SourceAddressedAccountingProfile
 	}

@@ -122,7 +122,7 @@ func TestSemanticBoundaryResidualHardwareBeforeAndAfterDefaults(t *testing.T) {
 				if strings.Contains(r.Text, "galvanic isolation") {
 					found = true
 					f["additional"].(map[string]any)["c"+strconv.Itoa(r.ClauseID)] = []any{map[string]any{
-						"kind": "other", "state": "requested", "detail": "galvanic isolation", "context": []string{}, "span": r.ID,
+						"kind": "other", "state": "requested", "context": []string{}, "span": r.ID,
 					}}
 				}
 			}
@@ -155,7 +155,7 @@ func TestSemanticBoundaryRejectsResidualAnchorTampering(t *testing.T) {
 		t.Run(strconv.FormatInt(int64(len(addressedJSON(t, span))), 10)+"-"+string(addressedJSON(t, span)), func(t *testing.T) {
 			_, f := boundaryFixture(t, prompt)
 			f["additional"].(map[string]any)["c0"] = []any{map[string]any{
-				"kind": "other", "state": "requested", "detail": "galvanic isolation", "context": []string{}, "span": span,
+				"kind": "other", "state": "requested", "context": []string{}, "span": span,
 			}}
 			raw := addressedJSON(t, f)
 			schema, _ := SemanticBoundarySchema(prompt)
@@ -170,7 +170,7 @@ func TestSemanticBoundaryRejectsResidualAnchorTampering(t *testing.T) {
 	// A valid residual ID cannot be borrowed by a different, complete-control clause.
 	_, f := boundaryFixture(t, prompt)
 	f["additional"].(map[string]any)["c1"] = []any{map[string]any{
-		"kind": "other", "state": "requested", "detail": "galvanic isolation", "context": []string{}, "span": "r0",
+		"kind": "other", "state": "requested", "context": []string{}, "span": "r0",
 	}}
 	if d, err := DecodeSemanticBoundaryIntent(prompt, addressedJSON(t, f)); err == nil || d.Configuration != nil {
 		t.Fatal("cross-clause residual accepted", d, err)
@@ -265,7 +265,7 @@ func TestSemanticBoundaryFrozenCorpusRepresentability(t *testing.T) {
 				for _, r := range input.Residuals {
 					if r.ClauseID == 1 {
 						f["additional"].(map[string]any)["c1"] = []any{map[string]any{
-							"kind": "other", "state": "requested", "detail": r.Text, "context": []string{"c0"}, "span": r.ID,
+							"kind": "other", "state": "requested", "context": []string{"c0"}, "span": r.ID,
 						}}
 					}
 				}
@@ -273,7 +273,6 @@ func TestSemanticBoundaryFrozenCorpusRepresentability(t *testing.T) {
 			if tc.ID == "refuse-06" {
 				f["quantities"].(map[string]any)["q0"] = []any{map[string]any{
 					"kind": "other", "state": "requested", "context": []string{},
-					"detail": "Guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization",
 				}}
 			}
 			d := checkBoundary(t, tc.Prompt, f, tc.Disposition)
