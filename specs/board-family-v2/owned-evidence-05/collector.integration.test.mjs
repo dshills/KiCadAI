@@ -15,7 +15,7 @@ const binary=process.env.KICADAI_OWNED_TEST_BINARY,cli=process.env.KICADAI_OFFLI
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const source='specs/board-family-v2/typed-evaluation-02/cases-02.json';
 function fixture(id) {
-  return {id,prompt:id==='clarify'?'I have not chosen a sensor.':id==='unsupported'?'Please use SHT31. Require its heater.':'Please use BMP280 with standard profile.'};
+  return {id,prompt:['clarify','slow-clarify'].includes(id)?'I have not chosen a sensor.':id==='unsupported'?'Please use SHT31. Require its heater.':'Please use BMP280 with standard profile.'};
 }
 function setup(t,cases,native=false,changes={}) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'owned-collector-go-'));
@@ -45,14 +45,25 @@ test('owned response outcomes retain all physical attempts and authenticate with
 });
 for(const failure of ['transport-error','missing-model','crash-after-request','generation-conflict','validation-failure','timeout','log-overflow']) {
   test(`owned collector stops after ${failure} and preserves the remaining denominator`,{skip:!binary},async t=>{
-    const options=setup(t,['clarify',failure,'unsupported'].map(fixture),false,['timeout','log-overflow'].includes(failure)?{case_timeout_ms:500}:{});
+    const first=['timeout','log-overflow'].includes(failure)?'slow-clarify':'clarify';
+    // Only the timeout fixture needs a shortened deadline. A 500 ms cap also
+    // killed healthy predecessors on CI, before the named failure was reached.
+    const options=setup(t,[first,failure,'unsupported'].map(fixture),false,failure==='timeout'?{case_timeout_ms:5000}:{});
     const result=await collect(options);
-    assert.equal(result.status,'stopped-no-retry');assert.equal(result.recorded_outcomes,1);assert.equal(result.prepared_cases,2);
+    assert.equal(result.status,'stopped-no-retry');assert.equal(result.recorded_outcomes,1,JSON.stringify(result.records));assert.equal(result.prepared_cases,2);
     assert.deepEqual(result.unattempted_case_ids,['unsupported']);
     assert.equal(result.records[1].collection_class,'unsafe-to-continue');
     assert.equal(fs.existsSync(path.join(options.output,'unsupported')),false);
-    if(failure==='timeout')assert.equal(result.records[1].execution.timed_out,true);
-    if(failure==='log-overflow')assert.equal(result.records[1].execution.log_overflow,true);
+    assert.equal(result.records[0].execution.timed_out,false);
+    if(failure==='timeout') {
+      assert.equal(result.records[1].execution.timed_out,true);
+      assert.equal(result.records[1].execution.log_overflow,false);
+    }
+    if(failure==='log-overflow') {
+      assert.equal(result.records[1].execution.log_overflow,true);
+      assert.equal(result.records[1].execution.timed_out,false);
+      assert.equal(fs.statSync(path.join(options.output,failure,'command.stdout.log')).size,1024*1024);
+    }
     authenticateBatch(options.manifestPath,options.output);
     if(failure==='generation-conflict')assert.equal(fs.readFileSync(path.join(options.output,failure,'board/user-owned.txt'),'utf8'),'do not replace');
   });
@@ -117,4 +128,3 @@ test('standalone preflight and collector CLI finish with observed terminal state
   assert.equal(read(path.join(options.root,'collector.stdout.log')).recorded_outcomes,1);
   authenticateBatch(options.manifestPath,options.output);
 });
-

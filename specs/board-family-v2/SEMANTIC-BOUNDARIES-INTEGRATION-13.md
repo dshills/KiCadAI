@@ -93,9 +93,10 @@ as a full-suite pass. The repository's normal bounded tier uses `-short`; its
 separate result must not be confused with exhaustive simulation coverage.
 The repository-wide short run passed the other packages but also exceeded the
 180-second limit in `opentopologysynthesis`. This package does not depend on the
-changed board-family packages. Its isolated rerun uses the CI-configured
-12-minute timeout; publication/CI results are recorded separately rather than
-retroactively relabeling either timed-out run as passing.
+changed board-family packages. Its isolated rerun passed in **442.790 s** using
+the CI-configured 12-minute timeout. This completes the short tier across the
+initial run and isolated rerun, not a single successful full-repository process
+or a retroactive pass for either timed-out run.
 
 The real command, deterministic generator and KiCad 10.0.3 completed all five
 useful cases from synthetic extractions in **22.65 s test-body time / 23.205 s
@@ -139,17 +140,35 @@ emitted. This known corpus is not an independent holdout. [Official Structured
 Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs)
 distinguishes structural conformance from semantic correctness.
 
-There have been **zero new live requests**, firewall changes, remote writes or
-merges in this checkpoint. The primary checkout and frozen v9 worktree remain
-clean at their original commits; the v9 binary, result and QA hashes are intact.
-PR #14 was read on 2026-09-17 and remains open/draft at `c07ef8a3`; its remote CI
-does not cover this new local candidate. Its body still contains pre-v9-live
-status and needs an authorized update with the closed v9 result.
+There have been **zero new live requests**, firewall changes or merges in this
+checkpoint. The primary checkout and frozen v9 worktree remain clean at their
+original commits; the v9 binary, result and QA hashes are intact. The user
+approved publication to the existing draft PR, and candidate `a35e96ce` plus
+the accurate closed-v9 summary were published to [PR #14](https://github.com/dshills/KiCadAI/pull/14).
+The PR remains draft; publication does not authorize a merge or live run.
 
-The user approved publication of this candidate and the accurate closed-v9
-summary to the existing draft PR during this checkpoint. Publication remains
-conditional on the local checks; it does not authorize a merge or live run.
-Next gate: publish, then verify CI on its exact source.
+The candidate's main [CI run](https://github.com/dshills/KiCadAI/actions/runs/35255734657)
+passed all 25 jobs, including quality gates. Six auxiliary workflows passed,
+but [owned offline rehearsal](https://github.com/dshills/KiCadAI/actions/runs/35255734516)
+failed its older log-overflow test before recording the healthy first case
+(0 recorded outcomes instead of 1). That log does not retain the subprocess
+record, so the exact runner-level cause cannot be independently recovered.
+The test applied a 500 ms deadline to every case, including the healthy one.
+
+A test-only 750 ms healthy-process delay reproduces the same failure locally:
+the first child is killed at 506.6 ms with `timed_out=true`, while
+`log_overflow=false`, before the overflow fixture is reached. The correction
+uses the normal 60-second ceiling for overflow tests and a 5-second deadline
+only for the timeout fixture (which sleeps 30 seconds). Both collector suites
+retain the delayed healthy predecessor and now additionally require the named
+failure: overflow must not be a timeout, its retained log must be exactly 1 MiB,
+and timeout must not be overflow. Stop/no-retry, observed termination and the
+unattempted denominator checks remain unchanged. No production collector,
+evaluation case, expected outcome, acceptance threshold or frozen evidence is
+modified. The combined offline Node suites pass **28 tests, one native-only
+skip**, in 14.463 seconds. Exact-head CI for this test-only correction remains
+the publication gate; the earlier failed workflow is not relabeled a pass.
+
 After release-preflight binding, at most one separately approved final live
 batch should lead to a release/no-release decision. Do not start an automatic
 next-parser cycle, reuse exhausted budgets, count retries as fresh cases, or

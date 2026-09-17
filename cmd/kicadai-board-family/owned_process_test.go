@@ -52,6 +52,13 @@ func TestOwnedProcessHelper(t *testing.T) {
 			t.Fatal("missing offline collector fixture identity")
 		}
 	}
+	// A healthy subprocess may take longer than the old 500 ms CI deadline.
+	// Keep this delay test-only so collector failure tests exercise their named
+	// failure after a real, successfully recorded predecessor.
+	if mode == "slow-clarify" {
+		time.Sleep(750 * time.Millisecond)
+		mode = "clarify"
+	}
 	flag.CommandLine = flag.NewFlagSet("offline-owned-process", flag.ExitOnError)
 	calls := 0
 	http.DefaultTransport = indexedCommandTransport(func(r *http.Request) (*http.Response, error) {

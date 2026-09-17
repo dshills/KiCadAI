@@ -12,7 +12,7 @@ import {authenticateBatch} from './final-authenticate.mjs';
 import {version,finalDependencies,checkManifest,verifyReuse,evaluationID} from './final-runtime.mjs';
 import {loadCorpus} from './scoring.mjs';
 const binary=process.env.KICADAI_OWNED_TEST_BINARY;
-const fixture=id=>({id,prompt:id==='clarify'?'I have not chosen a sensor.':id==='unsupported'?'Please use SHT31. Require its heater.':'Please use BMP280 with standard profile.'});
+const fixture=id=>({id,prompt:['clarify','slow-clarify'].includes(id)?'I have not chosen a sensor.':id==='unsupported'?'Please use SHT31. Require its heater.':'Please use BMP280 with standard profile.'});
 function setup(t,ids,changes={}) {
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'owned-final-process-')));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -40,13 +40,24 @@ test('final collector retains completed model failures, owns a single batch and 
 });
 for(const failure of ['transport-error','missing-model','crash-after-request','generation-conflict','validation-failure','timeout','log-overflow']) {
   test('final collector stops after '+failure+' without dropping or reattempting cases',{skip:!binary},async t=>{
-    const o=setup(t,['clarify',failure,'unsupported'],['timeout','log-overflow'].includes(failure)?{case_timeout_ms:500}:{});
-    const r=await collect(o);assert.equal(r.status,'stopped-no-retry');assert.equal(r.prepared_cases,2);assert.equal(r.recorded_outcomes,1);
+    const first=['timeout','log-overflow'].includes(failure)?'slow-clarify':'clarify';
+    // Match the rehearsal safeguard: overflow must not race a 500 ms deadline
+    // on its healthy predecessor. The timeout fixture still sleeps for 30 s.
+    const o=setup(t,[first,failure,'unsupported'],failure==='timeout'?{case_timeout_ms:5000}:{});
+    const r=await collect(o);assert.equal(r.status,'stopped-no-retry');assert.equal(r.prepared_cases,2,JSON.stringify(r.records));assert.equal(r.recorded_outcomes,1);
     assert.deepEqual(r.unattempted_case_ids,['unsupported']);assert.equal(r.records[1].collection_class,'unsafe-to-continue');
     assert.equal(fs.existsSync(path.join(o.m.batch_directory,'unsupported')),false);
     authenticateBatch(o.manifestPath,o.m.batch_directory);
-    if(failure==='timeout')assert.equal(r.records[1].execution.timed_out,true);
-    if(failure==='log-overflow')assert.equal(r.records[1].execution.log_overflow,true);
+    assert.equal(r.records[0].execution.timed_out,false);
+    if(failure==='timeout') {
+      assert.equal(r.records[1].execution.timed_out,true);
+      assert.equal(r.records[1].execution.log_overflow,false);
+    }
+    if(failure==='log-overflow') {
+      assert.equal(r.records[1].execution.log_overflow,true);
+      assert.equal(r.records[1].execution.timed_out,false);
+      assert.equal(fs.statSync(path.join(o.m.batch_directory,failure,'command.stdout.log')).size,1024*1024);
+    }
     if(failure==='generation-conflict')assert.equal(fs.readFileSync(path.join(o.m.batch_directory,failure,'board/user-owned.txt'),'utf8'),'do not replace');
   });
 }
