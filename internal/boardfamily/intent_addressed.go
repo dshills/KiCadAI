@@ -9,8 +9,8 @@ import (
 	"strconv"
 )
 
-// The source-addressed prototype is pure/offline. It has no provider, journal,
-// ledger or command dispatch route. It never reinterprets historical responses.
+// This source-addressed representation is pure and never reinterprets historical
+// responses. Its explicit experimental provider route is defined separately.
 const SourceAddressedVersion = "9-source-addressed-evidence-experimental"
 const SourceAddressedSchemaName = "board_family_source_addressed_requirements_v9"
 
@@ -140,25 +140,6 @@ additional: review every cN clause for substantive nonnumeric requirements not r
 quantities: classify every qN in its supplied slot. The application owns magnitudes, units and location. Keep the correct state and role; use both endpoints for a range. quantity_roles is only lexical/dimensional eligibility, not proof of meaning. Empty roles requires precise other or genuine unclear. An accuracy tolerance is not an operating temperature; a GPIO load is not supply capacity; sampling rate is not bus clock. Do not duplicate a quantity as an additional requirement.
 Return only the schema object. Review the whole source for unrepresented constraints, incorrect polarity and changed scope before returning. A schema slot is not evidence of a request.
 `
-}
-
-// SourceAddressedEvidenceContract is inspectable offline design data, not an
-// executable provider request or spending authority. Live integration is absent.
-func SourceAddressedEvidenceContract(prompt string) (map[string]any, error) {
-	input, err := PrepareSourceAddressedRequest(prompt)
-	if err != nil {
-		return nil, err
-	}
-	schema, err := SourceAddressedEvidenceSchema(prompt)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"admission_version": SourceAddressedVersion, "schema_name": SourceAddressedSchemaName,
-		"input": input, "schema": schema, "capability_context": sourceAddressedContext(),
-		"stage": "offline-prototype-not-integrated", "network_enabled": false, "live_authorization_granted": false,
-		"limitations": "Source slots prevent invented identities/anchors, not wrong state, scope, context-only classification, or omitted additional requirements. Synthetic checks are not live acceptance.",
-	}, nil
 }
 
 // CompileSourceAddressedEvidence makes a separate internal v8 object and applies

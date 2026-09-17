@@ -34,6 +34,12 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 			if protocol == sourceEligibleProtocol {
 				key, check, raw = "offline-eligible-placeholder", checkSourceEligibleProviderRequest, eligibleRaw(t, []map[string]any{ownedFact("sensor", "BMP280", "requested", "c0"), ownedFact("profile", "standard", "requested", "c0")}, nil)
 			}
+			if protocol == sourceAddressedProtocol {
+				input, f := addressedFixture(t, journalTestPrompt)
+				setAddressedState(t, input, f, 0, "sensor", "BMP280", "requested")
+				setAddressedState(t, input, f, 0, "profile", "standard", "requested")
+				key, check, raw = "offline-addressed-placeholder", checkSourceAddressedProviderRequest, addressedJSON(t, f)
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
@@ -117,7 +123,7 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 				t.Fatal("incomplete verified audit")
 			}
 			if mode == "unchanged" {
-				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol} {
+				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol, sourceAddressedProtocol} {
 					if other != protocol {
 						if _, err := inspectProtocolJournal(root, other); err == nil {
 							t.Fatal("another protocol accepted this journal")

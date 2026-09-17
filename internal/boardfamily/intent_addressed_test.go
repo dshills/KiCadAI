@@ -344,7 +344,7 @@ func TestSourceAddressedDenseQuantitiesAndOfflineOnlyContract(t *testing.T) {
 		}
 	}
 	contract, err := SourceAddressedEvidenceContract("Use BMP280.")
-	if err != nil || contract["network_enabled"] != false || contract["live_authorization_granted"] != false || contract["stage"] != "offline-prototype-not-integrated" {
+	if err != nil || contract["export_dispatches_request"] != false || contract["live_authorization_granted"] != false || contract["stage"] != "experimental-integration-no-live-acceptance" {
 		t.Fatal("offline boundary", contract, err)
 	}
 }

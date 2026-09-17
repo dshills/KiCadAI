@@ -20,6 +20,9 @@ func TestGroundedFullCommandSyntheticCorpus(t *testing.T) {
 }
 
 func groundedCommandMode(protocol string) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
+	if protocol == "source-addressed-v9" {
+		return protocol, "--inspect-source-addressed-journal", boardfamily.InspectSourceAddressedJournal
+	}
 	if protocol == "source-eligible-v8" {
 		return protocol, "--inspect-source-eligible-journal", boardfamily.InspectSourceEligibleJournal
 	}
@@ -38,6 +41,10 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, mode string) {
 	if protocol == "source-eligible-v8" {
 		version, profile = boardfamily.SourceEligibleVersion, boardfamily.SourceEligibleAccountingProfile
 		fixture, decode = eligibleCorpusFixture, boardfamily.DecodeSourceEligibleEvidenceIntent
+	}
+	if protocol == "source-addressed-v9" {
+		version, profile = boardfamily.SourceAddressedVersion, boardfamily.SourceAddressedAccountingProfile
+		fixture, decode = addressedCorpusFixture, boardfamily.DecodeSourceAddressedEvidenceIntent
 	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "specs", "board-family-v2", "typed-evaluation-02", "cases-02.json"))
 	if err != nil {
@@ -131,6 +138,9 @@ func testGroundedCommandFailureGates(t *testing.T, protocolMode string) {
 			raw := groundedCorpusFixture(t, "useful-01", prompt)
 			if protocol == "source-eligible-v8" {
 				raw = eligibleCorpusFixture(t, "useful-01", prompt)
+			}
+			if protocol == "source-addressed-v9" {
+				raw = addressedCorpusFixture(t, "useful-01", prompt)
 			}
 			if mode == "invalid-extraction" {
 				raw = []byte(`{"version":"wrong","facts":[]}`)
@@ -233,7 +243,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			case "config":
 				args = append(args, "--config", "never-read.json")
 			case "nil-selector":
-				if protocol == "source-eligible-v8" {
+				if protocol == "source-addressed-v9" {
+					p.interpretAddressed = nil
+				} else if protocol == "source-eligible-v8" {
 					p.interpretEligible = nil
 				} else if protocol == "partitioned-full-v7" {
 					p.interpretGroundedFull = nil
@@ -262,6 +274,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			}
 			if protocol == "source-eligible-v8" {
 				export = boardfamily.SourceEligibleEvidenceContract
+			}
+			if protocol == "source-addressed-v9" {
+				export = boardfamily.SourceAddressedEvidenceContract
 			}
 			want, err := export(prompt)
 			if err != nil {

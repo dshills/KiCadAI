@@ -1,5 +1,8 @@
 # Offline verification record
 
+Scope: prototype commit `7d8e2488`, before command integration. The later
+integration checks are recorded separately in [INTEGRATION.md](INTEGRATION.md).
+
 Date: 2026-09-17. Base commit: `a7b4d51e78940b79c9e916c82e913535e0068531`.
 Worktree: `.cache/board-family-v2/development-12`, branch
 `codex/source-addressed-12`. Review and test interpretation were performed by the

@@ -87,6 +87,10 @@ func testPartitionedCandidateCommandNative(t *testing.T, protocol string) {
 		name = "source-eligible-native"
 		fixture, inspect = eligibleCorpusFixture, boardfamily.InspectSourceEligibleJournal
 	}
+	if protocol == "source-addressed-v9" {
+		name = "source-addressed-native"
+		fixture, inspect = addressedCorpusFixture, boardfamily.InspectSourceAddressedJournal
+	}
 	root := groundedReviewDirectory(t, name)
 	useful := 0
 	for _, c := range groundedReviewCases(t) {

@@ -1,5 +1,10 @@
 # Source-addressed extraction: offline prototype 12
 
+This document records the prototype checkpoint at `7d8e2488`. For the subsequent
+experimental command integration and offline native checks, see
+[INTEGRATION.md](INTEGRATION.md). The historical prototype results below remain
+unchanged; they are not live acceptance evidence.
+
 Status: **experimental, offline-only, not integrated into the command**. This
 checkpoint is progress toward the two-family natural-language-to-KiCad goal,
 not completion of that goal and not permission for a live evaluation.

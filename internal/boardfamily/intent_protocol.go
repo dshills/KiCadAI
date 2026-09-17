@@ -18,9 +18,13 @@ const (
 	groundedProtocol
 	groundedFullProtocol
 	sourceEligibleProtocol
+	sourceAddressedProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == sourceAddressedProtocol {
+		return SourceAddressedVersion
+	}
 	if p == sourceEligibleProtocol {
 		return SourceEligibleVersion
 	}
@@ -40,6 +44,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == sourceAddressedProtocol {
+		return "source-addressed-evidence-journal-1"
+	}
 	if p == sourceEligibleProtocol {
 		return "source-eligible-evidence-journal-1"
 	}
@@ -62,6 +69,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == sourceAddressedProtocol {
+		return "source-addressed-journal-audit-1"
+	}
 	if p == sourceEligibleProtocol {
 		return "source-eligible-journal-audit-1"
 	}
@@ -99,6 +109,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return GroundedFullMaxRequestBytes
 	case sourceEligibleProtocol:
 		return SourceEligibleMaxRequestBytes
+	case sourceAddressedProtocol:
+		return SourceAddressedMaxRequestBytes
 	default:
 		return 0
 	}
@@ -118,6 +130,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareGroundedGenerateRequest(prompt)
 	case sourceEligibleProtocol:
 		return prepareSourceEligibleGenerateRequest(prompt)
+	case sourceAddressedProtocol:
+		return prepareSourceAddressedGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -137,6 +151,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeGroundedEvidenceIntent(prompt, raw)
 	case sourceEligibleProtocol:
 		return DecodeSourceEligibleEvidenceIntent(prompt, raw)
+	case sourceAddressedProtocol:
+		return DecodeSourceAddressedEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}
