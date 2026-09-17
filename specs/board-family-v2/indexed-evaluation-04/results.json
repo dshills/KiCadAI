@@ -1,0 +1,587 @@
+{
+  "version": "indexed-semantic-results-1",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "planned_cases": 14,
+  "recorded_cases": 14,
+  "raw_passes": 9,
+  "application_passes": 11,
+  "complete_passes": 9,
+  "median_all_useful_seconds": 6.4391022499999995,
+  "maximum_all_useful_seconds": 8.282090709,
+  "timing_target_met": true,
+  "corpus_status": "known regression cases; not independent or statistical evidence",
+  "reviewer": {
+    "kind": "implementing-agent",
+    "name": "Codex implementing agent; not independent review"
+  },
+  "acceptance": "complete-acceptance-not-met",
+  "cases": [
+    {
+      "id": "useful-01",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "pressure",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": [
+              2
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": false,
+        "configuration_matches": false,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "useful-02",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "pullups",
+            "matching_fact_indices": [
+              1
+            ]
+          },
+          {
+            "id": "clock",
+            "matching_fact_indices": [
+              2
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": [
+              3
+            ]
+          },
+          {
+            "id": "humidity-excluded",
+            "matching_fact_indices": [
+              4
+            ]
+          },
+          {
+            "id": "wireless-excluded",
+            "matching_fact_indices": [
+              5
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "useful-03",
+      "raw_automatic": {
+        "structure_pass": false,
+        "required_facts_present": false,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "pullups",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "clock",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "power-scope",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "battery-excluded",
+            "matching_fact_indices": []
+          }
+        ],
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": false,
+        "configuration_matches": false,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "useful-04",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "temperature",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "humidity",
+            "matching_fact_indices": [
+              1
+            ]
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": [
+              3
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": [
+              4
+            ]
+          },
+          {
+            "id": "pressure-excluded",
+            "matching_fact_indices": [
+              2
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "useful-05",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": [
+              1
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": [
+              3
+            ]
+          },
+          {
+            "id": "heater-forbidden",
+            "matching_fact_indices": [
+              2
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "choice-01",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "choice-02",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "BMP-choice",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "SHT-choice",
+            "matching_fact_indices": [
+              1
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "choice-03",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "standard-choice",
+            "matching_fact_indices": [
+              1
+            ]
+          },
+          {
+            "id": "fast-choice",
+            "matching_fact_indices": [
+              2
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-01",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "BMP-required",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "SHT-required",
+            "matching_fact_indices": [
+              1
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-02",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": [
+              1
+            ]
+          },
+          {
+            "id": "pullups",
+            "matching_fact_indices": [
+              2
+            ]
+          },
+          {
+            "id": "clock",
+            "matching_fact_indices": [
+              3
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": [
+              4
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-03",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": false,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "profile",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "pullups",
+            "matching_fact_indices": [
+              2
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matching_fact_indices": [
+              3
+            ]
+          }
+        ],
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": false,
+      "application_pass": true,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-04",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "later-heater",
+            "matching_fact_indices": [
+              2
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": true,
+      "application_pass": true,
+      "complete_pass": true
+    },
+    {
+      "id": "refuse-05",
+      "raw_automatic": {
+        "structure_pass": false,
+        "required_facts_present": false,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "USB-power",
+            "matching_fact_indices": []
+          },
+          {
+            "id": "wireless",
+            "matching_fact_indices": []
+          }
+        ],
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": false,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": false,
+      "application_pass": false,
+      "complete_pass": false
+    },
+    {
+      "id": "refuse-06",
+      "raw_automatic": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matching_fact_indices": [
+              0
+            ]
+          },
+          {
+            "id": "accuracy",
+            "matching_fact_indices": [
+              11
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-fact-and-source-review"
+      },
+      "application_automatic": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "raw_pass": false,
+      "application_pass": true,
+      "complete_pass": false
+    }
+  ]
+}

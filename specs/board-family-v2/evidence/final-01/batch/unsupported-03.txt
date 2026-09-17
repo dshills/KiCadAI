@@ -1,0 +1,1 @@
+Create an SHT31 temperature/humidity board using the 10k low_current profile with 100 pF total capacitance.

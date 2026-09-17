@@ -1,0 +1,52 @@
+{
+  "id": "useful-01",
+  "prompt_sha256": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+  "state": "recorded-outcome",
+  "started_utc": "2026-09-15T11:15:31.784Z",
+  "execution": {
+    "exit_code": 0,
+    "signal": null,
+    "child_pid": 29097,
+    "child_terminal_observed": true,
+    "timed_out": false,
+    "spawn_error": null,
+    "log_overflow": false,
+    "storage_error": false,
+    "wall_seconds": 2.790860709
+  },
+  "audit_execution": {
+    "exit_code": 0,
+    "signal": null,
+    "child_pid": 29110,
+    "child_terminal_observed": true,
+    "timed_out": false,
+    "spawn_error": null,
+    "log_overflow": false,
+    "storage_error": false,
+    "wall_seconds": 0.011237583000000086
+  },
+  "collection_class": "recorded-decision-semantic-review-pending",
+  "advance": true,
+  "model_correct": null,
+  "response_id": "resp_0b49cd7b3cc1db3d016aa928d4d86487d18dcf011189fef085",
+  "ledger_index": 1,
+  "files_sha256": {
+    "attempt.json": "105c87712b02518f1d08e7dd0898c229736ef64f605d07be6f41e118b9111a8d",
+    "audit.process.json": "a23de6733fa2eaf5b2b18c16d34ed845bfb03b1969dbd6cb06d4c32eccaa70e0",
+    "audit.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audit.stdout.log": "1cf14f870d2093438b446c39e7eab3e7f84dab0129620db6c68f92f8df291e04",
+    "board/selection.json": "806bab97d050cafa41787e2dbf067fff1edc48348742343e74483db0c4527031",
+    "command.process.json": "132238138cd58877e6bede8c6dcf5bea21dcbf181683d7bcab25a6f62161af5f",
+    "command.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "command.stdout.log": "198e186839a9e75ba253f203bbbf36a6fd7bcdb94fed992a68081c2e0fe791ab",
+    "journal/request/body.bin": "89f91e3fe296320516c4aa261da009af5448fd8a74b0635d3da55bf3ddb226f7",
+    "journal/request/receipt.json": "fa7ec1b925c7cb0ccd8f7307807a56368bb23d2e204121885ebcde62b6d9d52c",
+    "journal/response.bin": "e3b27c936f2a6231c2dd1a88879cd50fadec3b73107bfdd6ea58c6d86ebcf795",
+    "journal/response/receipt.json": "bb91d7f7100af0427d9bfc1264ffb1481f44bd0878f28df318f5d81347e1711b",
+    "journal/selection/ledger.json": "b12f168b3b9923004413511fbd547a89ec02c137ef16c3178650c32601f789b1",
+    "journal/selection/receipt.json": "9ab8360b9f94a2e936b356b2ba35a26b30a4478a67be0de27d8005b6583cddba",
+    "journal/selection/selection.json": "806bab97d050cafa41787e2dbf067fff1edc48348742343e74483db0c4527031",
+    "journal/start.json": "20e5e3059468bb4a5f0a495a93e268b6f293125c4c0fc679539067c8eb840c03",
+    "prompt.txt": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0"
+  }
+}

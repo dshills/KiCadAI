@@ -1,0 +1,28 @@
+{
+  "version": "indexed-runtime-pointer-1",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "status": "offline-qualified-exact-source-ci-and-live-approval-pending",
+  "manifest_path": ".cache/board-family-v2/indexed-runtime-03-01/manifest.json",
+  "manifest_sha256": "429f02b613038d22adaacc1cc9ef054e8b18703afe748312c3e925b59c977023",
+  "qualification_path": ".cache/board-family-v2/indexed-runtime-03-01/qualification.json",
+  "qualification_sha256": "b466e2392b9739f6373f97d893debc5d1a569e3bfd342bcaf18db2cdb111f161",
+  "binary_path": ".cache/board-family-v2/indexed-runtime-03-01/kicadai-board-family",
+  "binary_sha256": "94f8cd780dbbdfe12a0503164686353671c5732b6484a80ecdd4e0560f291e20",
+  "test_binary_sha256": "2ea3007570247fbd8e89fdc5fe949a3f14760f9f577626e145ff9dabda3870be",
+  "contract_path": ".cache/board-family-v2/indexed-runtime-03-01/contract.json",
+  "contract_sha256": "61a66a05ae60b3564b977218a3adcf50cf46a02cdaf213639f242e74ed74332a",
+  "compiler_version": "go1.26.8 darwin/arm64",
+  "source_compiler_and_evaluator_files": 2388,
+  "total_frozen_files": 2530,
+  "qualification_commands_passed": 11,
+  "proposed_policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "live_requests": 0,
+  "semantic_acceptance": "not-tested-live",
+  "default_protocol": "typed-v2-unchanged",
+  "review_path": "specs/board-family-v2/source-reference-candidate-03/REVIEW-03.md",
+  "notice": "This pointer is not approval. Local runtime files must remain present and authenticate against the manifest. Exact-source review/CI and actual new user approval are required before any live request. Prior exhausted budgets and frozen evidence are unchanged."
+}

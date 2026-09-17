@@ -1,0 +1,1 @@
+Generate an SHT31 temperature and humidity board using the standard 4.7k pull-ups at 100 kHz with 70 pF total bus capacitance. Use the supported default power and ambient limits. I do not need pressure measurement or an ambient accuracy guarantee.

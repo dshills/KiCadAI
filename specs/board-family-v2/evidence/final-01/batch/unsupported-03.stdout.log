@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The SHT31 family (esp32_sht31_v1) does not support the low_current profile or 10k pull-ups; these options exist only for the BMP280 family. Please revise your profile or sensor selection.","output":".cache/board-family-v2/evaluation-final-01/unsupported-03","passed":false}
