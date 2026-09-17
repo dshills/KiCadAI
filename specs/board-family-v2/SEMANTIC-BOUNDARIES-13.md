@@ -1,5 +1,9 @@
 # Offline semantic-boundary checkpoint
 
+This records the initial `be49235d` checkpoint. See
+[the compound-control follow-up](SEMANTIC-CONTROL-SPANS-13.md) for current
+prototype behavior and verification; the historical results below are retained.
+
 Status: **offline prototype, not live acceptance or a finished goal**.
 
 This checkpoint reduces the model's responsibility for a small set of

@@ -13,19 +13,22 @@ import (
 // CLI flag or accounting profile accepts it. Historical v9 bytes stay v9.
 const SemanticBoundaryVersion = "10-semantic-boundaries-offline"
 
-// SourceControl is an application-understood, complete source clause. It cannot
-// consume a quantity or hide a residual requirement in a compound sentence.
+// SourceControl is an application-understood span of the original request.
+// It cannot consume a quantity or hide the residual of a compound sentence.
 // Defaults apply only to unspecified values. Preserve-requirements is already
 // enforced by catalog admission: no substitution or bound weakening is allowed.
 type SourceControl struct {
 	ClauseID int    `json:"clause_id"`
 	Kind     string `json:"kind"`
+	Start    int    `json:"start"`
+	End      int    `json:"end"`
 }
 
 type SemanticBoundaryRequest struct {
 	SourceAddressedRequest
 	Controls      []SourceControl   `json:"controls"`
 	RequiredState map[string]string `json:"required_state"`
+	Residuals     []SourceResidual  `json:"residuals"`
 }
 
 // Whole-clause grammars intentionally under-recognize. In particular, a keyword
@@ -76,15 +79,18 @@ func PrepareSemanticBoundaryRequest(prompt string) (SemanticBoundaryRequest, err
 	// extraction rather than force a local state across a detected scope cue.
 	// This finite guard is not a proof of general English discourse semantics.
 	if boundaryScopeAmbiguity.MatchString(prompt) || strings.ContainsAny(prompt, "\"“”()") {
-		return result, nil
+		return withBoundaryResiduals(result), nil
 	}
+	offset := 0
 	for _, clause := range base.Source.Clauses {
 		text := boundaryClauseText(clause.Text)
 		switch {
 		case boundaryDefaults.MatchString(text):
-			result.Controls = append(result.Controls, SourceControl{clause.ID, "reviewed_defaults_for_unspecified_values"})
+			result.Controls = append(result.Controls, SourceControl{ClauseID: clause.ID, Kind: "reviewed_defaults_for_unspecified_values", Start: offset, End: offset + len(clause.Text)})
 		case boundaryPreserve.MatchString(text):
-			result.Controls = append(result.Controls, SourceControl{clause.ID, "preserve_explicit_requirements"})
+			result.Controls = append(result.Controls, SourceControl{ClauseID: clause.ID, Kind: "preserve_explicit_requirements", Start: offset, End: offset + len(clause.Text)})
+		default:
+			result.Controls = append(result.Controls, compoundDefaultControls(clause, offset)...)
 		}
 		for _, mention := range base.Mentions {
 			if mention.ClauseID != clause.ID {
@@ -98,13 +104,16 @@ func PrepareSemanticBoundaryRequest(prompt string) (SemanticBoundaryRequest, err
 				state = "unnecessary_but_allowed"
 			case boundaryHeaterOff.MatchString(text) && mention.Kind == "feature" && mention.Value == "heater_operation":
 				state = "must_not_occur"
+			case mention.Kind == "profile" && mention.Value == "standard" && standardOnlyInsideControls(clause, offset, result.Controls):
+				state = "context_only"
 			}
 			if state != "" {
 				result.RequiredState[mention.ID] = state
 			}
 		}
+		offset += len(clause.Text)
 	}
-	return result, nil
+	return withBoundaryResiduals(result), nil
 }
 
 // SemanticBoundarySchema removes model decisions only where the entire source
@@ -121,11 +130,8 @@ func SemanticBoundarySchema(prompt string) (map[string]any, error) {
 	props := schema["properties"].(map[string]any)
 	props["version"] = enumSchema(SemanticBoundaryVersion)
 	additional := props["additional"].(map[string]any)["properties"].(map[string]any)
-	for _, control := range input.Controls {
-		additional["c"+strconv.Itoa(control.ClauseID)] = map[string]any{
-			"type": "array", "maxItems": 0,
-			"items": map[string]any{"$ref": "#/$defs/mention_classification"},
-		}
+	for _, clause := range input.Source.Clauses {
+		additional["c"+strconv.Itoa(clause.ID)] = boundaryAdditionalSchema(input, clause.ID)
 	}
 	mentions := props["mentions"].(map[string]any)["properties"].(map[string]any)
 	for id, state := range input.RequiredState {
@@ -139,7 +145,7 @@ func SemanticBoundarySchema(prompt string) (map[string]any, error) {
 }
 
 func semanticBoundaryContext() string {
-	return sourceAddressedContext() + `Offline successor rules override v9 only for application-owned controls and required_state. A controls entry recognizes its COMPLETE clause: reviewed defaults fill only unspecified values; preserve_explicit_requirements forbids substitution or weakened bounds. Emit an empty additional array for those clauses, not an unsupported other fact. Never infer a named profile, numeric value or hardware capability from a defaults control. required_state fixes an unambiguous local mention state; use exactly that one state with empty context. Preserve every other requirement, quantity, compound clause and unfamiliar constraint under the ordinary rules. No control applies to another clause or cancels a later heater requirement. This prototype has no provider dispatch.
+	return sourceAddressedContext() + `Offline successor rules override v9 only for application-owned controls, residuals and required_state. controls cover exact original UTF-8 byte ranges: reviewed defaults fill only unspecified values; preserve_explicit_requirements forbids substitution or weakened bounds. Control spans are already represented and are not unsupported other facts. residuals retain EVERY byte outside controls, including the rest of a compound sentence. Each additional fact requires a span rN from its own clause. Preserve every substantive residual constraint, including unfamiliar hardware and no-adapter restrictions; use context for other clauses when needed. Only clauses with no residual span must have an empty additional array. Never infer a named profile, numeric value or hardware capability from a defaults control. required_state fixes an unambiguous local mention state; use exactly that one state with empty context. Controls never erase mention or quantity slots and cannot cancel a later heater requirement. This prototype has no provider dispatch.
 `
 }
 
@@ -171,11 +177,8 @@ func DecodeSemanticBoundaryIntent(prompt string, raw []byte) (Decision, error) {
 	if err != nil {
 		return failure, err
 	}
-	for _, control := range input.Controls {
-		id := "c" + strconv.Itoa(control.ClauseID)
-		if entries, ok := envelope.Additional[id]; !ok || entries == nil || len(entries) != 0 {
-			return failure, fmt.Errorf("control %s is complete and requires an empty additional array", id)
-		}
+	if err := lowerBoundaryAdditional(input, envelope.Additional); err != nil {
+		return failure, err
 	}
 	// Iterate in source order, not map order, for stable first-error diagnostics.
 	for _, mention := range input.Mentions {

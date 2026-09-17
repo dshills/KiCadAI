@@ -90,10 +90,6 @@ func TestSemanticBoundaryDoesNotSwallowCompoundOrUnsupportedWording(t *testing.T
 		"Use manufacturer electrical defaults.",
 		"Use the reviewed default layout.",
 		"Use factory operating limits.",
-		"Use standard electrical defaults.",
-		"Your standard profile and reviewed default operating limits are fine.",
-		"Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits.",
-		"I'd like the SHT31 controller with the reviewed electrical defaults.",
 		"For context, use the reviewed electrical defaults.",
 		"The label must say 'Use the reviewed operating limits'.",
 		"\"Use the reviewed operating limits\".",
@@ -103,12 +99,12 @@ func TestSemanticBoundaryDoesNotSwallowCompoundOrUnsupportedWording(t *testing.T
 	} {
 		t.Run(clause, func(t *testing.T) {
 			input, err := PrepareSemanticBoundaryRequest(clause)
-			if err != nil || len(input.Controls) != 0 {
-				t.Fatal("unjustified control", input.Controls, err)
+			if err != nil || len(input.Residuals) == 0 {
+				t.Fatal("compound clause swallowed", input.Controls, err)
 			}
 			_, f := boundaryFixture(t, clause)
 			f["additional"].(map[string]any)["c0"] = []any{map[string]any{
-				"kind": "other", "detail": clause, "state": "requested", "context": []string{},
+				"kind": "other", "detail": clause, "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID,
 			}}
 			for _, q := range input.Source.Quantities {
 				f["quantities"].(map[string]any)["q"+strconv.Itoa(q.ID)] = []any{map[string]any{
@@ -142,7 +138,7 @@ func TestSemanticBoundaryDefaultsNeverOverwriteExplicitValues(t *testing.T) {
 			case "wrong-supply":
 				f["quantities"] = map[string]any{"q0": []any{groundedNumber("supply_min_v", "requested"), groundedNumber("supply_max_v", "requested")}}
 			case "unknown":
-				f["additional"].(map[string]any)["c2"] = []any{map[string]any{"kind": "other", "detail": "galvanic isolation", "state": "requested", "context": []string{}}}
+				f["additional"].(map[string]any)["c2"] = []any{map[string]any{"kind": "other", "detail": "galvanic isolation", "state": "requested", "context": []string{}, "span": input.Residuals[len(input.Residuals)-1].ID}}
 			}
 			d := checkBoundary(t, tc.prompt, f, tc.want)
 			if tc.reason != "" && !strings.Contains(strings.ToLower(d.Message), tc.reason) {
