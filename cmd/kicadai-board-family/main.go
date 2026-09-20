@@ -42,6 +42,7 @@ type commandPipeline struct {
 	interpretEligible     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretAddressed    func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretBoundary     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
+	interpretCoverage     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	generate              func(boardfamily.Config, string) (boardfamily.Electrical, error)
 	validate              func(context.Context, string, string) (boardfamily.Validation, error)
 }
@@ -88,6 +89,10 @@ func defaultCommandPipeline() commandPipeline {
 			s, err := boardfamily.InterpretSemanticBoundaryWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
 			return s.Selection, s, err
 		},
+		interpretCoverage: func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
+			s, err := boardfamily.InterpretCoverageWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
+			return s.Selection, s, err
+		},
 		generate: boardfamily.Generate,
 		validate: boardfamily.Validate,
 	}
@@ -102,7 +107,7 @@ func runWithPipeline(pipeline commandPipeline) error {
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
 	ledger := flag.String("ledger", "", "persistent ledger required with a prompt; legacy limits unless --live-budget supplies a separate approved goal")
 	budgetFile := flag.String("live-budget", "", "JSON goal/request/microdollar policy for a separately approved new goal; not spending authorization")
-	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9 or semantic-boundaries-v10 (experimental; requires separate approval and evidence journal)")
+	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10 or requirement-coverage-v11 (experimental; requires separate approval and evidence journal)")
 	journal := flag.String("evidence-journal", "", "new private evidence directory outside output; required for experimental prompts")
 	inspectJournal := flag.String("inspect-indexed-journal", "", "verify an existing indexed journal by local byte replay; no key or API request")
 	inspectOwnedJournal := flag.String("inspect-owned-journal", "", "verify an existing owned-v4 journal by local byte replay; no key or API request")
@@ -113,13 +118,14 @@ func runWithPipeline(pipeline commandPipeline) error {
 	inspectEligibleJournal := flag.String("inspect-source-eligible-journal", "", "verify an existing source-eligible-v8 journal by local byte replay; no key or API request")
 	inspectAddressedJournal := flag.String("inspect-source-addressed-journal", "", "verify an existing source-addressed-v9 journal by local byte replay; no key or API request")
 	inspectBoundaryJournal := flag.String("inspect-semantic-boundary-journal", "", "verify an existing semantic-boundaries-v10 journal by local byte replay; no key or API request")
+	inspectCoverageJournal := flag.String("inspect-requirement-coverage-journal", "", "verify an existing requirement-coverage-v11 journal by local byte replay; no key or API request")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
 	inspectModes := 0
-	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal, *inspectEligibleJournal, *inspectAddressedJournal, *inspectBoundaryJournal} {
+	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal, *inspectEligibleJournal, *inspectAddressedJournal, *inspectBoundaryJournal, *inspectCoverageJournal} {
 		if value != "" {
 			inspectModes++
 		}
@@ -153,16 +159,19 @@ func runWithPipeline(pipeline commandPipeline) error {
 		if *inspectBoundaryJournal != "" {
 			inspect, path = boardfamily.InspectSemanticBoundaryJournal, *inspectBoundaryJournal
 		}
+		if *inspectCoverageJournal != "" {
+			inspect, path = boardfamily.InspectCoverageJournal, *inspectCoverageJournal
+		}
 		audit, err := inspect(path)
 		if err != nil {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(audit)
 	}
-	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" && *protocol != "source-eligible-v8" && *protocol != "source-addressed-v9" && *protocol != "semantic-boundaries-v10" {
-		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9 or semantic-boundaries-v10")
+	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" && *protocol != "source-eligible-v8" && *protocol != "source-addressed-v9" && *protocol != "semantic-boundaries-v10" && *protocol != "requirement-coverage-v11" {
+		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10 or requirement-coverage-v11")
 	}
-	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7" || *protocol == "source-eligible-v8" || *protocol == "source-addressed-v9" || *protocol == "semantic-boundaries-v10"
+	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7" || *protocol == "source-eligible-v8" || *protocol == "source-addressed-v9" || *protocol == "semantic-boundaries-v10" || *protocol == "requirement-coverage-v11"
 	experimental := *protocol == "indexed-v3" || requestSpecific
 	if *journal != "" && (!experimental || *listFamilies || *exportContract != "" || *config != "") {
 		return errors.New("--evidence-journal is only valid for experimental prompt generation")
@@ -210,6 +219,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 			if *protocol == "semantic-boundaries-v10" {
 				export = boardfamily.SemanticBoundaryEvidenceContract
 			}
+			if *protocol == "requirement-coverage-v11" {
+				export = boardfamily.CoverageEvidenceContract
+			}
 			contract, err := export(*prompt)
 			if err != nil {
 				return err
@@ -238,6 +250,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		return errors.New("--live-budget requires a prompt and a separate --ledger")
 	}
 	if experimental {
+		if *protocol == "requirement-coverage-v11" && pipeline.interpretCoverage == nil {
+			return errors.New("requirement-coverage-v11 requires a configured selector")
+		}
 		if *config != "" || *ledger == "" || *budgetFile == "" || *journal == "" || (*protocol == "indexed-v3" && pipeline.interpretIndexed == nil) || (*protocol == "owned-v4" && pipeline.interpretOwned == nil) || (*protocol == "connection-v5" && pipeline.interpretConnection == nil) || (*protocol == "direct-v6" && pipeline.interpretDirect == nil) || (*protocol == "partitioned-v7" && pipeline.interpretGrounded == nil) || (*protocol == "partitioned-full-v7" && pipeline.interpretGroundedFull == nil) || (*protocol == "source-eligible-v8" && pipeline.interpretEligible == nil) || (*protocol == "source-addressed-v9" && pipeline.interpretAddressed == nil) || (*protocol == "semantic-boundaries-v10" && pipeline.interpretBoundary == nil) {
 			return fmt.Errorf("%s requires a prompt, a separate --live-budget, --ledger and --evidence-journal", *protocol)
 		}
@@ -292,7 +307,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		var s boardfamily.Selection
 		var record any
 		var e error
-		if *protocol == "semantic-boundaries-v10" {
+		if *protocol == "requirement-coverage-v11" {
+			s, record, e = pipeline.interpretCoverage(ctx, *prompt, *ledger, policy, *journal)
+		} else if *protocol == "semantic-boundaries-v10" {
 			s, record, e = pipeline.interpretBoundary(ctx, *prompt, *ledger, policy, *journal)
 		} else if *protocol == "source-addressed-v9" {
 			s, record, e = pipeline.interpretAddressed(ctx, *prompt, *ledger, policy, *journal)

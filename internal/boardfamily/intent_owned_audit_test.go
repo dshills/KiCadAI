@@ -45,6 +45,11 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 				requestAllBoundaryMentions(t, input, f)
 				key, check, raw = "offline-boundary-placeholder", checkSemanticBoundaryProviderRequest, addressedJSON(t, f)
 			}
+			if protocol == coverageProtocol {
+				_, f := coverageFixture(t, journalTestPrompt)
+				f["version"] = CoverageEvidenceVersion
+				key, check, raw = "offline-boundary-placeholder", checkCoverageProviderRequest, addressedJSON(t, f)
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")
@@ -128,7 +133,7 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 				t.Fatal("incomplete verified audit")
 			}
 			if mode == "unchanged" {
-				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol, sourceAddressedProtocol, semanticBoundaryProtocol} {
+				for _, other := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol, sourceAddressedProtocol, semanticBoundaryProtocol, coverageProtocol} {
 					if other != protocol {
 						if _, err := inspectProtocolJournal(root, other); err == nil {
 							t.Fatal("another protocol accepted this journal")

@@ -103,6 +103,11 @@ func TestSemanticBoundaryProviderCorpusWireAndJournal(t *testing.T) {
 }
 
 func TestSemanticBoundaryProviderPreflightAndUnknownOutcome(t *testing.T) {
+	testBoundedProviderPreflight(t, semanticBoundaryProtocol, checkSemanticBoundaryProviderRequest)
+}
+
+func testBoundedProviderPreflight(t *testing.T, protocol extractionProtocol, check func(testing.TB, *http.Request, string) int) {
+	t.Helper()
 	for _, mode := range []string{"no-budget", "no-key", "nil-transport", "no-ledger", "no-journal", "existing-journal", "oversize", "wrong-model", "transport-error", "incomplete"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("OPENAI_API_KEY", "offline-boundary-placeholder")
@@ -113,7 +118,7 @@ func TestSemanticBoundaryProviderPreflightAndUnknownOutcome(t *testing.T) {
 			calls, want := 0, 0
 			var base http.RoundTripper = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 				calls++
-				checkSemanticBoundaryProviderRequest(t, r, prompt)
+				check(t, r, prompt)
 				if mode == "transport-error" {
 					return nil, errors.New("synthetic transport error")
 				}
@@ -139,11 +144,11 @@ func TestSemanticBoundaryProviderPreflightAndUnknownOutcome(t *testing.T) {
 			default:
 				want = 1
 			}
-			s, err := InterpretSemanticBoundaryWithJournal(context.Background(), prompt, ledger, policy, base, journal)
+			s, err := interpretProtocolJournal(context.Background(), prompt, ledger, policy, base, journal, protocol)
 			if err == nil || calls != want || s.Decision.Configuration != nil {
 				t.Fatal("unsafe preflight/result", mode, err, calls, s.Outcome)
 			}
-			if _, err := InspectSemanticBoundaryJournal(journal); err == nil {
+			if _, err := inspectProtocolJournal(journal, protocol); err == nil {
 				t.Fatal("failed request audited as complete")
 			}
 			if want == 0 {
@@ -162,7 +167,7 @@ func TestSemanticBoundaryProviderPreflightAndUnknownOutcome(t *testing.T) {
 					t.Fatal("disputed model priced or not halted")
 				}
 			}
-			if _, err := InterpretSemanticBoundaryWithJournal(context.Background(), prompt, ledger, policy, base, filepath.Join(root, "second-journal")); err == nil || calls != 1 {
+			if _, err := interpretProtocolJournal(context.Background(), prompt, ledger, policy, base, filepath.Join(root, "second-journal"), protocol); err == nil || calls != 1 {
 				t.Fatal("unresolved/disputed history allowed another invocation", err)
 			}
 			after, err := os.ReadFile(ledger)
@@ -174,12 +179,20 @@ func TestSemanticBoundaryProviderPreflightAndUnknownOutcome(t *testing.T) {
 }
 
 func TestSemanticBoundaryLedgerIsolationAndCaps(t *testing.T) {
+	testBoundedLedgerIsolationAndCaps(t, semanticBoundaryProtocol)
+}
+
+func testBoundedLedgerIsolationAndCaps(t *testing.T, protocol extractionProtocol) {
+	t.Helper()
 	policy := LedgerPolicy{"offline-boundary-accounting", 2, 100000}
-	if semanticBoundaryProtocol.estimatedMicroUSD(100, 200) != 1800 || semanticBoundaryProtocol.estimatedMicroUSD(SemanticBoundaryMaxRequestBytes, 1600) != 44800 {
+	if protocol.estimatedMicroUSD(100, 200) != 1800 || protocol.estimatedMicroUSD(int(protocol.requestLimit()), 1600) != 44800 {
 		t.Fatal("wrong model pricing or reserve bound")
 	}
-	for _, old := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol, sourceAddressedProtocol} {
-		for _, pair := range [][2]extractionProtocol{{old, semanticBoundaryProtocol}, {semanticBoundaryProtocol, old}} {
+	for _, old := range []extractionProtocol{indexedProtocol, ownedProtocol, connectionProtocol, directProtocol, groundedProtocol, groundedFullProtocol, sourceEligibleProtocol, sourceAddressedProtocol, semanticBoundaryProtocol, coverageProtocol} {
+		if old == protocol {
+			continue
+		}
+		for _, pair := range [][2]extractionProtocol{{old, protocol}, {protocol, old}} {
 			file := filepath.Join(t.TempDir(), "ledger.json")
 			if _, err := reserveForProtocol(file, policy, pair[0]); err != nil {
 				t.Fatal(err)
@@ -213,22 +226,22 @@ func TestSemanticBoundaryLedgerIsolationAndCaps(t *testing.T) {
 				p.MaxRequests, p.MaxMicroUSD = 3, 150000
 			}
 			file := filepath.Join(t.TempDir(), "ledger.json")
-			if _, err := reserveForProtocol(file, p, semanticBoundaryProtocol); err != nil {
+			if _, err := reserveForProtocol(file, p, protocol); err != nil {
 				t.Fatal(err)
 			}
 			input := 100
 			if mode == "overrun" {
 				input = 200000
 			}
-			err := finishReservationForProtocol(file, p, semanticBoundaryProtocol, 1, "completed", "synthetic-accounting", input, 200)
+			err := finishReservationForProtocol(file, p, protocol, 1, "completed", "synthetic-accounting", input, 200)
 			if (err != nil) != (mode == "overrun") {
 				t.Fatal("wrong settlement result", err)
 			}
 			if mode == "duplicate-id" {
-				if _, err := reserveForProtocol(file, p, semanticBoundaryProtocol); err != nil {
+				if _, err := reserveForProtocol(file, p, protocol); err != nil {
 					t.Fatal(err)
 				}
-				if err := finishReservationForProtocol(file, p, semanticBoundaryProtocol, 2, "completed", "synthetic-accounting", 100, 200); err != nil {
+				if err := finishReservationForProtocol(file, p, protocol, 2, "completed", "synthetic-accounting", 100, 200); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -242,7 +255,7 @@ func TestSemanticBoundaryLedgerIsolationAndCaps(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := reserveForProtocol(file, p, semanticBoundaryProtocol); err == nil {
+			if _, err := reserveForProtocol(file, p, protocol); err == nil {
 				t.Fatal("unsafe ledger accepted", mode)
 			}
 		})

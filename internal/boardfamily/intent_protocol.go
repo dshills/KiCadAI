@@ -20,9 +20,13 @@ const (
 	sourceEligibleProtocol
 	sourceAddressedProtocol
 	semanticBoundaryProtocol
+	coverageProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == coverageProtocol {
+		return CoverageEvidenceVersion
+	}
 	if p == semanticBoundaryProtocol {
 		return SemanticBoundaryVersion
 	}
@@ -48,6 +52,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == coverageProtocol {
+		return "requirement-coverage-evidence-journal-1"
+	}
 	if p == semanticBoundaryProtocol {
 		return "semantic-boundary-evidence-journal-1"
 	}
@@ -76,6 +83,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == coverageProtocol {
+		return "requirement-coverage-journal-audit-1"
+	}
 	if p == semanticBoundaryProtocol {
 		return "semantic-boundary-journal-audit-1"
 	}
@@ -123,6 +133,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return SourceAddressedMaxRequestBytes
 	case semanticBoundaryProtocol:
 		return SemanticBoundaryMaxRequestBytes
+	case coverageProtocol:
+		return CoverageEvidenceMaxRequestBytes
 	default:
 		return 0
 	}
@@ -146,6 +158,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareSourceAddressedGenerateRequest(prompt)
 	case semanticBoundaryProtocol:
 		return prepareSemanticBoundaryGenerateRequest(prompt)
+	case coverageProtocol:
+		return prepareCoverageGenerateRequest(prompt)
 	default:
 		return aiprovider.GenerateRequest{}, ReferencedRequest{}, errors.New("unknown extraction protocol")
 	}
@@ -169,6 +183,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeSourceAddressedEvidenceIntent(prompt, raw)
 	case semanticBoundaryProtocol:
 		return DecodeSemanticBoundaryIntent(prompt, raw)
+	case coverageProtocol:
+		return DecodeCoverageEvidenceIntent(prompt, raw)
 	default:
 		return Decision{}, errors.New("unknown extraction protocol")
 	}

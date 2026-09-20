@@ -95,6 +95,10 @@ func testPartitionedCandidateCommandNative(t *testing.T, protocol string) {
 		name = "semantic-boundaries-native"
 		fixture, inspect = boundaryCorpusFixture, boardfamily.InspectSemanticBoundaryJournal
 	}
+	if protocol == "requirement-coverage-v11" {
+		name = "requirement-coverage-native"
+		fixture, inspect = coverageCorpusFixture, boardfamily.InspectCoverageJournal
+	}
 	root := groundedReviewDirectory(t, name)
 	useful := 0
 	for _, c := range groundedReviewCases(t) {

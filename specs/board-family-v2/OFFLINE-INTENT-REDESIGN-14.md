@@ -3,6 +3,11 @@
 Date: 2026-09-18. Status: offline prototype; NOT a successful live evaluation,
 production replacement, completed two-family goal, or authorization to run.
 
+This is the prototype-stage record. The subsequent separately versioned,
+offline-tested integration is recorded in
+[COVERAGE-INTEGRATION-14.md](COVERAGE-INTEGRATION-14.md); it does not change these
+historical prototype observations or establish live acceptance.
+
 ## Decision
 
 Keep the deterministic two-family generator and engineering admission unchanged.
