@@ -104,6 +104,9 @@ func defaultCommandPipeline() commandPipeline {
 }
 
 func runWithPipeline(pipeline commandPipeline) error {
+	if len(os.Args) > 1 && os.Args[1] == "spec" {
+		return runSpecification(os.Args[2:], pipeline, os.Stdout)
+	}
 	if pipeline.interpret == nil || pipeline.generate == nil || pipeline.validate == nil {
 		return errors.New("incomplete board-family command pipeline")
 	}

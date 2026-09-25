@@ -19,6 +19,13 @@ Its CAD-validated outputs must not be treated as proof of complete request
 compliance or used as unattended fabrication instructions. See its
 [results and release blockers](specs/board-family-v2/RESULTS.md).
 
+For a usable two-family workflow without unattended language interpretation,
+use the [confirmed-specification workflow](docs/confirmed-specification.md):
+create or optionally AI-draft an editable specification, review and confirm its
+fingerprint, then generate and validate a complete KiCad bundle offline.
+Human confirmation is required; this does not turn earlier failed language
+evaluations into passing results.
+
 ## See The Proof
 
 The featured demo asks for a protected 0.1 A/V programmable current output
