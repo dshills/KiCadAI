@@ -1,0 +1,26 @@
+name: SHT31 prototype software checks
+on:
+  pull_request:
+    paths:
+      - 'firmware/sht31-bringup/**'
+      - 'scripts/sht31-prototype/**'
+      - 'docs/prototypes/sht31/**'
+      - '.github/workflows/sht31-prototype.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protocol-and-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Protocol fault injection with sanitizers (no hardware)
+        run: |
+          mkdir -p .cache/sht31-tests
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined \
+            -I firmware/sht31-bringup/include firmware/sht31-bringup/tests/test_sht31.cpp \
+            -o .cache/sht31-tests/test-sht31
+          .cache/sht31-tests/test-sht31
+      - name: Log and package integrity negative controls (synthetic, no physical claims)
+        run: node --test scripts/sht31-prototype/verify-run.test.mjs scripts/sht31-prototype/verify-package.test.mjs
