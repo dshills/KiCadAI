@@ -50,6 +50,11 @@ func testRequestEvidenceJournalTampering(t *testing.T, protocol extractionProtoc
 				f["version"] = CoverageEvidenceVersion
 				key, check, raw = "offline-boundary-placeholder", checkCoverageProviderRequest, addressedJSON(t, f)
 			}
+			if protocol == fidelityProtocol {
+				_, f := coverageFixture(t, journalTestPrompt)
+				f["version"] = FidelityEvidenceVersion
+				key, check, raw = "offline-boundary-placeholder", checkFidelityProviderRequest, addressedJSON(t, f)
+			}
 			t.Setenv("OPENAI_API_KEY", key)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "journal")

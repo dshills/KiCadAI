@@ -271,6 +271,10 @@ func DecodeOwnedEvidenceIntent(prompt string, raw []byte) (Decision, error) {
 }
 
 func decodeOwnedEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
+	return decodeOwnedEvidenceWithExplanation(prompt, raw, maxFacts, legacyExplanation)
+}
+
+func decodeOwnedEvidenceWithExplanation(prompt string, raw []byte, maxFacts int, explanation admissionExplanation) (Decision, error) {
 	compiled, err := compileOwnedEvidenceWithLimit(prompt, raw, maxFacts)
 	if err != nil {
 		return localDecision(prompt, "clarify", "The owned-evidence extraction could not be validated; no board was generated.", nil), err
@@ -279,5 +283,5 @@ func decodeOwnedEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (Deci
 	if err != nil {
 		return Decision{}, err
 	}
-	return decodeReferencedIntentWithLimit(prompt, encoded, maxFacts)
+	return decodeReferencedIntentWithExplanation(prompt, encoded, maxFacts, explanation)
 }

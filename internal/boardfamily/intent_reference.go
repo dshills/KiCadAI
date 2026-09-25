@@ -40,6 +40,10 @@ func DecodeReferencedIntent(prompt string, raw []byte) (Decision, error) {
 // Only a separately validated successor envelope may use a larger internal
 // inventory. The public historical decoder retains its original 64-fact cap.
 func decodeReferencedIntentWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
+	return decodeReferencedIntentWithExplanation(prompt, raw, maxFacts, legacyExplanation)
+}
+
+func decodeReferencedIntentWithExplanation(prompt string, raw []byte, maxFacts int, explanation admissionExplanation) (Decision, error) {
 	failure := localDecision(prompt, "clarify", "The source-referenced extraction could not be validated; no board was generated.", nil)
 	request, err := PrepareReferencedRequest(prompt)
 	if err != nil {
@@ -174,7 +178,7 @@ func decodeReferencedIntentWithLimit(prompt string, raw []byte, maxFacts int) (D
 			})
 		}
 	}
-	return admitIntent(prompt, derived, clauses), nil
+	return admitIntentWithExplanation(prompt, derived, clauses, explanation), nil
 }
 
 func referencedNumberConstraint(f RequirementFact, quote string) []RequirementFact {

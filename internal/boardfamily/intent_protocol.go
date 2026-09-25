@@ -21,9 +21,13 @@ const (
 	sourceAddressedProtocol
 	semanticBoundaryProtocol
 	coverageProtocol
+	fidelityProtocol
 )
 
 func (p extractionProtocol) admissionVersion() string {
+	if p == fidelityProtocol {
+		return FidelityEvidenceVersion
+	}
 	if p == coverageProtocol {
 		return CoverageEvidenceVersion
 	}
@@ -52,6 +56,9 @@ func (p extractionProtocol) admissionVersion() string {
 }
 
 func (p extractionProtocol) journalVersion() string {
+	if p == fidelityProtocol {
+		return "requirement-fidelity-evidence-journal-1"
+	}
 	if p == coverageProtocol {
 		return "requirement-coverage-evidence-journal-1"
 	}
@@ -83,6 +90,9 @@ func (p extractionProtocol) journalVersion() string {
 }
 
 func (p extractionProtocol) auditVersion() string {
+	if p == fidelityProtocol {
+		return "requirement-fidelity-journal-audit-1"
+	}
 	if p == coverageProtocol {
 		return "requirement-coverage-journal-audit-1"
 	}
@@ -133,6 +143,8 @@ func (p extractionProtocol) requestLimit() int64 {
 		return SourceAddressedMaxRequestBytes
 	case semanticBoundaryProtocol:
 		return SemanticBoundaryMaxRequestBytes
+	case fidelityProtocol:
+		return FidelityEvidenceMaxRequestBytes
 	case coverageProtocol:
 		return CoverageEvidenceMaxRequestBytes
 	default:
@@ -158,6 +170,8 @@ func (p extractionProtocol) prepare(prompt string) (aiprovider.GenerateRequest, 
 		return prepareSourceAddressedGenerateRequest(prompt)
 	case semanticBoundaryProtocol:
 		return prepareSemanticBoundaryGenerateRequest(prompt)
+	case fidelityProtocol:
+		return prepareFidelityGenerateRequest(prompt)
 	case coverageProtocol:
 		return prepareCoverageGenerateRequest(prompt)
 	default:
@@ -183,6 +197,8 @@ func (p extractionProtocol) decode(prompt string, raw []byte) (Decision, error) 
 		return DecodeSourceAddressedEvidenceIntent(prompt, raw)
 	case semanticBoundaryProtocol:
 		return DecodeSemanticBoundaryIntent(prompt, raw)
+	case fidelityProtocol:
+		return DecodeFidelityEvidenceIntent(prompt, raw)
 	case coverageProtocol:
 		return DecodeCoverageEvidenceIntent(prompt, raw)
 	default:

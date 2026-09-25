@@ -99,6 +99,10 @@ func testPartitionedCandidateCommandNative(t *testing.T, protocol string) {
 		name = "requirement-coverage-native"
 		fixture, inspect = coverageCorpusFixture, boardfamily.InspectCoverageJournal
 	}
+	if protocol == "requirement-fidelity-v12" {
+		name = "requirement-fidelity-native"
+		fixture, inspect = fidelityCorpusFixture, boardfamily.InspectFidelityJournal
+	}
 	root := groundedReviewDirectory(t, name)
 	useful := 0
 	for _, c := range groundedReviewCases(t) {

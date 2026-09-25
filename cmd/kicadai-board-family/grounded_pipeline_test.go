@@ -20,7 +20,9 @@ func TestGroundedFullCommandSyntheticCorpus(t *testing.T) {
 }
 
 func groundedCommandMode(protocol string) (string, string, func(string) (boardfamily.ReferencedJournalAudit, error)) {
-	if protocol == "requirement-coverage-v11" {
+	if protocol == "requirement-fidelity-v12" {
+		return protocol, "--inspect-requirement-fidelity-journal", boardfamily.InspectFidelityJournal
+	} else if protocol == "requirement-coverage-v11" {
 		return protocol, "--inspect-requirement-coverage-journal", boardfamily.InspectCoverageJournal
 	}
 	if protocol == "semantic-boundaries-v10" {
@@ -56,7 +58,10 @@ func testGroundedCommandSyntheticCorpus(t *testing.T, mode string) {
 		version, profile = boardfamily.SemanticBoundaryVersion, boardfamily.SemanticBoundaryAccountingProfile
 		fixture, decode = boundaryCorpusFixture, boardfamily.DecodeSemanticBoundaryIntent
 	}
-	if protocol == "requirement-coverage-v11" {
+	if protocol == "requirement-fidelity-v12" {
+		version, profile = boardfamily.FidelityEvidenceVersion, boardfamily.FidelityEvidenceAccountingProfile
+		fixture, decode = fidelityCorpusFixture, boardfamily.DecodeFidelityEvidenceIntent
+	} else if protocol == "requirement-coverage-v11" {
 		version, profile = boardfamily.CoverageEvidenceVersion, boardfamily.CoverageEvidenceAccountingProfile
 		fixture, decode = coverageCorpusFixture, boardfamily.DecodeCoverageEvidenceIntent
 	}
@@ -159,7 +164,9 @@ func testGroundedCommandFailureGates(t *testing.T, protocolMode string) {
 			if protocol == "semantic-boundaries-v10" {
 				raw = boundaryCorpusFixture(t, "useful-01", prompt)
 			}
-			if protocol == "requirement-coverage-v11" {
+			if protocol == "requirement-fidelity-v12" {
+				raw = fidelityCorpusFixture(t, "useful-01", prompt)
+			} else if protocol == "requirement-coverage-v11" {
 				raw = coverageCorpusFixture(t, "useful-01", prompt)
 			}
 			if mode == "invalid-extraction" {
@@ -263,7 +270,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			case "config":
 				args = append(args, "--config", "never-read.json")
 			case "nil-selector":
-				if protocol == "requirement-coverage-v11" {
+				if protocol == "requirement-fidelity-v12" {
+					p.interpretFidelity = nil
+				} else if protocol == "requirement-coverage-v11" {
 					p.interpretCoverage = nil
 				} else if protocol == "semantic-boundaries-v10" {
 					p.interpretBoundary = nil
@@ -305,7 +314,9 @@ func testGroundedFlagsAndContract(t *testing.T, protocolMode string) {
 			if protocol == "semantic-boundaries-v10" {
 				export = boardfamily.SemanticBoundaryEvidenceContract
 			}
-			if protocol == "requirement-coverage-v11" {
+			if protocol == "requirement-fidelity-v12" {
+				export = boardfamily.FidelityEvidenceContract
+			} else if protocol == "requirement-coverage-v11" {
 				export = boardfamily.CoverageEvidenceContract
 			}
 			want, err := export(prompt)

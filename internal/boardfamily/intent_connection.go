@@ -63,6 +63,10 @@ func DecodeConnectionEvidenceIntent(prompt string, raw []byte) (Decision, error)
 }
 
 func decodeConnectionEvidenceWithLimit(prompt string, raw []byte, maxFacts int) (Decision, error) {
+	return decodeConnectionEvidenceWithExplanation(prompt, raw, maxFacts, legacyExplanation)
+}
+
+func decodeConnectionEvidenceWithExplanation(prompt string, raw []byte, maxFacts int, explanation admissionExplanation) (Decision, error) {
 	failure := localDecision(prompt, "clarify", "The connection extraction could not be validated; no board was generated.", nil)
 	if len(raw) > 65536 {
 		return failure, errors.New("connection evidence exceeds 65536 bytes")
@@ -137,5 +141,5 @@ func decodeConnectionEvidenceWithLimit(prompt string, raw []byte, maxFacts int) 
 	if err != nil {
 		return failure, err
 	}
-	return decodeOwnedEvidenceWithLimit(prompt, encoded, maxFacts)
+	return decodeOwnedEvidenceWithExplanation(prompt, encoded, maxFacts, explanation)
 }

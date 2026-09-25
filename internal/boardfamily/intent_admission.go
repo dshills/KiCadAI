@@ -162,7 +162,23 @@ type intentRequirements struct {
 	conflicts, questions                                     []string
 }
 
-func (r *intentRequirements) add(f RequirementFact) {
+// A closed application policy changes catalog wording only. Source quotations
+// and untrusted requirement details never pass through text replacement.
+type admissionExplanation uint8
+
+const (
+	legacyExplanation admissionExplanation = iota
+	noSubstitutionExplanation
+)
+
+func (p admissionExplanation) featureReason(feature string) string {
+	if p == noSubstitutionExplanation && feature == "usb" {
+		return "No USB interface or direct USB power is supported; no alternative power or interface arrangement was substituted."
+	}
+	return intentFeatureReasons[feature]
+}
+
+func (r *intentRequirements) addWithExplanation(f RequirementFact, explanation admissionExplanation) {
 	if f.Kind == "none" || f.State == "not_required" {
 		return
 	}
@@ -187,7 +203,7 @@ func (r *intentRequirements) add(f RequirementFact) {
 	}
 	if f.Kind == "feature" {
 		if f.State == "required" {
-			r.conflicts = append(r.conflicts, intentFeatureReasons[f.Value])
+			r.conflicts = append(r.conflicts, explanation.featureReason(f.Value))
 		}
 		return
 	}
@@ -222,6 +238,10 @@ func (r *intentRequirements) add(f RequirementFact) {
 }
 
 func admitIntent(prompt string, intent RequirementIntent, clauses []RequestClause) Decision {
+	return admitIntentWithExplanation(prompt, intent, clauses, legacyExplanation)
+}
+
+func admitIntentWithExplanation(prompt string, intent RequirementIntent, clauses []RequestClause, explanation admissionExplanation) Decision {
 	r := intentRequirements{families: map[string]bool{}, profiles: map[string]bool{}, forbiddenFamilies: map[string]bool{}, forbiddenProfiles: map[string]bool{}, forbiddenMeasurements: map[string]bool{}, numbers: map[string]float64{}}
 	// Process in application clause order for deterministic explanations even if
 	// the provider reordered its ID-addressed response objects.
@@ -231,7 +251,7 @@ func admitIntent(prompt string, intent RequirementIntent, clauses []RequestClaus
 	}
 	for _, c := range clauses {
 		for _, f := range byID[c.ID].Facts {
-			r.add(f)
+			r.addWithExplanation(f, explanation)
 		}
 		if missing := uncoveredQuantities(c.Text, byID[c.ID].Facts); len(missing) > 0 {
 			r.questions = append(r.questions, "Please confirm the role and requirement for "+strings.Join(missing, ", ")+"; those explicit quantities were not retained by the extraction.")
@@ -241,7 +261,7 @@ func admitIntent(prompt string, intent RequirementIntent, clauses []RequestClaus
 		r.conflicts = append(r.conflicts, reason)
 	}
 	for _, c := range clauses {
-		r.conflicts = append(r.conflicts, directSourceConflicts(c.Text)...)
+		r.conflicts = append(r.conflicts, directSourceConflictsWithExplanation(c.Text, explanation)...)
 	}
 	local := assessRequirements(prompt)
 	if len(scanRequestConstraints(prompt).unknown) == 0 && local.Disposition == "unsupported" {
@@ -361,7 +381,7 @@ func uncoveredQuantities(source string, facts []RequirementFact) []string {
 // These are independent checks for demonstrated affirmative contradictions,
 // not a general English classifier. Unknown language is handled by typed facts,
 // not by an allowlist. Negation and condition interpretation still need evals.
-func directSourceConflicts(source string) []string {
+func directSourceConflictsWithExplanation(source string, explanation admissionExplanation) []string {
 	var result []string
 	for _, match := range directHeaterOperation.FindAllStringIndex(source, -1) {
 		prefix := strings.ToLower(strings.TrimSpace(source[:match[0]]))
@@ -372,13 +392,13 @@ func directSourceConflicts(source string) []string {
 			}
 		}
 		if !negated {
-			result = append(result, intentFeatureReasons["heater_operation"])
+			result = append(result, explanation.featureReason("heater_operation"))
 		}
 	}
 	if directFiveVolt.MatchString(source) {
 		lower := strings.ToLower(source)
 		if !strings.Contains(lower, "not") && !strings.Contains(lower, "no ") && !strings.Contains(lower, "without") {
-			result = append(result, intentFeatureReasons["usb"])
+			result = append(result, explanation.featureReason("usb"))
 		}
 	}
 	return result

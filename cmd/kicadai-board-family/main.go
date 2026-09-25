@@ -42,6 +42,7 @@ type commandPipeline struct {
 	interpretEligible     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretAddressed    func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretBoundary     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
+	interpretFidelity     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretCoverage     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	generate              func(boardfamily.Config, string) (boardfamily.Electrical, error)
 	validate              func(context.Context, string, string) (boardfamily.Validation, error)
@@ -93,6 +94,10 @@ func defaultCommandPipeline() commandPipeline {
 			s, err := boardfamily.InterpretCoverageWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
 			return s.Selection, s, err
 		},
+		interpretFidelity: func(ctx context.Context, prompt, ledger string, policy boardfamily.LedgerPolicy, journal string) (boardfamily.Selection, any, error) {
+			s, err := boardfamily.InterpretFidelityWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
+			return s.Selection, s, err
+		},
 		generate: boardfamily.Generate,
 		validate: boardfamily.Validate,
 	}
@@ -107,7 +112,7 @@ func runWithPipeline(pipeline commandPipeline) error {
 	promptFile := flag.String("prompt-file", "", "UTF-8 file containing an ordinary-language request")
 	ledger := flag.String("ledger", "", "persistent ledger required with a prompt; legacy limits unless --live-budget supplies a separate approved goal")
 	budgetFile := flag.String("live-budget", "", "JSON goal/request/microdollar policy for a separately approved new goal; not spending authorization")
-	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10 or requirement-coverage-v11 (experimental; requires separate approval and evidence journal)")
+	protocol := flag.String("intent-protocol", "typed-v2", "typed-v2 (default), indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10, requirement-coverage-v11 or requirement-fidelity-v12 (experimental; requires separate approval and evidence journal)")
 	journal := flag.String("evidence-journal", "", "new private evidence directory outside output; required for experimental prompts")
 	inspectJournal := flag.String("inspect-indexed-journal", "", "verify an existing indexed journal by local byte replay; no key or API request")
 	inspectOwnedJournal := flag.String("inspect-owned-journal", "", "verify an existing owned-v4 journal by local byte replay; no key or API request")
@@ -119,13 +124,14 @@ func runWithPipeline(pipeline commandPipeline) error {
 	inspectAddressedJournal := flag.String("inspect-source-addressed-journal", "", "verify an existing source-addressed-v9 journal by local byte replay; no key or API request")
 	inspectBoundaryJournal := flag.String("inspect-semantic-boundary-journal", "", "verify an existing semantic-boundaries-v10 journal by local byte replay; no key or API request")
 	inspectCoverageJournal := flag.String("inspect-requirement-coverage-journal", "", "verify an existing requirement-coverage-v11 journal by local byte replay; no key or API request")
+	inspectFidelityJournal := flag.String("inspect-requirement-fidelity-journal", "", "verify an existing requirement-fidelity-v12 journal by local byte replay; no key or API request")
 	exportContract := flag.String("export-live-contract", "", "write the exact non-secret capability context/schema for inspection; no API call")
 	listFamilies := flag.Bool("list-families", false, "print supported families, profiles and fixed conditions; no API call")
 	out := flag.String("output", "", "new output directory (required)")
 	cli := flag.String("kicad-cli", "kicad-cli", "KiCad 10.0.3 executable")
 	flag.Parse()
 	inspectModes := 0
-	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal, *inspectEligibleJournal, *inspectAddressedJournal, *inspectBoundaryJournal, *inspectCoverageJournal} {
+	for _, value := range []string{*inspectJournal, *inspectOwnedJournal, *inspectConnectionJournal, *inspectDirectJournal, *inspectGroundedJournal, *inspectGroundedFullJournal, *inspectEligibleJournal, *inspectAddressedJournal, *inspectBoundaryJournal, *inspectCoverageJournal, *inspectFidelityJournal} {
 		if value != "" {
 			inspectModes++
 		}
@@ -162,16 +168,19 @@ func runWithPipeline(pipeline commandPipeline) error {
 		if *inspectCoverageJournal != "" {
 			inspect, path = boardfamily.InspectCoverageJournal, *inspectCoverageJournal
 		}
+		if *inspectFidelityJournal != "" {
+			inspect, path = boardfamily.InspectFidelityJournal, *inspectFidelityJournal
+		}
 		audit, err := inspect(path)
 		if err != nil {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(audit)
 	}
-	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" && *protocol != "source-eligible-v8" && *protocol != "source-addressed-v9" && *protocol != "semantic-boundaries-v10" && *protocol != "requirement-coverage-v11" {
-		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10 or requirement-coverage-v11")
+	if *protocol != "typed-v2" && *protocol != "indexed-v3" && *protocol != "owned-v4" && *protocol != "connection-v5" && *protocol != "direct-v6" && *protocol != "partitioned-v7" && *protocol != "partitioned-full-v7" && *protocol != "source-eligible-v8" && *protocol != "source-addressed-v9" && *protocol != "semantic-boundaries-v10" && *protocol != "requirement-coverage-v11" && *protocol != "requirement-fidelity-v12" {
+		return errors.New("unknown --intent-protocol; expected typed-v2, indexed-v3, owned-v4, connection-v5, direct-v6, partitioned-v7, partitioned-full-v7, source-eligible-v8, source-addressed-v9, semantic-boundaries-v10, requirement-coverage-v11 or requirement-fidelity-v12")
 	}
-	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7" || *protocol == "source-eligible-v8" || *protocol == "source-addressed-v9" || *protocol == "semantic-boundaries-v10" || *protocol == "requirement-coverage-v11"
+	requestSpecific := *protocol == "owned-v4" || *protocol == "connection-v5" || *protocol == "direct-v6" || *protocol == "partitioned-v7" || *protocol == "partitioned-full-v7" || *protocol == "source-eligible-v8" || *protocol == "source-addressed-v9" || *protocol == "semantic-boundaries-v10" || *protocol == "requirement-coverage-v11" || *protocol == "requirement-fidelity-v12"
 	experimental := *protocol == "indexed-v3" || requestSpecific
 	if *journal != "" && (!experimental || *listFamilies || *exportContract != "" || *config != "") {
 		return errors.New("--evidence-journal is only valid for experimental prompt generation")
@@ -222,6 +231,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 			if *protocol == "requirement-coverage-v11" {
 				export = boardfamily.CoverageEvidenceContract
 			}
+			if *protocol == "requirement-fidelity-v12" {
+				export = boardfamily.FidelityEvidenceContract
+			}
 			contract, err := export(*prompt)
 			if err != nil {
 				return err
@@ -250,6 +262,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		return errors.New("--live-budget requires a prompt and a separate --ledger")
 	}
 	if experimental {
+		if *protocol == "requirement-fidelity-v12" && pipeline.interpretFidelity == nil {
+			return errors.New("requirement-fidelity-v12 requires a configured selector")
+		}
 		if *protocol == "requirement-coverage-v11" && pipeline.interpretCoverage == nil {
 			return errors.New("requirement-coverage-v11 requires a configured selector")
 		}
@@ -307,7 +322,9 @@ func runWithPipeline(pipeline commandPipeline) error {
 		var s boardfamily.Selection
 		var record any
 		var e error
-		if *protocol == "requirement-coverage-v11" {
+		if *protocol == "requirement-fidelity-v12" {
+			s, record, e = pipeline.interpretFidelity(ctx, *prompt, *ledger, policy, *journal)
+		} else if *protocol == "requirement-coverage-v11" {
 			s, record, e = pipeline.interpretCoverage(ctx, *prompt, *ledger, policy, *journal)
 		} else if *protocol == "semantic-boundaries-v10" {
 			s, record, e = pipeline.interpretBoundary(ctx, *prompt, *ledger, policy, *journal)
