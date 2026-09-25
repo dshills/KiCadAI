@@ -1,0 +1,96 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected esp32_bmp280_v1/standard from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply.",
+    "clauses": [
+      {
+        "text": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+        "disposition": "supported",
+        "reason": "Selected esp32_bmp280_v1/standard from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "original_request": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Hello!"
+    },
+    {
+      "id": 1,
+      "text": " Could you put together a wired pressure monitor for my desk?"
+    },
+    {
+      "id": 2,
+      "text": " Your standard profile and reviewed default operating limits are fine."
+    },
+    {
+      "id": 3,
+      "text": " Thank you."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "measurement",
+            "quote": "pressure monitor",
+            "state": "required",
+            "value": "pressure"
+          }
+        ],
+        "id": 1
+      },
+      {
+        "facts": [
+          {
+            "kind": "profile",
+            "quote": "standard profile",
+            "state": "required",
+            "value": "standard"
+          }
+        ],
+        "id": 2
+      },
+      {
+        "facts": [
+          {
+            "kind": "none"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "none"
+          }
+        ],
+        "id": 3
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_072537027edab313016aa815e848e087d1a0b23cac0ddb8e4f",
+  "usage": {
+    "input_tokens": 2464,
+    "output_tokens": 85,
+    "total_tokens": 2549
+  },
+  "ledger_index": 1,
+  "seconds": 2.392737416
+}

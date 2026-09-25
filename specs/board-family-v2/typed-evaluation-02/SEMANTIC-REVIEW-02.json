@@ -1,0 +1,685 @@
+{
+  "status": "source-bound-semantic-review",
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "state_sha256": "e2f41dae704037f9beabfb4603ad09ea8f6c67c112e3e27bb5e40cab4e873de3",
+  "runtime_sha256": "1410dfa077f9a05fde1f53e8bfc4ed1175dfcd798737b7200c3dd88f5b76a540",
+  "freeze_sha256": "4109d31c0f1e808b7ef9e45963e7e2f0f1b8d0592ae487b713f42c3f8dbeb998",
+  "reviewer": {
+    "kind": "implementing-agent",
+    "name": "Codex implementing agent",
+    "independent": false
+  },
+  "review_method": "Manually compared every original prompt, numbered source clause, raw fact/quote and final decision against the frozen case requirements. Machine scores are supplementary only. The review preserves raw semantic errors even when admission is safe.",
+  "cases": [
+    {
+      "id": "useful-01",
+      "prompt_sha256": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+      "selection_sha256": "e9fb4c1597ef40a692df5a2b04284814c0182f23f458676332ae64a94772365c",
+      "raw_complete": true,
+      "raw_correct": true,
+      "decision_correct": true,
+      "notes": "Pressure and standard are source-bound without invented sensor identities or numeric limits. Politeness, desk context and acceptance of defaults impose no incompatible custom requirement. The application selects the reviewed BMP280/standard defaults and preserves operating/firmware/bench caveats.",
+      "requirements": [
+        {
+          "id": "pressure",
+          "passed": true,
+          "note": "Pressure measurement is actually requested; no sensor was named. Source clause 1, fact 0 quotes \"pressure monitor\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "The standard profile is selected, not an unresolved choice. Source clause 2, fact 0 quotes \"standard profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 2,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "useful-02",
+      "prompt_sha256": "3875569f50031b85f8baee364ff9574645afe637351311a09e894dfc5bc72b88",
+      "selection_sha256": "c97529d0ab932771a8de1fd769042df70a6242b2879ef56c5008f72dff9d2758",
+      "raw_complete": true,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "Sensor and all three numeric conversions are correct and both exclusions are recognized, but the humidity quote uses an invented ellipsis, not source text. The application safely generates no board, yet the useful request is rejected and the batch case fails.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "BMP280 is required. Source clause 0, fact 0 quotes \"BMP280 controller\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "pullups",
+          "passed": true,
+          "note": "2.2 kilohms means 2200 ohms. Source clause 0, fact 1 quotes \"2.2 kilohm pull-ups\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "clock",
+          "passed": true,
+          "note": "400 kilohertz means 400000 Hz I2C clock. Source clause 0, fact 2 quotes \"400 kilohertz I2C bus\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 2
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "Declared bus capacitance is 100 pF. Source clause 0, fact 3 quotes \"100 pF total bus capacitance\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 3
+            }
+          ]
+        },
+        {
+          "id": "humidity-excluded",
+          "passed": false,
+          "note": "The model used non-verbatim Humidity ... not needed as evidence; it is not source-bound.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "wireless-excluded",
+          "passed": true,
+          "note": "Wireless telemetry is excluded from requirements, not demanded. Source clause 1, fact 1 quotes \"wireless telemetry are not needed\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "useful-03",
+      "prompt_sha256": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+      "selection_sha256": "a54345210500f50686912e0fb76af136a60075908145f5cbe7286e332a9a83ae",
+      "raw_complete": false,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "Named sensor/profile and explicit electrical quantities are retained, but not-requested whole-board power and battery operation become forbidden. The model also invents four numeric supply/ambient facts from a defaults-only clause. The application rejects the invented numbers and fails the useful request.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "BMP280 is required. Source clause 0, fact 0 quotes \"BMP280\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "The pull-up-only low_current profile is explicitly requested. Source clause 0, fact 1 quotes \"low_current profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "pullups",
+          "passed": true,
+          "note": "Pull-ups are 10000 ohms. Source clause 0, fact 3 quotes \"10k I2C pull-ups\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 3
+            }
+          ]
+        },
+        {
+          "id": "clock",
+          "passed": true,
+          "note": "I2C clock is 100000 Hz. Source clause 0, fact 2 quotes \"100 kHz bus\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 2
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "Bus capacitance is 100 pF. Source clause 0, fact 4 quotes \"100 pF total capacitance\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 4
+            }
+          ]
+        },
+        {
+          "id": "power-scope",
+          "passed": false,
+          "note": "not_required was incorrectly strengthened to forbidden.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "battery-excluded",
+          "passed": false,
+          "note": "not_required was incorrectly strengthened to forbidden.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "useful-04",
+      "prompt_sha256": "50ce54728682c6695fa32b141be7bfda424659a5eef0e2d3ea57d031dec317c9",
+      "selection_sha256": "4664834dd5206aed506843bd3505a6d181a11bdb3d8374a07a7f944995817eea",
+      "raw_complete": true,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "Required temperature/humidity, standard profile, 70 pF and pressure exclusion are recognized, but the humidity quote indoor humidity is not present in the source. The useful request is rejected instead of generating the SHT31/standard board.",
+      "requirements": [
+        {
+          "id": "temperature",
+          "passed": true,
+          "note": "Temperature is required; no exact sensor was named. Source clause 0, fact 0 quotes \"indoor temperature\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "humidity",
+          "passed": false,
+          "note": "The quote indoor humidity is not a source substring.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "Standard profile is selected. Source clause 1, fact 0 quotes \"standard profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "Bus capacitance is 70 pF. Source clause 1, fact 1 quotes \"70 pF total bus capacitance\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "pressure-excluded",
+          "passed": true,
+          "note": "Pressure is excluded from requirements. Source clause 2, fact 0 quotes \"I don't need pressure measurement\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 2,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "useful-05",
+      "prompt_sha256": "641165b916600ae406b3e8a14df919992bc86f0682fccefd9a2ffeea462ead30",
+      "selection_sha256": "e41377d7fb0b7be421c86bdf07a344f2d7577d1dc6a64e0622bd5de721879b0a",
+      "raw_complete": true,
+      "raw_correct": true,
+      "decision_correct": true,
+      "notes": "SHT31, fast, 100 pF and the explicit prohibition on any heater use are retained with exact source quotes. No numeric default facts are invented. The code-derived SHT31/fast configuration is exact, and the native bundle passes all gates and reviewed replay.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is required. Source clause 0, fact 0 quotes \"SHT31\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "Fast profile is selected. Source clause 0, fact 1 quotes \"fast profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "Total bus loading is 100 pF. Source clause 0, fact 2 quotes \"100 pF total bus loading\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 2
+            }
+          ]
+        },
+        {
+          "id": "heater-forbidden",
+          "passed": true,
+          "note": "Heater operation is explicitly forbidden, not requested. Source clause 1, fact 0 quotes \"Do not run the heater at any time\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choice-01",
+      "prompt_sha256": "bc7be7d62fdcec5a6b3ed6911b2d83672c67add8f485b2f371df1679a1828da1",
+      "selection_sha256": "c3346bbd35060535138ad5426a857706a28b292fb13495b5df4d5da503956c45",
+      "raw_complete": true,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "The user specifies no measurement or custom geometry. The model invents custom_geometry=required from indoor project, and the application refuses with an irrelevant fixed-outline explanation instead of asking which measurement is needed. Automatic raw shape checks pass but meaning is wrong.",
+      "requirements": []
+    },
+    {
+      "id": "choice-02",
+      "prompt_sha256": "0ae7a2afd13996c5cd9cbfdfc9ae46fe9ae833e36818151567192683c2ba82ca",
+      "selection_sha256": "dfc4bac5adc1be3b8b198dfee85fb815a7e194ec83415604cc21d43652f54a16",
+      "raw_complete": true,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "The two alternatives are correctly uncertain in clause 0. Extra repeated named-sensor facts quote only I haven't chosen which one I need, which does not identify either sensor in that clause. Production validation fails; the returned generic extraction-error clarification does not ask the targeted unresolved family question.",
+      "requirements": [
+        {
+          "id": "BMP-choice",
+          "passed": true,
+          "note": "BMP280/pressure is one unresolved alternative. Source clause 0, fact 0 quotes \"Either BMP280 pressure sensing or SHT31 humidity sensing\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "SHT-choice",
+          "passed": true,
+          "note": "SHT31/humidity is the other unresolved alternative. Source clause 0, fact 1 quotes \"Either BMP280 pressure sensing or SHT31 humidity sensing\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choice-03",
+      "prompt_sha256": "36ee7c7c2d3ecc3b8e4346632edac9d4a44a8227d0ca1f5d770dc7d8a725f109",
+      "selection_sha256": "7408219d2a3e227e3da35c6d73039454f920ee8b593c9e9e2b49962d7b686788",
+      "raw_complete": true,
+      "raw_correct": true,
+      "decision_correct": true,
+      "notes": "SHT31 is required and both named profiles remain uncertain; no silent default is applied. The application asks which profile is needed and generates nothing. Its question additionally lists BMP280-only low_current, but explicitly labels the family restriction; the standard-versus-fast choice is targeted and truthful.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is selected. Source clause 0, fact 0 quotes \"Please use SHT31\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "standard-choice",
+          "passed": true,
+          "note": "Standard is unresolved. Source clause 1, fact 0 quotes \"deciding between the standard profile and the fast profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "fast-choice",
+          "passed": true,
+          "note": "Fast is unresolved. Source clause 1, fact 1 quotes \"deciding between the standard profile and the fast profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-01",
+      "prompt_sha256": "8e2b690786b0db1175db63a7b460029bc39836ce41ea85d29dee787c8d72eef0",
+      "selection_sha256": "5aabc1b0a21609b19a16406b9cb015260989714be6233c3b65b15169010f1911",
+      "raw_complete": false,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "Both sensors appear in the response, but clause ID 0 is duplicated and the last group attaches absent sensor-name quotes to a pronoun-only clause. The mandatory unique, source-bound clause contract fails. The generic extraction-error clarification does not truthfully refuse combined sensing.",
+      "requirements": [
+        {
+          "id": "BMP-required",
+          "passed": false,
+          "note": "Duplicate clause ID 0 prevents a unique valid source-bound clause record.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "SHT-required",
+          "passed": false,
+          "note": "SHT31 occurs in a second duplicate ID 0 group and is also attributed to a quote absent from clause 2; no valid unique fact reference.",
+          "evidence": [
+            {
+              "clause_id": 2,
+              "fact_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-02",
+      "prompt_sha256": "04a8e730de28d908f362deeb7be0bc529b0481dcf4e0320843d3713372fd542f",
+      "selection_sha256": "960dc5936fdbac697fd9b87d4dc819c9c6eb1c9ed97a3202b4dde3447942ad48",
+      "raw_complete": true,
+      "raw_correct": false,
+      "decision_correct": false,
+      "notes": "All required sensor/profile/quantity facts are correctly represented in clauses 0-1. Additional facts attach standard to that profile and numeric values to all those values; these fail the frozen literal identity/numeric grounding contract. The generic extraction-error clarification does not explain the SHT31 standard capacitance incompatibility.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is required. Source clause 0, fact 0 quotes \"SHT31\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "Standard profile cannot be changed. Source clause 0, fact 1 quotes \"standard profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "pullups",
+          "passed": true,
+          "note": "4700 ohm pull-ups cannot be changed. Source clause 0, fact 2 quotes \"4.7k pull-ups\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 2
+            }
+          ]
+        },
+        {
+          "id": "clock",
+          "passed": true,
+          "note": "100000 Hz I2C clock cannot be changed. Source clause 0, fact 3 quotes \"100 kHz I2C bus\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 3
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "100 pF must not become the 70 pF supported default. Source clause 1, fact 0 quotes \"total bus capacitance is 100 pF\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-03",
+      "prompt_sha256": "32f5ed565dd8dcb45828dc0e0906c2a0be887a9a81703d005bed0d699a2098e7",
+      "selection_sha256": "2cdd3629e3af8c0e352b4717ae330ea1355fef068f9cc560f71f75ab9e015332",
+      "raw_complete": true,
+      "raw_correct": true,
+      "decision_correct": true,
+      "notes": "The question-form request retains SHT31, explicit low_current, 10000 ohms and 100 pF. The code correctly refuses this unreviewed SHT31 profile without substituting a different family/profile or generating artifacts.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is required. Source clause 0, fact 0 quotes \"SHT31\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "profile",
+          "passed": true,
+          "note": "low_current is requested for the wrong family. Source clause 0, fact 1 quotes \"low_current profile\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "pullups",
+          "passed": true,
+          "note": "10000 ohm pull-ups are required. Source clause 0, fact 2 quotes \"10k I2C pull-ups\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 2
+            }
+          ]
+        },
+        {
+          "id": "capacitance",
+          "passed": true,
+          "note": "100 pF is explicitly declared. Source clause 1, fact 0 quotes \"100 pF total capacitance\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-04",
+      "prompt_sha256": "ec6bead157253f7d2bb461fdfa8af981e19ba0f0c94f9c2ae86c7662bf92706a",
+      "selection_sha256": "f7d8f88da887ead5cec1111a1f68d56d702fc8391e11f8c082477e10b840883b",
+      "raw_complete": false,
+      "raw_correct": false,
+      "decision_correct": true,
+      "notes": "The later affirmative heater request is correctly required and the application correctly refuses heater operation. However, startup must stay off is weakened to not_required rather than a prohibition at startup, and the quote omits its temporal qualifier. The raw extraction is not fully faithful even though the final refusal is correct.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is required. Source clause 0, fact 0 quotes \"SHT31 controller\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "later-heater",
+          "passed": true,
+          "note": "Later heater operation is required despite the startup-off condition. Source clause 2, fact 0 quotes \"energize its heater between the humidity samples\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 2,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-05",
+      "prompt_sha256": "827da3a2f89af2454291a0260e4635f99c5bc8d3bf08216ac2047367a5a7bc3f",
+      "selection_sha256": "c14f33038df0ca62b48c0106ea23165c11957d082d89eb66cf7d995a0c760d16",
+      "raw_complete": false,
+      "raw_correct": false,
+      "decision_correct": true,
+      "notes": "Direct 5 V USB and wireless requirements are correctly retained and both are truthfully refused. The response invents external_gpio_load=forbidden from no external adapter or change to either requirement, which is not a GPIO-load constraint and loses the no-substitution meaning. This raw semantic error is not excused by the correct refusal.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "BMP280 is required. Source clause 0, fact 0 quotes \"BMP280 controller\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "USB-power",
+          "passed": true,
+          "note": "Direct 5 V USB power is demanded. Source clause 0, fact 1 quotes \"powered directly from 5 V USB\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 1
+            }
+          ]
+        },
+        {
+          "id": "wireless",
+          "passed": true,
+          "note": "Wireless telemetry is also demanded. Source clause 1, fact 0 quotes \"wireless telemetry\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refuse-06",
+      "prompt_sha256": "a8fa1063ace7ac663d97b9fdae8441830083e1d5d39364f1cf34a699bf3af049",
+      "selection_sha256": "451180a3f81582b1433e5486de8daece402126f9f24b974646ef9b48c6ca2176",
+      "raw_complete": true,
+      "raw_correct": true,
+      "decision_correct": true,
+      "notes": "SHT31, required temperature/humidity and standard defaults are retained. The physical accuracy guarantee and 0.1 C tolerance are preserved in an exact quote; the second same-clause fact preserves the without-calibration/bench qualifier. No numeric ambient bound is invented. The application truthfully refuses an unmeasured assembled-board guarantee.",
+      "requirements": [
+        {
+          "id": "sensor",
+          "passed": true,
+          "note": "SHT31 is required. Source clause 0, fact 0 quotes \"SHT31\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 0,
+              "fact_index": 0
+            }
+          ]
+        },
+        {
+          "id": "accuracy",
+          "passed": true,
+          "note": "A physical assembled-board accuracy guarantee is required. Source clause 1, fact 0 quotes \"guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C\" and retains the required meaning.",
+          "evidence": [
+            {
+              "clause_id": 1,
+              "fact_index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,6 +12,13 @@ AI-facing boundary accepts behavior; deterministic code owns architecture and
 part selection, calculations, simulation, schematic and PCB generation,
 placement, routing, validation, and the final pass-or-refuse decision.
 
+The separate [experimental two-family sensor-board workflow](specs/board-family-v2/README.md)
+has **not passed natural-language acceptance**: its latest frozen batch achieved
+8/14 correct application outcomes and admitted an unsupported heater request.
+Its CAD-validated outputs must not be treated as proof of complete request
+compliance or used as unattended fabrication instructions. See its
+[results and release blockers](specs/board-family-v2/RESULTS.md).
+
 ## See The Proof
 
 The featured demo asks for a protected 0.1 A/V programmable current output

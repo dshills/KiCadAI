@@ -1,0 +1,100 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	"kicadai/internal/boardfamily"
+)
+
+type Case struct {
+	ID            string             `json:"id"`
+	Variant       string             `json:"variant"`
+	Prompt        string             `json:"prompt"`
+	Expected      string             `json:"expected_disposition"`
+	Configuration boardfamily.Config `json:"configuration"`
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	for _, key := range []string{"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "KICADAI_LIVE_PROVIDER_TESTS"} {
+		if os.Getenv(key) != "" {
+			return fmt.Errorf("run without provider credentials or live-test opt-ins")
+		}
+	}
+	if len(os.Args) != 3 {
+		return fmt.Errorf("usage: usability CASES NEW_OUTPUT")
+	}
+	b, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		return err
+	}
+	var spec struct {
+		AuditID     string `json:"audit_id"`
+		ExpectedAll int    `json:"expected_all"`
+		Cases       []Case `json:"cases"`
+	}
+	if err = json.Unmarshal(b, &spec); err != nil {
+		return err
+	}
+	if len(spec.Cases) != spec.ExpectedAll || len(spec.Cases) != 25 {
+		return fmt.Errorf("unexpected case count")
+	}
+	var outcomes []map[string]any
+	passed := 0
+	for _, c := range spec.Cases {
+		if _, err := boardfamily.Check(c.Configuration); err != nil {
+			return err
+		}
+		ideal := boardfamily.Decision{Disposition: "supported", Message: "Synthetic ideal proposal for a fully specified supported family/profile.", Clauses: []boardfamily.Clause{{Text: c.Prompt, Disposition: "supported", Reason: "Synthetic ideal annotation; not a model response."}}, Configuration: &c.Configuration}
+		raw, err := json.Marshal(ideal)
+		if err != nil {
+			return err
+		}
+		decision, decodeErr := boardfamily.DecodeDecision(c.Prompt, raw)
+		correct := decodeErr == nil && decision.Disposition == c.Expected && decision.Configuration != nil && *decision.Configuration == c.Configuration
+		if correct {
+			passed++
+		}
+		var errorText any
+		if decodeErr != nil {
+			errorText = decodeErr.Error()
+		}
+		outcomes = append(outcomes, map[string]any{"id": c.ID, "variant": c.Variant, "prompt": c.Prompt, "synthetic_proposal": ideal, "admitted_decision": decision, "decoder_error": errorText, "expected_outcome_met": correct})
+	}
+	bindings := map[string]string{}
+	for _, file := range []string{os.Args[1], ".cache/board-family-v2/usability-01/main.go", "internal/boardfamily/interpret.go", "internal/boardfamily/requirements.go", "internal/boardfamily/config.go", "specs/board-family-v2/offline-admission-01/publication.json", "specs/board-family-v2/evidence/final-01/manifest.json"} {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(content)
+		bindings[file] = hex.EncodeToString(sum[:])
+	}
+	result := map[string]any{"audit_id": spec.AuditID, "created_utc": time.Now().UTC().Format(time.RFC3339), "admission_version": boardfamily.AdmissionVersion, "status": "completed-offline-usability-audit", "synthetic_proposals": true, "new_api_requests": 0, "new_api_spend_usd": 0, "total": len(outcomes), "expected_outcomes_met": passed, "cases": outcomes, "files_sha256": bindings, "limitations": []string{"Agent-authored metamorphic counterexamples, not user traffic, independent holdouts or a model reliability estimate.", "The ideal proposal is injected locally; this isolates the admission gate and does not measure provider behavior.", "A failure here demonstrates unnecessary clarification despite an ideal model response; native CAD is not generated.", "Neither the failed live evidence nor the previous offline regression is regraded."}}
+	f, err := os.OpenFile(os.Args[2], os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err = enc.Encode(result); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	fmt.Printf("%d/%d expected outcomes; no API calls; %s\n", passed, len(outcomes), os.Args[2])
+	return nil
+}

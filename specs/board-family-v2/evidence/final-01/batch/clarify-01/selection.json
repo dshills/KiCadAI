@@ -1,0 +1,55 @@
+{
+  "decision": {
+    "disposition": "clarify",
+    "message": "Your request does not specify whether you need pressure/barometric measurement or temperature/humidity measurement. Please specify if you require air pressure measurement (BMP280) or temperature and humidity measurement (SHT31), or both. Note that combined pressure and humidity sensing is unsupported.",
+    "clauses": [
+      {
+        "text": "Create a sensor controller board for my indoor monitoring project.",
+        "disposition": "supported",
+        "reason": "Request for a sensor controller board for indoor monitoring fits within the available board families and capabilities."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Request for a sensor controller board for indoor monitoring fits within the available board families and capabilities.",
+        "text": "Create a sensor controller board for my indoor monitoring project."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 200,
+      "version": "1"
+    },
+    "disposition": "clarify",
+    "message": "Your request does not specify whether you need pressure/barometric measurement or temperature/humidity measurement. Please specify if you require air pressure measurement (BMP280) or temperature and humidity measurement (SHT31), or both. Note that combined pressure and humidity sensing is unsupported."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_023f910222877b7e016aa7ddb868f887d1b51fd980e459a522",
+  "usage": {
+    "input_tokens": 1542,
+    "output_tokens": 176,
+    "total_tokens": 1718
+  },
+  "ledger_index": 6,
+  "seconds": 2.7951682079999998
+}

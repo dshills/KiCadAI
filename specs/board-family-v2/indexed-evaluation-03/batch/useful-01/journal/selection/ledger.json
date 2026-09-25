@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "goal": "board-family-v2-indexed-final-03",
+  "max_requests": 14,
+  "max_micro_usd": 1000000,
+  "entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-15T09:45:28.498028Z",
+      "status": "failed_or_unknown",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000
+    }
+  ]
+}

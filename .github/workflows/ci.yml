@@ -48,6 +48,29 @@ jobs:
         env:
           KICADAI_FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
+      - name: Verify immutable historical lint exceptions
+        run: go test -count=1 ./internal/promotionrunner -run '^TestFrozenHistoricalLintExceptions'
+
+      - name: Test two-family evaluation safeguards offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          # Fresh CI fixture only: copy the published, exhausted ledger exactly.
+          # COPYFILE_EXCL refuses an existing history; no keys or live calls.
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('CI fixture only');
+          fs.mkdirSync('.cache/board-family-v1', { recursive: true });
+          fs.copyFileSync('specs/board-family-v1/evidence/guardrails/ledger-after.json', '.cache/board-family-v1/live-ledger.json', fs.constants.COPYFILE_EXCL);
+          NODE
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node --test specs/board-family-v2/evaluation/acceptance.test.mjs specs/board-family-v2/development/replay-normalization.test.mjs
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node specs/board-family-v2/evaluation/audit-final.mjs --check
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node specs/board-family-v2/typed-intent-02/check.mjs
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:

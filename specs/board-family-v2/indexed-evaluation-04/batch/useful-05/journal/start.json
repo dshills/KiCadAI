@@ -1,0 +1,11 @@
+{
+  "admission_version": "3-indexed-quantities-experimental",
+  "original_request": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+  "policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "status": "prepared-not-transport-authority",
+  "version": "indexed-evidence-journal-1"
+}

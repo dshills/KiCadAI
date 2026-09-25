@@ -1,0 +1,32 @@
+{
+  "status": "offline-typed-intent-published-not-live-acceptance",
+  "source_run": ".cache/board-family-v2/typed-intent-02-run-01",
+  "published_utc": "2026-09-14T14:48:01.188Z",
+  "files_sha256": {
+    "README.md": "e5cb3bbaecba4837ce0b1e6bf30ba644cbcbd55c0e78a93feb4b32288928ea39",
+    "REVIEW.md": "a84f923fd5aeb69ab1dbaa00b517b1452f88ebe400dc4539446b283b533ef2d6",
+    "verify.mjs": "764c10e173fde731788fa4137249e17541603978b665d9712071a4bb4de60aad",
+    "check.mjs": "68a18a44c34ef9fb6edc11d88659d9cb0561c56de0659e9a588e2a83f15d3d02",
+    "publish.mjs": "1c4c155cc40dcfc899dacd61cde08dcce83fe55af3bba8402ca9e732bd295222",
+    "verification/build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verification/contract.json": "f4f039460befc30d3de8d47d5c0c5f27ba6c8509476da31d68a1d8146a1df55a",
+    "verification/export-contract.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verification/full-lint.log": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+    "verification/full-short-regression.log": "1af1ee8676a2523ed28625c3ed575d7f04c669a9003a8a4d0de4ed01652100d0",
+    "verification/historical-after.log": "abe5e5a205d150c3efe7bbfdb0c8987193f61fda1b6a3bfc744c492f1259f87d",
+    "verification/historical-before.log": "abe5e5a205d150c3efe7bbfdb0c8987193f61fda1b6a3bfc744c492f1259f87d",
+    "verification/intent-fuzz.log": "49a36075aaa3b4e70c2b1f831815fb60a2b1a70070b1a443e0728f9fc679b0f9",
+    "verification/intent-race.log": "5c361c2f472b7c59a3ad9099958279e089207d8a8d09477475db1eb6edfcc8f0",
+    "verification/intent-tests.log": "0cae5997a077742b3377f6cffd077c36c7713f2cb61a66466402594a5d4200fa",
+    "verification/intent.cover": "02916c52a3a065e7034292eaf0af595f4d7bfa8b0ce947ac4d32890a0d3fe89e",
+    "verification/native-bmp280-standard.log": "c1b1c91b389cb669767f499a34a72e88cd9980d12cefb0d2b5d81679150d8384",
+    "verification/native-sht31-standard.log": "6d4279a99c8d3775d6876f52c591f00e7f4118d4c209626e6b57a0af38b38056",
+    "verification/node-safeguards.log": "c4703917bbc740c53c2146b254744f9f84b0ca48b3f2ef7d9dad3b98d11468d7",
+    "verification/prior-correction.log": "902105db17cd10868109243f7f2e8ebe412f34add9a3d4f1fa175aab4076538d",
+    "verification/receipt.json": "82dac9112b2ebdc843a5fda778148924ad374e941c0504a9a4c3c4ddf5eb9256",
+    "usability-01/REVIEW.md": "d4b6a88d9516f4742d5d9ad49f1b18789ff34c13448fd978ee695a9d232f3cfb",
+    "usability-01/cases.json": "31c5b3596b3240ba078f3c14be4f97aa4cf7328d6b348838f0d1044f12364a6d",
+    "usability-01/main.go.txt": "052c0989ec4761603d11dbf6a051bf7ee1249246448413330b2ecf6a50792546",
+    "usability-01/results.json": "4a378b90dd9db912f005aa952c9867ab9ad26bb36c98891084b4d6045e7df5d2"
+  }
+}

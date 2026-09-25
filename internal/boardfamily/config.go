@@ -1,4 +1,4 @@
-// Package boardfamily configures one bounded, engineered native board reference.
+// Package boardfamily configures bounded, engineered native board references.
 // It does not search architectures, substitute arbitrary parts, place or autoroute.
 package boardfamily
 
@@ -12,6 +12,7 @@ import (
 )
 
 const Family = "esp32_bmp280_v1"
+const FamilySHT31 = "esp32_sht31_v1"
 
 type Config struct {
 	Version               string  `json:"version"`
@@ -40,6 +41,22 @@ func Profiles() []Profile {
 		{"standard", 100000, 4700, "4.7k", "RC0805FR-074K7L", 200, 1000},
 		{"fast", 400000, 2200, "2.2k", "RC0805FR-072K2L", 100, 300},
 		{"low_current", 100000, 10000, "10k", "RC0805FR-0710KL", 100, 1000},
+	}
+}
+
+// ProfilesFor returns a fresh profile list. Profiles retains its original BMP280
+// meaning for callers replaying the first-family contract.
+func ProfilesFor(family string) []Profile {
+	switch family {
+	case Family:
+		return Profiles()
+	case FamilySHT31:
+		return []Profile{
+			{"standard", 100000, 4700, "4.7k", "RC0805FR-074K7L", 70, 300},
+			{"fast", 400000, 2200, "2.2k", "RC0805FR-072K2L", 100, 300},
+		}
+	default:
+		return nil
 	}
 }
 
@@ -82,10 +99,11 @@ func Check(c Config) (Electrical, error) {
 			return e, errors.New("non-finite operating limit")
 		}
 	}
-	if c.Version != "1" || c.Family != Family {
+	profiles := ProfilesFor(c.Family)
+	if c.Version != "1" || len(profiles) == 0 {
 		return e, errors.New("unsupported family or configuration version")
 	}
-	for _, p := range Profiles() {
+	for _, p := range profiles {
 		if p.ID == c.Profile {
 			e.Profile = p
 		}
@@ -112,15 +130,27 @@ func Check(c Config) (Electrical, error) {
 	e.TimeTo80PercentNS = math.Log(5) * rmax * c.TotalBusCapacitancePF / 1000
 	// Include Bosch's minimum 70k internal pull-up; ESP32 internal pull-ups must be disabled.
 	e.PullupSinkMA = c.SupplyMaxV * (1/rmin + 1.0/70000.0) * 1000
+	sensorPeakMA := 1.12
+	if c.Family == FamilySHT31 {
+		// SHT3x-DIS datasheet v7 Tables 3 and 7: external bus pulls only,
+		// 1.5 mA maximum measuring current, with the heater disabled.
+		e.PullupSinkMA = c.SupplyMaxV / rmin * 1000
+		sensorPeakMA = 1.5
+	}
 	e.PullupPowerMW = c.SupplyMaxV * c.SupplyMaxV / rmin * 1000
 	// 500 mA controller allocation is based on Espressif's supply recommendation,
-	// not a claimed measured maximum. Add 1.12 mA sensor peak, two bus sinks,
+	// not a claimed measured maximum. Add the sensor peak and two bus sinks,
 	// 2 mA control-network allocation and 90 mA engineering reserve.
-	e.AllocatedCurrentMA = 500 + 1.12 + 2*e.PullupSinkMA + 2 + 90
+	e.AllocatedCurrentMA = 500 + sensorPeakMA + 2*e.PullupSinkMA + 2 + 90
 	e.SourceMarginMA = c.SupplyCapacityMA - e.AllocatedCurrentMA
 	if e.RiseTimeNS > e.Profile.RiseLimitNS || e.PullupSinkMA > 3 || e.PullupPowerMW > 62.5 || e.SourceMarginMA < 0 {
 		return e, errors.New("electrical margin check failed")
 	}
 	e.Notes = []string{"External regulated 3.3 V only; no regulator, reverse-polarity, surge, ESD, or hot-plug protection.", "Radio disabled; external GPIO loads and extra pull-ups unsupported. UART is 3.3 V logic, not USB or RS-232.", "I2C capacitance is a declared total bound, not a measurement; validate the assembled bus before use.", "Firmware must set the selected I2C clock, disable internal pulls, use SDA GPIO21 / SCL GPIO22, and apply BMP280 calibration coefficients.", "Supply ripple at the sensor must not exceed 50 mV peak-to-peak. Keep RESET held until power is stable; no automatic-reset guarantee.", "Software-qualified reference, not manufactured-hardware performance or EMC certification."}
+	if c.Family == FamilySHT31 {
+		e.Notes[3] = "Firmware must set the selected I2C clock, disable controller internal pulls, use SDA GPIO21 / SCL GPIO22 at address 0x44, keep the SHT31 heater off, validate CRC and convert digital temperature/humidity readings. No firmware is delivered."
+		e.Notes[4] = "Supply ripple at the sensor must not exceed 50 mV peak-to-peak; supply slew within the sensor operating range must stay below 20 V/ms. Hold controller RESET until power is stable, wait at least 1 ms for sensor power-up and 1.5 ms after sensor soft reset; controller RESET does not reset the sensor."
+		e.Notes = append(e.Notes, "SHT31 temperature/humidity capability excludes pressure measurement and guaranteed assembled-board ambient accuracy; controller heat, contamination, enclosure and airflow require bench characterization. No coating or wash over the sensor opening; follow Sensirion handling and assembly instructions.")
+	}
 	return e, nil
 }

@@ -1,0 +1,433 @@
+{
+  "audit_id": "board-family-v2-usability-01",
+  "kind": "implementing-agent-authored metamorphic local admission audit; not live or statistically representative",
+  "candidate_origin": "Synthetic ideal supported proposals, not provider responses",
+  "expected_all": 25,
+  "cases": [
+    {
+      "id": "bmp280-standard-canonical",
+      "variant": "canonical",
+      "prompt": "Use BMP280 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      }
+    },
+    {
+      "id": "bmp280-standard-please-prefix",
+      "variant": "please-prefix",
+      "prompt": "Please use BMP280 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      }
+    },
+    {
+      "id": "bmp280-standard-thanks-suffix",
+      "variant": "thanks-suffix",
+      "prompt": "Use BMP280 with the standard profile. Thank you.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      }
+    },
+    {
+      "id": "bmp280-standard-request-prefix",
+      "variant": "request-prefix",
+      "prompt": "I would like BMP280 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      }
+    },
+    {
+      "id": "bmp280-standard-question-form",
+      "variant": "question-form",
+      "prompt": "Could you use BMP280 with the standard profile?",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      }
+    },
+    {
+      "id": "bmp280-fast-canonical",
+      "variant": "canonical",
+      "prompt": "Use BMP280 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-fast-please-prefix",
+      "variant": "please-prefix",
+      "prompt": "Please use BMP280 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-fast-thanks-suffix",
+      "variant": "thanks-suffix",
+      "prompt": "Use BMP280 with the fast profile. Thank you.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-fast-request-prefix",
+      "variant": "request-prefix",
+      "prompt": "I would like BMP280 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-fast-question-form",
+      "variant": "question-form",
+      "prompt": "Could you use BMP280 with the fast profile?",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-low_current-canonical",
+      "variant": "canonical",
+      "prompt": "Use BMP280 with the low_current profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-low_current-please-prefix",
+      "variant": "please-prefix",
+      "prompt": "Please use BMP280 with the low_current profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-low_current-thanks-suffix",
+      "variant": "thanks-suffix",
+      "prompt": "Use BMP280 with the low_current profile. Thank you.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-low_current-request-prefix",
+      "variant": "request-prefix",
+      "prompt": "I would like BMP280 with the low_current profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "bmp280-low_current-question-form",
+      "variant": "question-form",
+      "prompt": "Could you use BMP280 with the low_current profile?",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "sht31-standard-canonical",
+      "variant": "canonical",
+      "prompt": "Use SHT31 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      }
+    },
+    {
+      "id": "sht31-standard-please-prefix",
+      "variant": "please-prefix",
+      "prompt": "Please use SHT31 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      }
+    },
+    {
+      "id": "sht31-standard-thanks-suffix",
+      "variant": "thanks-suffix",
+      "prompt": "Use SHT31 with the standard profile. Thank you.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      }
+    },
+    {
+      "id": "sht31-standard-request-prefix",
+      "variant": "request-prefix",
+      "prompt": "I would like SHT31 with the standard profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      }
+    },
+    {
+      "id": "sht31-standard-question-form",
+      "variant": "question-form",
+      "prompt": "Could you use SHT31 with the standard profile?",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      }
+    },
+    {
+      "id": "sht31-fast-canonical",
+      "variant": "canonical",
+      "prompt": "Use SHT31 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "sht31-fast-please-prefix",
+      "variant": "please-prefix",
+      "prompt": "Please use SHT31 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "sht31-fast-thanks-suffix",
+      "variant": "thanks-suffix",
+      "prompt": "Use SHT31 with the fast profile. Thank you.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "sht31-fast-request-prefix",
+      "variant": "request-prefix",
+      "prompt": "I would like SHT31 with the fast profile.",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    },
+    {
+      "id": "sht31-fast-question-form",
+      "variant": "question-form",
+      "prompt": "Could you use SHT31 with the fast profile?",
+      "expected_disposition": "supported",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      }
+    }
+  ]
+}

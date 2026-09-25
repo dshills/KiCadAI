@@ -1,0 +1,1 @@
+I need pressure sensing with a BMP280. Reduce only the I2C pull-up current using the 10k low_current profile at 100 kHz and 100 pF total capacitance. I am not asking for reduced whole-board power or battery operation. Use default supported power and ambient limits.

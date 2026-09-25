@@ -1,0 +1,200 @@
+{
+  "notice": "Offline semantic regression fixtures from the closed v10 batch. raw_intent is JSON-normalized from selection.json, NOT exact provider bytes or a new live result. No facts or decisions have been repaired.",
+  "source_run": "development-13/.cache/semantic-boundaries-13-production-01/batch",
+  "cases": [
+    {
+      "case_id": "useful-04",
+      "prompt": "Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+      "source_selection_sha256": "ddd25014848582244d58157c24f3102ce23db77a1d95ab32202bbf0d7f6d53d9",
+      "source_response_sha256": "c619f9db77c7c9f94600e749fc48c9a55692740e3f279b240b13554554d9c9b3",
+      "raw_intent": {
+        "additional": {
+          "c0": [
+            {
+              "context": [
+                "c0"
+              ],
+              "kind": "other",
+              "span": "r0",
+              "state": "requested"
+            }
+          ],
+          "c1": [
+            {
+              "context": [
+                "c1"
+              ],
+              "kind": "other",
+              "span": "r1",
+              "state": "requested"
+            },
+            {
+              "context": [
+                "c1"
+              ],
+              "kind": "other",
+              "span": "r2",
+              "state": "requested"
+            }
+          ],
+          "c2": [
+            {
+              "context": [
+                "c2"
+              ],
+              "kind": "other",
+              "span": "r3",
+              "state": "unnecessary_but_allowed"
+            }
+          ],
+          "c3": [
+            {
+              "context": [
+                "c3"
+              ],
+              "kind": "other",
+              "span": "r4",
+              "state": "requested"
+            }
+          ]
+        },
+        "mentions": {
+          "m0": [
+            {
+              "context": [
+                "c0"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m1": [
+            {
+              "context": [
+                "c0"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m2": [
+            {
+              "context": [
+                "c1"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m3": [
+            {
+              "context": [],
+              "state": "unnecessary_but_allowed"
+            }
+          ]
+        },
+        "quantities": {
+          "q0": [
+            {
+              "context": [
+                "c1"
+              ],
+              "field": "total_bus_capacitance_pf",
+              "kind": "number",
+              "state": "requested"
+            }
+          ]
+        },
+        "version": "10-semantic-boundaries-experimental"
+      },
+      "recorded_decision": {
+        "disposition": "unsupported",
+        "message": "No reviewed family implements this additional requirement: Would you make an indoor temperature and humidity monitor for me? No reviewed family implements this additional requirement:  Please use your standard profile, 70 pF total bus capacitance, and the  No reviewed family implements this additional requirement: . No reviewed family implements this additional requirement:  Thanks!",
+        "clauses": [
+          {
+            "text": "Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+            "disposition": "unsupported",
+            "reason": "No reviewed family implements this additional requirement: Would you make an indoor temperature and humidity monitor for me? No reviewed family implements this additional requirement:  Please use your standard profile, 70 pF total bus capacitance, and the  No reviewed family implements this additional requirement: . No reviewed family implements this additional requirement:  Thanks!"
+          }
+        ],
+        "configuration": null
+      }
+    },
+    {
+      "case_id": "useful-05",
+      "prompt": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+      "source_selection_sha256": "f7bf2ecad7060e2ccc15f82bb06a4c5a792cbe8f0d1131f0216699b1f056065b",
+      "source_response_sha256": "41e8940eed7bda5ca8a992bfbd24f4989260b9691aef3a4c360707fe0bffe4a7",
+      "raw_intent": {
+        "additional": {
+          "c0": [],
+          "c1": [
+            {
+              "context": [
+                "c1"
+              ],
+              "kind": "other",
+              "span": "r1",
+              "state": "must_not_occur"
+            }
+          ],
+          "c2": []
+        },
+        "mentions": {
+          "m0": [
+            {
+              "context": [
+                "c0"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m1": [
+            {
+              "context": [
+                "c0"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m2": [
+            {
+              "context": [
+                "c0"
+              ],
+              "state": "requested"
+            }
+          ],
+          "m3": [
+            {
+              "context": [],
+              "state": "must_not_occur"
+            }
+          ]
+        },
+        "quantities": {
+          "q0": [
+            {
+              "context": [
+                "c0"
+              ],
+              "field": "total_bus_capacitance_pf",
+              "kind": "number",
+              "state": "requested"
+            }
+          ]
+        },
+        "version": "10-semantic-boundaries-experimental"
+      },
+      "recorded_decision": {
+        "disposition": "unsupported",
+        "message": "No reviewed family implements this additional requirement:  Do not run the heater at any time.",
+        "clauses": [
+          {
+            "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+            "disposition": "unsupported",
+            "reason": "No reviewed family implements this additional requirement:  Do not run the heater at any time."
+          }
+        ],
+        "configuration": null
+      }
+    }
+  ]
+}

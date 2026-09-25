@@ -274,6 +274,12 @@ func Validate(ctx context.Context, dir, cli string) (Validation, error) {
 	check("pcb_preview", func() error {
 		return command(ctx, cli, dir, "pcb-preview", "pcb", "export", "svg", "--layers", "F.Cu,B.Cu,F.SilkS,Edge.Cuts", "--mode-single", "--fit-page-to-board", "--exclude-drawing-sheet", "--output", filepath.Join(dir, "preview", "pcb.svg"), path("kicad_pcb"))
 	})
+	check("manufacturing_exports", func() error {
+		if !v.Passed {
+			return errors.New("manufacturing exports withheld because native validation failed")
+		}
+		return exportManufacturing(ctx, dir, cli)
+	})
 	check("input_immutability", func() error {
 		for file, want := range v.NativeSHA256 {
 			b, e := os.ReadFile(filepath.Join(dir, file))
