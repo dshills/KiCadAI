@@ -1,0 +1,32 @@
+{
+  "schema": "sht31-prototype-bench-1",
+  "physical_validation": "not_performed",
+  "decision": "not_run",
+  "board_serial": null,
+  "package_sha256": null,
+  "firmware_sha256": null,
+  "operator": null,
+  "reviewer": null,
+  "hardware_test_approval": null,
+  "started_utc": null,
+  "instruments_and_calibration": [],
+  "checks": {
+    "release_holds_closed": "not_run",
+    "unpowered_inspection": "not_run",
+    "held_reset_power": "not_run",
+    "rail_startup_ripple_slew": "not_run",
+    "boot_rail_and_current": "not_run",
+    "flash_and_verify": "not_run",
+    "bus_timing_and_levels": "not_run",
+    "ten_minute_capture": "not_run",
+    "reference_comparison_recorded": "not_run",
+    "three_cold_starts": "not_run",
+    "three_manual_resets": "not_run",
+    "optional_missing_sensor": "not_run",
+    "optional_voltage_endpoints": "not_run"
+  },
+  "measurements_with_units_uncertainty_and_conditions": [],
+  "raw_evidence_files_sha256": {},
+  "faults_and_deviations": [],
+  "signature_and_date": null
+}
