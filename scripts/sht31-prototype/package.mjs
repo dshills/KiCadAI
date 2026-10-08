@@ -52,12 +52,13 @@ run('c++',['-std=c++11','-Wall','-Wextra','-Werror','-fsanitize=address,undefine
   '-I','firmware/sht31-bringup/include','firmware/sht31-bringup/tests/test_sht31.cpp',
   '-o',path.join(output,'verification','test-sht31')],'host-build');
 run(path.join(output,'verification','test-sht31'),[],'host-tests');
-run(process.execPath,['--test','scripts/sht31-prototype/verify-run.test.mjs','scripts/sht31-prototype/verify-package.test.mjs'],'verifier-tests');
+run(process.execPath,['--test','scripts/sht31-prototype/verify-run.test.mjs','scripts/sht31-prototype/verify-package.test.mjs','scripts/sht31-prototype/audit-board.test.mjs'],'verifier-tests');
 // Force recompilation so cached object files cannot hide a source change.
 run(pio,['run','-d','firmware/sht31-bringup','-e','sht31-standard','-t','clean'],'firmware-clean');
 run(pio,['run','-d','firmware/sht31-bringup','-e','sht31-standard'],'firmware-build',600000);
 run(cli,['spec','build','--input',confirmation,'--output',path.join(output,'board'),'--kicad-cli',kicad],'native-build',600000);
 const board=path.join(output,'board'),validation=json(path.join(board,'validation.json'));
+run(process.execPath,['scripts/sht31-prototype/audit-board.mjs',board],'pad-net-audit');
 if(!validation.passed || validation.checks.length!==14 || validation.checks.some(c=>!c.passed)) throw new Error('native gates failed');
 const bm=json(path.join(board,'bundle-manifest.json'));
 for(const [f,h] of Object.entries(bm.files_sha256)) if(hash(path.join(board,f))!==h) throw new Error('board hash mismatch');

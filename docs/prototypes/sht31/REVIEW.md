@@ -37,8 +37,10 @@ Manufacturer sources reviewed:
 
 ## Release holds (all must be closed before an order)
 
-1. Named human reviewer and user approve the exact package hash, intended prototype
-   quantity, supplier, cost and use. This document provides none of those approvals.
+1. Agent-led engineering review is the accepted review route, as directed by the
+   user on 2026-10-08; an independent engineer is not a prerequisite. The user
+   must still approve the exact package hash, remaining risks, intended prototype
+   quantity, supplier, cost and use before ordering. This review is not that approval.
 2. Fabricator accepts nominal 120 x 80 mm Edge.Cuts centerline dimensions, two layers,
    nominal 1.6 mm FR4/35 um copper and the actual minimum features/drills. Confirm
    actual stack/tolerances and surface finish; do not infer dimensions from the

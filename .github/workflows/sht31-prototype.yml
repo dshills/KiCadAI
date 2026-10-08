@@ -23,4 +23,4 @@ jobs:
             -o .cache/sht31-tests/test-sht31
           .cache/sht31-tests/test-sht31
       - name: Log and package integrity negative controls (synthetic, no physical claims)
-        run: node --test scripts/sht31-prototype/verify-run.test.mjs scripts/sht31-prototype/verify-package.test.mjs
+        run: node --test scripts/sht31-prototype/*.test.mjs
