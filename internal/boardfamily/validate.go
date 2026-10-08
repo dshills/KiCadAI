@@ -118,7 +118,11 @@ func Validate(ctx context.Context, dir, cli string) (Validation, error) {
 		}
 		defer func() { err = errors.Join(err, os.RemoveAll(tmp)) }()
 		expected := filepath.Join(tmp, "project")
-		if _, e = Generate(c, expected); e != nil {
+		layout, e := readLayout(dir)
+		if e != nil {
+			return e
+		}
+		if _, e = GenerateWithLayout(c, layout, expected); e != nil {
 			return e
 		}
 		return filepath.WalkDir(expected, func(p string, d os.DirEntry, e error) error {

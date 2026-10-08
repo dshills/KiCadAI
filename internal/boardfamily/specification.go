@@ -16,12 +16,13 @@ const SpecificationAcknowledgement = "I reviewed the original request, resolved 
 // Specification is an editable proposal, never permission to generate a board.
 // OriginalRequest is retained verbatim so a reviewer can catch AI omissions.
 type Specification struct {
-	Version         string   `json:"version"`
-	Origin          string   `json:"origin"`
-	OriginalRequest string   `json:"original_request"`
-	Configuration   *Config  `json:"configuration"`
-	Unresolved      []string `json:"unresolved"`
-	ReviewNotes     []string `json:"review_notes"`
+	Version         string      `json:"version"`
+	Origin          string      `json:"origin"`
+	OriginalRequest string      `json:"original_request"`
+	Configuration   *Config     `json:"configuration"`
+	Unresolved      []string    `json:"unresolved"`
+	ReviewNotes     []string    `json:"review_notes"`
+	Layout          *LayoutSpec `json:"layout,omitempty"`
 }
 
 type SpecificationReview struct {
@@ -32,6 +33,7 @@ type SpecificationReview struct {
 	Issues          []string      `json:"issues"`
 	SHA256          string        `json:"sha256"`
 	Acknowledgement string        `json:"required_acknowledgement"`
+	Layout          *LayoutReview `json:"layout_review,omitempty"`
 }
 
 // Confirmation is a reproducible review receipt, not a signature or identity proof.
@@ -108,6 +110,22 @@ func ReviewSpecification(s Specification) (SpecificationReview, error) {
 		r.Issues = append(r.Issues, err.Error())
 	} else {
 		r.Electrical = &e
+	}
+	if s.Layout != nil {
+		layout, err := ReviewLayout(*s.Layout)
+		if err != nil {
+			r.Issues = append(r.Issues, err.Error())
+		} else {
+			r.Layout = &layout
+			for i := range r.Catalog {
+				for j, x := range r.Catalog[i].Unsupported {
+					if x == "custom geometry or routing" {
+						r.Catalog[i].Unsupported[j] = "arbitrary geometry, rotation or unbounded routing outside the displayed layout choices"
+					}
+				}
+				r.Catalog[i].Conditions[0] = "Bounded layout sizes and connector constraints are displayed in layout_review; two copper layers, nominal 1.6 mm FR4, unchanged ESP32-WROOM-32E-N4 circuit and external regulated 3.3 V."
+			}
+		}
 	}
 	r.Ready = len(r.Issues) == 0
 	// Hash all displayed review content, including the current catalog and acknowledgement.

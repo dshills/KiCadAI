@@ -59,7 +59,8 @@ Each directory has `configuration.json`. You may edit declared operating limits
 within the reviewed bounds. Supply voltage, current capability, ambient range,
 bus capacitance, family and profile are explicit; confirmation never silently
 fills missing configuration fields. Geometry, circuitry and routing remain
-fixed. For a written request, pass `--request-file request.txt` to `spec new`
+fixed when no layout is supplied. The optional [bounded layout workflow](board-layouts.md)
+changes board size and connector placement through automatic routing. For a written request, pass `--request-file request.txt` to `spec new`
 so it appears alongside the configuration during review.
 
 ## Optional AI-assisted drafting

@@ -106,9 +106,20 @@ func partsFor(family string, p Profile) []Part {
 // Generate writes an exclusively-created output. Native geometry comes only from
 // the engineered reference. All native/round-trip validation is a separate gate.
 func Generate(c Config, dir string) (Electrical, error) {
+	return GenerateWithLayout(c, nil, dir)
+}
+
+// GenerateWithLayout retains reviewed circuit groups and automatically places
+// and routes the selected connector arrangement. Validation remains mandatory.
+func GenerateWithLayout(c Config, layout *LayoutSpec, dir string) (Electrical, error) {
 	e, err := Check(c)
 	if err != nil {
 		return e, err
+	}
+	if layout != nil {
+		if _, err = ReviewLayout(*layout); err != nil {
+			return e, err
+		}
 	}
 	if err = os.MkdirAll(filepath.Dir(dir), 0755); err != nil {
 		return e, err
@@ -191,6 +202,18 @@ func Generate(c Config, dir string) (Electrical, error) {
 		for r := range byRef {
 			if !seen[r] {
 				return e, fmt.Errorf("reference missing %s in %s", r, ext)
+			}
+		}
+		if ext == "kicad_pcb" && layout != nil {
+			report, layoutErr := applyLayout(&root, *layout)
+			if layoutErr != nil {
+				return e, layoutErr
+			}
+			if err = writeJSON(filepath.Join(dir, "layout.json"), layout); err != nil {
+				return e, err
+			}
+			if err = writeJSON(filepath.Join(dir, "layout-report.json"), report); err != nil {
+				return e, err
 			}
 		}
 		s, err := sexpr.Format(root.Node())

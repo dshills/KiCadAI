@@ -57,6 +57,14 @@ func exportManufacturing(ctx context.Context, dir, cli string) error {
 	if err := verifyManufacturing(dir); err != nil {
 		return err
 	}
+	width, height, err := manufacturingSize(dir)
+	if err != nil {
+		return err
+	}
+	geometryNote := "KiCad job size includes the 0.1 mm outline stroke (120.1x80.1 mm); nominal board dimensions follow the 120x80 mm Edge.Cuts centerline."
+	if width != 120 || height != 80 {
+		geometryNote = fmt.Sprintf("KiCad job size includes the 0.1 mm outline stroke (%.1fx%.1f mm); nominal board dimensions follow the %.0fx%.0f mm Edge.Cuts centerline.", width+.1, height+.1, width, height)
+	}
 	native, err := os.ReadFile(board)
 	if err != nil {
 		return err
@@ -86,7 +94,7 @@ func exportManufacturing(ctx context.Context, dir, cli string) error {
 		"status": "software-validated-exports-not-fabrication-approval", "source_pcb_sha256": fmt.Sprintf("%x", sha256.Sum256(native)),
 		"kicad_version": "10.0.3", "files_sha256": hashes, "units": "mm", "origin": "absolute board origin; placement and drill Y is negative native board Y",
 		"checks":      []string{"required native layer/drill outputs", "Gerber X2 layer identity, units and terminators", "Gerber job two-layer 1.6 mm stack", "placement reference/value/package/position/rotation against every native footprint", "plated and non-plated circular drill hits against native pads and vias, 0.00051 mm serialization tolerance"},
-		"limitations": []string{"No fabrication order or assembly authorization. Fabricator must confirm stack, finish, tolerances and accepted file conventions.", "Position CSV includes all parts, including through-hole headers; it is not a machine-specific assembly program. Verify component orientation/pin 1 with the assembler.", "KiCad job size includes the 0.1 mm outline stroke (120.1x80.1 mm); nominal board dimensions follow the 120x80 mm Edge.Cuts centerline.", "Raw exports contain native timestamps; preserve these bytes and normalize timestamps only for explicitly labeled replay comparisons."},
+		"limitations": []string{"No fabrication order or assembly authorization. Fabricator must confirm stack, finish, tolerances and accepted file conventions.", "Position CSV includes all parts, including through-hole headers; it is not a machine-specific assembly program. Verify component orientation/pin 1 with the assembler.", geometryNote, "Raw exports contain native timestamps; preserve these bytes and normalize timestamps only for explicitly labeled replay comparisons."},
 	})
 }
 
@@ -116,8 +124,12 @@ func verifyManufacturing(dir string) error {
 	if err := json.Unmarshal(b, &job); err != nil {
 		return err
 	}
-	if job.GeneralSpecs.LayerNumber != 2 || job.GeneralSpecs.BoardThickness != 1.6 || math.Abs(job.GeneralSpecs.Size.X-120.1) > 1e-6 || math.Abs(job.GeneralSpecs.Size.Y-80.1) > 1e-6 {
-		return errors.New("Gerber job geometry/stack differs from fixed family")
+	width, height, err := manufacturingSize(dir)
+	if err != nil {
+		return err
+	}
+	if job.GeneralSpecs.LayerNumber != 2 || job.GeneralSpecs.BoardThickness != 1.6 || math.Abs(job.GeneralSpecs.Size.X-(width+.1)) > 1e-6 || math.Abs(job.GeneralSpecs.Size.Y-(height+.1)) > 1e-6 {
+		return errors.New("Gerber job geometry/stack differs from selected family layout")
 	}
 	listed := map[string]string{}
 	for _, file := range job.FilesAttributes {
@@ -143,10 +155,22 @@ func verifyManufacturing(dir string) error {
 	return verifyDrills(filepath.Join(out, "drill"), board)
 }
 
+func manufacturingSize(dir string) (float64, float64, error) {
+	layout, err := readLayout(dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	if layout == nil {
+		return 120, 80, nil
+	}
+	r, err := ReviewLayout(*layout)
+	return r.WidthMM, r.HeightMM, err
+}
+
 func number(n nativeNode, index int) (float64, error) {
 	v, err := strconv.ParseFloat(n.ListValue(index), 64)
 	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
-		return 0, errors.New("invalid native/export coordinate")
+		return 0, fmt.Errorf("invalid native/export coordinate in %s[%d]: %q", n.Head(), index, n.ListValue(index))
 	}
 	return v, nil
 }

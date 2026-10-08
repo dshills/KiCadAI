@@ -45,6 +45,7 @@ type commandPipeline struct {
 	interpretFidelity     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	interpretCoverage     func(context.Context, string, string, boardfamily.LedgerPolicy, string) (boardfamily.Selection, any, error)
 	generate              func(boardfamily.Config, string) (boardfamily.Electrical, error)
+	generateLayout        func(boardfamily.Config, *boardfamily.LayoutSpec, string) (boardfamily.Electrical, error)
 	validate              func(context.Context, string, string) (boardfamily.Validation, error)
 }
 
@@ -98,8 +99,9 @@ func defaultCommandPipeline() commandPipeline {
 			s, err := boardfamily.InterpretFidelityWithJournal(ctx, prompt, ledger, policy, http.DefaultTransport, journal)
 			return s.Selection, s, err
 		},
-		generate: boardfamily.Generate,
-		validate: boardfamily.Validate,
+		generate:       boardfamily.Generate,
+		generateLayout: boardfamily.GenerateWithLayout,
+		validate:       boardfamily.Validate,
 	}
 }
 

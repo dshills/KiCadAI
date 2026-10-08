@@ -1,0 +1,24 @@
+name: Bounded board layouts
+on:
+  pull_request:
+    paths:
+      - 'internal/boardfamily/**'
+      - 'cmd/kicadai-board-family/**'
+      - 'examples/board-layouts/**'
+      - 'scripts/board-layouts/**'
+      - '.github/workflows/board-layouts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  layout-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Admission, confirmation, deterministic routing and failure controls
+        run: go test -race ./internal/boardfamily ./cmd/kicadai-board-family -run '^TestLayout' -count=1
