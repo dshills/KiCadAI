@@ -1,0 +1,22 @@
+✔ 14 explicit cases cover useful profiles, choices and refusals without executing them (0.899083ms)
+✔ synthetic matches leave raw and final meaning review pending (0.904209ms)
+✔ every required typed fact matters, even if the application answer is correct (1.335416ms)
+✔ wrong polarity, value and quantity cannot satisfy frozen fact requirements (0.215417ms)
+✔ invalid schema branch, original request, clause coverage and invented quotes fail (0.205541ms)
+✔ correct raw facts do not excuse a wrong final configuration or unnecessary question (0.089959ms)
+✔ new budget approval is exact, not inherited from the previous evaluation (1.823416ms)
+✔ ledger guards prevent reset, mutation, excess requests and inaccurate usage (0.452333ms)
+✔ resume requires terminal evidence, unchanged prefix and only untouched cases (0.332542ms)
+✔ all five useful attempts count in timing, including failures and missing values (0.140875ms)
+✔ an execution or evidence error defeats an optimistic artifact flag (0.045958ms)
+✔ source-bound meaning review cannot pass a missing requirement, changed byte binding or false judgment (1.225041ms)
+✔ failed local child has a durable identity and is never retried (40.155834ms)
+✔ runner without frozen runtime or actual approval cannot launch an evaluation (87.312792ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 173.020167

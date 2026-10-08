@@ -1,0 +1,17 @@
+Reference,Value,Manufacturer,MPN,Footprint
+C1,100nF,Murata,GRM21BR71H104KA01L,Capacitor_SMD:C_0805_2012Metric
+C2,10uF,Murata,GRM21BR61A106KE19L,Capacitor_SMD:C_0805_2012Metric
+C3,1uF,Murata,GCM21BR71H105KA03L,Capacitor_SMD:C_0805_2012Metric
+C4,100nF,Murata,GRM21BR71H104KA01L,Capacitor_SMD:C_0805_2012Metric
+C5,100nF,Murata,GRM21BR71H104KA01L,Capacitor_SMD:C_0805_2012Metric
+J1,3V3 INPUT,Samtec,TSW-102-07-L-S,Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical
+J2,3V3 UART,Samtec,TSW-104-07-L-S,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical
+J3,GPIO I2C SPI,Samtec,TSW-106-07-L-S,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
+R1,10k,Yageo,RC0805FR-0710KL,Resistor_SMD:R_0805_2012Metric
+R2,10k,Yageo,RC0805FR-0710KL,Resistor_SMD:R_0805_2012Metric
+R3,4.7k,Yageo,RC0805FR-074K7L,Resistor_SMD:R_0805_2012Metric
+R4,4.7k,Yageo,RC0805FR-074K7L,Resistor_SMD:R_0805_2012Metric
+SW1,RESET,Omron,B3U-1000P,Button_Switch_SMD:SW_SPST_B3U-1000P
+SW2,BOOT,Omron,B3U-1000P,Button_Switch_SMD:SW_SPST_B3U-1000P
+U1,ESP32-WROOM-32E-N4,Espressif,ESP32-WROOM-32E-N4,RF_Module:ESP32-WROOM-32E
+U2,SHT31-DIS-B 0x44,Sensirion,SHT31-DIS-B2.5kS,Sensor_Humidity:SHT31-DIS_SensirionV7_MaskPaste

@@ -1,0 +1,26 @@
+name: Typed intent evaluation safeguards
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-runner:
+    name: Typed intent runner safeguards (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify frozen plan and test guards without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node --test specs/board-family-v2/typed-evaluation-02/acceptance.test.mjs
+          env -u OPENAI_API_KEY -u ANTHROPIC_API_KEY -u GEMINI_API_KEY -u GOOGLE_API_KEY -u KICADAI_LIVE_PROVIDER_TESTS \
+            node specs/board-family-v2/typed-evaluation-02/freeze.mjs --check

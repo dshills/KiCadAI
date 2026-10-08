@@ -1,0 +1,19 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "status": "verified-never-attempted-suffix-only",
+  "authority": "Original frozen protocol, unchanged approval and remaining original budget; never retry an attempted case.",
+  "stop_after_case": "clarify-01",
+  "diagnosis": "Completed provider response asked the relevant sensor-choice question but supplied a non-null BMP280 configuration and a supported clause under an overall clarify disposition. The application rejected invalid clarification disposition, exited 1 and withheld native output. This is a model protocol failure, not observed transport/accounting failure.",
+  "previous_runner_pid": 65183,
+  "all_previous_runner_and_child_processes_verified_absent": true,
+  "all_previous_recorded_files_hash_verified": true,
+  "prior_state_sha256": "0f8d05b4ed1e0575b39627d99f98895cb94eb84d7c0dc62c8ebc052d8ebd29b6",
+  "prior_ledger_sha256": "15008ec2eb08858ecf2d8e1cd74ff99fee49fbfd1e7a2fdab25e7d7ab8f1ff8b",
+  "checkpoint_directory": ".cache/board-family-v2/evaluation-final-01-checkpoints",
+  "completed_physical_requests": 6,
+  "pending_case_ids": ["clarify-02", "clarify-03", "unsupported-01", "unsupported-02", "unsupported-03", "unsupported-04", "unsupported-05", "unsupported-06"],
+  "pending_paths_verified_absent": true,
+  "batch_and_ledger_locks_absent": true,
+  "runtime_prompts_model_budget_firewall_changed": false,
+  "acceptance_impact": "All six first attempts remain unchanged, including both application rejections. Completing the unseen suffix cannot establish 14/14 acceptance."
+}

@@ -1,0 +1,1 @@
+Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.

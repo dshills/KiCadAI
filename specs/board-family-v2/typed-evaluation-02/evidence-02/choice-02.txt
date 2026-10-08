@@ -1,0 +1,1 @@
+Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project; I haven't chosen which one I need. What should we settle before you generate the board?

@@ -1,0 +1,20 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "status": "verified-never-attempted-suffix-only",
+  "authority": "Original frozen protocol permits resuming only never-attempted cases after verifying terminal processes and unchanged evidence. This is not a retry or additional budget.",
+  "stop_after_case": "supported-02",
+  "diagnosis": "Provider response completed with recorded usage. The raw decision duplicated the humidity/wireless exclusion clause and marked one duplicate unsupported despite a supported overall decision. The application rejected original-text mismatch, exited 1 and produced only selection.json; no native generation was attempted for this case. No transport, credential or accounting failure was observed.",
+  "previous_runner_pid": 64698,
+  "previous_child_pids": [64711, 64794],
+  "all_previous_processes_verified_absent": true,
+  "all_previous_recorded_files_hash_verified": true,
+  "prior_state_sha256": "acff8ae870cf31577c1b2e8888c34c05d6a34b5d132c8be79c3c2c89b3f88405",
+  "prior_ledger_sha256": "b1b6ace5bb2a860ef8171bb7f893b60d076ee63b66ac1936cbda85882baa50b2",
+  "checkpoint_directory": ".cache/board-family-v2/evaluation-final-01-checkpoints",
+  "completed_physical_requests": 2,
+  "pending_case_ids": ["supported-03", "supported-04", "supported-05", "clarify-01", "clarify-02", "clarify-03", "unsupported-01", "unsupported-02", "unsupported-03", "unsupported-04", "unsupported-05", "unsupported-06"],
+  "pending_paths_verified_absent": true,
+  "batch_and_ledger_locks_absent": true,
+  "runtime_prompts_model_budget_firewall_changed": false,
+  "acceptance_impact": "The failed first attempt remains in the 14-case denominator and cannot become a pass by completing the unseen suffix."
+}

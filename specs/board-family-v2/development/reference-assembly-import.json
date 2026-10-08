@@ -1,0 +1,40 @@
+{
+  "source": ".cache/board-family-v2/sht31-assembly-03",
+  "destination": "internal/boardfamily/reference-sht31",
+  "status": "native-development-assembly-reference-not-final-acceptance",
+  "previous_import_sha256": "22b529e5ac1348986fc69a2303b9cd619c8f35160b4b168cfd6d7a1f041739b1",
+  "engineering_sha256": "605596d2ad2652fe842599f57ee2ed00600fc33ab2f829c74a94a425cfae6854",
+  "recipe_sha256": "9ced962087c07aabe07ce1a86232a2a60576cec74d5b741c7d503c380b73a826",
+  "tests_sha256": "639ab8f4778bbf0bf942d0a7ecdb789396fadce8a0d6db5f2abb556084e8a3ec",
+  "native_checks_sha256": {
+    "erc": "7d0c428b1f4fa8769c3ca70265f34131108eb2f1ef773d2f5b5e95740aada549",
+    "drc": "397326e4b350a5675b049ed604b301777e2d7f85d3b4bd55b111e82cfdbc0ad9"
+  },
+  "files_sha256": {
+    "board.kicad_pcb": "c3aee505aa062587762a38a005b280057bbb45ce08ef7c82b0cabe2ddbc562c1",
+    "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+    "board.kicad_sch": "bd38cb38fcd568d4e181e19e128436cc8536de88ffa7f7510a0adc012fbcebce",
+    "footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+    "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+    "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+    "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+    "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+    "footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+    "footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+    "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+    "footprints/Sensor_Humidity.pretty/SHT31-DIS_SensirionV7_MaskPaste.kicad_mod": "715a3843d0f74d4d614ebb21e9db4afc95afff947d8e2148b0cb855cf9cf7b2b",
+    "footprints/Sensor_Humidity.pretty/Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm.kicad_mod": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66",
+    "fp-lib-table": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db",
+    "lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+    "lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+    "lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+    "lib/kicadai_sensor_humidity.kicad_sym": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34",
+    "lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+    "sym-lib-table": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9"
+  },
+  "notes": [
+    "Custom U2 footprint identity distinguishes the manufacturer-directed mask/paste revision from the original KiCad footprint.",
+    "Original footprint remains byte-identical as provenance and the development recipe test input.",
+    "No generated evaluation output was edited. Software review does not qualify the physical assembly process."
+  ]
+}

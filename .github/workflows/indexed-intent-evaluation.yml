@@ -1,0 +1,50 @@
+name: Indexed intent evaluation safeguards
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  historical-archive:
+    name: Indexed failed-publication preservation (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source and recorded historical commits
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify archived failure without provider credentials or runtime execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY KICADAI_LIVE_PROVIDER_TESTS
+          node --test specs/board-family-v2/history-verification-04/authenticate-indexed-03.test.mjs
+          node specs/board-family-v2/history-verification-04/authenticate-indexed-03.mjs --check-archive
+  offline-evidence:
+    name: Indexed intent collection and scoring (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test collection, review and approval guards without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY KICADAI_LIVE_PROVIDER_TESTS
+          node --test specs/board-family-v2/source-reference-candidate-03/collector.test.mjs specs/board-family-v2/source-reference-candidate-03/scoring.test.mjs specs/board-family-v2/source-reference-candidate-03/runtime-qualification.test.mjs
+          go test ./cmd/kicadai-board-family -run 'TestIndexedCorpusSyntheticAdmissions|TestExportIndexedContractOffline' -count=1
+          go test -c -o "$RUNNER_TEMP/indexed-board-family.test" ./cmd/kicadai-board-family
+          KICADAI_INDEXED_TEST_BINARY="$RUNNER_TEMP/indexed-board-family.test" \
+            node --test specs/board-family-v2/source-reference-candidate-03/collector.integration.test.mjs specs/board-family-v2/source-reference-candidate-03/scoring.integration.test.mjs

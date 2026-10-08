@@ -1,0 +1,1 @@
+Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!

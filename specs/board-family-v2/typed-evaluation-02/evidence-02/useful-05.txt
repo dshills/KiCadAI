@@ -1,0 +1,1 @@
+For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.

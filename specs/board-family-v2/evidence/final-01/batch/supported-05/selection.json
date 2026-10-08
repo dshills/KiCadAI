@@ -1,0 +1,75 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "The esp32_sht31_v1 family with the fast profile exactly matches the request for a wired temperature/humidity controller using SHT31 with 2.2k pull-ups, 400 kHz bus speed, and 100 pF bus loading. Heater off and default supply and ambient conditions are within standard operating bounds.",
+    "clauses": [
+      {
+        "text": "Build a wired temperature/humidity controller using SHT31, 2.2k pull-ups, a 400 kHz bus and 100 pF total loading.",
+        "disposition": "supported",
+        "reason": "Specifies SHT31 sensor with 2.2k pull-ups, 400 kHz bus and 100 pF total loading which matches the esp32_sht31_v1 family fast profile."
+      },
+      {
+        "text": " Keep the heater off",
+        "disposition": "supported",
+        "reason": "Request to keep the heater off is supported by esp32_sht31_v1 heater off requirement."
+      },
+      {
+        "text": " and use the default supported supply and ambient envelope.",
+        "disposition": "supported",
+        "reason": "Default supported supply (3.2-3.4 V, 1000 mA), ambient envelope (10-35 C, 35-60% RH noncondensing indoor air) matches family default operating envelope."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_sht31_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Specifies SHT31 sensor with 2.2k pull-ups, 400 kHz bus and 100 pF total loading which matches the esp32_sht31_v1 family fast profile.",
+        "text": "Build a wired temperature/humidity controller using SHT31, 2.2k pull-ups, a 400 kHz bus and 100 pF total loading."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Request to keep the heater off is supported by esp32_sht31_v1 heater off requirement.",
+        "text": "Keep the heater off"
+      },
+      {
+        "disposition": "supported",
+        "reason": "Default supported supply (3.2-3.4 V, 1000 mA), ambient envelope (10-35 C, 35-60% RH noncondensing indoor air) matches family default operating envelope.",
+        "text": "and use the default supported supply and ambient envelope."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_sht31_v1",
+      "profile": "fast",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "The esp32_sht31_v1 family with the fast profile exactly matches the request for a wired temperature/humidity controller using SHT31 with 2.2k pull-ups, 400 kHz bus speed, and 100 pF bus loading. Heater off and default supply and ambient conditions are within standard operating bounds."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0e6f5947062da4c8016aa7ddafc00487d1808a2b8dd664eb8b",
+  "usage": {
+    "input_tokens": 1579,
+    "output_tokens": 333,
+    "total_tokens": 1912
+  },
+  "ledger_index": 5,
+  "seconds": 4.677730458
+}

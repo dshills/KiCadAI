@@ -1,0 +1,114 @@
+[
+  {
+    "reference": "C1",
+    "value": "100nF",
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR71H104KA01L",
+    "footprint": "Capacitor_SMD:C_0805_2012Metric"
+  },
+  {
+    "reference": "C2",
+    "value": "10uF",
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR61A106KE19L",
+    "footprint": "Capacitor_SMD:C_0805_2012Metric"
+  },
+  {
+    "reference": "C3",
+    "value": "1uF",
+    "manufacturer": "Murata",
+    "mpn": "GCM21BR71H105KA03L",
+    "footprint": "Capacitor_SMD:C_0805_2012Metric"
+  },
+  {
+    "reference": "C4",
+    "value": "100nF",
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR71H104KA01L",
+    "footprint": "Capacitor_SMD:C_0805_2012Metric"
+  },
+  {
+    "reference": "C5",
+    "value": "100nF",
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR71H104KA01L",
+    "footprint": "Capacitor_SMD:C_0805_2012Metric"
+  },
+  {
+    "reference": "J1",
+    "value": "3V3 INPUT",
+    "manufacturer": "Samtec",
+    "mpn": "TSW-102-07-L-S",
+    "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+  },
+  {
+    "reference": "J2",
+    "value": "3V3 UART",
+    "manufacturer": "Samtec",
+    "mpn": "TSW-104-07-L-S",
+    "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
+  },
+  {
+    "reference": "J3",
+    "value": "GPIO I2C SPI",
+    "manufacturer": "Samtec",
+    "mpn": "TSW-106-07-L-S",
+    "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
+  },
+  {
+    "reference": "R1",
+    "value": "10k",
+    "manufacturer": "Yageo",
+    "mpn": "RC0805FR-0710KL",
+    "footprint": "Resistor_SMD:R_0805_2012Metric"
+  },
+  {
+    "reference": "R2",
+    "value": "10k",
+    "manufacturer": "Yageo",
+    "mpn": "RC0805FR-0710KL",
+    "footprint": "Resistor_SMD:R_0805_2012Metric"
+  },
+  {
+    "reference": "R3",
+    "value": "4.7k",
+    "manufacturer": "Yageo",
+    "mpn": "RC0805FR-074K7L",
+    "footprint": "Resistor_SMD:R_0805_2012Metric"
+  },
+  {
+    "reference": "R4",
+    "value": "4.7k",
+    "manufacturer": "Yageo",
+    "mpn": "RC0805FR-074K7L",
+    "footprint": "Resistor_SMD:R_0805_2012Metric"
+  },
+  {
+    "reference": "SW1",
+    "value": "RESET",
+    "manufacturer": "Omron",
+    "mpn": "B3U-1000P",
+    "footprint": "Button_Switch_SMD:SW_SPST_B3U-1000P"
+  },
+  {
+    "reference": "SW2",
+    "value": "BOOT",
+    "manufacturer": "Omron",
+    "mpn": "B3U-1000P",
+    "footprint": "Button_Switch_SMD:SW_SPST_B3U-1000P"
+  },
+  {
+    "reference": "U1",
+    "value": "ESP32-WROOM-32E-N4",
+    "manufacturer": "Espressif",
+    "mpn": "ESP32-WROOM-32E-N4",
+    "footprint": "RF_Module:ESP32-WROOM-32E"
+  },
+  {
+    "reference": "U2",
+    "value": "SHT31-DIS-B 0x44",
+    "manufacturer": "Sensirion",
+    "mpn": "SHT31-DIS-B2.5kS",
+    "footprint": "Sensor_Humidity:SHT31-DIS_SensirionV7_MaskPaste"
+  }
+]

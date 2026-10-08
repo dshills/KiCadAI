@@ -1,0 +1,86 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "Assembled-board ambient accuracy requires bench characterization; software qualification cannot guarantee it.",
+    "clauses": [
+      {
+        "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+        "disposition": "unsupported",
+        "reason": "Assembled-board ambient accuracy requires bench characterization; software qualification cannot guarantee it."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+    },
+    {
+      "id": 1,
+      "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          },
+          {
+            "kind": "measurement",
+            "quote": "temperature",
+            "state": "required",
+            "value": "temperature"
+          },
+          {
+            "kind": "measurement",
+            "quote": "humidity",
+            "state": "required",
+            "value": "humidity"
+          },
+          {
+            "kind": "profile",
+            "quote": "standard electrical defaults",
+            "state": "required",
+            "value": "standard"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C",
+            "state": "required",
+            "value": "accuracy_guarantee"
+          },
+          {
+            "kind": "feature",
+            "quote": "without calibration or any bench characterization",
+            "state": "required",
+            "value": "accuracy_guarantee"
+          }
+        ],
+        "id": 1
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_00ac5fe8f87f58b5016aa817b8e40887d1bff2600c1dc16ed8",
+  "usage": {
+    "input_tokens": 2468,
+    "output_tokens": 154,
+    "total_tokens": 2622
+  },
+  "ledger_index": 14,
+  "seconds": 2.2431895
+}

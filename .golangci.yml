@@ -55,3 +55,10 @@ linters:
         text: "SA4026:"
         linters:
           - staticcheck
+      # Two additional historical, checksum-frozen experiment programs.
+      # CI verifies their exact bytes before lint; this does not exempt any
+      # successor or production code. See specs/board-family-v2/CI.md.
+      - path: (^|.*/)(specs/ai-requirement-contract-integration/publication-live-v1/replay-audit/main\.go|specs/practical-board-completion-v1/engine/main\.go)$
+        text: '^Error return value of `f\.Close` is not checked$'
+        linters:
+          - errcheck

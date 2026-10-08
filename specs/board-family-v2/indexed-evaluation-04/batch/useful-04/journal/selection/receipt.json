@@ -1,0 +1,9 @@
+{
+  "ledger_index": 4,
+  "ledger_joined": true,
+  "ledger_sha256": "d1bfddbc326ad39b66b8109fe54ef4503f16c9a30f0ba5ac3f9ff6ac622998f8",
+  "ledger_snapshot_error": false,
+  "outcome": "decision",
+  "status": "selection-recorded-not-process-terminal",
+  "version": "indexed-evidence-journal-1"
+}

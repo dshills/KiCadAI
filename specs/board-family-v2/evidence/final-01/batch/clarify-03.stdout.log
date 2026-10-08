@@ -1,0 +1,1 @@
+{"disposition":"clarify","message":"Please specify whether you want the SHT31 board configured with the standard (100 kHz I2C, 4.7k pull-ups, 50–70 pF bus capacitance) or fast (400 kHz, 2.2k pull-ups, 50–100 pF bus capacitance) bus profile to proceed.","output":".cache/board-family-v2/evaluation-final-01/clarify-03","passed":false}

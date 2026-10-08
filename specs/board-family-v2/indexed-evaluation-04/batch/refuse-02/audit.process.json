@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "signal": null,
+  "child_pid": 29339,
+  "child_terminal_observed": true,
+  "timed_out": false,
+  "spawn_error": null,
+  "log_overflow": false,
+  "storage_error": false,
+  "wall_seconds": 0.013128624999997555
+}

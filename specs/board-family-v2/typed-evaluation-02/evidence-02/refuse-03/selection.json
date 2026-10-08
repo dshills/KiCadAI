@@ -1,0 +1,74 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The requested/forbidden profiles, I2C clock and pull-ups do not match a reviewed profile for esp32_sht31_v1. No alternative was substituted.",
+    "clauses": [
+      {
+        "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+        "disposition": "unsupported",
+        "reason": "The requested/forbidden profiles, I2C clock and pull-ups do not match a reviewed profile for esp32_sht31_v1. No alternative was substituted."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups?"
+    },
+    {
+      "id": 1,
+      "text": " Please declare 100 pF total capacitance."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          },
+          {
+            "kind": "profile",
+            "quote": "low_current profile",
+            "state": "required",
+            "value": "low_current"
+          },
+          {
+            "kind": "number",
+            "number": 10000,
+            "quote": "10k I2C pull-ups",
+            "value": "pullup_ohms"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "number",
+            "number": 100,
+            "quote": "100 pF total capacitance",
+            "value": "total_bus_capacitance_pf"
+          }
+        ],
+        "id": 1
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_01b45889e83f2209016aa817b322f487d19392ffbdd055e541",
+  "usage": {
+    "input_tokens": 2457,
+    "output_tokens": 119,
+    "total_tokens": 2576
+  },
+  "ledger_index": 11,
+  "seconds": 2.104957334
+}

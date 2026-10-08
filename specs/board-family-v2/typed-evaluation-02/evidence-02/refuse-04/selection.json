@@ -1,0 +1,77 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The SHT31 heater must remain off; heater operation is outside the reviewed family.",
+    "clauses": [
+      {
+        "text": "I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+        "disposition": "unsupported",
+        "reason": "The SHT31 heater must remain off; heater operation is outside the reviewed family."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "I'd like the SHT31 controller with the reviewed electrical defaults."
+    },
+    {
+      "id": 1,
+      "text": " At startup the heater should stay off."
+    },
+    {
+      "id": 2,
+      "text": " Once normal readings begin, energize its heater between the humidity samples."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31 controller",
+            "state": "required",
+            "value": "SHT31"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "heater should stay off",
+            "state": "not_required",
+            "value": "heater_operation"
+          }
+        ],
+        "id": 1
+      },
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "energize its heater between the humidity samples",
+            "state": "required",
+            "value": "heater_operation"
+          }
+        ],
+        "id": 2
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0cfa135d2e30bd8e016aa817b5416087d1b45af2480cdbe920",
+  "usage": {
+    "input_tokens": 2468,
+    "output_tokens": 101,
+    "total_tokens": 2569
+  },
+  "ledger_index": 12,
+  "seconds": 1.5518222910000001
+}

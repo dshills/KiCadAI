@@ -1,0 +1,1 @@
+Create an SHT31 controller using the normal supported electrical limits. Keep its heater off at startup, but run the heater continuously while taking normal humidity measurements.

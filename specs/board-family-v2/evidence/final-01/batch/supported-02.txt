@@ -1,0 +1,1 @@
+Make the BMP280 pressure controller with 2.2k pull-ups, a 400 kHz bus, and 100 pF total loading. Humidity sensing and wireless are not required. Keep the default supported supply and ambient envelope.

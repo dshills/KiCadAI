@@ -1,0 +1,1 @@
+{"disposition":"clarify","message":"Please specify whether your project requires air pressure measurement (choose BMP280) or temperature and humidity sensing (choose SHT31). Both sensors serve different purposes and selecting one depends on the measurement you need.","output":".cache/board-family-v2/evaluation-final-01/clarify-02","passed":false}

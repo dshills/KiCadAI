@@ -1,0 +1,3 @@
+# Preserve raw journals and native/export artifacts byte-for-byte. Their native
+# whitespace is evidence, not authored-source formatting to normalize or repair.
+batch/** -text -diff

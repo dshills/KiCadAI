@@ -1,0 +1,1 @@
+Create one board that measures both pressure and humidity using a BMP280 plus an SHT31, with the shared ESP32 controller.

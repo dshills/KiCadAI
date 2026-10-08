@@ -1,0 +1,161 @@
+{
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "status": "candidate-cases-not-authorized-to-run",
+  "independence": "Fresh wording authored by the implementing agent after development. Known task categories and synthetic grading tests; not an independent holdout, production sample, or statistical reliability estimate. Expected facts and review rubrics are never sent to the selector.",
+  "supported_configuration_defaults": {"version":"1","supply_min_v":3.2,"supply_max_v":3.4,"supply_capacity_ma":1000,"ambient_min_c":10,"ambient_max_c":35},
+  "cases": [
+    {
+      "id":"useful-01", "expected_disposition":"supported", "family":"esp32_bmp280_v1", "profile":"standard", "total_bus_capacitance_pf":200,
+      "prompt":"Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+      "requirements":[
+        {"id":"pressure","description":"Pressure measurement is actually requested; no sensor was named.","any_of":[{"kind":"measurement","value":"pressure","state":"required"}]},
+        {"id":"profile","description":"The standard profile is selected, not an unresolved choice.","any_of":[{"kind":"profile","value":"standard","state":"required"}]}
+      ],
+      "review":"Politeness and desk context must not cause clarification. Preserve pressure and standard profile; do not invent electrical limits or extra capabilities. Use catalog defaults."
+    },
+    {
+      "id":"useful-02", "expected_disposition":"supported", "family":"esp32_bmp280_v1", "profile":"fast", "total_bus_capacitance_pf":100,
+      "prompt":"I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance. Humidity and wireless telemetry are not needed. The reviewed default supply and ambient limits are acceptable.",
+      "requirements":[
+        {"id":"sensor","description":"BMP280 is required.","any_of":[{"kind":"sensor","value":"BMP280","state":"required"}]},
+        {"id":"pullups","description":"2.2 kilohms means 2200 ohms.","any_of":[{"kind":"number","value":"pullup_ohms","number":2200}]},
+        {"id":"clock","description":"400 kilohertz means 400000 Hz I2C clock.","any_of":[{"kind":"number","value":"clock_hz","number":400000}]},
+        {"id":"capacitance","description":"Declared bus capacitance is 100 pF.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":100}]},
+        {"id":"humidity-excluded","description":"Humidity is not required, not an additional sensor requirement or a prohibition.","any_of":[{"kind":"measurement","value":"humidity","state":"not_required"}]},
+        {"id":"wireless-excluded","description":"Wireless telemetry is excluded from requirements, not demanded.","any_of":[{"kind":"feature","value":"wireless_operation","state":"not_required"}]}
+      ],
+      "review":"Infer fast from exact bus/resistor values without inventing an explicit named profile fact. Retain both exclusions and all quantities."
+    },
+    {
+      "id":"useful-03", "expected_disposition":"supported", "family":"esp32_bmp280_v1", "profile":"low_current", "total_bus_capacitance_pf":100,
+      "prompt":"Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance. I only mean reducing pull-up current, not whole-board power or battery operation. Use the normal reviewed operating limits.",
+      "requirements":[
+        {"id":"sensor","description":"BMP280 is required.","any_of":[{"kind":"sensor","value":"BMP280","state":"required"}]},
+        {"id":"profile","description":"The pull-up-only low_current profile is explicitly requested.","any_of":[{"kind":"profile","value":"low_current","state":"required"}]},
+        {"id":"pullups","description":"Pull-ups are 10000 ohms.","any_of":[{"kind":"number","value":"pullup_ohms","number":10000}]},
+        {"id":"clock","description":"I2C clock is 100000 Hz.","any_of":[{"kind":"number","value":"clock_hz","number":100000}]},
+        {"id":"capacitance","description":"Bus capacitance is 100 pF.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":100}]},
+        {"id":"power-scope","description":"Whole-board power optimization is not requested.","any_of":[{"kind":"feature","value":"whole_board_low_power","state":"not_required"}]},
+        {"id":"battery-excluded","description":"Battery operation is not requested.","any_of":[{"kind":"feature","value":"battery_operation","state":"not_required"}]}
+      ],
+      "review":"Do not recast a clear pull-up-only optimization as battery support or an ambiguous low-power request."
+    },
+    {
+      "id":"useful-04", "expected_disposition":"supported", "family":"esp32_sht31_v1", "profile":"standard", "total_bus_capacitance_pf":70,
+      "prompt":"Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+      "requirements":[
+        {"id":"temperature","description":"Temperature is required; no exact sensor was named.","any_of":[{"kind":"measurement","value":"temperature","state":"required"}]},
+        {"id":"humidity","description":"Humidity is required.","any_of":[{"kind":"measurement","value":"humidity","state":"required"}]},
+        {"id":"profile","description":"Standard profile is selected.","any_of":[{"kind":"profile","value":"standard","state":"required"}]},
+        {"id":"capacitance","description":"Bus capacitance is 70 pF.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":70}]},
+        {"id":"pressure-excluded","description":"Pressure is excluded from requirements.","any_of":[{"kind":"measurement","value":"pressure","state":"not_required"}]}
+      ],
+      "review":"Select SHT31 from required measurements. Politeness and the negative pressure clause must not cause false refusal or generic restatement."
+    },
+    {
+      "id":"useful-05", "expected_disposition":"supported", "family":"esp32_sht31_v1", "profile":"fast", "total_bus_capacitance_pf":100,
+      "prompt":"For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"profile","description":"Fast profile is selected.","any_of":[{"kind":"profile","value":"fast","state":"required"}]},
+        {"id":"capacitance","description":"Total bus loading is 100 pF.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":100}]},
+        {"id":"heater-forbidden","description":"Heater operation is explicitly forbidden, not requested.","any_of":[{"kind":"feature","value":"heater_operation","state":"forbidden"}]}
+      ],
+      "review":"The negative heater instruction must not be mistaken for an affirmative demand."
+    },
+    {
+      "id":"choice-01", "expected_disposition":"clarify",
+      "prompt":"Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+      "requirements":[],
+      "question_must_resolve":"Which measurement is required: pressure or temperature/humidity. No silently selected family.",
+      "review":"No measurement or sensor is specified. A targeted measurement question is required; politeness alone is not an ambiguity. Raw facts must not invent a named sensor or measurement."
+    },
+    {
+      "id":"choice-02", "expected_disposition":"clarify",
+      "prompt":"Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project; I haven't chosen which one I need. What should we settle before you generate the board?",
+      "requirements":[
+        {"id":"BMP-choice","description":"BMP280/pressure is one unresolved alternative.","any_of":[{"kind":"sensor","value":"BMP280","state":"uncertain"},{"kind":"measurement","value":"pressure","state":"uncertain"}]},
+        {"id":"SHT-choice","description":"SHT31/humidity is the other unresolved alternative.","any_of":[{"kind":"sensor","value":"SHT31","state":"uncertain"},{"kind":"measurement","value":"humidity","state":"uncertain"}]}
+      ],
+      "question_must_resolve":"Resolve the measurement/family choice, not a fabricated requirement for both sensors.",
+      "review":"Both alternatives remain unresolved. Neither refusal for combined sensing nor silently choosing one is correct."
+    },
+    {
+      "id":"choice-03", "expected_disposition":"clarify",
+      "prompt":"Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is selected.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"standard-choice","description":"Standard is unresolved.","any_of":[{"kind":"profile","value":"standard","state":"uncertain"}]},
+        {"id":"fast-choice","description":"Fast is unresolved.","any_of":[{"kind":"profile","value":"fast","state":"uncertain"}]}
+      ],
+      "question_must_resolve":"Ask which I2C profile to use, rather than silently applying a default.",
+      "review":"A missing profile may default; this explicitly undecided profile may not."
+    },
+    {
+      "id":"refuse-01", "expected_disposition":"unsupported",
+      "prompt":"Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+      "requirements":[
+        {"id":"BMP-required","description":"BMP280 is required, not an alternative.","any_of":[{"kind":"sensor","value":"BMP280","state":"required"}]},
+        {"id":"SHT-required","description":"SHT31 is also required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]}
+      ],
+      "required_reason":"Neither reviewed family includes both sensors. No single-sensor substitution.",
+      "review":"Both sensors are mandatory. Preserve the conjunction and refusal of degraded substitution."
+    },
+    {
+      "id":"refuse-02", "expected_disposition":"unsupported",
+      "prompt":"I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"profile","description":"Standard profile cannot be changed.","any_of":[{"kind":"profile","value":"standard","state":"required"}]},
+        {"id":"pullups","description":"4700 ohm pull-ups cannot be changed.","any_of":[{"kind":"number","value":"pullup_ohms","number":4700}]},
+        {"id":"clock","description":"100000 Hz I2C clock cannot be changed.","any_of":[{"kind":"number","value":"clock_hz","number":100000}]},
+        {"id":"capacitance","description":"100 pF must not become the 70 pF supported default.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":100}]}
+      ],
+      "required_reason":"100 pF exceeds the SHT31 standard maximum of 70 pF; no profile or value substitution.",
+      "review":"An in-range invented capacitance or fast-profile substitution fails even if native validation passes."
+    },
+    {
+      "id":"refuse-03", "expected_disposition":"unsupported",
+      "prompt":"Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"profile","description":"low_current is requested for the wrong family.","any_of":[{"kind":"profile","value":"low_current","state":"required"}]},
+        {"id":"pullups","description":"10000 ohm pull-ups are required.","any_of":[{"kind":"number","value":"pullup_ohms","number":10000}]},
+        {"id":"capacitance","description":"100 pF is explicitly declared.","any_of":[{"kind":"number","value":"total_bus_capacitance_pf","number":100}]}
+      ],
+      "required_reason":"The low_current/10k profile is BMP280-only; do not replace the requested SHT31.",
+      "review":"Question-form wording is an actual configuration request, not uncertainty about which sensor to use."
+    },
+    {
+      "id":"refuse-04", "expected_disposition":"unsupported",
+      "prompt":"I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"later-heater","description":"Later heater operation is required despite the startup-off condition.","any_of":[{"kind":"feature","value":"heater_operation","state":"required"}]}
+      ],
+      "required_reason":"Heater operation at any time violates the reviewed heater-off condition.",
+      "review":"Retain the temporal contrast. Startup-off must not erase the later affirmative heater requirement. A generic firmware caveat cannot authorize it."
+    },
+    {
+      "id":"refuse-05", "expected_disposition":"unsupported",
+      "prompt":"Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+      "requirements":[
+        {"id":"sensor","description":"BMP280 is required.","any_of":[{"kind":"sensor","value":"BMP280","state":"required"}]},
+        {"id":"USB-power","description":"Direct 5 V USB power is demanded.","any_of":[{"kind":"feature","value":"usb","state":"required"}]},
+        {"id":"wireless","description":"Wireless telemetry is also demanded.","any_of":[{"kind":"feature","value":"wireless_operation","state":"required"}]}
+      ],
+      "required_reason":"Direct 5 V USB power and wireless telemetry are both unsupported; no external adapter or deletion of wireless demand.",
+      "review":"Explain both unmet requirements. The negative adapter clause does not negate the positive power or wireless demands."
+    },
+    {
+      "id":"refuse-06", "expected_disposition":"unsupported",
+      "prompt":"Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+      "requirements":[
+        {"id":"sensor","description":"SHT31 is required.","any_of":[{"kind":"sensor","value":"SHT31","state":"required"}]},
+        {"id":"accuracy","description":"A physical assembled-board accuracy guarantee is required.","any_of":[{"kind":"feature","value":"accuracy_guarantee","state":"required"}]}
+      ],
+      "required_reason":"Software validation cannot guarantee the requested assembled-board ambient accuracy without measurement/calibration.",
+      "review":"The 0.1 C accuracy tolerance is not an ambient operating bound. A bare sensor specification or unmeasured accuracy claim does not satisfy the request."
+    }
+  ]
+}

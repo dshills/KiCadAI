@@ -1,0 +1,1 @@
+I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.

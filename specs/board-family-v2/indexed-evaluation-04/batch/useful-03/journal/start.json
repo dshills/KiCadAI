@@ -1,0 +1,11 @@
+{
+  "admission_version": "3-indexed-quantities-experimental",
+  "original_request": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance. I only mean reducing pull-up current, not whole-board power or battery operation. Use the normal reviewed operating limits.",
+  "policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "status": "prepared-not-transport-authority",
+  "version": "indexed-evidence-journal-1"
+}

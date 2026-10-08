@@ -1,0 +1,35 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "The SHT31 family (esp32_sht31_v1) does not support the low_current profile or 10k pull-ups; these options exist only for the BMP280 family. Please revise your profile or sensor selection.",
+    "clauses": [
+      {
+        "text": "Create an SHT31 temperature/humidity board using the 10k low_current profile with 100 pF total capacitance.",
+        "disposition": "unsupported",
+        "reason": "Whole original request retained; no design is authorized. The SHT31 family (esp32_sht31_v1) does not support the low_current profile or 10k pull-ups; these options exist only for the BMP280 family. Please revise your profile or sensor selection."
+      }
+    ],
+    "configuration": null
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "unsupported",
+        "reason": "The user requests the SHT31 family with a '10k low_current' profile, but this family does not support a low_current profile or 10k pull-ups; low_current/10k option exists only for the BMP280 family.",
+        "text": "Create an SHT31 temperature/humidity board using the 10k low_current profile with 100 pF total capacitance."
+      }
+    ],
+    "configuration": null,
+    "disposition": "unsupported",
+    "message": "The SHT31 family (esp32_sht31_v1) does not support the low_current profile or 10k pull-ups; these options exist only for the BMP280 family. Please revise your profile or sensor selection."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0f02b89815f27483016aa7de346d3887d186ec6c2f86123902",
+  "usage": {
+    "input_tokens": 1557,
+    "output_tokens": 151,
+    "total_tokens": 1708
+  },
+  "ledger_index": 11,
+  "seconds": 2.588154709
+}

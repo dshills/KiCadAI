@@ -1,0 +1,25 @@
+{
+  "profile": {
+    "id": "fast",
+    "clock_hz": 400000,
+    "resistance_ohms": 2200,
+    "value": "2.2k",
+    "mpn": "RC0805FR-072K2L",
+    "max_bus_pf": 100,
+    "rise_limit_ns": 300
+  },
+  "worst_case_30_70_rise_ns": 188.54966900000002,
+  "time_to_80_percent_ns": 358.1482186539604,
+  "worst_case_sink_ma_per_line": 1.6120054654500784,
+  "worst_case_resistor_power_mw": 5.3156757253874085,
+  "allocated_current_ma": 596.3440109309001,
+  "source_margin_ma": 403.65598906909986,
+  "notes": [
+    "External regulated 3.3 V only; no regulator, reverse-polarity, surge, ESD, or hot-plug protection.",
+    "Radio disabled; external GPIO loads and extra pull-ups unsupported. UART is 3.3 V logic, not USB or RS-232.",
+    "I2C capacitance is a declared total bound, not a measurement; validate the assembled bus before use.",
+    "Firmware must set the selected I2C clock, disable internal pulls, use SDA GPIO21 / SCL GPIO22, and apply BMP280 calibration coefficients.",
+    "Supply ripple at the sensor must not exceed 50 mV peak-to-peak. Keep RESET held until power is stable; no automatic-reset guarantee.",
+    "Software-qualified reference, not manufactured-hardware performance or EMC certification."
+  ]
+}

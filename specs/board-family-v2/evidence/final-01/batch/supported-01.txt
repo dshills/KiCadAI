@@ -1,0 +1,1 @@
+Create a wired pressure-monitoring board with a BMP280 and a 100 kHz I2C bus. Use the standard 4.7k pull-ups and declare 200 pF total bus capacitance. Use the supported default power and ambient limits.

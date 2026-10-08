@@ -1,0 +1,10 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/203 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 203/203 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 9182 (3060/sec), new interesting: 16 (total: 219)
+fuzz: elapsed: 6s, execs: 9182 (0/sec), new interesting: 16 (total: 219)
+fuzz: elapsed: 9s, execs: 9182 (0/sec), new interesting: 16 (total: 219)
+fuzz: elapsed: 12s, execs: 9182 (0/sec), new interesting: 16 (total: 219)
+fuzz: elapsed: 15s, execs: 9182 (0/sec), new interesting: 16 (total: 219)
+fuzz: elapsed: 16s, execs: 9182 (0/sec), new interesting: 16 (total: 219)
+PASS
+ok  	kicadai/internal/boardfamily	16.276s

@@ -1,0 +1,107 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "reviewer": "implementing Codex agent; not independent",
+  "reviewed_utc": "2026-09-14T11:48:18Z",
+  "final_state_sha256": "931afca663ac937d362bb173a5b90c0199e92dbb20f6318a3d76ea289464661a",
+  "method": "Read every full original prompt, raw structured decision, locally decoded decision, stdout/stderr and artifact disposition. Exact-text and schema checks remain those of frozen protocol 01; no tolerance added after seeing results. A rejected local candidate is not an admitted response.",
+  "cases": [
+    {
+      "id": "supported-01",
+      "selection_sha256": "9851ca21c1c7540940dc54ef9f64706645a630296a078eec9271b4e342db1536",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Correct BMP280 standard configuration and all requested bounds. Raw clause boundaries omit separating spaces, so raw exact-text acceptance fails. The local decoder restores only spaces; the admitted decision and generated bundle meet this case."
+    },
+    {
+      "id": "supported-02",
+      "selection_sha256": "94945ccaaa02dbe45a1ecfbd55dedc2eee39002e5607d7ebc3761e79aa7d91bf",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "Top-level fast configuration is correct, but the humidity/wireless exclusion sentence is duplicated and one duplicate is marked unsupported while its own reason says the excluded feature is supported as absent. The app rejects exact-text mismatch and generates no board."
+    },
+    {
+      "id": "supported-03",
+      "selection_sha256": "53fc6399e2586163821291f19451d56756ee8bff945aedcc88eeffe290674d3d",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Correct BMP280 low_current configuration; explicitly distinguishes reduced pull-up current from whole-board power and battery operation. Raw inter-clause spaces are missing; local restoration fixes text only. Generated bundle meets the case."
+    },
+    {
+      "id": "supported-04",
+      "selection_sha256": "325113b48cc9ef3f4e7cfc07a4d1866d8d9922de2a204c6cfb7e8e9c00a964d2",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Correct SHT31 standard configuration with 70 pF. Both forms retain the original prompt and correctly treat pressure and ambient-accuracy guarantees as not required. Native bundle matches the reviewed reference."
+    },
+    {
+      "id": "supported-05",
+      "selection_sha256": "caa11381c4d17317f9f50b7f8dd28c19d9bf3086dc07fe71fb251f2bbb9ed3cb",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Correct SHT31 fast configuration with 100 pF and heater off. No firmware or ambient accuracy guarantee is promised. Raw boundary spaces are missing and locally restored. Native bundle meets the case."
+    },
+    {
+      "id": "clarify-01",
+      "selection_sha256": "4fdf796cdecc700e46f9cdd455a488a3e8ed7961a7577a8c40171bda3b3edc03",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "Message asks the relevant pressure-versus-temperature/humidity question and warns combined sensing is unsupported, but the response also silently supplies a BMP280 configuration and a supported clause. These contradict the required null-configuration clarification; app rejects it with no native output."
+    },
+    {
+      "id": "clarify-02",
+      "selection_sha256": "c2fe007054af933a1d2e45a5c309eefde4149a924f7db84814a8233184142c01",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Both forms correctly ask the user to choose pressure/BMP280 or temperature-humidity/SHT31, preserving the unresolved either/or choice rather than treating it as a both-sensors demand. Null configuration and no board. Local non-design clause replacement changes the reason, not a raw miss into a pass."
+    },
+    {
+      "id": "clarify-03",
+      "selection_sha256": "5eebf30ed934843236ca023f28b14f090310ad8ce0d338a7a5e2d2ec193b1705",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Question specifically resolves standard versus fast with correct profile bounds; no default is silently selected and configuration is null. Raw clauses are reordered and do not concatenate to the original prompt. Local whole-prompt replacement repairs provenance, not the question's meaning; only application acceptance passes."
+    },
+    {
+      "id": "unsupported-01",
+      "selection_sha256": "8a6b4d63c5ae40177fa25985bb38b88cd29cc55e897f28c705486445f09f6e69",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Both forms refuse simultaneous BMP280 and SHT31 integration and explain that no existing family combines them. Null configuration and no board; no single-sensor substitution."
+    },
+    {
+      "id": "unsupported-02",
+      "selection_sha256": "c2e048c83d386810098c381d4b80aae064dc400bd36357928c6eb41412428f6e",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "Both forms falsely say the exact request overrides the SHT31 standard 70 pF maximum. Configuration contains 100 pF and is not null. Local numeric checking blocks generation with the correct 50–70 pF error, but a caught model mistake is not the required truthful unsupported decision."
+    },
+    {
+      "id": "unsupported-03",
+      "selection_sha256": "74f2e35d9827469d1d947821d8694313cc8cfd3659c89bd7767f7faae1b59992",
+      "raw_meaning_consistent": true,
+      "local_candidate_meaning_consistent": true,
+      "review": "Both forms truthfully explain SHT31 has no low_current/10k profile and that this option belongs only to BMP280. Null configuration and no output design; suggested revision is not an executed substitution."
+    },
+    {
+      "id": "unsupported-04",
+      "selection_sha256": "663b7371738e312a8fcdd920ea06b8e993be8145dfb239f53b8d8c467a61d144",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "Both forms falsely claim continuous heater operation during normal humidity measurements is allowed firmware behavior. The application accepts SHT31 standard and generates a native/manufacturing bundle despite the fixed heater-off condition. All native gates pass but the request is unsupported; this is a requirements-admission failure, not a passing board request."
+    },
+    {
+      "id": "unsupported-05",
+      "selection_sha256": "4c4ac87f8f0862d29cd345da8576e69d907bf5ffc192458e88b539fbf04d9aa5",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "Response refuses wireless but incorrectly accepts direct 5 V USB by inventing external regulation, omitting the other required refusal reason. It also includes a non-null configuration and loses punctuation/spacing. The app rejects malformed original text and withholds native output; the full refusal criterion fails."
+    },
+    {
+      "id": "unsupported-06",
+      "selection_sha256": "e695bf216ac5ec220de93786696b14b97c7ec97a248b0a0f5db3d64e6fea104b",
+      "raw_meaning_consistent": false,
+      "local_candidate_meaning_consistent": false,
+      "review": "The top-level message correctly refuses an uncharacterized ±0.1 C assembled-board guarantee, but its supported clause and non-null SHT31 configuration contradict that refusal. The app rejects invalid unsupported disposition and produces no board; a relevant message alone cannot pass."
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "decision": {
+    "disposition": "unsupported",
+    "message": "No USB interface or direct USB power is supported; use external regulated 3.2–3.4 V and 3.3 V UART. Wireless operation is unsupported; radios must remain disabled.",
+    "clauses": [
+      {
+        "text": "Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+        "disposition": "unsupported",
+        "reason": "No USB interface or direct USB power is supported; use external regulated 3.2–3.4 V and 3.3 V UART. Wireless operation is unsupported; radios must remain disabled."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Please make a BMP280 controller powered directly from 5 V USB."
+    },
+    {
+      "id": 1,
+      "text": " I also need wireless telemetry, with no external adapter or change to either requirement."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "BMP280 controller",
+            "state": "required",
+            "value": "BMP280"
+          },
+          {
+            "kind": "feature",
+            "quote": "powered directly from 5 V USB",
+            "state": "required",
+            "value": "usb"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "wireless telemetry",
+            "state": "required",
+            "value": "wireless_operation"
+          },
+          {
+            "kind": "feature",
+            "quote": "no external adapter or change to either requirement",
+            "state": "forbidden",
+            "value": "external_gpio_load"
+          }
+        ],
+        "id": 1
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_04a5a2f054233f11016aa817b6fec487d1af3d89f5c4c2e367",
+  "usage": {
+    "input_tokens": 2450,
+    "output_tokens": 114,
+    "total_tokens": 2564
+  },
+  "ledger_index": 13,
+  "seconds": 1.7929089999999999
+}

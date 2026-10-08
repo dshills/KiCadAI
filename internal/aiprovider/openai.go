@@ -188,9 +188,14 @@ func (provider *OpenAIProvider) generate(ctx context.Context, request GenerateRe
 	if err != nil {
 		return GenerateResult{}, newProviderError(ErrorConfiguration, "encode OpenAI input", err)
 	}
+	instructions := openAIInstructions
+	if request.DirectSourceJSON {
+		input = []byte(request.Prompt)
+		instructions += "\n\n" + request.CapabilityContext
+	}
 	body, err := json.Marshal(openAIRequest{
 		Model:        provider.model,
-		Instructions: openAIInstructions,
+		Instructions: instructions,
 		Input:        string(input),
 		Text: openAIText{Format: openAITextFormat{
 			Type:   "json_schema",

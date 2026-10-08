@@ -1,0 +1,19 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "status": "verified-never-attempted-suffix-only",
+  "authority": "Original frozen protocol, unchanged approval and last remaining original request; never retry an attempted case.",
+  "stop_after_case": "unsupported-05",
+  "diagnosis": "Completed provider response refused wireless but falsely accepted direct 5 V USB by assuming an unrequested regulator. It also supplied a non-null configuration and omitted original punctuation/spacing. The application rejected original-text mismatch, exited 1 and withheld native output. Both semantic and protocol failures remain in the original denominator; no transport/accounting failure was observed.",
+  "previous_runner_pid": 66057,
+  "all_previous_runner_and_child_processes_verified_absent": true,
+  "all_previous_recorded_files_hash_verified": true,
+  "prior_state_sha256": "481a34b0484e28f873d018265a651f12744ea9dd0998f924468b6fd9a9a4a6c0",
+  "prior_ledger_sha256": "03dc30693f76b243981523e6f888f7c2484a1da779acab643a08440fbf14520d",
+  "checkpoint_directory": ".cache/board-family-v2/evaluation-final-01-checkpoints",
+  "completed_physical_requests": 13,
+  "pending_case_ids": ["unsupported-06"],
+  "pending_paths_verified_absent": true,
+  "batch_and_ledger_locks_absent": true,
+  "runtime_prompts_model_budget_firewall_changed": false,
+  "acceptance_impact": "The first thirteen attempts, including the generated but semantically unsupported heater case, remain unchanged and cannot be repaired by collecting the final unseen case."
+}

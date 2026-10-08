@@ -1,0 +1,11 @@
+{
+  "admission_version": "3-indexed-quantities-experimental",
+  "original_request": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+  "policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "status": "prepared-not-transport-authority",
+  "version": "indexed-evidence-journal-1"
+}

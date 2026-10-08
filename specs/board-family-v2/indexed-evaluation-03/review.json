@@ -1,0 +1,1225 @@
+{
+  "status": "source-bound-semantic-review",
+  "reviewer": {
+    "kind": "implementing-agent",
+    "name": "Codex implementing agent; not independent review"
+  },
+  "reviewed_utc": "2026-09-15T09:48:22Z",
+  "bindings": {
+    "plan_sha256": "fa0e4b6c3f5fde0b54ebaf2836305bc0b86f804efbf5f94eeb050071e5ee91cf",
+    "manifest_sha256": "429f02b613038d22adaacc1cc9ef054e8b18703afe748312c3e925b59c977023",
+    "result_sha256": "e14bea31156d3eb78f3328f6dc457a7011a9331e38c60751160e2115d975f242",
+    "cases_sha256": "90bbc1f728374a9d3ba55d1fa7ff5583ede74bf6107f833eb51758ae5ebee867",
+    "selection_sha256": {
+      "useful-01": "b1b09087c2f151d935b77671e4182f6f6039b567fec78119c6f0044697fd9e47"
+    }
+  },
+  "cases": [
+    {
+      "id": "useful-01",
+      "original_prompt": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "No validated requirement extraction is available; no board was generated.",
+        "clauses": [
+          {
+            "text": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+            "disposition": "clarify",
+            "reason": "No validated requirement extraction is available; no board was generated."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Politeness and desk context must not cause clarification. Preserve pressure and standard profile; do not invent electrical limits or extra capabilities. Use catalog defaults.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+      "selection_sha256": "b1b09087c2f151d935b77671e4182f6f6039b567fec78119c6f0044697fd9e47",
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "The local evidence validator rejected this HTTP-200 stream, so this is diagnostic review of retained bytes, not an accepted response. Both minimum gold requirements appear, but two extra facts are unfaithful. The original stopped result and unknown-usage ledger remain unchanged.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Could you put together a wired pressure monitor for my desk?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Clause 1 requests pressure sensing but never names BMP280. The extraction contract forbids inferring a named sensor fact; family inference belongs to the application."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "pressure"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Could you put together a wired pressure monitor for my desk?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 explicitly requests a pressure monitor, supporting required pressure measurement."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              2
+            ],
+            "state": "required",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 2,
+              "text": " Your standard profile and reviewed default operating limits are fine."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 2 explicitly accepts the standard profile, supporting required standard profile."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "wireless_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Could you put together a wired pressure monitor for my desk?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Clause 1 explicitly asks for a wired monitor. It does not request wireless operation; the emitted affirmative wireless requirement is invented and contradicts the wired scope."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "pressure",
+          "requirement": {
+            "id": "pressure",
+            "description": "Pressure measurement is actually requested; no sensor was named.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "The required pressure measurement is supported by fact 1 and source clause 1."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "The standard profile is selected, not an unresolved choice.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "The standard-profile requirement is supported by fact 2 and source clause 2."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "The application correctly withheld an unverified configuration, but its generic failure clarification did not satisfy this supported board request. No native output exists; safety behavior is not task success."
+      }
+    },
+    {
+      "id": "useful-02",
+      "original_prompt": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance. Humidity and wireless telemetry are not needed. The reviewed default supply and ambient limits are acceptable.",
+      "decision_context": null,
+      "review_rubric": "Infer fast from exact bus/resistor values without inventing an explicit named profile fact. Retain both exclusions and all quantities.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "3875569f50031b85f8baee364ff9574645afe637351311a09e894dfc5bc72b88",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "2.2 kilohms means 2200 ohms.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 2200
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "400 kilohertz means 400000 Hz I2C clock.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 400000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Declared bus capacitance is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "humidity-excluded",
+          "requirement": {
+            "id": "humidity-excluded",
+            "description": "Humidity is not required, not an additional sensor requirement or a prohibition.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "wireless-excluded",
+          "requirement": {
+            "id": "wireless-excluded",
+            "description": "Wireless telemetry is excluded from requirements, not demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "wireless_operation",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "useful-03",
+      "original_prompt": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance. I only mean reducing pull-up current, not whole-board power or battery operation. Use the normal reviewed operating limits.",
+      "decision_context": null,
+      "review_rubric": "Do not recast a clear pull-up-only optimization as battery support or an ambiguous low-power request.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "The pull-up-only low_current profile is explicitly requested.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "low_current",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "Pull-ups are 10000 ohms.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 10000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "I2C clock is 100000 Hz.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 100000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Bus capacitance is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "power-scope",
+          "requirement": {
+            "id": "power-scope",
+            "description": "Whole-board power optimization is not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "whole_board_low_power",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "battery-excluded",
+          "requirement": {
+            "id": "battery-excluded",
+            "description": "Battery operation is not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "battery_operation",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "useful-04",
+      "original_prompt": "Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+      "decision_context": null,
+      "review_rubric": "Select SHT31 from required measurements. Politeness and the negative pressure clause must not cause false refusal or generic restatement.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "50ce54728682c6695fa32b141be7bfda424659a5eef0e2d3ea57d031dec317c9",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "temperature",
+          "requirement": {
+            "id": "temperature",
+            "description": "Temperature is required; no exact sensor was named.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "temperature",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "humidity",
+          "requirement": {
+            "id": "humidity",
+            "description": "Humidity is required.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Standard profile is selected.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Bus capacitance is 70 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 70
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "pressure-excluded",
+          "requirement": {
+            "id": "pressure-excluded",
+            "description": "Pressure is excluded from requirements.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "useful-05",
+      "original_prompt": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+      "decision_context": null,
+      "review_rubric": "The negative heater instruction must not be mistaken for an affirmative demand.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "641165b916600ae406b3e8a14df919992bc86f0682fccefd9a2ffeea462ead30",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Fast profile is selected.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "fast",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Total bus loading is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "heater-forbidden",
+          "requirement": {
+            "id": "heater-forbidden",
+            "description": "Heater operation is explicitly forbidden, not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "heater_operation",
+                "state": "forbidden"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "choice-01",
+      "original_prompt": "Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+      "decision_context": null,
+      "review_rubric": "No measurement or sensor is specified. A targeted measurement question is required; politeness alone is not an ambiguity. Raw facts must not invent a named sensor or measurement.",
+      "required_reason": null,
+      "question_must_resolve": "Which measurement is required: pressure or temperature/humidity. No silently selected family.",
+      "prompt_sha256": "bc7be7d62fdcec5a6b3ed6911b2d83672c67add8f485b2f371df1679a1828da1",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "choice-02",
+      "original_prompt": "Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project; I haven't chosen which one I need. What should we settle before you generate the board?",
+      "decision_context": null,
+      "review_rubric": "Both alternatives remain unresolved. Neither refusal for combined sensing nor silently choosing one is correct.",
+      "required_reason": null,
+      "question_must_resolve": "Resolve the measurement/family choice, not a fabricated requirement for both sensors.",
+      "prompt_sha256": "0ae7a2afd13996c5cd9cbfdfc9ae46fe9ae833e36818151567192683c2ba82ca",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "BMP-choice",
+          "requirement": {
+            "id": "BMP-choice",
+            "description": "BMP280/pressure is one unresolved alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "uncertain"
+              },
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "SHT-choice",
+          "requirement": {
+            "id": "SHT-choice",
+            "description": "SHT31/humidity is the other unresolved alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "uncertain"
+              },
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "choice-03",
+      "original_prompt": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+      "decision_context": null,
+      "review_rubric": "A missing profile may default; this explicitly undecided profile may not.",
+      "required_reason": null,
+      "question_must_resolve": "Ask which I2C profile to use, rather than silently applying a default.",
+      "prompt_sha256": "36ee7c7c2d3ecc3b8e4346632edac9d4a44a8227d0ca1f5d770dc7d8a725f109",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is selected.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "standard-choice",
+          "requirement": {
+            "id": "standard-choice",
+            "description": "Standard is unresolved.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "fast-choice",
+          "requirement": {
+            "id": "fast-choice",
+            "description": "Fast is unresolved.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "fast",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-01",
+      "original_prompt": "Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+      "decision_context": null,
+      "review_rubric": "Both sensors are mandatory. Preserve the conjunction and refusal of degraded substitution.",
+      "required_reason": "Neither reviewed family includes both sensors. No single-sensor substitution.",
+      "question_must_resolve": null,
+      "prompt_sha256": "8e2b690786b0db1175db63a7b460029bc39836ce41ea85d29dee787c8d72eef0",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "BMP-required",
+          "requirement": {
+            "id": "BMP-required",
+            "description": "BMP280 is required, not an alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "SHT-required",
+          "requirement": {
+            "id": "SHT-required",
+            "description": "SHT31 is also required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-02",
+      "original_prompt": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+      "decision_context": null,
+      "review_rubric": "An in-range invented capacitance or fast-profile substitution fails even if native validation passes.",
+      "required_reason": "100 pF exceeds the SHT31 standard maximum of 70 pF; no profile or value substitution.",
+      "question_must_resolve": null,
+      "prompt_sha256": "04a8e730de28d908f362deeb7be0bc529b0481dcf4e0320843d3713372fd542f",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Standard profile cannot be changed.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "4700 ohm pull-ups cannot be changed.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 4700
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "100000 Hz I2C clock cannot be changed.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 100000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "100 pF must not become the 70 pF supported default.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-03",
+      "original_prompt": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+      "decision_context": null,
+      "review_rubric": "Question-form wording is an actual configuration request, not uncertainty about which sensor to use.",
+      "required_reason": "The low_current/10k profile is BMP280-only; do not replace the requested SHT31.",
+      "question_must_resolve": null,
+      "prompt_sha256": "32f5ed565dd8dcb45828dc0e0906c2a0be887a9a81703d005bed0d699a2098e7",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "low_current is requested for the wrong family.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "low_current",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "10000 ohm pull-ups are required.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 10000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "100 pF is explicitly declared.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-04",
+      "original_prompt": "I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+      "decision_context": null,
+      "review_rubric": "Retain the temporal contrast. Startup-off must not erase the later affirmative heater requirement. A generic firmware caveat cannot authorize it.",
+      "required_reason": "Heater operation at any time violates the reviewed heater-off condition.",
+      "question_must_resolve": null,
+      "prompt_sha256": "ec6bead157253f7d2bb461fdfa8af981e19ba0f0c94f9c2ae86c7662bf92706a",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "later-heater",
+          "requirement": {
+            "id": "later-heater",
+            "description": "Later heater operation is required despite the startup-off condition.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "heater_operation",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-05",
+      "original_prompt": "Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+      "decision_context": null,
+      "review_rubric": "Explain both unmet requirements. The negative adapter clause does not negate the positive power or wireless demands.",
+      "required_reason": "Direct 5 V USB power and wireless telemetry are both unsupported; no external adapter or deletion of wireless demand.",
+      "question_must_resolve": null,
+      "prompt_sha256": "827da3a2f89af2454291a0260e4635f99c5bc8d3bf08216ac2047367a5a7bc3f",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "USB-power",
+          "requirement": {
+            "id": "USB-power",
+            "description": "Direct 5 V USB power is demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "usb",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "wireless",
+          "requirement": {
+            "id": "wireless",
+            "description": "Wireless telemetry is also demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "wireless_operation",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    },
+    {
+      "id": "refuse-06",
+      "original_prompt": "Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+      "decision_context": null,
+      "review_rubric": "The 0.1 C accuracy tolerance is not an ambient operating bound. A bare sensor specification or unmeasured accuracy claim does not satisfy the request.",
+      "required_reason": "Software validation cannot guarantee the requested assembled-board ambient accuracy without measurement/calibration.",
+      "question_must_resolve": null,
+      "prompt_sha256": "a8fa1063ace7ac663d97b9fdae8441830083e1d5d39364f1cf34a699bf3af049",
+      "selection_sha256": null,
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Not attempted: collection stopped after useful-01 failed evidence validation. No model output, decision, or native bundle exists for this case; no correctness credit is assigned.",
+      "facts": [],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        },
+        {
+          "id": "accuracy",
+          "requirement": {
+            "id": "accuracy",
+            "description": "A physical assembled-board accuracy guarantee is required.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "accuracy_guarantee",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "Not assessed: no response exists for this unattempted case."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Not attempted; no application outcome exists to review."
+      }
+    }
+  ]
+}

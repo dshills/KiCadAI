@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "goal": "board-family-v2-final-01",
+  "max_requests": 14,
+  "max_micro_usd": 1000000,
+  "entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-14T11:40:51.809204Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_08d594747ba67f79016aa7dd44e1c887d18b56adcda90535f0",
+      "input_tokens": 1583,
+      "output_tokens": 345,
+      "estimated_micro_usd": 1186
+    },
+    {
+      "index": 2,
+      "started_utc": "2026-09-14T11:41:01.468686Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b291e6efd6bb79d016aa7dd4dc81c87d18ed5dd748f9e8a30",
+      "input_tokens": 1579,
+      "output_tokens": 421,
+      "estimated_micro_usd": 1306
+    }
+  ]
+}

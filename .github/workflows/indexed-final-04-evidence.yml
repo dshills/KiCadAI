@@ -1,0 +1,28 @@
+name: Indexed request 04 final evidence
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  authenticate-publication:
+    name: Authenticate all 14 responses and failed acceptance (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out publication and recorded source history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check evidence, accounting, scores and tamper rejection without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY KICADAI_LIVE_PROVIDER_TESTS
+          node --test specs/board-family-v2/indexed-evaluation-04/authenticate-archive-04.test.mjs
+          node specs/board-family-v2/indexed-evaluation-04/authenticate-archive-04.mjs

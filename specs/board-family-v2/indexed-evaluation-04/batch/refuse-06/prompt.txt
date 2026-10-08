@@ -1,0 +1,1 @@
+Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.

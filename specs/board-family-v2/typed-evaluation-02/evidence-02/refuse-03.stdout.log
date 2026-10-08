@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"The requested/forbidden profiles, I2C clock and pull-ups do not match a reviewed profile for esp32_sht31_v1. No alternative was substituted.","output":".cache/board-family-v2/typed-evaluation-02-final/refuse-03","passed":false}
