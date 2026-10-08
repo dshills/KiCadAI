@@ -1,0 +1,7 @@
+{
+  "version": "board-layout-1",
+  "size": "140x80",
+  "power_connector": "west",
+  "uart_connector": "south",
+  "gpio_connector": "east"
+}

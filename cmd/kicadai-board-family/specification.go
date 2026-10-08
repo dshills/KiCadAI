@@ -29,11 +29,17 @@ func runSpecification(args []string, p commandPipeline, w io.Writer) (resultErr 
 	f := flag.NewFlagSet("spec "+args[0], flag.ContinueOnError)
 	f.SetOutput(w)
 	switch args[0] {
+	case "layouts":
+		if len(args) != 1 {
+			return errors.New("layouts takes no arguments")
+		}
+		return json.NewEncoder(w).Encode(boardfamily.LayoutOptions())
 	case "help", "--help", "-h":
 		_, err := fmt.Fprintln(w, "Confirmed specification workflow: spec new|draft|review|confirm|build. Use ACTION --help for flags. Drafting never generates a board; build is offline and requires a confirmed specification.")
 		return err
 	case "new":
 		config := f.String("config", "", "existing explicit configuration JSON")
+		layoutFile := f.String("layout", "", "optional bounded layout JSON; see spec layouts")
 		request := f.String("request-file", "", "optional original request for human reconciliation")
 		out := f.String("output", "", "new editable specification JSON file")
 		if err := f.Parse(args[1:]); err != nil {
@@ -54,6 +60,17 @@ func runSpecification(args []string, p commandPipeline, w io.Writer) (resultErr 
 			return err
 		}
 		s := boardfamily.Specification{Version: boardfamily.SpecificationVersion, Origin: "manual", Configuration: &c, Unresolved: []string{}, ReviewNotes: []string{}}
+		if *layoutFile != "" {
+			file, err := os.Open(*layoutFile)
+			if err != nil {
+				return err
+			}
+			layout, err := boardfamily.DecodeLayout(file)
+			if err = errors.Join(err, file.Close()); err != nil {
+				return err
+			}
+			s.Layout = &layout
+		}
 		if *request != "" {
 			b, err := readPrompt(*request)
 			if err != nil {
@@ -186,7 +203,15 @@ func runSpecification(args []string, p commandPipeline, w io.Writer) (resultErr 
 		if err = clearProviderCredentials(); err != nil {
 			return err
 		}
-		if _, err = p.generate(c, *out); err != nil {
+		if confirmed.Specification.Layout != nil {
+			if p.generateLayout == nil {
+				return errors.New("layout generation unavailable")
+			}
+			_, err = p.generateLayout(c, confirmed.Specification.Layout, *out)
+		} else {
+			_, err = p.generate(c, *out)
+		}
+		if err != nil {
 			return err
 		}
 		if err = writeNewSpecification(filepath.Join(*out, "confirmed-specification.json"), confirmed); err != nil {
