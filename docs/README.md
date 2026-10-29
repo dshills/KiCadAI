@@ -4,6 +4,8 @@ This directory holds the detailed reference material that used to live in the pr
 
 ## User Workflows
 
+- [Guided schematic workflow](schematic-assistant.md): offline divider and RC filter generation, resumable confirmation, beginner reports, and guided behavioral clarification.
+
 - [Featured Public Demo](../examples/public-demo/protected-programmable-current-output/README.md): behavior-only protected current-output synthesis, native KiCad artifacts, compact evidence, refusal replay, and video storyboard.
 - [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
 - [v1 Support Contract](../SUPPORT.md): release platforms, KiCad compatibility,

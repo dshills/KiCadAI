@@ -184,6 +184,19 @@ that arbitrary dense boards are supported.
 
 ## Run It In Under Ten Minutes
 
+For a small schematic-first workflow that needs no API key, try:
+
+```sh
+make build
+bin/kicadai --output ./out/divider schematic example divider
+bin/kicadai --output ./out/my-session schematic new
+```
+
+Open the generated `report.html` for component explanations, calculations and
+explicit check statuses. Add `--require-erc` before `schematic` to require native
+KiCad validation. See the [guided schematic workflow](docs/schematic-assistant.md).
+This produces a schematic candidate, not a board or fabrication approval.
+
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
 experimental for those claims. Source builds require Go 1.26.8 or newer;

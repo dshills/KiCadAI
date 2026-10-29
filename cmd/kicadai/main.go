@@ -89,6 +89,7 @@ Commands:
   route         Run PCB routing
   repair        Plan, export-bundle, or apply validation repair attempts
   schematic-ir  Validate, normalize, create transactions, or write schematic design IR
+  schematic     Guided offline passive-circuit schematics, reports, and verification
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -416,6 +417,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runRepairCommand(opts, stdout)
 	case "schematic-ir":
 		return runSchematicIRContext(ctx, opts, stdout)
+	case "schematic":
+		return runSchematicAssistant(ctx, opts, os.Stdin, stdout, stderr)
 	case "transaction":
 		return runTransactionContext(ctx, opts, stdout)
 	case "export":
@@ -2807,11 +2810,13 @@ type aiLaneStatus struct {
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: compile, draft, plan, explain, rationale, or create"})
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: compile, clarify, draft, plan, explain, rationale, or create"})
 	}
 	switch opts.commandArgs[0] {
 	case "compile":
 		return runBehavioralIntentCompile(ctx, opts, stdout)
+	case "clarify":
+		return runIntentClarify(ctx, opts, os.Stdin, stdout, os.Stderr)
 	case "draft":
 		return runIntentDraft(opts, stdout)
 	case "plan", "explain":
