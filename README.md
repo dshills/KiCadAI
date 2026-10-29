@@ -207,14 +207,15 @@ for catalog self-test kits and the versioned NetForm adapter.
 
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
-experimental for those claims. Source builds require Go 1.26.8 or newer;
+experimental for those claims. Supported source builds use the exact patched
+Go release in [`.go-version`](.go-version) (currently 1.26.10) through Make;
 `protoc` is needed only when regenerating vendored protobuf bindings. See the
 [v1 support contract](SUPPORT.md) and [v1.0.1 installation guide](docs/installation.md).
 v1.0.1 is a security maintenance release; existing v1.0.0 users should replace
 their binary, not merely update system Go.
 
 ```sh
-git clone --branch v1.0.1 https://github.com/dshills/KiCadAI.git
+git clone --branch main https://github.com/dshills/KiCadAI.git
 cd KiCadAI
 make public-demo
 ```

@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           # Share the security-patched toolchain pin with local and CI gates.
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
 
       - name: Validate and export release identity

@@ -3,6 +3,7 @@ package promotionrunner
 import (
 	"crypto/sha256"
 	"fmt"
+	"go/version"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -37,5 +38,34 @@ func TestLintCoversHistoricalSourcesWithoutChangingFrozenBytes(t *testing.T) {
 	}
 	if regexp.MustCompile(finding).MatchString("Error return value of `f.Write` is not checked") {
 		t.Fatal("exception must not hide write errors")
+	}
+}
+
+func TestMaintainedGoToolchainDoesNotRewriteHistoricalModuleSeal(t *testing.T) {
+	root := repositoryRootForContractTest(t)
+	module := readContractFile(t, filepath.Join(root, "go.mod"))
+	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(module))); got != "c75915ecfea53fdde56bb163adc699d408aaaf7c8e52a842ccd1d92840704dc9" {
+		t.Fatal("historical go.mod seal changed; maintain build toolchains independently")
+	}
+	pin := strings.TrimSpace(readContractFile(t, filepath.Join(root, ".go-version")))
+	if !regexp.MustCompile(`^1\.[0-9]+\.[0-9]+$`).MatchString(pin) {
+		t.Fatal("build toolchain must be pinned to an exact Go release")
+	}
+	if version.Compare("go"+pin, "go1.26.10") < 0 {
+		t.Fatal("build toolchain must include the Go 1.26.10 security fixes")
+	}
+	makefile := readContractFile(t, filepath.Join(root, "Makefile"))
+	if !strings.Contains(makefile, "GOTOOLCHAIN ?= go$(shell tr -d '[:space:]' < .go-version)") {
+		t.Fatal("Make must use the maintained toolchain pin")
+	}
+	workflows, err := filepath.Glob(filepath.Join(root, ".github", "workflows", "*.yml"))
+	if err != nil || len(workflows) == 0 {
+		t.Fatalf("list workflows: %v", err)
+	}
+	for _, path := range workflows {
+		workflow := readContractFile(t, path)
+		if got, want := strings.Count(workflow, "go-version-file: .go-version"), strings.Count(workflow, "uses: actions/setup-go@"); got != want {
+			t.Errorf("%s: %d of %d Go setup steps use the maintained pin", path, got, want)
+		}
 	}
 }

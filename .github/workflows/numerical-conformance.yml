@@ -12,6 +12,7 @@ on:
       - '.github/workflows/numerical-conformance.yml'
       - 'Makefile'
       - 'go.mod'
+      - '.go-version'
       - 'go.sum'
   push:
     branches: [main]
@@ -25,6 +26,7 @@ on:
       - '.github/workflows/numerical-conformance.yml'
       - 'Makefile'
       - 'go.mod'
+      - '.go-version'
       - 'go.sum'
   workflow_dispatch:
 
@@ -39,7 +41,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
       - name: Build SHA256 pinned headless ngspice 47
         run: bash scripts/build-ngspice47.sh "$RUNNER_TEMP/ngspice47"

@@ -1,7 +1,9 @@
 .DEFAULT_GOAL := help
 
 # Use the same exact security-patched toolchain as CI and release builds.
-GOTOOLCHAIN ?= go$(shell awk '$$1 == "go" { print $$2 }' go.mod)
+# go.mod retains its historical minimum because published evaluator seals
+# authenticate its exact bytes; .go-version is the maintained build pin.
+GOTOOLCHAIN ?= go$(shell tr -d '[:space:]' < .go-version)
 export GOTOOLCHAIN
 
 .PHONY: security-check
