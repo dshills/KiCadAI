@@ -1,0 +1,220 @@
+{
+  "schema": "kicadai.trusted-simulation-report.v2",
+  "registry_version": "kicadai.trusted-simulation-registry.v1",
+  "registry_hash": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "catalog_id": "conformance-ideal-passives-v1",
+  "catalog_hash": "34d0a6be649cbf4c76a9411fecdb94f959ff38df2d9bb6e29838907605268261",
+  "model_id": "linear_circuit_mna_v1",
+  "bindings": null,
+  "inputs": null,
+  "ground_node": "GND",
+  "nodes": [
+    "GND",
+    "OUT",
+    "VIN"
+  ],
+  "devices": [
+    {
+      "component": "c1",
+      "catalog_id": "conformance.capacitor",
+      "family": "capacitor",
+      "primitive_model": "mna_capacitor_v1",
+      "value_si": 1e-7,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "OUT"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "load",
+      "catalog_id": "conformance.resistor",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "OUT"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "r1",
+      "catalog_id": "conformance.resistor",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "VIN"
+        },
+        {
+          "terminal": "B",
+          "net": "OUT"
+        }
+      ]
+    },
+    {
+      "component": "source",
+      "catalog_id": "conformance.voltage_source",
+      "family": "voltage_source",
+      "primitive_model": "mna_voltage_source_v1",
+      "terminals": [
+        {
+          "terminal": "POSITIVE",
+          "net": "VIN"
+        },
+        {
+          "terminal": "NEGATIVE",
+          "net": "GND"
+        }
+      ]
+    }
+  ],
+  "topology_hash": "78ea501e93bb431f1727f38d96818c0b33fc44e32fac5e8938e537e46648ecfb",
+  "analyses": [
+    {
+      "id": "comparison",
+      "kind": "ac_sweep",
+      "points": [
+        {
+          "frequency_hz": 31.830988618379067,
+          "nodes": [
+            {
+              "node": "GND",
+              "real": 0,
+              "imaginary": 0,
+              "magnitude": 0,
+              "phase_deg": 0
+            },
+            {
+              "node": "OUT",
+              "real": 0.49504950495049505,
+              "imaginary": -0.0495049504950495,
+              "magnitude": 0.4975185951049945,
+              "phase_deg": -5.710593137499642
+            },
+            {
+              "node": "VIN",
+              "real": 1,
+              "imaginary": 0,
+              "magnitude": 1,
+              "phase_deg": 0
+            }
+          ],
+          "devices": [
+            {
+              "component": "c1",
+              "voltage_v": 0.49504950495049505,
+              "current_a": 9.9009900990099e-7,
+              "current_magnitude_a": 0.000009950371902099888,
+              "dissipation_w": 0
+            },
+            {
+              "component": "load",
+              "voltage_v": 0.49504950495049505,
+              "current_a": 0.0000495049504950495,
+              "current_magnitude_a": 0.00004975185951049945,
+              "dissipation_w": 0
+            },
+            {
+              "component": "r1",
+              "voltage_v": 0.504950495049505,
+              "current_a": 0.000050495049504950497,
+              "current_magnitude_a": 0.000050737140496312696,
+              "dissipation_w": 0
+            },
+            {
+              "component": "source",
+              "voltage_v": 1,
+              "current_a": -0.000050495049504950497,
+              "current_magnitude_a": 0.000050737140496312696,
+              "dissipation_w": 0
+            }
+          ]
+        },
+        {
+          "frequency_hz": 318.3098861837907,
+          "nodes": [
+            {
+              "node": "GND",
+              "real": 0,
+              "imaginary": 0,
+              "magnitude": 0,
+              "phase_deg": 0
+            },
+            {
+              "node": "OUT",
+              "real": 0.25000000000000006,
+              "imaginary": -0.25,
+              "magnitude": 0.3535533905932738,
+              "phase_deg": -44.99999999999999
+            },
+            {
+              "node": "VIN",
+              "real": 1,
+              "imaginary": 0,
+              "magnitude": 1,
+              "phase_deg": 0
+            }
+          ],
+          "devices": [
+            {
+              "component": "c1",
+              "voltage_v": 0.25000000000000006,
+              "current_a": 0.000049999999999999996,
+              "current_magnitude_a": 0.00007071067811865475,
+              "dissipation_w": 0
+            },
+            {
+              "component": "load",
+              "voltage_v": 0.25000000000000006,
+              "current_a": 0.000025000000000000005,
+              "current_magnitude_a": 0.00003535533905932738,
+              "dissipation_w": 0
+            },
+            {
+              "component": "r1",
+              "voltage_v": 0.75,
+              "current_a": 0.000075,
+              "current_magnitude_a": 0.00007905694150420948,
+              "dissipation_w": 0
+            },
+            {
+              "component": "source",
+              "voltage_v": 1,
+              "current_a": -0.000075,
+              "current_magnitude_a": 0.00007905694150420948,
+              "dissipation_w": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "measurements": null,
+  "assertions": [
+    {
+      "analysis_id": "comparison",
+      "node": "OUT",
+      "quantity": "voltage_magnitude_v",
+      "frequency_hz": 31.830988618379067,
+      "min": 0,
+      "max": 1,
+      "actual": 0.4975185951049945,
+      "pass": true
+    }
+  ],
+  "status": "pass"
+}

@@ -72,6 +72,7 @@ help:
 	@printf "KiCadAI targets:\n"
 	@printf "  make security-check  Check reachable vulnerabilities (requires network)\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
+	@printf "  make numerical-conformance Compare Go/analytical/ngspice 47 (set NGSPICE)\n"
 	@printf "  make board-family    Build bounded ESP32/BMP280 family CLI\n"
 	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
 	@printf "  make release         Build versioned macOS/Linux release artifacts\n"
@@ -108,6 +109,15 @@ help:
 build:
 	mkdir -p "$(BIN_DIR)"
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
+
+.PHONY: numerical-conformance
+ifndef CONFORMANCE_OUTPUT
+CONFORMANCE_OUTPUT := $(CURDIR)/.tmp/numerical-conformance-$(shell date -u +%Y%m%dT%H%M%SZ)
+endif
+numerical-conformance: build
+	@test -n "$(NGSPICE)" || (echo 'Set NGSPICE to the pinned ngspice 47 executable' >&2; exit 2)
+	"$(BIN)" --ngspice "$(NGSPICE)" --output "$(CONFORMANCE_OUTPUT)" conformance run
+	"$(BIN)" --target "$(CONFORMANCE_OUTPUT)" conformance verify
 
 .PHONY: board-family
 board-family:

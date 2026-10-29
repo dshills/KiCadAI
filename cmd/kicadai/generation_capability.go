@@ -6,11 +6,30 @@ import (
 	"io"
 	"strings"
 
+	"kicadai/internal/capabilityexplorer"
 	"kicadai/internal/generationcapability"
 	"kicadai/internal/reports"
 )
 
 func runGenerationCapability(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) > 0 && opts.commandArgs[0] == "explore" {
+		if len(opts.commandArgs) == 1 {
+			return writeJSON(stdout, capabilityexplorer.Build())
+		}
+		if len(opts.commandArgs) == 2 {
+			if entry, ok := capabilityexplorer.Lookup(opts.commandArgs[1]); ok {
+				return writeJSON(stdout, entry)
+			}
+		}
+		return fmt.Errorf("capability explore accepts no arguments or one known workflow ID")
+	}
+	if len(opts.commandArgs) > 0 && opts.commandArgs[0] == "docs" {
+		if len(opts.commandArgs) != 1 {
+			return fmt.Errorf("capability docs accepts no arguments")
+		}
+		_, err := stdout.Write(capabilityexplorer.Markdown())
+		return err
+	}
 	if len(opts.commandArgs) > 0 && strings.TrimSpace(opts.commandArgs[0]) == "expansion" {
 		return runCapabilityExpansion(ctx, opts, stdout)
 	}
@@ -19,7 +38,7 @@ func runGenerationCapability(ctx context.Context, opts cliOptions, stdout io.Wri
 			Code:       reports.CodeInvalidArgument,
 			Severity:   reports.SeverityError,
 			Path:       "capability",
-			Message:    "capability requires subcommand: generation or expansion",
+			Message:    "capability requires subcommand: explore, docs, generation or expansion",
 			Suggestion: "run kicadai capability generation --json or kicadai capability expansion plan --request <assessment.json>",
 		}
 		return writeReportFailure(stdout, "capability", issue)

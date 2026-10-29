@@ -52,11 +52,17 @@ type Options struct {
 	Runner     checks.Runner
 }
 
-func Generate(ctx context.Context, session Session, output string, options Options) (Report, error) {
-	var report Report
+func Generate(ctx context.Context, session Session, output string, options Options) (report Report, err error) {
+	stageName := "confirmation"
+	defer func() {
+		if err != nil {
+			err = &StageError{Stage: stageName, Cause: err}
+		}
+	}()
 	if err := session.ValidateConfirmation(); err != nil {
 		return report, err
 	}
+	stageName = "output_preflight"
 	if strings.TrimSpace(output) == "" {
 		return report, errors.New("output directory is required")
 	}
@@ -82,6 +88,7 @@ func Generate(ctx context.Context, session Session, output string, options Optio
 	}
 	defer func() { _ = os.RemoveAll(stagingRoot) }()
 	stage := filepath.Join(stagingRoot, "project")
+	stageName = "schematic_construction"
 	document, err := Circuit(session.Spec)
 	if err != nil {
 		return report, err
@@ -90,11 +97,13 @@ func Generate(ctx context.Context, session Session, output string, options Optio
 	if reports.HasBlockingIssue(issues) {
 		return report, fmt.Errorf("schematic construction blocked: %s", issues[0].Message)
 	}
+	stageName = "schematic_write"
 	applied := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: stage})
 	if reports.HasBlockingIssue(applied.Issues) {
 		return report, fmt.Errorf("schematic write blocked: %s", firstBlocking(applied.Issues))
 	}
 	schematicPath := filepath.Join(stage, session.Spec.Name+".kicad_sch")
+	stageName = "internal_evaluation"
 	evaluated, err := evaluate.Schematic(schematicPath)
 	if err != nil {
 		return report, err
@@ -119,6 +128,7 @@ func Generate(ctx context.Context, session Session, output string, options Optio
 	if reports.HasBlockingIssue(evaluated.Issues) {
 		return report, fmt.Errorf("schematic evaluation blocked: %s", firstBlocking(evaluated.Issues))
 	}
+	stageName = "report_artifacts"
 	if err = writeJSON(stage, "internal-checks.json", evaluated); err != nil {
 		return report, err
 	}
@@ -141,9 +151,11 @@ func Generate(ctx context.Context, session Session, output string, options Optio
 	if err = os.WriteFile(filepath.Join(stage, "diagram.svg"), []byte(diagramSVG(session.Spec)), 0644); err != nil {
 		return report, err
 	}
+	stageName = "native_kicad"
 	if err = runNative(ctx, stage, schematicPath, options, &report); err != nil {
 		return report, err
 	}
+	stageName = "report_artifacts"
 	report.Checks = append(report.Checks, Check{"Hardware behavior", "not_checked", "No assembled hardware or measured results exist in this workflow.", ""}, Check{"PCB / manufacturing", "not_applicable", "No PCB or manufacturing approval is produced.", ""})
 	report.Artifacts, err = inventory(stage)
 	if err != nil {
@@ -165,6 +177,7 @@ func Generate(ctx context.Context, session Session, output string, options Optio
 	if err = ctx.Err(); err != nil {
 		return report, err
 	}
+	stageName = "publication"
 	err = atomicdir.Publish(absolute, func(destination string) error {
 		entries, readErr := os.ReadDir(stage)
 		if readErr != nil {

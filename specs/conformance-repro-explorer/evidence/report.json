@@ -1,0 +1,238 @@
+{
+  "schema": "kicadai.numerical-conformance.v1",
+  "status": "conformant",
+  "corpus_sha256": "34d0a6be649cbf4c76a9411fecdb94f959ff38df2d9bb6e29838907605268261",
+  "registry_sha256": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "identity": {
+    "go": "go1.26.8",
+    "revision": "66cb10d6add875ef1dd36514b80526a100c5b13a",
+    "modified": "true",
+    "executable_sha256": "feaee117db41004cf9db20bbaa893fef0a0ededaf7f596ac2e38b086c779e224"
+  },
+  "external_status": "checked",
+  "external_version": "47",
+  "cases": [
+    {
+      "fixture_id": "divider-equal",
+      "status": "conformant",
+      "analytical": {
+        "real": 2.5,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 2.5,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 2.5,
+        "imaginary": 0
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "divider-loaded",
+      "status": "conformant",
+      "analytical": {
+        "real": 1.6666666666666667,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 1.6666666666666665,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 1.6666666666666665,
+        "imaginary": 0
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "divider-asymmetric",
+      "status": "conformant",
+      "analytical": {
+        "real": 1.0521739130434782,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 1.0521739130434782,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 1.0521739130434782,
+        "imaginary": 0
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "divider-high-resistance",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.0000999000000999,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 0.00009990000009989999,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 0.0000999000000999,
+        "imaginary": 0
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-0-ratio-0.1",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.9900990099009901,
+        "imaginary": -0.09900990099009901
+      },
+      "go": {
+        "real": 0.9900990099009901,
+        "imaginary": -0.099009900990099
+      },
+      "ngspice": {
+        "real": 0.9900990099009902,
+        "imaginary": -0.09900990099009901
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-0-ratio-1",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.5,
+        "imaginary": -0.5
+      },
+      "go": {
+        "real": 0.5000000000000001,
+        "imaginary": -0.5
+      },
+      "ngspice": {
+        "real": 0.5000000000000001,
+        "imaginary": -0.5
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-0-ratio-10",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.009900990099009901,
+        "imaginary": -0.09900990099009901
+      },
+      "go": {
+        "real": 0.009900990099009905,
+        "imaginary": -0.09900990099009903
+      },
+      "ngspice": {
+        "real": 0.009900990099009905,
+        "imaginary": -0.09900990099009903
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-step-load-0",
+      "status": "conformant",
+      "analytical": {
+        "real": 3.1606027941427883,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 3.1596834653439414,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 3.1606,
+        "imaginary": 0
+      },
+      "relative_tolerance": 0.005,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-10000-ratio-0.1",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.49504950495049505,
+        "imaginary": -0.04950495049504951
+      },
+      "go": {
+        "real": 0.49504950495049505,
+        "imaginary": -0.0495049504950495
+      },
+      "ngspice": {
+        "real": 0.4950495049504951,
+        "imaginary": -0.04950495049504951
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-10000-ratio-1",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.25,
+        "imaginary": -0.25
+      },
+      "go": {
+        "real": 0.25000000000000006,
+        "imaginary": -0.25
+      },
+      "ngspice": {
+        "real": 0.25000000000000006,
+        "imaginary": -0.25
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-ac-load-10000-ratio-10",
+      "status": "conformant",
+      "analytical": {
+        "real": 0.0049504950495049506,
+        "imaginary": -0.04950495049504951
+      },
+      "go": {
+        "real": 0.004950495049504952,
+        "imaginary": -0.049504950495049514
+      },
+      "ngspice": {
+        "real": 0.004950495049504952,
+        "imaginary": -0.049504950495049514
+      },
+      "relative_tolerance": 1e-7,
+      "absolute_tolerance": 1e-8
+    },
+    {
+      "fixture_id": "rc-step-load-10000",
+      "status": "conformant",
+      "analytical": {
+        "real": 1.5803013970713942,
+        "imaginary": 0
+      },
+      "go": {
+        "real": 1.5798417359750057,
+        "imaginary": 0
+      },
+      "ngspice": {
+        "real": 1.5803,
+        "imaginary": 0
+      },
+      "relative_tolerance": 0.005,
+      "absolute_tolerance": 1e-8
+    }
+  ],
+  "limitations": [
+    "Only 12 frozen ideal passive-circuit cases; not coverage of nonlinear devices, switching, noise, thermal behavior or arbitrary circuits.",
+    "Agreement is software conformance, not physical validation. Tolerances are frozen: 1e-8 V absolute plus 1e-7 relative for DC/AC, 0.5% relative for fixed-step transient.",
+    "Evidence hashes are integrity checks, not independent attestation. Build revision may be dirty or unknown; executable hash identifies the actual program.",
+    "ngspice source release is pinned to 47; executable content and version output are recorded, but the tool is not a sandbox for arbitrary SPICE."
+  ]
+}

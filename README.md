@@ -197,6 +197,10 @@ explicit check statuses. Add `--require-erc` before `schematic` to require nativ
 KiCad validation. See the [guided schematic workflow](docs/schematic-assistant.md).
 This produces a schematic candidate, not a board or fabrication approval.
 
+Discover supported workflows with `bin/kicadai capability explore`. For bounded
+solver comparisons and compact failure replay, see
+[numerical conformance and reproduction](docs/numerical-conformance.md).
+
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
 experimental for those claims. Source builds require Go 1.26.8 or newer;

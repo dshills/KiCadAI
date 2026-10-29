@@ -1,0 +1,3 @@
+kicadai --target BUNDLE --output NEW_OUTPUT repro replay
+Native KiCad checking is NEVER auto-enabled from this package. To repeat a recorded native check, explicitly add --require-erc and optionally --kicad-cli PATH before repro.
+The recorded argv is documentation only and is never executed. Input bytes may contain private design data: inspect before sharing. No environment snapshot or directory copy is included.

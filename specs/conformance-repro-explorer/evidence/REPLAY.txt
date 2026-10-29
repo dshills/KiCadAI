@@ -1,0 +1,3 @@
+Run from the parent directory, replacing BUNDLE and NEW_OUTPUT with paths:
+kicadai --target BUNDLE --output NEW_OUTPUT conformance replay
+External execution is opt-in: add --ngspice /path/to/ngspice-47 before the command. No retries. No circuit minimization: each fixture is already a 3–4-device circuit.

@@ -1,0 +1,124 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "ec007fd9a8fca92b65a3c96fc1b27a20",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "66cb10d6add875ef1dd36514b80526a100c5b13a",
+    "branch": "codex/conformance-repro-explorer"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 2,
+      "medium": 0,
+      "high": 0
+    },
+    "highestSeverity": "low"
+  },
+  "findings": [
+    {
+      "id": "4dfd86f5021272eb",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Native replay guard bypassed by --kicad-cli alone",
+      "message": "The guard that stops native checks from being re-enabled implicitly is skipped when only --kicad-cli is passed. The error text says --require-erc must be passed explicitly, but the check does not enforce it. A replay with just a tool path then sets KiCadCLI without RequireERC, so native-check behavior is ambiguous and the replay may differ from the recorded run.",
+      "suggestion": "Require --require-erc whenever the original run requested native KiCad, regardless of whether --kicad-cli is set. Also make the error message match what is actually enforced.",
+      "confidence": 0.5,
+      "locations": [
+        {
+          "path": "cmd/kicadai/conformance.go",
+          "lines": {
+            "start": 96,
+            "end": 96
+          }
+        }
+      ],
+      "tags": [
+        "cli",
+        "replay",
+        "location-corrected"
+      ],
+      "evidence": "if err == nil && previous.NativeRequested && !opts.requireERC && opts.kicadCLI == \"\" {",
+      "fix": {
+        "before": "\t\tif err == nil && previous.NativeRequested && !opts.requireERC && opts.kicadCLI == \"\" {",
+        "after": "\t\tif err == nil && previous.NativeRequested && !opts.requireERC {"
+      },
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "3876a4db44261239",
+      "severity": "low",
+      "category": "bug",
+      "title": "Off-by-one file limit and all-or-nothing publish on oversize output",
+      "message": "The docs and capability inventory advertise a 256-file maximum, but Publish rejects 256 files (>= check). It also fails the whole bundle without writing it, so all evidence is lost if any single file or the total exceeds the limits. For example, a large ngspice stdout over 2 MiB in ngspice-command.json would discard the entire failure bundle. The limit check is also inconsistent with Verify.",
+      "suggestion": "Align the limit semantics with the documentation, counting manifest.json explicitly. Truncate oversized captured stdout/stderr before putting it in the bundle, so a failing run still saves evidence.",
+      "confidence": 0.35,
+      "locations": [
+        {
+          "path": "internal/evidencebundle/bundle.go",
+          "lines": {
+            "start": 131,
+            "end": 131
+          }
+        }
+      ],
+      "tags": [
+        "limits",
+        "evidence",
+        "location-corrected"
+      ],
+      "evidence": "if len(files) == 0 || len(files) >= MaxFiles {",
+      "fix": {
+        "before": "\tif len(files) == 0 || len(files) >= MaxFiles {",
+        "after": "\tif len(files) == 0 || len(files) > MaxFiles-1 {"
+      },
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 43669,
+    "totalMs": 43747
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "coverage": {
+    "reviewer": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      }
+    ],
+    "files": 24,
+    "bytes": 93126,
+    "chunks": 1,
+    "llmCalls": 1,
+    "cacheHit": false,
+    "cachedChunks": 0,
+    "tokens": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "input": 44774,
+        "output": 5837,
+        "costUSD": 0.147918
+      }
+    ],
+    "excluded": [],
+    "truncatedBytes": 0,
+    "skipped": [],
+    "complete": true
+  },
+  "discarded": [],
+  "suppressed": []
+}

@@ -63,7 +63,7 @@ Usage:
 
 Commands:
   capabilities  Report detected KiCad API capabilities
-  capability    Report generation contracts and manage evidence-driven capability expansion
+  capability    Explore workflows, render capability docs, or manage generation contracts
   config        Print resolved connection configuration
   documents     List open KiCad documents
   draw-led-demo Execute the LED indicator schematic plan when supported
@@ -90,6 +90,8 @@ Commands:
   repair        Plan, export-bundle, or apply validation repair attempts
   schematic-ir  Validate, normalize, create transactions, or write schematic design IR
   schematic     Guided offline passive-circuit schematics, reports, and verification
+  conformance   Compare Go simulation with analytical oracles and pinned ngspice
+  repro         Capture and replay bounded schematic failure evidence
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -231,6 +233,7 @@ type cliOptions struct {
 	output                      string
 	target                      string
 	requestPath                 string
+	ngspice                     string
 	capabilityRegistry          string
 	intentText                  string
 	intentFile                  string
@@ -419,6 +422,10 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runSchematicIRContext(ctx, opts, stdout)
 	case "schematic":
 		return runSchematicAssistant(ctx, opts, os.Stdin, stdout, stderr)
+	case "conformance":
+		return runConformance(ctx, opts, stdout)
+	case "repro":
+		return runReproduction(ctx, opts, stdout)
 	case "transaction":
 		return runTransactionContext(ctx, opts, stdout)
 	case "export":
@@ -466,6 +473,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
 	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
 	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
+	flags.StringVar(&opts.ngspice, "ngspice", "", "explicit ngspice 47 executable for numerical conformance (no auto-discovery)")
 	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including behavioral-intent-v1 and generic-circuit-v1")
 	flags.StringVar(&opts.promotionReadiness, "promotion-readiness", "", "declared promotion readiness: expected_fail, candidate, pass, or blocked")
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")

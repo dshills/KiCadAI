@@ -1,0 +1,10 @@
+{
+  "id": "divider-asymmetric",
+  "kind": "dc",
+  "vin": 3.3,
+  "r1_ohms": 4700,
+  "r2_ohms": 2200,
+  "capacitance_f": 0,
+  "load_ohms": 0,
+  "frequency_ratio": 0
+}

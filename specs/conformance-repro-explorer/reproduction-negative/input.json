@@ -1,0 +1,11 @@
+{
+  "schema": "kicadai.schematic-assistant.v1",
+  "spec": {
+    "name": "unconfirmed_divider",
+    "family": "divider",
+    "input_v": 5,
+    "r1_ohms": 10000,
+    "r2_ohms": 10000,
+    "load_ohms": 0
+  }
+}

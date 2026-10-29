@@ -1,0 +1,10 @@
+{
+  "id": "rc-step-load-0",
+  "kind": "transient",
+  "vin": 5,
+  "r1_ohms": 10000,
+  "r2_ohms": 0,
+  "capacitance_f": 1e-7,
+  "load_ohms": 0,
+  "frequency_ratio": 0
+}

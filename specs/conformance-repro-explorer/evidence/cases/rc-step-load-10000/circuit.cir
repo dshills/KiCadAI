@@ -1,0 +1,16 @@
+KiCadAI frozen conformance rc-step-load-10000
+V1 vin 0 PULSE(0 5 5.0000000000000002e-05 5.0000000000000003e-10 5.0000000000000003e-10 0.001 0.002)
+R1 vin out 10000
+C1 out 0 9.9999999999999995e-08
+RL out 0 10000
+.options reltol=1e-9 abstol=1e-12 vntol=1e-10
+.control
+set noaskquit
+set numdgt=17
+tran 4.9999999999999998e-07 0.00055000000000000003 0 4.9999999999999998e-07
+meas tran observed_real FIND v(out) AT=0.00055000000000000003
+let observed_imag=0
+print observed_imag
+quit
+.endc
+.end

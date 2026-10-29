@@ -1,0 +1,192 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "4068d7b46f538d35204e4671c429de78",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "66cb10d6add875ef1dd36514b80526a100c5b13a",
+    "branch": "codex/conformance-repro-explorer"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 5,
+      "medium": 0,
+      "high": 0
+    },
+    "highestSeverity": "low"
+  },
+  "findings": [
+    {
+      "id": "25be09e8519d8ff1",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Make target not re-runnable with the default output path",
+      "message": "The default output directory is fixed, and the tool refuses to overwrite an existing directory. A second local `make numerical-conformance` therefore fails with 'output already exists' until the user deletes the directory by hand.",
+      "suggestion": "Remove the directory before running, e.g. `rm -rf \"$(CONFORMANCE_OUTPUT)\"` as the first recipe step, or use a timestamped default path.",
+      "confidence": 0.5,
+      "locations": [
+        {
+          "path": "Makefile",
+          "lines": {
+            "start": 113,
+            "end": 113
+          }
+        }
+      ],
+      "tags": [
+        "makefile"
+      ],
+      "evidence": "CONFORMANCE_OUTPUT ?= $(CURDIR)/.tmp/numerical-conformance",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "86cd994f006ba074",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Verify conflates integrity with identity compatibility",
+      "message": "`conformance verify` is documented as an integrity-only check, but it calls `ReplayCases`. That function also requires the corpus and registry hashes to match the current executable. A bundle that is intact but was produced by another build is rejected with a misleading 'replay corpus/model identity differs' error. `repro verify` has the same coupling through `reproduction.Load`, which compares `RegistrySHA256`.",
+      "suggestion": "Have verify call only `evidencebundle.Verify` plus schema decoding. Keep the identity-match check in the replay path.",
+      "confidence": 0.5,
+      "locations": [
+        {
+          "path": "cmd/kicadai/conformance.go",
+          "lines": {
+            "start": 31,
+            "end": 33
+          }
+        }
+      ],
+      "tags": [
+        "verify",
+        "semantics"
+      ],
+      "evidence": "if _, err := numericalconformance.ReplayCases(opts.target); err != nil {",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "af0e4921038d45e5",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Zero-value report emitted on early failure",
+      "message": "When `Run` fails before producing a report (output already exists, unknown case, cancelled context), `report` is a zero value. The code still prints it as JSON to stdout, so consumers see a misleading empty report with an empty status.",
+      "suggestion": "Write the report only when `report.Schema != \"\"`. Otherwise return the error alone.",
+      "confidence": 0.4,
+      "locations": [
+        {
+          "path": "cmd/kicadai/conformance.go",
+          "lines": {
+            "start": 54,
+            "end": 59
+          }
+        }
+      ],
+      "tags": [
+        "cli"
+      ],
+      "evidence": "report, err := numericalconformance.Run(ctx, opts.output, options)",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "e1ffaefd8dad7d16",
+      "severity": "low",
+      "category": "correctness",
+      "title": "PATH lookup contradicts the explicit-path claim",
+      "message": "The flag is documented as 'no auto-discovery', but `exec.LookPath` resolves a bare name such as `ngspice` through PATH. The executed binary can then differ from what the user meant. Only the version output and a digest are checked, so an unintended binary reporting 47 would be accepted.",
+      "suggestion": "Require an explicit path: reject values without a path separator, or use `os.Stat` and `filepath.Abs` instead of `LookPath`.",
+      "confidence": 0.35,
+      "locations": [
+        {
+          "path": "internal/numericalconformance/run.go",
+          "lines": {
+            "start": 96,
+            "end": 96
+          }
+        }
+      ],
+      "tags": [
+        "tool-resolution",
+        "location-corrected"
+      ],
+      "evidence": "found, err := exec.LookPath(options.Ngspice)",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "92b365d6d8095627",
+      "severity": "low",
+      "category": "security",
+      "title": "Download not restricted to HTTPS and not retried",
+      "message": "`--location` without `--proto` can follow a redirect to a non-HTTPS protocol. The SHA256 check blocks tampering, but a restricted protocol list is still cheap hardening. There is also no retry, so a transient SourceForge failure breaks the CI job.",
+      "suggestion": "Add `--proto '=https' --tlsv1.2` and a small `--retry`.",
+      "confidence": 0.3,
+      "locations": [
+        {
+          "path": "scripts/build-ngspice47.sh",
+          "lines": {
+            "start": 16,
+            "end": 16
+          }
+        }
+      ],
+      "tags": [
+        "supply-chain",
+        "ci",
+        "location-corrected"
+      ],
+      "evidence": "curl --fail --location --max-time 90 --output source.tar.gz \\",
+      "fix": {
+        "before": "curl --fail --location --max-time 90 --output source.tar.gz \\",
+        "after": "curl --fail --location --proto '=https' --tlsv1.2 --retry 3 --max-time 90 --output source.tar.gz \\"
+      },
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 40255,
+    "totalMs": 40356
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "coverage": {
+    "reviewer": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      }
+    ],
+    "files": 24,
+    "bytes": 89306,
+    "chunks": 1,
+    "llmCalls": 1,
+    "cacheHit": false,
+    "cachedChunks": 0,
+    "tokens": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "input": 43060,
+        "output": 5502,
+        "costUSD": 0.14114
+      }
+    ],
+    "excluded": [],
+    "truncatedBytes": 0,
+    "skipped": [],
+    "complete": true
+  },
+  "discarded": [],
+  "suppressed": []
+}

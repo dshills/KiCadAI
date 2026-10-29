@@ -30,7 +30,7 @@ func runSchematicAssistant(ctx context.Context, opts cliOptions, input io.Reader
 	}
 	command := opts.commandArgs[0]
 	if command == "list" && len(opts.commandArgs) == 1 {
-		return writeJSON(stdout, map[string]any{"families": []string{"divider", "rc-filter"}, "input_v": []float64{0.1, 24}, "resistance_ohms": []float64{1000, 1e6}, "power_budget_w": schematicassistant.PowerBudget, "api_required": false, "hardware_validated": false})
+		return writeJSON(stdout, map[string]any{"families": schematicassistant.Families(), "input_v": []float64{schematicassistant.InputMin, schematicassistant.InputMax}, "resistance_ohms": []float64{schematicassistant.ResistanceMin, schematicassistant.ResistanceMax}, "power_budget_w": schematicassistant.PowerBudget, "api_required": false, "hardware_validated": false})
 	}
 	if command == "verify" && len(opts.commandArgs) == 1 {
 		if strings.TrimSpace(opts.target) == "" {

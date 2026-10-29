@@ -1,0 +1,138 @@
+{
+  "schema": "kicadai.trusted-simulation-report.v2",
+  "registry_version": "kicadai.trusted-simulation-registry.v1",
+  "registry_hash": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "catalog_id": "conformance-ideal-passives-v1",
+  "catalog_hash": "34d0a6be649cbf4c76a9411fecdb94f959ff38df2d9bb6e29838907605268261",
+  "model_id": "linear_circuit_mna_v1",
+  "bindings": null,
+  "inputs": null,
+  "ground_node": "GND",
+  "nodes": [
+    "GND",
+    "OUT",
+    "VIN"
+  ],
+  "devices": [
+    {
+      "component": "r1",
+      "catalog_id": "conformance.resistor",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "VIN"
+        },
+        {
+          "terminal": "B",
+          "net": "OUT"
+        }
+      ]
+    },
+    {
+      "component": "r2",
+      "catalog_id": "conformance.resistor",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "OUT"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "source",
+      "catalog_id": "conformance.voltage_source",
+      "family": "voltage_source",
+      "primitive_model": "mna_voltage_source_v1",
+      "terminals": [
+        {
+          "terminal": "POSITIVE",
+          "net": "VIN"
+        },
+        {
+          "terminal": "NEGATIVE",
+          "net": "GND"
+        }
+      ]
+    }
+  ],
+  "topology_hash": "f4e9c7753a366cbe5c773ca8971fa5840f485e86716e7af1454b571916a4d8db",
+  "analyses": [
+    {
+      "id": "comparison",
+      "kind": "dc_operating_point",
+      "points": [
+        {
+          "nodes": [
+            {
+              "node": "GND",
+              "real": 0,
+              "imaginary": 0,
+              "magnitude": 0,
+              "phase_deg": 0
+            },
+            {
+              "node": "OUT",
+              "real": 2.5,
+              "imaginary": 0,
+              "magnitude": 2.5,
+              "phase_deg": 0
+            },
+            {
+              "node": "VIN",
+              "real": 5,
+              "imaginary": 0,
+              "magnitude": 5,
+              "phase_deg": 0
+            }
+          ],
+          "devices": [
+            {
+              "component": "r1",
+              "voltage_v": 2.5,
+              "current_a": 0.00025,
+              "current_magnitude_a": 0.00025,
+              "dissipation_w": 0
+            },
+            {
+              "component": "r2",
+              "voltage_v": 2.5,
+              "current_a": 0.00025,
+              "current_magnitude_a": 0.00025,
+              "dissipation_w": 0
+            },
+            {
+              "component": "source",
+              "voltage_v": 5,
+              "current_a": -0.00025,
+              "current_magnitude_a": 0.00025,
+              "dissipation_w": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "measurements": null,
+  "assertions": [
+    {
+      "analysis_id": "comparison",
+      "node": "OUT",
+      "quantity": "voltage_v",
+      "min": 0,
+      "max": 5,
+      "actual": 2.5,
+      "pass": true
+    }
+  ],
+  "status": "pass"
+}

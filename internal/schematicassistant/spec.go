@@ -18,6 +18,22 @@ import (
 const Schema = "kicadai.schematic-assistant.v1"
 const MaxInputBytes = 64 << 10
 const PowerBudget = 0.125
+const InputMin = 0.1
+const InputMax = 24.0
+const ResistanceMin = 1000.0
+const ResistanceMax = 1e6
+const LoadMax = 1e9
+const CapacitanceMin = 1e-12
+const CapacitanceMax = 1e-3
+
+func Families() []string { return []string{"divider", "rc-filter"} }
+func SupportedLimits(family string) []string {
+	limits := []string{fmt.Sprintf("Input: %g–%g V; R1/R2: %g–%g ohms", InputMin, InputMax, ResistanceMin, ResistanceMax), fmt.Sprintf("Load: %g–%g ohms, or 0 for explicitly unloaded (not shorted)", ResistanceMin, LoadMax), fmt.Sprintf("Predicted resistor dissipation <= %g W (workflow budget, not a qualified part rating)", PowerBudget)}
+	if family == "rc-filter" {
+		limits = append(limits, fmt.Sprintf("Capacitance: %g–%g F", CapacitanceMin, CapacitanceMax))
+	}
+	return limits
+}
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
 
@@ -75,26 +91,26 @@ func Questions(s Spec) []Question {
 		p             *float64
 		min, max      float64
 	}{
-		{"input_v", "Maximum positive input voltage in V (0.1–24):", s.InputV, 0.1, 24},
-		{"r1_ohms", "R1 resistance in ohms (1k–1M; e.g. 10k):", s.R1, 1000, 1e6},
-		{"load_ohms", "Output load in ohms (1k–1G), or 0 for explicitly unloaded/high impedance:", s.Load, 0, 1e9},
+		{"input_v", "Maximum positive input voltage in V (0.1–24):", s.InputV, InputMin, InputMax},
+		{"r1_ohms", "R1 resistance in ohms (1k–1M; e.g. 10k):", s.R1, ResistanceMin, ResistanceMax},
+		{"load_ohms", "Output load in ohms (1k–1G), or 0 for explicitly unloaded/high impedance:", s.Load, 0, LoadMax},
 	}
 	if s.Family == "divider" {
 		numeric = append(numeric, struct {
 			field, prompt string
 			p             *float64
 			min, max      float64
-		}{"r2_ohms", "R2 resistance in ohms (1k–1M):", s.R2, 1000, 1e6})
+		}{"r2_ohms", "R2 resistance in ohms (1k–1M):", s.R2, ResistanceMin, ResistanceMax})
 	}
 	if s.Family == "rc-filter" {
 		numeric = append(numeric, struct {
 			field, prompt string
 			p             *float64
 			min, max      float64
-		}{"capacitance_f", "C1 capacitance in farads (1p–1m; e.g. 100n):", s.C, 1e-12, 1e-3})
+		}{"capacitance_f", "C1 capacitance in farads (1p–1m; e.g. 100n):", s.C, CapacitanceMin, CapacitanceMax})
 	}
 	for _, n := range numeric {
-		if n.p == nil || !finite(*n.p) || *n.p < n.min || *n.p > n.max || (n.field == "load_ohms" && *n.p > 0 && *n.p < 1000) {
+		if n.p == nil || !finite(*n.p) || *n.p < n.min || *n.p > n.max || (n.field == "load_ohms" && *n.p > 0 && *n.p < ResistanceMin) {
 			q = append(q, Question{n.field, n.prompt})
 		}
 	}

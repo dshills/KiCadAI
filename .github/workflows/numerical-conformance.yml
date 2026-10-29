@@ -1,0 +1,58 @@
+name: Numerical conformance
+
+on:
+  pull_request:
+    paths:
+      - 'internal/simmodel/**'
+      - 'internal/numericalconformance/**'
+      - 'internal/evidencebundle/**'
+      - 'internal/schematicassistant/runner.go'
+      - 'cmd/kicadai/**'
+      - 'scripts/build-ngspice47.sh'
+      - '.github/workflows/numerical-conformance.yml'
+      - 'Makefile'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main]
+    paths:
+      - 'internal/simmodel/**'
+      - 'internal/numericalconformance/**'
+      - 'internal/evidencebundle/**'
+      - 'internal/schematicassistant/runner.go'
+      - 'cmd/kicadai/**'
+      - 'scripts/build-ngspice47.sh'
+      - '.github/workflows/numerical-conformance.yml'
+      - 'Makefile'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build SHA256 pinned headless ngspice 47
+        run: bash scripts/build-ngspice47.sh "$RUNNER_TEMP/ngspice47"
+      - name: Compare production Go solver with analytical equations and ngspice
+        run: make numerical-conformance
+        env:
+          NGSPICE: ${{ runner.temp }}/ngspice47/install/bin/ngspice
+          CONFORMANCE_OUTPUT: ${{ runner.temp }}/conformance-evidence
+      - name: Retain observations including failed comparisons
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: numerical-conformance-${{ github.sha }}
+          path: ${{ runner.temp }}/conformance-evidence
+          if-no-files-found: warn
+          retention-days: 14
