@@ -36,6 +36,14 @@ linters:
         text: Error return value of `.*\.Close` is not checked
         linters:
           - errcheck
+      # These two read/write-error cleanup calls are in checksum-frozen audit
+      # sources (branch-review-scope.json and publication-inventory.json).
+      # Preserve their published bytes; do not exempt successor audit files
+      # or any other error checks in these files.
+      - path: ^specs/(practical-board-completion-v1/engine/main\.go|ai-requirement-contract-integration/publication-live-v1/replay-audit/main\.go)$
+        text: ^Error return value of `f\.Close` is not checked$
+        linters:
+          - errcheck
       # These findings are in checksum-frozen V9/V10 evidence-chain files.
       # Mutating their bytes would invalidate published corpus and baseline
       # commitments. Keep the exclusions exact; successor versions must fix

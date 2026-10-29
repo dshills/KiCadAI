@@ -1,7 +1,9 @@
 .DEFAULT_GOAL := help
 
 # Use the same exact security-patched toolchain as CI and release builds.
-GOTOOLCHAIN ?= go$(shell awk '$$1 == "go" { print $$2 }' go.mod)
+# go.mod retains its historical minimum because published evaluator seals
+# authenticate its exact bytes; .go-version is the maintained build pin.
+GOTOOLCHAIN ?= go$(shell tr -d '[:space:]' < .go-version)
 export GOTOOLCHAIN
 
 .PHONY: security-check
@@ -72,6 +74,8 @@ help:
 	@printf "KiCadAI targets:\n"
 	@printf "  make security-check  Check reachable vulnerabilities (requires network)\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
+	@printf "  make numerical-conformance Compare Go/analytical/ngspice 47 (set NGSPICE)\n"
+	@printf "  make install-experience Exercise relocated binary and portable offline workflows\n"
 	@printf "  make board-family    Build bounded ESP32/BMP280 family CLI\n"
 	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
 	@printf "  make release         Build versioned macOS/Linux release artifacts\n"
@@ -108,6 +112,19 @@ help:
 build:
 	mkdir -p "$(BIN_DIR)"
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
+
+.PHONY: numerical-conformance
+ifndef CONFORMANCE_OUTPUT
+CONFORMANCE_OUTPUT := $(CURDIR)/.tmp/numerical-conformance-$(shell date -u +%Y%m%dT%H%M%SZ)
+endif
+numerical-conformance: build
+	@test -n "$(NGSPICE)" || (echo 'Set NGSPICE to the pinned ngspice 47 executable' >&2; exit 2)
+	"$(BIN)" --ngspice "$(NGSPICE)" --output "$(CONFORMANCE_OUTPUT)" conformance run
+	"$(BIN)" --target "$(CONFORMANCE_OUTPUT)" conformance verify
+
+.PHONY: install-experience
+install-experience: build
+	bash scripts/install-experience-smoke.sh "$(BIN)"
 
 .PHONY: board-family
 board-family:
@@ -247,7 +264,7 @@ lint:
 	./scripts/check-go-format.sh
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go vet ./...
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOLANGCI_LINT_CACHE="$(GOLANGCI_LINT_CACHE)" golangci-lint run ./cmd/... ./internal/...; \
+		GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOLANGCI_LINT_CACHE="$(GOLANGCI_LINT_CACHE)" golangci-lint run ./...; \
 	else \
 		printf "golangci-lint not installed; skipped optional lint pass\n"; \
 	fi

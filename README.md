@@ -184,16 +184,38 @@ that arbitrary dense boards are supported.
 
 ## Run It In Under Ten Minutes
 
+For a small schematic-first workflow that needs no API key, try:
+
+```sh
+make build
+bin/kicadai --output ./out/divider schematic example divider
+bin/kicadai --output ./out/my-session schematic new
+```
+
+Open the generated `report.html` for component explanations, calculations and
+explicit check statuses. Add `--require-erc` before `schematic` to require native
+KiCad validation. See the [guided schematic workflow](docs/schematic-assistant.md).
+This produces a schematic candidate, not a board or fabrication approval.
+
+Discover supported workflows with `bin/kicadai capability explore`. For bounded
+solver comparisons and compact failure replay, see
+[numerical conformance and reproduction](docs/numerical-conformance.md).
+
+For an existing schematic, use `review schematic`; use `doctor` to diagnose
+local dependencies. See [project review and local integrations](docs/project-review-and-integration.md)
+for catalog self-test kits and the versioned NetForm adapter.
+
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
-experimental for those claims. Source builds require Go 1.26.8 or newer;
+experimental for those claims. Supported source builds use the exact patched
+Go release in [`.go-version`](.go-version) (currently 1.26.10) through Make;
 `protoc` is needed only when regenerating vendored protobuf bindings. See the
 [v1 support contract](SUPPORT.md) and [v1.0.1 installation guide](docs/installation.md).
 v1.0.1 is a security maintenance release; existing v1.0.0 users should replace
 their binary, not merely update system Go.
 
 ```sh
-git clone --branch v1.0.1 https://github.com/dshills/KiCadAI.git
+git clone --branch main https://github.com/dshills/KiCadAI.git
 cd KiCadAI
 make public-demo
 ```

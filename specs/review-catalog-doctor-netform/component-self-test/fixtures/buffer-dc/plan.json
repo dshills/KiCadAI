@@ -1,0 +1,263 @@
+{
+  "registry_version": "kicadai.trusted-simulation-registry.v1",
+  "registry_hash": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "catalog_id": "quarantined-self-test",
+  "catalog_hash": "8a6c2c73eeae0fec5b2e89cb9e8944000bed9d8cf500166fb11420a74ff4ba58",
+  "model_id": "linear_circuit_mna_v1",
+  "bindings": null,
+  "inputs": null,
+  "ground_node": "GND",
+  "nodes": [
+    "5V",
+    "CONDITIONED_OUT",
+    "FILTER_1",
+    "FILTER_2",
+    "GND",
+    "SIGNAL_IN"
+  ],
+  "devices": [
+    {
+      "component": "buffer",
+      "catalog_id": "opamp.example.ax101.sot23_5",
+      "family": "opamp",
+      "primitive_model": "mna_opamp_single_pole_v1",
+      "model_parameters": [
+        {
+          "name": "dc_open_loop_gain",
+          "value": 100000
+        },
+        {
+          "name": "gain_bandwidth_hz",
+          "value": 1000000
+        },
+        {
+          "name": "input_voltage_noise_density_v_sqrt_hz",
+          "value": 3.9e-8
+        },
+        {
+          "name": "junction_to_ambient_c_per_w",
+          "value": 232.9
+        },
+        {
+          "name": "max_temperature_c",
+          "value": 150
+        },
+        {
+          "name": "output_high_margin_v",
+          "value": 0.12
+        },
+        {
+          "name": "output_low_margin_v",
+          "value": 0.065
+        },
+        {
+          "name": "quiescent_current_a",
+          "value": 0.00035
+        },
+        {
+          "name": "supply_max_v",
+          "value": 5.5
+        },
+        {
+          "name": "supply_min_v",
+          "value": 2.7
+        }
+      ],
+      "terminals": [
+        {
+          "terminal": "IN_PLUS",
+          "net": "FILTER_2"
+        },
+        {
+          "terminal": "IN_MINUS",
+          "net": "CONDITIONED_OUT"
+        },
+        {
+          "terminal": "OUT",
+          "net": "CONDITIONED_OUT"
+        },
+        {
+          "terminal": "V_PLUS",
+          "net": "5V"
+        },
+        {
+          "terminal": "V_MINUS",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "section_1_capacitor",
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "primitive_model": "mna_capacitor_v1",
+      "value_si": 1e-8,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "FILTER_1"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "section_1_resistor",
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "SIGNAL_IN"
+        },
+        {
+          "terminal": "B",
+          "net": "FILTER_1"
+        }
+      ]
+    },
+    {
+      "component": "section_2_capacitor",
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "primitive_model": "mna_capacitor_v1",
+      "value_si": 1e-8,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "FILTER_2"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "section_2_resistor",
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "primitive_model": "mna_resistor_v1",
+      "value_si": 10000,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "FILTER_1"
+        },
+        {
+          "terminal": "B",
+          "net": "FILTER_2"
+        }
+      ]
+    },
+    {
+      "component": "signal_source",
+      "catalog_id": "source.voltage.connector.1x02",
+      "family": "voltage_source",
+      "primitive_model": "mna_voltage_source_v1",
+      "terminals": [
+        {
+          "terminal": "POSITIVE",
+          "net": "SIGNAL_IN"
+        },
+        {
+          "terminal": "NEGATIVE",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "supply_decoupling",
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "primitive_model": "mna_capacitor_v1",
+      "value_si": 1e-7,
+      "terminals": [
+        {
+          "terminal": "A",
+          "net": "5V"
+        },
+        {
+          "terminal": "B",
+          "net": "GND"
+        }
+      ]
+    },
+    {
+      "component": "supply_source",
+      "catalog_id": "source.voltage.connector.1x02",
+      "family": "voltage_source",
+      "primitive_model": "mna_voltage_source_v1",
+      "terminals": [
+        {
+          "terminal": "POSITIVE",
+          "net": "5V"
+        },
+        {
+          "terminal": "NEGATIVE",
+          "net": "GND"
+        }
+      ]
+    }
+  ],
+  "topology_hash": "23be2b8fa61087c6ec8f118691c02e311176baf1b3a525549078492eb4d69aae",
+  "analyses": [
+    {
+      "id": "operating_point",
+      "kind": "dc_operating_point",
+      "excitations": [
+        {
+          "component": "signal_source",
+          "dc_value": 2
+        },
+        {
+          "component": "supply_source",
+          "dc_value": 5
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "analysis_id": "operating_point",
+      "node": "5V",
+      "quantity": "voltage_v",
+      "min": 4.99,
+      "max": 5.01
+    },
+    {
+      "analysis_id": "operating_point",
+      "node": "CONDITIONED_OUT",
+      "quantity": "voltage_v",
+      "min": 1.99,
+      "max": 2.01
+    }
+  ],
+  "uncertainties": [
+    {
+      "target": "devices.section_1_capacitor.value_si",
+      "source": "catalog:capacitor.ceramic.0603:capacitance_tolerance",
+      "nominal": 1e-8,
+      "minimum": 8e-9,
+      "maximum": 1.2e-8
+    },
+    {
+      "target": "devices.section_2_capacitor.value_si",
+      "source": "catalog:capacitor.ceramic.0603:capacitance_tolerance",
+      "nominal": 1e-8,
+      "minimum": 8e-9,
+      "maximum": 1.2e-8
+    },
+    {
+      "target": "devices.supply_decoupling.value_si",
+      "source": "catalog:capacitor.ceramic.0603:capacitance_tolerance",
+      "nominal": 1e-7,
+      "minimum": 8e-8,
+      "maximum": 1.2e-7
+    }
+  ]
+}

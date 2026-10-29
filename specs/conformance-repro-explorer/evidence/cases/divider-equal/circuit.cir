@@ -1,0 +1,16 @@
+KiCadAI frozen conformance divider-equal
+V1 vin 0 DC 5 AC 1
+R1 vin out 10000
+R2 out 0 10000
+.options reltol=1e-9 abstol=1e-12 vntol=1e-10
+.control
+set noaskquit
+set numdgt=17
+op
+let observed_real=v(out)
+let observed_imag=0
+print observed_real
+print observed_imag
+quit
+.endc
+.end

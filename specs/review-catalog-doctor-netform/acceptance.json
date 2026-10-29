@@ -1,0 +1,133 @@
+{
+  "schema": "kicadai.items-7-10.acceptance.v1",
+  "date": "2026-10-29",
+  "status": "local_acceptance_passed",
+  "base_commit": "c4e21144471cd67b87bc6993f76ae0a26ab73cce",
+  "branch": "codex/review-catalog-doctor-netform",
+  "delivered": {
+    "item7": "Read-only multi-sheet schematic review, bounded snapshots, beginner HTML and JSON, unsupported-content reporting, optional native ERC, source-preservation and portable verification.",
+    "item8": "Quarantined component self-test kits: document/pin-map/ratings/model-provenance revalidation, candidate-bound regression circuits, failure evidence and integrity verification. No real manufacturer record was added or promoted.",
+    "item9": "Consolidated doctor, expanded relocated release smoke and macOS/Linux CI; existing offline board-family generation/checks/portable bundles exposed in the main binary.",
+    "item10": "Versioned one-shot NetForm CLI/JSON protocol plus standalone Rust 1.99 reference client, actually tested against the CLI. GUI wiring and NetForm's simulation engine remain separate."
+  },
+  "checks": [
+    {
+      "command": "make test-fast",
+      "result": "passed on final source",
+      "scope": "Existing short developer-feedback tier, retaining its six documented expensive-case skips; not exhaustive release testing."
+    },
+    {
+      "command": "make lint",
+      "result": "passed; 0 issues"
+    },
+    {
+      "command": "KICADAI_RUN_KICAD_CLI=1 go test -race ./internal/schematicreview ./internal/environmentdoctor ./internal/netformbridge ./internal/componentonboarding ./internal/capabilityexplorer ./cmd/kicadai -run 'TestSchematicReview|TestDoctor|TestNetForm|TestComponentSelfTest|TestExplorer|TestProductWorkflow|TestOfflineFamily|TestDiagnosticCLI|TestReproNativeReplay' -count=1",
+      "toolchain": "go1.26.8",
+      "result": "passed including actual native KiCad review"
+    },
+    {
+      "command": "component self-test with installed KiCad symbol/footprint roots and a synthetic quarantined candidate",
+      "result": "passed; candidate_validation=checked, buffer-dc passed and candidate remained quarantined",
+      "evidence": "component-self-test/report.json",
+      "note": "Synthetic Example Analog AX101 is a software test fixture, not a real manufacturer qualification or supported-catalog addition."
+    },
+    {
+      "command": "component self-test verify on relocated saved bundle",
+      "result": "passed; integrity only, not a simulation rerun or independent attestation"
+    },
+    {
+      "command": "review schematic --require-erc and review verify",
+      "result": "passed; native_erc=checked, source_unchanged=true; original schematic bundle integrity also verified",
+      "evidence": "schematic-review/report.json"
+    },
+    {
+      "command": "make install-experience",
+      "result": "passed with a relocated executable, empty working directory, clean environment, relocated symbol libraries, schematic/review bundles, adapter and board-family bundle"
+    },
+    {
+      "command": "KICADAI_ADAPTER_BIN=<current CLI> cargo test --locked --offline; cargo fmt --all --check; cargo clippy --all-targets --locked --offline -- -D warnings",
+      "result": "3 Rust tests passed, including actual CLI subprocess round trips; formatting and clippy passed",
+      "scope": "Standalone integrations/netform-client crate, not the NetForm GUI"
+    },
+    {
+      "command": "GOTOOLCHAIN=go1.26.8 GOCACHE=<project cache> GOMODCACHE=<project modules> ALLOW_DIRTY_RELEASE=1 OUTPUT_DIR=.cache/items-7-10-release-final bash scripts/build-release.sh",
+      "result": "built darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64",
+      "qualification": "Development snapshot using explicit dirty-build override: release-format test candidates, not publishable release evidence. Candidate manifest parent revision is not a clean-source claim."
+    },
+    {
+      "command": "bash scripts/release-smoke-test.sh <final darwin/arm64 release-format candidate>",
+      "result": "passed including expanded install-experience smoke"
+    },
+    {
+      "command": "bash -n scripts/install-experience-smoke.sh scripts/release-smoke-test.sh; Ruby YAML parse; git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "Compare NetForm git status before and after",
+      "result": "pre-existing staged/unstaged P2 work remains unchanged; no NetForm checkout files were edited"
+    }
+  ],
+  "review": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5",
+    "runs": [
+      {
+        "run_id": "a9e64abb82d9003330f19531a6d2eaed",
+        "files": 29,
+        "complete": true,
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      {
+        "run_id": "8bd69e46fb9153b3031a55c4d6ab795d",
+        "files": 30,
+        "complete": true,
+        "high": 0,
+        "medium": 0,
+        "low": 2
+      }
+    ],
+    "excluded": "Cargo.lock excluded by Prism's lockfile policy; locked Cargo build/test/clippy validated the dependency graph.",
+    "provider_reported_cost_usd": 0.326022,
+    "dispositions": [
+      {
+        "id": "b997c0d050e1b158",
+        "result": "fixed using typed ErrorKind::BrokenPipe; still reads structured stdout response; regression test covers BrokenPipe and a distinct I/O failure"
+      },
+      {
+        "id": "557c3e19f01b8995",
+        "result": "fixed: family verification rejects native/hardware approval claims and invalid configurations, recomputes bounded equations with 1e-9 numerical allowance, and reports offline_report_consistent; rehashed negative controls cover all cases"
+      },
+      {
+        "id": "92ac3b67e48d53de",
+        "result": "fixed: purpose inference matches exact alphabetic designators; CN/CR/RV/RT/RN and non-ASCII unknowns retain the explicit unknown-purpose fallback; regression tests"
+      }
+    ],
+    "final_correction_scope": "Final two low-severity fixes were regression/race/lint-tested locally after the second review. Generated acceptance evidence was verified locally, not submitted as another model-review campaign."
+  },
+  "negative_controls": [
+    "output overwrite and output-in-source rejection, including symlinked parents",
+    "hierarchy traversal, oversized sources, cancellation and source integrity",
+    "HTML escaping and exact reference-prefix matching",
+    "missing/wrong required KiCad reference",
+    "oversized/unknown/incompatible adapter requests, parameters, methods, responses and identities",
+    "stale candidate kit identity, fabricated source, corrupt pin maps/model provenance, and failing numerical assertions",
+    "rehashed family reports claiming native/hardware approval, invalid configuration or wrong bounded calculations",
+    "Rust stdin broken-pipe handling and contradictory response envelopes"
+  ],
+  "development_failures": [
+    "Initial API wiring referenced a nonexistent evaluator context overload and resolver index field; corrected to existing APIs before acceptance.",
+    "The first candidate regression retained original manufacturer constraints after substitution with a synthetic candidate; corrected the fixture, not the validator.",
+    "The first direct release script invocation attempted the default external Go cache and was sandbox-blocked; reran with pinned toolchain and project-local caches into new output directories."
+  ],
+  "limitations": [
+    "Software acceptance only; no physical validation, manufacturing approval, hardware order, new supported manufacturer part, or fabricated independent approval.",
+    "New macOS/Linux CI workflow is configured and syntax-checked, not executed remotely. All four targets cross-compiled; only the current macOS ARM64 host binary was executed here.",
+    "The NetForm GUI and its existing uncommitted checkout are untouched; the adapter/reference client is ready for separate integration.",
+    "HTML content/escaping was tested; browser visual QA was not performed.",
+    "Native review omits source-project exclusions, overrides and external libraries; internal review is per-sheet and unsupported constructs stay visible.",
+    "No live circuit-generation API calls were deliberately made. The two normal Prism reviews used Anthropic.",
+    "No push, PR, merge, release publication, system package installation or firewall changes."
+  ]
+}

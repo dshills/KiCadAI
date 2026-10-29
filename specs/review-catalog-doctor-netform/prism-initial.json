@@ -1,0 +1,100 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "a9e64abb82d9003330f19531a6d2eaed",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "c4e21144471cd67b87bc6993f76ae0a26ab73cce",
+    "branch": "codex/review-catalog-doctor-netform"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 1,
+      "medium": 0,
+      "high": 0
+    },
+    "highestSeverity": "low"
+  },
+  "findings": [
+    {
+      "id": "b997c0d050e1b158",
+      "severity": "low",
+      "category": "bug",
+      "title": "Stdin write failure masks the adapter's real error response",
+      "message": "A stdin write error aborts the call before the child's response is read. If the adapter exits early without reading stdin, the write can fail with EPIPE (BrokenPipe), and the caller sees an opaque I/O error instead of the structured protocol error already on stdout. A request near the 64 KiB limit makes this more likely.",
+      "suggestion": "Treat BrokenPipe from the stdin writer as non-fatal and still parse the child's stdout and exit status. A cleaner fix is to have the writer thread send the io::Error and match on ErrorKind::BrokenPipe, not on the message text.",
+      "confidence": 0.3,
+      "locations": [
+        {
+          "path": "integrations/netform-client/src/lib.rs",
+          "lines": {
+            "start": 136,
+            "end": 136
+          }
+        }
+      ],
+      "tags": [
+        "rust",
+        "subprocess",
+        "error-handling",
+        "location-corrected"
+      ],
+      "evidence": "receive(writer, deadline)?;",
+      "fix": {
+        "before": "receive(writer, deadline)?;",
+        "after": "match receive(writer, deadline) {\n        Ok(()) => {}\n        Err(error) if error.to_lowercase().contains(\"broken pipe\") => {}\n        Err(error) => return Err(error),\n    }"
+      },
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 36106,
+    "totalMs": 36194
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "coverage": {
+    "reviewer": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      }
+    ],
+    "files": 29,
+    "bytes": 114339,
+    "chunks": 1,
+    "llmCalls": 1,
+    "cacheHit": false,
+    "cachedChunks": 0,
+    "tokens": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "input": 52571,
+        "output": 4533,
+        "costUSD": 0.150472
+      }
+    ],
+    "excluded": [
+      {
+        "path": "integrations/netform-client/Cargo.lock",
+        "reason": "lockfile"
+      }
+    ],
+    "truncatedBytes": 0,
+    "skipped": [],
+    "complete": true
+  },
+  "discarded": [],
+  "suppressed": []
+}

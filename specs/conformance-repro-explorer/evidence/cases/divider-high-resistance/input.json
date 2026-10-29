@@ -1,0 +1,10 @@
+{
+  "id": "divider-high-resistance",
+  "kind": "dc",
+  "vin": 0.1,
+  "r1_ohms": 1000000,
+  "r2_ohms": 1000,
+  "capacitance_f": 0,
+  "load_ohms": 1000000000,
+  "frequency_ratio": 0
+}

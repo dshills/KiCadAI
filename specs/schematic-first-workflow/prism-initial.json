@@ -1,0 +1,122 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "751fdf38ce9495601ecc4a3c945e7ff2",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "b696e1afa784018df15e943cf50d9b00e9e9779b",
+    "branch": "codex/schematic-first-workflow"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 0,
+      "medium": 1,
+      "high": 0
+    },
+    "highestSeverity": "medium"
+  },
+  "findings": [
+    {
+      "id": "229ddc167f50f086",
+      "severity": "medium",
+      "category": "bug",
+      "title": "Session is loaded before the session lock is taken",
+      "message": "On resume, session.json is loaded before the lock is acquired. A concurrent resumption can save newer answers between the load and the lock. This process then runs the wizard on stale data and overwrites session.json with it, which defeats the lock's stated purpose.",
+      "suggestion": "Acquire the lock before loading session.json. For `resume`, lock first, then load. For `new`, lock right after creating the directory.",
+      "confidence": 0.5,
+      "locations": [
+        {
+          "path": "cmd/kicadai/schematic_assistant.go",
+          "lines": {
+            "start": 87,
+            "end": 96
+          }
+        }
+      ],
+      "tags": [
+        "concurrency",
+        "race"
+      ],
+      "evidence": "lock, err := atomicfile.AcquireLock(filepath.Join(opts.output, \".assistant-session.lock\"))",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 53394,
+    "totalMs": 53533
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "coverage": {
+    "reviewer": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      }
+    ],
+    "files": 13,
+    "bytes": 70674,
+    "chunks": 1,
+    "llmCalls": 1,
+    "cacheHit": false,
+    "cachedChunks": 0,
+    "tokens": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "input": 34751,
+        "output": 6820,
+        "costUSD": 0.137702
+      }
+    ],
+    "excluded": [],
+    "truncatedBytes": 0,
+    "skipped": [],
+    "complete": true
+  },
+  "discarded": [
+    {
+      "finding": {
+        "id": "977b3d3a1552154a",
+        "severity": "low",
+        "category": "bug",
+        "title": "CSP img-src 'self' may block the diagram when opened via file://",
+        "message": "The report is meant to be opened offline from a local directory, so it will normally load from file://. Some browsers (e.g. Chrome) do not match 'self' for file: URLs, so the diagram/SVG image may be blocked and the 'Understand the circuit' section would show no picture.",
+        "suggestion": "Allow file: images in the CSP (the report has no external content), or inline the SVG, and test by opening report.html from disk.",
+        "confidence": 0.35,
+        "locations": [
+          {
+            "path": "internal/schematicassistant/report.go",
+            "lines": {
+              "start": 12,
+              "end": 12
+            }
+          }
+        ],
+        "tags": [
+          "csp",
+          "offline-report"
+        ],
+        "evidence": "img-src 'self'; style-src 'unsafe-inline'",
+        "fix": {
+          "before": "img-src 'self'; style-src 'unsafe-inline'",
+          "after": "img-src 'self' file:; style-src 'unsafe-inline'"
+        },
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "reason": "quoted evidence not found in internal/schematicassistant/report.go"
+    }
+  ],
+  "suppressed": []
+}

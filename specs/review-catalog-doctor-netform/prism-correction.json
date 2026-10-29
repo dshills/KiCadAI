@@ -1,0 +1,120 @@
+{
+  "tool": "prism",
+  "version": "1.0",
+  "runId": "8bd69e46fb9153b3031a55c4d6ab795d",
+  "repo": {
+    "root": "/Users/dshills/Development/projects/KiCadAI",
+    "head": "c4e21144471cd67b87bc6993f76ae0a26ab73cce",
+    "branch": "codex/review-catalog-doctor-netform"
+  },
+  "inputs": {
+    "mode": "staged"
+  },
+  "summary": {
+    "counts": {
+      "low": 2,
+      "medium": 0,
+      "high": 0
+    },
+    "highestSeverity": "low"
+  },
+  "findings": [
+    {
+      "id": "557c3e19f01b8995",
+      "severity": "low",
+      "category": "correctness",
+      "title": "family verify ignores decoded report claims",
+      "message": "`family verify` decodes Configuration, Electrical, NativeChecksRun and HardwareValidated from the report but never uses them. Beyond bundle integrity, it only checks the schema string and that three files exist. A bundle whose family-report.json claims native_checks_run or hardware_validated true is accepted, and so is one whose configuration no longer passes boardfamily.Check. The output reports success without that semantic validation.",
+      "suggestion": "After decoding, reject the bundle if report.NativeChecksRun or report.HardwareValidated is true. Re-run boardfamily.Check(report.Configuration) and compare the result with report.Electrical before returning integrity_verified.",
+      "confidence": 0.4,
+      "locations": [
+        {
+          "path": "cmd/kicadai/product_workflows.go",
+          "lines": {
+            "start": 199,
+            "end": 201
+          }
+        }
+      ],
+      "tags": [
+        "verification",
+        "board-family",
+        "location-corrected"
+      ],
+      "evidence": "if report.Schema != \"kicadai.offline-board-family.v1\" {\n\t\t\treturn errors.New(\"unsupported family report\")\n\t\t}",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "92ac3b67e48d53de",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Reference-prefix purpose heuristic mislabels common designators",
+      "message": "The purpose text is chosen from only the first letter of the reference. Common designators such as CN1 (connector), RV1 (potentiometer), RT1 (thermistor), RN1 (resistor network) and CR1 (diode) would be described as a capacitor or plain resistor. The report is meant to describe components accurately, so these labels mislead readers.",
+      "suggestion": "Match the designator's alphabetic prefix exactly. For example, extract the leading letters and compare against {R, C, U, J, TP}. Fall back to \"Purpose not inferred\" for everything else, including CN, RV, RT, RN and CR.",
+      "confidence": 0.55,
+      "locations": [
+        {
+          "path": "internal/schematicreview/review.go",
+          "lines": {
+            "start": 364,
+            "end": 374
+          }
+        }
+      ],
+      "tags": [
+        "heuristic",
+        "review"
+      ],
+      "evidence": "case strings.HasPrefix(ref, \"R\"):\n\t\treturn \"Resistor; may limit current, bias a node, divide voltage or set a time constant.\"\n\tcase strings.HasPrefix(ref, \"C\"):",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "timing": {
+    "gitMs": 0,
+    "llmMs": 51785,
+    "totalMs": 51865
+  },
+  "_provenance": [
+    {
+      "ai_generated": true,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ],
+  "coverage": {
+    "reviewer": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      }
+    ],
+    "files": 30,
+    "bytes": 118348,
+    "chunks": 1,
+    "llmCalls": 1,
+    "cacheHit": false,
+    "cachedChunks": 0,
+    "tokens": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "input": 54375,
+        "output": 6680,
+        "costUSD": 0.17555
+      }
+    ],
+    "excluded": [
+      {
+        "path": "integrations/netform-client/Cargo.lock",
+        "reason": "lockfile"
+      }
+    ],
+    "truncatedBytes": 0,
+    "skipped": [],
+    "complete": true
+  },
+  "discarded": [],
+  "suppressed": []
+}

@@ -1,0 +1,71 @@
+{
+  "schema": "kicadai.schematic-first-workflow.acceptance.v1",
+  "date": "2026-10-29",
+  "scope": [
+    "offline confirmed-specification divider and RC filter generation",
+    "resumable guided specification confirmation",
+    "guided bound behavioral clarification with recorded-only automatic resume",
+    "beginner-readable self-contained HTML reports and native KiCad bundles"
+  ],
+  "branch": "codex/schematic-first-workflow",
+  "checks": {
+    "focused_tests": "passed",
+    "race_tests": "passed",
+    "make_lint": "passed; 0 issues",
+    "make_test_fast": "passed on corrected production implementation",
+    "native_kicad": {
+      "version": "10.0.3",
+      "cases": [
+        "divider unloaded",
+        "divider 10k load",
+        "RC filter unloaded",
+        "RC filter 10k load"
+      ],
+      "erc": "passed, all severities",
+      "native_svg": "passed",
+      "artifact_integrity": "passed"
+    },
+    "determinism": "native schematic and project bytes match across repeated offline generation",
+    "browser_visual_qa": "unverified; local file browser URL blocked by policy, no workaround attempted"
+  },
+  "review": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5",
+    "initial_run": "751fdf38ce9495601ecc4a3c945e7ff2",
+    "correction_run": "b53c9357065c29170812115e390bedcf",
+    "coverage": "both complete; one chunk each; zero skipped/truncated bytes",
+    "findings": [
+      {
+        "id": "229ddc167f50f086",
+        "status": "fixed; session lock now acquired before reading; dedicated regression test"
+      },
+      {
+        "id": "5a44bb1bee346d8a",
+        "status": "fixed; answer workspace uses existing atomicdir.Publish; original compilation preserved"
+      },
+      {
+        "id": "aced3b6fc2a6b9d0",
+        "status": "fixed; filtered environment always non-nil; credential-only and empty-environment tests"
+      }
+    ],
+    "reported_total_cost_usd": 0.266526,
+    "note": "Provider usage as reported by Prism, not independent billing verification. Final fixes locally retested; no repeated review-to-zero loop."
+  },
+  "implementation_notes": [
+    "Uses existing schematic IR, transaction writer, evaluator, native ERC adapter, atomicfile and atomicdir helpers.",
+    "HTML preview embedded as base64 SVG with data-only image CSP; no external scripts/fonts/network.",
+    "No fabrication approval, hardware ordering, physical validation claim, catalog expansion, or frozen campaign rerun.",
+    "Initial fast/lint attempts exposed a bounded-reader variable redeclaration during development; corrected and rerun successfully.",
+    "Documentation writing guidance kept workflow instructions in repository documentation."
+  ],
+  "reproduction": [
+    "make build",
+    "make test-fast",
+    "make lint",
+    "GOTOOLCHAIN=go1.26.8 go test -race ./internal/schematicassistant ./cmd/kicadai -run 'TestAssistant|TestSchematicAssistant|TestIntentClarify' -count=1",
+    "KICADAI_RUN_KICAD_CLI=1 GOTOOLCHAIN=go1.26.8 go test ./internal/schematicassistant -run TestAssistantNativeKiCad -count=1 -v",
+    "bin/kicadai --output ./out/divider --require-erc schematic example divider",
+    "bin/kicadai --output ./out/my-session schematic new",
+    "bin/kicadai --target ./out/divider schematic verify"
+  ]
+}

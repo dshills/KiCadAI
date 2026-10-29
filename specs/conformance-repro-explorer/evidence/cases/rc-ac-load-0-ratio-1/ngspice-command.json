@@ -1,0 +1,10 @@
+{
+  "path": "/Users/dshills/Development/projects/KiCadAI/.cache/ngspice-47/install/bin/ngspice",
+  "args": [
+    "-n",
+    "-b",
+    "circuit.cir"
+  ],
+  "working_dir": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-conformance-1891534160",
+  "stdout": "\nNote: No compatibility mode selected!\n\n\nCircuit: kicadai frozen conformance rc-ac-load-0-ratio-1\n\nDoing analysis at TEMP = 27.000000 and TNOM = 27.000000\n\nUsing SPARSE 1.3 as Direct Linear Solver\n\nNo. of Data Rows : 1\nobserved_real = 5.00000000000000111e-01\nobserved_imag = -5.0000000000000000e-01\nngspice-47 done\n"
+}

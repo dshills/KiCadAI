@@ -1,0 +1,26 @@
+{
+  "schema": "kicadai.reproduction.v1",
+  "workflow": "schematic",
+  "input_sha256": "06516c1c22c8ffa3ef3003b4cd7c1faca09865267fcca5f17b0d671e121f11d4",
+  "registry_sha256": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "identity": {
+    "go": "go1.26.8",
+    "revision": "66cb10d6add875ef1dd36514b80526a100c5b13a",
+    "modified": "true",
+    "executable_sha256": "feaee117db41004cf9db20bbaa893fef0a0ededaf7f596ac2e38b086c779e224"
+  },
+  "status": "failed",
+  "first_failing_stage": "confirmation",
+  "error": "confirmation: specification is unconfirmed or changed; run schematic resume to confirm it",
+  "native_requested": false,
+  "minimization": "not_attempted: deleting passive devices would change the confirmed specification; one run, no retries",
+  "replay_argv": [
+    "kicadai",
+    "--target",
+    "BUNDLE",
+    "--output",
+    "NEW_OUTPUT",
+    "repro",
+    "replay"
+  ]
+}

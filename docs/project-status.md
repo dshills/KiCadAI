@@ -54,7 +54,8 @@ release acceptance.
 The published v1.0.1 security maintenance release packages the merged Go 1.26.8 and
 dependency updates, release provenance/input-validation fixes, and V21
 maintenance corrections without changing the supported v1 envelope. Source
-builds now require Go 1.26.8 or newer. The annotated release tag and published
+builds now use the patched Go pin in `.go-version` (currently 1.26.10) through
+Make; this does not replace published binaries. The annotated release tag and published
 checksummed artifacts were verified before the separate V21 maintenance
 evaluation began; that evaluation does not replace or rewrite release assets.
 See the [release notes](../RELEASE_NOTES.md).

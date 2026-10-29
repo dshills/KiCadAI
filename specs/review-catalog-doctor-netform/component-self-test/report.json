@@ -1,0 +1,25 @@
+{
+  "schema": "kicadai.component-test-kit.v1.report",
+  "status": "passed",
+  "candidate_sha256": "b0a3b39cad11945ecc93455536a6bddebfd95812d4bb39fdf7a0f2c92e51671c",
+  "candidate_status": "quarantined",
+  "registry_sha256": "a2ea8899e04217d8ef61a22e8dec70a2c37e650b948b3cf92903492595e3f16a",
+  "candidate_validation": "checked",
+  "fixtures": [
+    {
+      "id": "buffer-dc",
+      "status": "passed",
+      "stage": "complete",
+      "model_id": "linear_circuit_mna_v1",
+      "plan_sha256": "2851dbbe67e82daef376855890b93b6d45b7587e47a9fc0a5681d41a0674247e"
+    }
+  ],
+  "covered_components": [
+    "opamp.example.ax101.sot23_5"
+  ],
+  "limitations": [
+    "Software tests only; candidate remains quarantined. No promotion, independent approval, physical validation, ERC/DRC or fabrication approval is produced.",
+    "Pin functions, footprint pads, ratings, parameter bounds, excerpts and provenance are revalidated through the existing onboarding validator.",
+    "Only supplied bounded regression cases are exercised; assertions are authored test expectations, not independent proof of a manufacturer's model."
+  ]
+}

@@ -51,14 +51,16 @@ Windows is not an official release target. On macOS, follow your organization's
 normal policy for unsigned downloaded command-line tools; do not disable
 system-wide protections.
 
-## Building from the release source
+## Building from maintained source
 
-Source builds require Go 1.26.8 or newer, Git, and Make. Canonical Make targets
-select Go 1.26.8 from `go.mod` and may download that toolchain. `protoc` is needed
+Source builds require Go, Git, and Make. Canonical Make targets select the
+exact patched Go release from `.go-version` (currently 1.26.10) and may download
+that toolchain. The historical `go.mod` minimum is not the supported build pin;
+see [development toolchains](development.md#go-toolchain). `protoc` is needed
 only for protobuf regeneration.
 
 ```sh
-git clone --branch v1.0.1 https://github.com/dshills/KiCadAI.git
+git clone --branch main https://github.com/dshills/KiCadAI.git
 cd KiCadAI
 make install
 ```

@@ -63,7 +63,7 @@ Usage:
 
 Commands:
   capabilities  Report detected KiCad API capabilities
-  capability    Report generation contracts and manage evidence-driven capability expansion
+  capability    Explore workflows, render capability docs, or manage generation contracts
   config        Print resolved connection configuration
   documents     List open KiCad documents
   draw-led-demo Execute the LED indicator schematic plan when supported
@@ -89,6 +89,13 @@ Commands:
   route         Run PCB routing
   repair        Plan, export-bundle, or apply validation repair attempts
   schematic-ir  Validate, normalize, create transactions, or write schematic design IR
+  schematic     Guided offline passive-circuit schematics, reports, and verification
+  conformance   Compare Go simulation with analytical oracles and pinned ngspice
+  repro         Capture and replay bounded schematic failure evidence
+  review        Read-only existing-project schematic review and evidence verification
+  doctor        Diagnose embedded resources, library roots, and local KiCad availability
+  adapter       Versioned local CLI/JSON interface for NetForm (one request)
+  family        Offline bounded board-family profiles, checks, generation, and verification
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -230,6 +237,7 @@ type cliOptions struct {
 	output                      string
 	target                      string
 	requestPath                 string
+	ngspice                     string
 	capabilityRegistry          string
 	intentText                  string
 	intentFile                  string
@@ -416,6 +424,20 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runRepairCommand(opts, stdout)
 	case "schematic-ir":
 		return runSchematicIRContext(ctx, opts, stdout)
+	case "schematic":
+		return runSchematicAssistant(ctx, opts, os.Stdin, stdout, stderr)
+	case "conformance":
+		return runConformance(ctx, opts, stdout)
+	case "repro":
+		return runReproduction(ctx, opts, stdout)
+	case "review":
+		return runExistingReview(ctx, opts, stdout)
+	case "doctor":
+		return runDoctor(ctx, opts, stdout)
+	case "adapter":
+		return runAdapter(ctx, opts, os.Stdin, stdout)
+	case "family":
+		return runOfflineFamily(opts, stdout)
 	case "transaction":
 		return runTransactionContext(ctx, opts, stdout)
 	case "export":
@@ -463,6 +485,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
 	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
 	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
+	flags.StringVar(&opts.ngspice, "ngspice", "", "explicit ngspice 47 executable for numerical conformance (no auto-discovery)")
 	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including behavioral-intent-v1 and generic-circuit-v1")
 	flags.StringVar(&opts.promotionReadiness, "promotion-readiness", "", "declared promotion readiness: expected_fail, candidate, pass, or blocked")
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
@@ -1733,6 +1756,8 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 	switch subcommand {
 	case "onboard":
 		return runComponentOnboard(ctx, opts, stdout, catalog)
+	case "self-test":
+		return runComponentSelfTest(ctx, opts, stdout, catalog)
 	case "promote":
 		return runComponentOnboardingPromote(ctx, opts, stdout, catalog)
 	case "overlay-validate":
@@ -2807,11 +2832,13 @@ type aiLaneStatus struct {
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: compile, draft, plan, explain, rationale, or create"})
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: compile, clarify, draft, plan, explain, rationale, or create"})
 	}
 	switch opts.commandArgs[0] {
 	case "compile":
 		return runBehavioralIntentCompile(ctx, opts, stdout)
+	case "clarify":
+		return runIntentClarify(ctx, opts, os.Stdin, stdout, os.Stderr)
 	case "draft":
 		return runIntentDraft(opts, stdout)
 	case "plan", "explain":

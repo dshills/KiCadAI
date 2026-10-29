@@ -1,0 +1,10 @@
+{
+  "id": "rc-ac-load-10000-ratio-1",
+  "kind": "ac",
+  "vin": 5,
+  "r1_ohms": 10000,
+  "r2_ohms": 0,
+  "capacitance_f": 1e-7,
+  "load_ohms": 10000,
+  "frequency_ratio": 1
+}

@@ -1,5 +1,21 @@
 # Development Reference
 
+## Go toolchain
+
+Use `make` for builds and checks: it selects the exact security-patched Go
+release in [`.go-version`](../.go-version), shared by CI and release jobs.
+For direct Go commands, first set:
+
+```sh
+export GOTOOLCHAIN="go$(tr -d '[:space:]' < .go-version)"
+```
+
+The `go.mod` minimum remains 1.26.8 because historical V21–V23 evaluator
+manifests authenticate its exact bytes. That is an audit-preservation
+constraint, not the supported build toolchain. Do not build or release with
+an unpatched 1.26.8 toolchain. A newer toolchain does not revalidate historical
+numerical results; their recorded environment and conclusions stay unchanged.
+
 Examples, package map, testing, protobuf maintenance, current limits, troubleshooting, and design direction.
 
 ## Release Builds
@@ -16,7 +32,7 @@ make release-reproducibility
 
 `make release` writes four CGO-free macOS/Linux AMD64/ARM64 binaries plus
 `RELEASE_MANIFEST.json` and `SHA256SUMS` to ignored `dist/`. The release
-workflow uses the Go 1.26.8 pin in `go.mod`, derives the build date from the tagged commit, verifies
+workflow uses the exact Go pin in `.go-version`, derives the build date from the tagged commit, verifies
 two byte-identical builds, smoke-tests the host binary, and publishes only a
 tag whose name exactly matches `VERSION`.
 
@@ -26,7 +42,7 @@ repository root, including when invoked from another directory. Maintainers may 
 `ALLOW_DIRTY_RELEASE=1` only to exercise packaging before a commit; artifacts
 built with that override are not publishable release evidence.
 
-Make targets use the exact Go patch recorded in `go.mod` by default. An explicit
+Make targets use the exact Go patch recorded in `.go-version` by default. An explicit
 `GOTOOLCHAIN` override is for compatibility experiments, not canonical release
 evidence. `make security-check` queries the public vulnerability database with
 a pinned scanner; it is intentionally separate from offline test gates.
