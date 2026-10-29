@@ -1,0 +1,15 @@
+Manufacturer: Example Analog
+Part number: AX101
+Family: opamp
+Supply voltage maximum: 5.5 V
+Operating temperature minimum: -40 C
+Operating temperature maximum: 125 C
+Footprint: Package_TO_SOT_SMD:SOT-23-5
+Pin IN_MINUS maps symbol 3 to package pad 3
+Pin IN_PLUS maps symbol 1 to package pad 1
+Pin OUT maps symbol 4 to package pad 4
+Pin V_MINUS maps symbol 2 to package pad 2
+Pin V_PLUS maps symbol 5 to package pad 5
+Derating: operating_voltage <= rated_voltage / 1.2
+Analytic model: mna_opamp_single_pole_v1
+Document revision: A

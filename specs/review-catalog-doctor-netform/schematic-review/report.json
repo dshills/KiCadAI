@@ -1,0 +1,146 @@
+{
+  "schema": "kicadai.schematic-review.v1",
+  "status": "reviewed",
+  "root_sheet": "divider.kicad_sch",
+  "sheets": [
+    {
+      "path": "divider.kicad_sch",
+      "sha256": "88febef41d51cbd5f297d3ab4ab1063b51d2558b1e61bc9a6ab10e864df316f3",
+      "inspection": {
+        "path": "divider.kicad_sch",
+        "format_version": "20260306",
+        "generator": "eeschema",
+        "symbol_count": 6,
+        "wire_count": 5,
+        "label_count": 2,
+        "junction_count": 2,
+        "no_connect_count": 0,
+        "sheet_count": 0,
+        "symbols": [
+          "#FLG01",
+          "#PWR01",
+          "R1",
+          "R2",
+          "TP1",
+          "TP2"
+        ],
+        "object_counts": {
+          "junction": 2,
+          "label": 2,
+          "lib_symbols": 4,
+          "no_connect": 0,
+          "raw_item": 0,
+          "sheet": 0,
+          "sheet_symbol": 1,
+          "symbol": 6,
+          "wire": 5
+        },
+        "inspection_depth": "structured",
+        "preservation": {
+          "status": "clean",
+          "scope": "imported",
+          "summary": {
+            "files": 1,
+            "preservation_only": 0,
+            "unsupported": 0
+          },
+          "files": [
+            {
+              "path": "divider.kicad_sch",
+              "kind": "schematic",
+              "ownership": "imported_user",
+              "mutability": "read_only"
+            }
+          ]
+        },
+        "issues": []
+      },
+      "evaluation": {
+        "target": "divider.kicad_sch",
+        "checks": [
+          {
+            "name": "imported_preservation",
+            "status": "passed",
+            "required": true
+          },
+          {
+            "name": "schematic_validation",
+            "status": "passed",
+            "required": true
+          },
+          {
+            "name": "schematic_electrical",
+            "status": "passed",
+            "required": true
+          }
+        ],
+        "issues": [],
+        "fabrication_ready": true,
+        "inspection_summary_present": true,
+        "preservation": {
+          "status": "clean",
+          "scope": "imported",
+          "summary": {
+            "files": 1,
+            "preservation_only": 0,
+            "unsupported": 0
+          },
+          "files": [
+            {
+              "path": "divider.kicad_sch",
+              "kind": "schematic",
+              "ownership": "imported_user",
+              "mutability": "read_only"
+            }
+          ]
+        }
+      },
+      "parts": [
+        {
+          "reference": "#FLG01",
+          "library": "power:PWR_FLAG",
+          "value": "PWR_FLAG",
+          "purpose": "Power or schematic-only marker."
+        },
+        {
+          "reference": "#PWR01",
+          "library": "power:GND",
+          "value": "GND",
+          "purpose": "Power or schematic-only marker."
+        },
+        {
+          "reference": "R1",
+          "library": "Device:R",
+          "value": "10000ohm",
+          "purpose": "Resistor; may limit current, bias a node, divide voltage or set a time constant."
+        },
+        {
+          "reference": "R2",
+          "library": "Device:R",
+          "value": "10000ohm",
+          "purpose": "Resistor; may limit current, bias a node, divide voltage or set a time constant."
+        },
+        {
+          "reference": "TP1",
+          "library": "Connector:TestPoint",
+          "value": "VIN 5 V",
+          "purpose": "External connection or observation point."
+        },
+        {
+          "reference": "TP2",
+          "library": "Connector:TestPoint",
+          "value": "VOUT",
+          "purpose": "External connection or observation point."
+        }
+      ]
+    }
+  ],
+  "native_erc": "checked",
+  "source_unchanged": true,
+  "limitations": [
+    "Read-only structural/electrical-rule review, not a design approval or physical validation.",
+    "Internal checks run per sheet. Cross-sheet electrical interpretation requires optional native ERC; project rule overrides/exclusions and external libraries are not imported.",
+    "Component purposes are conservative reference-prefix descriptions, not inferred functional correctness. No operating-point, tolerance, thermal, PCB or manufacturing checks are performed.",
+    "Unsupported and preservation-only constructs remain explicitly listed; passing supported checks does not assess those constructs."
+  ]
+}

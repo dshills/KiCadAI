@@ -15,25 +15,25 @@ if [ ! -x "$binary" ]; then
 	exit 1
 fi
 
-help_output=$($binary --help)
+help_output=$("$binary" --help)
 grep -Fq 'kicad-version Print connected KiCad version information' <<<"$help_output"
 
-version_output=$($binary --json version)
+version_output=$("$binary" --json version)
 grep -Fq '"name": "kicadai"' <<<"$version_output"
 grep -Fq "\"version\": \"$expected_version\"" <<<"$version_output"
 
-flag_output=$($binary --format text --version)
+flag_output=$("$binary" --format text --version)
 grep -Fq "kicadai $expected_version" <<<"$flag_output"
 
-capability_output=$($binary --format text capability generation)
+capability_output=$("$binary" --format text capability generation)
 grep -Fq 'generic-circuit-v1' <<<"$capability_output"
 grep -Fq 'not free-form or guaranteed for arbitrary' <<<"$capability_output"
 
-example_output=$($binary --format json --document release-smoke plan-led-demo)
+example_output=$("$binary" --format json --document release-smoke plan-led-demo)
 grep -Fq '"kind": "add_wire"' <<<"$example_output"
 
 set +e
-refusal_output=$($binary --format json \
+refusal_output=$("$binary" --format json \
 	--catalog-dir "$root/data/components" \
 	--request "$root/examples/circuit-graph/unsupported_unknown_component.json" \
 	circuit preflight)
@@ -46,4 +46,5 @@ fi
 grep -Fq '"ok": false' <<<"$refusal_output"
 grep -Fq '"code": "GRAPH_COMPONENT_UNRESOLVED"' <<<"$refusal_output"
 
+bash "$root/scripts/install-experience-smoke.sh" "$binary"
 printf 'release smoke test passed: %s\n' "$binary"

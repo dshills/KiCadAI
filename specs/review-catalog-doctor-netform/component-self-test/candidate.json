@@ -1,0 +1,558 @@
+{
+  "schema": "kicadai.component-onboarding-candidate.v1",
+  "policy_version": "evidence-backed-component-onboarding-v1",
+  "status": "quarantined",
+  "requirement": {
+    "schema": "kicadai.component-onboarding-request.v1",
+    "id": "low_voltage_buffer",
+    "family": "opamp",
+    "required_functions": [
+      "IN_MINUS",
+      "IN_PLUS",
+      "OUT",
+      "V_MINUS",
+      "V_PLUS"
+    ],
+    "required_ratings": [
+      {
+        "kind": "supply_voltage",
+        "value": "4",
+        "unit": "V"
+      }
+    ],
+    "required_temperature": {
+      "minimum_c": -20,
+      "maximum_c": 85
+    },
+    "required_analyses": [
+      "dc_operating_point"
+    ],
+    "allowed_packages": [
+      "sot23_5"
+    ],
+    "minimum_derating_ratio": 1.2
+  },
+  "documents": [
+    {
+      "id": "ax101.datasheet",
+      "kind": "manufacturer_datasheet",
+      "publisher": "Example Analog",
+      "locator": "https://example.invalid/ax101-datasheet",
+      "revision": "A",
+      "sha256": "f3d0e6bae53ff3c4555a37760853289eb50241083e629d0d53c2b7aa67c6404f",
+      "bytes": 528
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim.derating",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "derating.supply_voltage",
+      "value": "operating_voltage \u003c= rated_voltage / 1.2",
+      "excerpt": "Derating: operating_voltage \u003c= rated_voltage / 1.2",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.family",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "identity.family",
+      "value": "opamp",
+      "excerpt": "Family: opamp",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.manufacturer",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "identity.manufacturer",
+      "value": "Example Analog",
+      "excerpt": "Manufacturer: Example Analog",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.model",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "model.id",
+      "value": "mna_opamp_single_pole_v1",
+      "excerpt": "Analytic model: mna_opamp_single_pole_v1",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.mpn",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "identity.mpn",
+      "value": "AX101",
+      "excerpt": "Part number: AX101",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.package",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "package.footprint",
+      "value": "Package_TO_SOT_SMD:SOT-23-5",
+      "excerpt": "Footprint: Package_TO_SOT_SMD:SOT-23-5",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.pin.in_minus",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "pin.IN_MINUS",
+      "value": "3:3",
+      "excerpt": "Pin IN_MINUS maps symbol 3 to package pad 3",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.pin.in_plus",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "pin.IN_PLUS",
+      "value": "1:1",
+      "excerpt": "Pin IN_PLUS maps symbol 1 to package pad 1",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.pin.out",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "pin.OUT",
+      "value": "4:4",
+      "excerpt": "Pin OUT maps symbol 4 to package pad 4",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.pin.v_minus",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "pin.V_MINUS",
+      "value": "2:2",
+      "excerpt": "Pin V_MINUS maps symbol 2 to package pad 2",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.pin.v_plus",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "pin.V_PLUS",
+      "value": "5:5",
+      "excerpt": "Pin V_PLUS maps symbol 5 to package pad 5",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.provenance",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "provenance.revision",
+      "value": "A",
+      "excerpt": "Document revision: A",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.rating",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "rating.supply_voltage.max",
+      "value": "5.5",
+      "unit": "V",
+      "excerpt": "Supply voltage maximum: 5.5 V",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.temp.max",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "temperature.max",
+      "value": "125",
+      "unit": "C",
+      "excerpt": "Operating temperature maximum: 125 C",
+      "location": "section:test"
+    },
+    {
+      "id": "claim.temp.min",
+      "document_id": "ax101.datasheet",
+      "subject": "AX101",
+      "field": "temperature.min",
+      "value": "-40",
+      "unit": "C",
+      "excerpt": "Operating temperature minimum: -40 C",
+      "location": "section:test"
+    }
+  ],
+  "proposals": [
+    {
+      "record": {
+        "id": "opamp.example.ax101.sot23_5",
+        "family": "opamp",
+        "name": "Example AX101 single op-amp",
+        "generic": false,
+        "manufacturer": "Example Analog",
+        "mpn": "AX101",
+        "lifecycle": "active",
+        "tags": [
+          "analog",
+          "low_voltage",
+          "opamp",
+          "rail_to_rail",
+          "single",
+          "sot23_5"
+        ],
+        "ratings": [
+          {
+            "kind": "supply_current",
+            "max": "0.35",
+            "unit": "mA"
+          },
+          {
+            "kind": "supply_voltage",
+            "min": "2.7",
+            "max": "5.5",
+            "unit": "V"
+          }
+        ],
+        "temperature": {
+          "min": "-40",
+          "max": "125",
+          "unit": "C"
+        },
+        "symbols": [
+          {
+            "symbol_id": "Amplifier_Operational:LMV321",
+            "function_pins": [
+              {
+                "function": "IN_MINUS",
+                "symbol_pin": "3",
+                "electrical": "input",
+                "required": true
+              },
+              {
+                "function": "IN_PLUS",
+                "symbol_pin": "1",
+                "electrical": "input",
+                "required": true
+              },
+              {
+                "function": "OUT",
+                "symbol_pin": "4",
+                "electrical": "output",
+                "required": true
+              },
+              {
+                "function": "V_MINUS",
+                "symbol_pin": "2",
+                "electrical": "power_in",
+                "required": true
+              },
+              {
+                "function": "V_PLUS",
+                "symbol_pin": "5",
+                "electrical": "power_in",
+                "required": true
+              }
+            ],
+            "verification": {
+              "confidence": "verified",
+              "sources": [
+                "builtin_pinmap:Amplifier_Operational:LMV321",
+                "kicad-symbols:Amplifier_Operational:LMV321"
+              ],
+              "resolver_checked": false,
+              "pinmap_checked": true
+            }
+          }
+        ],
+        "packages": [
+          {
+            "id": "sot23_5",
+            "name": "SOT-23-5",
+            "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+            "package_type": "sot23_5",
+            "mpn": "AX101",
+            "lifecycle": "active",
+            "pinmap_id": "Amplifier_Operational:LMV321|Package_TO_SOT_SMD:SOT-23-5",
+            "pad_functions": [
+              {
+                "function": "IN_MINUS",
+                "pad": "3"
+              },
+              {
+                "function": "IN_PLUS",
+                "pad": "1"
+              },
+              {
+                "function": "OUT",
+                "pad": "4"
+              },
+              {
+                "function": "V_MINUS",
+                "pad": "2"
+              },
+              {
+                "function": "V_PLUS",
+                "pad": "5"
+              }
+            ],
+            "verification": {
+              "confidence": "verified",
+              "sources": [
+                "builtin_pinmap:Amplifier_Operational:LMV321"
+              ],
+              "resolver_checked": false,
+              "pinmap_checked": true
+            }
+          }
+        ],
+        "companions": [
+          {
+            "id": "opamp.decoupling_capacitor",
+            "family": "capacitor",
+            "role": "decoupling_capacitor",
+            "required": true,
+            "recipes": [
+              {
+                "id": "supply_bypass",
+                "family": "capacitor",
+                "role": "decoupling_capacitor",
+                "package": "0603",
+                "value_kind": "capacitance",
+                "value": "100n",
+                "min_voltage_v": 6.3,
+                "minimum_confidence": "rule_inferred",
+                "required_functions": [
+                  "A",
+                  "B"
+                ],
+                "connections": [
+                  {
+                    "function": "A",
+                    "parent_function": "V_PLUS"
+                  },
+                  {
+                    "function": "B",
+                    "parent_function": "V_MINUS"
+                  }
+                ]
+              }
+            ],
+            "description": "Place supply decoupling capacitor close to V+ and V- pins."
+          }
+        ],
+        "derating_rules": [
+          {
+            "kind": "supply_voltage",
+            "expression": "operating_voltage \u003c= rated_voltage / 1.2",
+            "description": "Maintain at least twenty percent supply-voltage margin."
+          }
+        ],
+        "opamp_evidence": {
+          "intended_roles": [
+            "input_buffer",
+            "gain_stage",
+            "small_signal_driver"
+          ],
+          "supply_mode": "rail_to_rail_single_supply",
+          "output_drive_status": "review_required",
+          "load_compatibility_status": "review_required",
+          "gain_bandwidth_status": "review_required",
+          "stability_status": "review_required",
+          "input_common_mode_status": "proven",
+          "output_swing_status": "review_required",
+          "noise_status": "review_required",
+          "distortion_status": "review_required",
+          "supply_voltage": {
+            "minimum": 2.7,
+            "maximum": 5.5,
+            "unit": "V",
+            "conditions": "TI LMV3xx recommended operating conditions"
+          },
+          "input_common_mode": {
+            "negative_rail_headroom_v": 0,
+            "positive_rail_headroom_v": 0.8,
+            "conditions": "typical 5 V operation; conservative lower-rail clamp"
+          },
+          "output_swing": {
+            "negative_rail_headroom_v": 0.065,
+            "positive_rail_headroom_v": 0.12,
+            "conditions": "typical 5 V operation at the TI product-table load condition"
+          },
+          "output_current": {
+            "value": 0.06,
+            "unit": "A",
+            "temperature_c": 25,
+            "conditions": "typical product-table output current; not a guaranteed headphone-drive rating"
+          },
+          "gain_bandwidth": {
+            "value": 1000000,
+            "unit": "Hz",
+            "conditions": "unity-gain bandwidth"
+          },
+          "slew_rate": {
+            "value": 1000000,
+            "unit": "V/s",
+            "conditions": "typical large-signal slew rate"
+          },
+          "voltage_noise_density": {
+            "value": 3.9e-8,
+            "unit": "V/sqrt(Hz)",
+            "frequency_hz": 1000,
+            "temperature_c": 25,
+            "conditions": "typical input voltage-noise density"
+          },
+          "max_junction_temperature_c": 150,
+          "junction_to_ambient_c_per_w": 232.9,
+          "fabrication_candidate_blocks": true,
+          "review_note": "LMV321 is selected as a low-voltage connectivity seed. Headphone-drive load, gain-bandwidth, compensation, and stability remain design-specific before fabrication-candidate use."
+        },
+        "simulation_models": [
+          {
+            "model_id": "mna_opamp_single_pole_v1",
+            "parameters": [
+              {
+                "name": "dc_open_loop_gain",
+                "value": 100000
+              },
+              {
+                "name": "gain_bandwidth_hz",
+                "value": 1000000
+              },
+              {
+                "name": "input_voltage_noise_density_v_sqrt_hz",
+                "value": 3.9e-8
+              },
+              {
+                "name": "output_high_margin_v",
+                "value": 0.12
+              },
+              {
+                "name": "output_low_margin_v",
+                "value": 0.065
+              },
+              {
+                "name": "supply_max_v",
+                "value": 5.5
+              },
+              {
+                "name": "supply_min_v",
+                "value": 2.7
+              }
+            ]
+          }
+        ],
+        "placement_hints": [
+          {
+            "kind": "near",
+            "target": "decoupling_capacitor",
+            "value": "3",
+            "unit": "mm"
+          }
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "document:ax101.datasheet@sha256:f3d0e6bae53ff3c4555a37760853289eb50241083e629d0d53c2b7aa67c6404f"
+          ],
+          "resolver_checked": true,
+          "pinmap_checked": true
+        }
+      },
+      "evidence": [
+        {
+          "path": "derating",
+          "claim_ids": [
+            "claim.derating"
+          ]
+        },
+        {
+          "path": "identity",
+          "claim_ids": [
+            "claim.family",
+            "claim.manufacturer",
+            "claim.mpn"
+          ]
+        },
+        {
+          "path": "model",
+          "claim_ids": [
+            "claim.model"
+          ]
+        },
+        {
+          "path": "package",
+          "claim_ids": [
+            "claim.package"
+          ]
+        },
+        {
+          "path": "pin_mapping",
+          "claim_ids": [
+            "claim.pin.in_minus",
+            "claim.pin.in_plus",
+            "claim.pin.out",
+            "claim.pin.v_minus",
+            "claim.pin.v_plus"
+          ]
+        },
+        {
+          "path": "provenance",
+          "claim_ids": [
+            "claim.provenance"
+          ]
+        },
+        {
+          "path": "ratings",
+          "claim_ids": [
+            "claim.rating"
+          ]
+        },
+        {
+          "path": "temperature",
+          "claim_ids": [
+            "claim.temp.max",
+            "claim.temp.min"
+          ]
+        }
+      ],
+      "model": {
+        "kind": "bounded_analytic_substitute",
+        "model_id": "mna_opamp_single_pole_v1",
+        "provenance": {
+          "catalog_id": "opamp.example.ax101.sot23_5",
+          "family": "opamp",
+          "model_id": "mna_opamp_single_pole_v1",
+          "provenance": {
+            "source": "document:ax101.datasheet",
+            "revision": "A",
+            "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+            "review_status": "reviewed",
+            "allowed_analyses": [
+              "dc_operating_point"
+            ],
+            "min_temperature_c": -40,
+            "max_temperature_c": 125
+          }
+        },
+        "claim_ids": [
+          "claim.model"
+        ],
+        "bounded_assumptions": [
+          "single-pole small-signal behavior inside documented supply and temperature bounds"
+        ]
+      }
+    }
+  ],
+  "ranking": [
+    {
+      "component_id": "opamp.example.ax101.sot23_5",
+      "variant_id": "sot23_5",
+      "minimum_margin": 1.375,
+      "evidence_coverage": 15,
+      "rank": 1
+    }
+  ],
+  "selected_id": "opamp.example.ax101.sot23_5",
+  "hash": "b0a3b39cad11945ecc93455536a6bddebfd95812d4bb39fdf7a0f2c92e51671c"
+}

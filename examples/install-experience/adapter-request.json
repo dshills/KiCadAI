@@ -1,0 +1,6 @@
+{
+  "schema": "netform.kicadai.request.v1",
+  "id": "relocated-install-smoke",
+  "method": "catalog.search",
+  "params": {"family": "resistor", "limit": 2}
+}

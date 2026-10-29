@@ -73,6 +73,7 @@ help:
 	@printf "  make security-check  Check reachable vulnerabilities (requires network)\n"
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
 	@printf "  make numerical-conformance Compare Go/analytical/ngspice 47 (set NGSPICE)\n"
+	@printf "  make install-experience Exercise relocated binary and portable offline workflows\n"
 	@printf "  make board-family    Build bounded ESP32/BMP280 family CLI\n"
 	@printf "  make install         Install CLI binary to %s\n" "$(INSTALL_DIR)"
 	@printf "  make release         Build versioned macOS/Linux release artifacts\n"
@@ -118,6 +119,10 @@ numerical-conformance: build
 	@test -n "$(NGSPICE)" || (echo 'Set NGSPICE to the pinned ngspice 47 executable' >&2; exit 2)
 	"$(BIN)" --ngspice "$(NGSPICE)" --output "$(CONFORMANCE_OUTPUT)" conformance run
 	"$(BIN)" --target "$(CONFORMANCE_OUTPUT)" conformance verify
+
+.PHONY: install-experience
+install-experience: build
+	bash scripts/install-experience-smoke.sh "$(BIN)"
 
 .PHONY: board-family
 board-family:

@@ -1,0 +1,14 @@
+{
+  "schema": "kicadai.release-manifest.v1",
+  "version": "1.0.1",
+  "commit": "c4e21144471cd67b87bc6993f76ae0a26ab73cce",
+  "build_date": "2026-10-29T10:59:45-05:00",
+  "go_version": "go1.26.8",
+  "cgo_enabled": false,
+  "artifacts": [
+    "kicadai_v1.0.1_darwin_amd64",
+    "kicadai_v1.0.1_darwin_arm64",
+    "kicadai_v1.0.1_linux_amd64",
+    "kicadai_v1.0.1_linux_arm64"
+  ]
+}

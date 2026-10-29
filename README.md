@@ -201,6 +201,10 @@ Discover supported workflows with `bin/kicadai capability explore`. For bounded
 solver comparisons and compact failure replay, see
 [numerical conformance and reproduction](docs/numerical-conformance.md).
 
+For an existing schematic, use `review schematic`; use `doctor` to diagnose
+local dependencies. See [project review and local integrations](docs/project-review-and-integration.md)
+for catalog self-test kits and the versioned NetForm adapter.
+
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains
 experimental for those claims. Source builds require Go 1.26.8 or newer;

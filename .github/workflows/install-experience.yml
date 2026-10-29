@@ -1,0 +1,39 @@
+name: Clean install and NetForm adapter
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  first-use:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build release-format binaries from a clean checkout
+        run: make release
+      - name: Exercise relocated host release binary and local Rust client
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$PWD/dist/kicadai_v$(tr -d '[:space:]' < VERSION)_$(go env GOOS)_$(go env GOARCH)"
+          bash scripts/release-smoke-test.sh "$binary"
+          rustup toolchain install 1.99.0 --profile minimal --component clippy,rustfmt
+          cargo +1.99.0 fmt --manifest-path integrations/netform-client/Cargo.toml --all --check
+          KICADAI_ADAPTER_BIN="$binary" cargo +1.99.0 test --manifest-path integrations/netform-client/Cargo.toml --locked
+          cargo +1.99.0 clippy --manifest-path integrations/netform-client/Cargo.toml --all-targets --locked -- -D warnings

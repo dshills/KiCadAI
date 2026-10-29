@@ -13,7 +13,7 @@ import (
 
 func offlineDiagnosticOptions(opts cliOptions) error {
 	if opts.overwrite || opts.withPCB || opts.requireDRC || opts.aiProvider != "" || opts.aiPrompt != "" || opts.aiPromptFile != "" {
-		return errors.New("diagnostic commands are offline, never overwrite, and never create/check PCB artifacts")
+		return errors.New("offline workflows reject provider, overwrite, with-pcb and require-drc flags")
 	}
 	return nil
 }

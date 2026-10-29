@@ -92,6 +92,10 @@ Commands:
   schematic     Guided offline passive-circuit schematics, reports, and verification
   conformance   Compare Go simulation with analytical oracles and pinned ngspice
   repro         Capture and replay bounded schematic failure evidence
+  review        Read-only existing-project schematic review and evidence verification
+  doctor        Diagnose embedded resources, library roots, and local KiCad availability
+  adapter       Versioned local CLI/JSON interface for NetForm (one request)
+  family        Offline bounded board-family profiles, checks, generation, and verification
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -426,6 +430,14 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runConformance(ctx, opts, stdout)
 	case "repro":
 		return runReproduction(ctx, opts, stdout)
+	case "review":
+		return runExistingReview(ctx, opts, stdout)
+	case "doctor":
+		return runDoctor(ctx, opts, stdout)
+	case "adapter":
+		return runAdapter(ctx, opts, os.Stdin, stdout)
+	case "family":
+		return runOfflineFamily(opts, stdout)
 	case "transaction":
 		return runTransactionContext(ctx, opts, stdout)
 	case "export":
@@ -1744,6 +1756,8 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 	switch subcommand {
 	case "onboard":
 		return runComponentOnboard(ctx, opts, stdout, catalog)
+	case "self-test":
+		return runComponentSelfTest(ctx, opts, stdout, catalog)
 	case "promote":
 		return runComponentOnboardingPromote(ctx, opts, stdout, catalog)
 	case "overlay-validate":
