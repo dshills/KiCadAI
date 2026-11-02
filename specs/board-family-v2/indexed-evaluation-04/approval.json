@@ -1,0 +1,25 @@
+{
+  "status": "explicit-user-approved",
+  "evaluation_id": "board-family-v2-indexed-final-03",
+  "recorded_batch_id": "indexed-final-04",
+  "request_revision": "indexed-request-04",
+  "manifest_sha256": "d3996a549ae1995f933179f8f73e93e21e23cb559465830ec5291b9ecc8322e4",
+  "max_physical_requests": 14,
+  "max_micro_usd": 1000000,
+  "existing_key_only": true,
+  "user_message": "approved",
+  "approval_context": "Actual user reply to the request for one fresh evaluation, 14 requests maximum and USD 1 maximum, using the existing key, plus a LuLu hostname-and-port rule limited to the reviewed evaluator and api.openai.com:443. Runtime reviewed in request-grounding-review-04.md. Offline qualification and CI green; live accuracy unproven.",
+  "recorded_utc": "2026-09-15T11:12:21Z",
+  "readiness_review_sha256": "6f995afb0398017068f5208e65129081dfee047b25bfe5bc2e5da938f77c6590",
+  "firewall": {
+    "executable": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/indexed-runtime-03-02/kicadai-board-family",
+    "executable_sha256": "9a92ea9846f0ada034e4c2a23e1ae0f275a05dff40b39cb1f4de190b33c89072",
+    "action": "allow",
+    "hostname": "api.openai.com",
+    "port": 443,
+    "regular_expression": false,
+    "limitation": "LuLu offers hostname and port restrictions but no separate TCP-only selector; evaluator uses HTTPS over TCP."
+  },
+  "excluded": ["probes", "retries", "recovery runs", "old batch resumption", "broader firewall changes", "Gemini review", "fabrication", "bench work"],
+  "authority_note": "The unchanged benchmark evaluation_id does not reuse any earlier approval, batch or ledger. This receipt records actual user authority, not authority inferred from a plan or review."
+}

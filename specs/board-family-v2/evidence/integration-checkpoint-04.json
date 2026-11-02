@@ -1,0 +1,528 @@
+{
+  "status": "offline-integration-checkpoint-not-final-acceptance",
+  "created_utc": "2026-09-13T19:31:35.522Z",
+  "notices": [
+    "All cases used explicit --config mode; no live model evaluation is represented.",
+    "Historical publication bytes remain unchanged; historical current-production-source identity assertions are version-bound and do not qualify successor code.",
+    "Export checks do not replace visual/manufacturing review or physical bring-up."
+  ],
+  "source_sha256": {
+    "internal/boardfamily/catalog.go": "29a04a5d62de0fdc4ddc09531f04ec65c83148d3578418714a94adcd18f15830",
+    "internal/boardfamily/catalog_test.go": "c9334cd440c9426c95ff563a99d5b2b0d04a89fdb822fd026c24535cfe6a4155",
+    "internal/boardfamily/config.go": "daacbc637d594a9f9a8312df2e403b20864edc50fcf1633857117d23584938de",
+    "internal/boardfamily/config_test.go": "6cf339975581608fb6ccd01daf094e95b877eed8815202a32b8dc70ba9ec2148",
+    "internal/boardfamily/interpret.go": "3dc8da9e42ac467f3a4dc480e17052f208f63f227c3992e6c9a990cfd8397e86",
+    "internal/boardfamily/interpret_test.go": "86087480d6196ccb9f363f3fe0bd4232d1f86596dd4cd361bf3734e6a3e9c1d0",
+    "internal/boardfamily/ledger.go": "3286a3bde38e9948b8f28ef8b07ea752c9d36e12f210c0897a5b137c073b474f",
+    "internal/boardfamily/ledger_test.go": "eba37f6e35b42c14e66748224c45fb790bcb9dcd23933030061c377e46e9d62d",
+    "internal/boardfamily/manufacturing.go": "b081456a4c8cd6a6b19a4a2fa3ff31c045b921775636893a1d387ad35c2d8264",
+    "internal/boardfamily/manufacturing_format.go": "e59267493772c2139d27278ef6501bd9d01e9b68b6fbc3ac6b926d2b037a062f",
+    "internal/boardfamily/manufacturing_test.go": "8910989a7a092d8d72e01978bbe3d575777a589edec636643568c1f6fb9dd1ad",
+    "internal/boardfamily/native.go": "5244f95da0dab62c259b00edf7451cb85765a7daf3123e9319ee5eaf6af618e0",
+    "internal/boardfamily/validate.go": "8061d9ed7881864f985f8d2f87cddfa842a6974787d9b1b980fe9838057d34fd",
+    "cmd/kicadai-board-family/main.go": "6ba09b82d4d39571fa316219b64352fc4e57bed4cb77cb72eaa911e696216c18",
+    "cmd/kicadai-board-family/main_test.go": "09b581e906fa28fb8bebff7cc29bd9dc2cef97a44a193bc056a20a4ae2fa64ba"
+  },
+  "binary_sha256": "28f374fe1e3871b51c21aca4d0945351ef6457f6cae9173888ee375a9b4d5802",
+  "reference_import_path": "specs/board-family-v2/development/reference-assembly-canonical-import.json",
+  "reference_import_sha256": "abe2c9be8cbb839ee761881f4f5ee9baecba6a7c42cbab24f9b55f8315a355e0",
+  "prior_live_ledger_sha256": "e074e37858576b6487e8f738025156d881f8f7bc80276e21117b76e6828d822f",
+  "historical_publication_files_verified": 677,
+  "cases": [
+    {
+      "id": "sht31-standard",
+      "directory": ".cache/board-family-v2/integration-09-sht31-standard",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 70
+      },
+      "validation": {
+        "passed": true,
+        "kicad_version": "10.0.3",
+        "seconds": 3.730722,
+        "checks": [
+          {
+            "name": "electrical_contract",
+            "passed": true,
+            "seconds": 0.000028042
+          },
+          {
+            "name": "reference_and_bom_integrity",
+            "passed": true,
+            "seconds": 0.014887458
+          },
+          {
+            "name": "pcb_writer_and_connectivity",
+            "passed": true,
+            "seconds": 0.005944
+          },
+          {
+            "name": "schematic_writer",
+            "passed": true,
+            "seconds": 0.00301775
+          },
+          {
+            "name": "native_parse_render",
+            "passed": true,
+            "seconds": 0.009443208
+          },
+          {
+            "name": "kicad_version",
+            "passed": true,
+            "seconds": 0.108152459
+          },
+          {
+            "name": "kicad_erc",
+            "passed": true,
+            "seconds": 0.716906625
+          },
+          {
+            "name": "kicad_strict_drc_and_parity",
+            "passed": true,
+            "seconds": 1.074987667
+          },
+          {
+            "name": "kicad_roundtrip_kicad_sch",
+            "passed": true,
+            "seconds": 0.344608333
+          },
+          {
+            "name": "kicad_roundtrip_kicad_pcb",
+            "passed": true,
+            "seconds": 0.320212042
+          },
+          {
+            "name": "schematic_preview",
+            "passed": true,
+            "seconds": 0.2699405
+          },
+          {
+            "name": "pcb_preview",
+            "passed": true,
+            "seconds": 0.219410667
+          },
+          {
+            "name": "manufacturing_exports",
+            "passed": true,
+            "seconds": 0.642566125
+          },
+          {
+            "name": "input_immutability",
+            "passed": true,
+            "seconds": 0.000153042
+          }
+        ],
+        "native_sha256": {
+          "board.kicad_pcb": "88087370d8338853473256fc0965249eeabdb61f246dd4bfbb83a9767c7038ea",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "9edacedc685074d01ed00d00874c61ed3f9f42b64f38123c788b4072bdb642bb"
+        }
+      },
+      "manufacturing_manifest_sha256": "b9948e3313d1da869790eb84d1e4dca5f3eab4acb90f4619940a73c3e4824c46",
+      "export_file_count": 19
+    },
+    {
+      "id": "sht31-fast",
+      "directory": ".cache/board-family-v2/integration-09-sht31-fast",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_sht31_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      },
+      "validation": {
+        "passed": true,
+        "kicad_version": "10.0.3",
+        "seconds": 3.789574667,
+        "checks": [
+          {
+            "name": "electrical_contract",
+            "passed": true,
+            "seconds": 0.000026583
+          },
+          {
+            "name": "reference_and_bom_integrity",
+            "passed": true,
+            "seconds": 0.013463917
+          },
+          {
+            "name": "pcb_writer_and_connectivity",
+            "passed": true,
+            "seconds": 0.005249041
+          },
+          {
+            "name": "schematic_writer",
+            "passed": true,
+            "seconds": 0.002949833
+          },
+          {
+            "name": "native_parse_render",
+            "passed": true,
+            "seconds": 0.009027666
+          },
+          {
+            "name": "kicad_version",
+            "passed": true,
+            "seconds": 0.109943959
+          },
+          {
+            "name": "kicad_erc",
+            "passed": true,
+            "seconds": 0.748503041
+          },
+          {
+            "name": "kicad_strict_drc_and_parity",
+            "passed": true,
+            "seconds": 1.086367875
+          },
+          {
+            "name": "kicad_roundtrip_kicad_sch",
+            "passed": true,
+            "seconds": 0.356901375
+          },
+          {
+            "name": "kicad_roundtrip_kicad_pcb",
+            "passed": true,
+            "seconds": 0.32541975
+          },
+          {
+            "name": "schematic_preview",
+            "passed": true,
+            "seconds": 0.266883
+          },
+          {
+            "name": "pcb_preview",
+            "passed": true,
+            "seconds": 0.215649583
+          },
+          {
+            "name": "manufacturing_exports",
+            "passed": true,
+            "seconds": 0.648768417
+          },
+          {
+            "name": "input_immutability",
+            "passed": true,
+            "seconds": 0.000213041
+          }
+        ],
+        "native_sha256": {
+          "board.kicad_pcb": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c"
+        }
+      },
+      "manufacturing_manifest_sha256": "36c4e9c157ca943e7580be6ab53e9d4ea98e90ee4994df92972ef20c89005aff",
+      "export_file_count": 19
+    },
+    {
+      "id": "bmp280-standard",
+      "directory": ".cache/board-family-v2/integration-09-bmp280-standard",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "standard",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 200
+      },
+      "validation": {
+        "passed": true,
+        "kicad_version": "10.0.3",
+        "seconds": 3.7752625,
+        "checks": [
+          {
+            "name": "electrical_contract",
+            "passed": true,
+            "seconds": 0.000027916
+          },
+          {
+            "name": "reference_and_bom_integrity",
+            "passed": true,
+            "seconds": 0.018725292
+          },
+          {
+            "name": "pcb_writer_and_connectivity",
+            "passed": true,
+            "seconds": 0.00618
+          },
+          {
+            "name": "schematic_writer",
+            "passed": true,
+            "seconds": 0.003000583
+          },
+          {
+            "name": "native_parse_render",
+            "passed": true,
+            "seconds": 0.008738042
+          },
+          {
+            "name": "kicad_version",
+            "passed": true,
+            "seconds": 0.116876958
+          },
+          {
+            "name": "kicad_erc",
+            "passed": true,
+            "seconds": 0.734956583
+          },
+          {
+            "name": "kicad_strict_drc_and_parity",
+            "passed": true,
+            "seconds": 1.092127833
+          },
+          {
+            "name": "kicad_roundtrip_kicad_sch",
+            "passed": true,
+            "seconds": 0.343897708
+          },
+          {
+            "name": "kicad_roundtrip_kicad_pcb",
+            "passed": true,
+            "seconds": 0.321830291
+          },
+          {
+            "name": "schematic_preview",
+            "passed": true,
+            "seconds": 0.266332375
+          },
+          {
+            "name": "pcb_preview",
+            "passed": true,
+            "seconds": 0.216471
+          },
+          {
+            "name": "manufacturing_exports",
+            "passed": true,
+            "seconds": 0.645667
+          },
+          {
+            "name": "input_immutability",
+            "passed": true,
+            "seconds": 0.000175958
+          }
+        ],
+        "native_sha256": {
+          "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+        }
+      },
+      "manufacturing_manifest_sha256": "d687c84d5e0ac363813c3c0844f3841f417409a965bb56c6955c7a2df5c05d11",
+      "export_file_count": 19
+    },
+    {
+      "id": "bmp280-fast",
+      "directory": ".cache/board-family-v2/integration-09-bmp280-fast",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "fast",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      },
+      "validation": {
+        "passed": true,
+        "kicad_version": "10.0.3",
+        "seconds": 3.7665812499999998,
+        "checks": [
+          {
+            "name": "electrical_contract",
+            "passed": true,
+            "seconds": 0.000017125
+          },
+          {
+            "name": "reference_and_bom_integrity",
+            "passed": true,
+            "seconds": 0.011014833
+          },
+          {
+            "name": "pcb_writer_and_connectivity",
+            "passed": true,
+            "seconds": 0.004898459
+          },
+          {
+            "name": "schematic_writer",
+            "passed": true,
+            "seconds": 0.002459958
+          },
+          {
+            "name": "native_parse_render",
+            "passed": true,
+            "seconds": 0.008654959
+          },
+          {
+            "name": "kicad_version",
+            "passed": true,
+            "seconds": 0.108954375
+          },
+          {
+            "name": "kicad_erc",
+            "passed": true,
+            "seconds": 0.728804417
+          },
+          {
+            "name": "kicad_strict_drc_and_parity",
+            "passed": true,
+            "seconds": 1.084540875
+          },
+          {
+            "name": "kicad_roundtrip_kicad_sch",
+            "passed": true,
+            "seconds": 0.348258541
+          },
+          {
+            "name": "kicad_roundtrip_kicad_pcb",
+            "passed": true,
+            "seconds": 0.322858042
+          },
+          {
+            "name": "schematic_preview",
+            "passed": true,
+            "seconds": 0.271166875
+          },
+          {
+            "name": "pcb_preview",
+            "passed": true,
+            "seconds": 0.216027208
+          },
+          {
+            "name": "manufacturing_exports",
+            "passed": true,
+            "seconds": 0.658597917
+          },
+          {
+            "name": "input_immutability",
+            "passed": true,
+            "seconds": 0.000152459
+          }
+        ],
+        "native_sha256": {
+          "board.kicad_pcb": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "a8669d26123be5dc7ac187d9f39002a623431697fef360c984524781eafdd910"
+        }
+      },
+      "manufacturing_manifest_sha256": "51f7a4cfe23facb667d4342a0b618aadeb028a5b446a11ff5787b4c51675c21d",
+      "export_file_count": 19
+    },
+    {
+      "id": "bmp280-low_current",
+      "directory": ".cache/board-family-v2/integration-09-bmp280-low_current",
+      "configuration": {
+        "version": "1",
+        "family": "esp32_bmp280_v1",
+        "profile": "low_current",
+        "supply_min_v": 3.2,
+        "supply_max_v": 3.4,
+        "supply_capacity_ma": 1000,
+        "ambient_min_c": 10,
+        "ambient_max_c": 35,
+        "total_bus_capacitance_pf": 100
+      },
+      "validation": {
+        "passed": true,
+        "kicad_version": "10.0.3",
+        "seconds": 3.914180958,
+        "checks": [
+          {
+            "name": "electrical_contract",
+            "passed": true,
+            "seconds": 0.000022833
+          },
+          {
+            "name": "reference_and_bom_integrity",
+            "passed": true,
+            "seconds": 0.011783833
+          },
+          {
+            "name": "pcb_writer_and_connectivity",
+            "passed": true,
+            "seconds": 0.0052685
+          },
+          {
+            "name": "schematic_writer",
+            "passed": true,
+            "seconds": 0.002569333
+          },
+          {
+            "name": "native_parse_render",
+            "passed": true,
+            "seconds": 0.008730958
+          },
+          {
+            "name": "kicad_version",
+            "passed": true,
+            "seconds": 0.113108875
+          },
+          {
+            "name": "kicad_erc",
+            "passed": true,
+            "seconds": 0.735396792
+          },
+          {
+            "name": "kicad_strict_drc_and_parity",
+            "passed": true,
+            "seconds": 1.078795709
+          },
+          {
+            "name": "kicad_roundtrip_kicad_sch",
+            "passed": true,
+            "seconds": 0.365968
+          },
+          {
+            "name": "kicad_roundtrip_kicad_pcb",
+            "passed": true,
+            "seconds": 0.339376709
+          },
+          {
+            "name": "schematic_preview",
+            "passed": true,
+            "seconds": 0.286821459
+          },
+          {
+            "name": "pcb_preview",
+            "passed": true,
+            "seconds": 0.237517291
+          },
+          {
+            "name": "manufacturing_exports",
+            "passed": true,
+            "seconds": 0.728421542
+          },
+          {
+            "name": "input_immutability",
+            "passed": true,
+            "seconds": 0.000193958
+          }
+        ],
+        "native_sha256": {
+          "board.kicad_pcb": "0c6911fe1ac3d3b1d0f21f64d558deb27b569ba63e368d524ed86ee49e569e57",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "dd7974f503684f9fe8f0f3a54313e0820837b7eec5e660cee09df2f9151e0b8c"
+        }
+      },
+      "manufacturing_manifest_sha256": "b8de431bd805419cc6ef69a4080bad4501407fe117d36d61b151f5e717ce2fa1",
+      "export_file_count": 19
+    }
+  ]
+}

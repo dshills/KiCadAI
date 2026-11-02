@@ -1,0 +1,1 @@
+I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.

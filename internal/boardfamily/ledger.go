@@ -12,8 +12,8 @@ import (
 
 const SelectionModel = "gpt-4.1-mini-2025-04-14"
 
-// Increased from 20 to 35 by explicit user approval on September 13, 2026.
-// The same ledger and every prior reservation remain in force; USD cap unchanged.
+// Legacy v1 allowance, including separately approved extensions on September 13,
+// 2026. Its exhausted ledger remains unchanged; these constants grant no new spend.
 const MaxLiveRequests = 41
 const MaxLiveMicroUSD = 10_000_000
 const RequestReserveMicroUSD = 50_000
@@ -30,15 +30,30 @@ type LedgerEntry struct {
 	EstimatedMicroUSD int64  `json:"estimated_micro_usd,omitempty"`
 }
 type Ledger struct {
-	Version    int           `json:"version"`
-	Goal       string        `json:"goal"`
-	HaltReason string        `json:"halt_reason,omitempty"`
-	Entries    []LedgerEntry `json:"entries"`
+	Version           int           `json:"version"`
+	AccountingProfile string        `json:"accounting_profile,omitempty"`
+	Goal              string        `json:"goal"`
+	MaxRequests       int           `json:"max_requests,omitempty"`
+	MaxMicroUSD       int64         `json:"max_micro_usd,omitempty"`
+	HaltReason        string        `json:"halt_reason,omitempty"`
+	Entries           []LedgerEntry `json:"entries"`
 }
 
 const ledgerGoal = "board-family-v1-2026-09-13"
 
 func ledgerChange(path string, f func(*Ledger) error) (err error) {
+	return ledgerChangeWithPolicy(path, legacyLedgerPolicy(), f)
+}
+
+func ledgerChangeWithPolicy(path string, policy LedgerPolicy, f func(*Ledger) error) (err error) {
+	return ledgerChangeForProtocol(path, policy, indexedProtocol, f)
+}
+
+func ledgerChangeForProtocol(path string, policy LedgerPolicy, protocol extractionProtocol, f func(*Ledger) error) (err error) {
+	policy = policy.effective()
+	if err = protocol.validatePolicy(policy); err != nil {
+		return err
+	}
 	if path == "" {
 		return errors.New("a persistent --ledger path is required for live requests")
 	}
@@ -50,20 +65,36 @@ func ledgerChange(path string, f func(*Ledger) error) (err error) {
 		return errors.New("ledger locked; no request sent (inspect previous process before recovery)")
 	}
 	defer func() { err = errors.Join(err, os.Remove(lock)) }()
-	l := Ledger{Version: 1, Goal: ledgerGoal, Entries: []LedgerEntry{}}
+	l := Ledger{Version: 1, Goal: policy.Goal, Entries: []LedgerEntry{}}
+	if policy != legacyLedgerPolicy() {
+		l.Version, l.MaxRequests, l.MaxMicroUSD = 2, policy.MaxRequests, policy.MaxMicroUSD
+	}
+	if protocol.fullModelAccounting() {
+		l.Version, l.AccountingProfile = 3, protocol.accountingProfile()
+	}
+	if info, e := os.Lstat(path); e == nil && !info.Mode().IsRegular() {
+		return errors.New("ledger must be a regular file, not a symlink")
+	} else if e != nil && !os.IsNotExist(e) {
+		return e
+	}
 	b, e := os.ReadFile(path)
 	if e == nil {
+		// Missing metadata must not inherit expected values from a new ledger.
+		l = Ledger{}
 		if e = json.Unmarshal(b, &l); e != nil {
 			return errors.New("invalid ledger; refusing to reset history")
 		}
 	} else if !os.IsNotExist(e) {
 		return e
 	}
-	if l.Version != 1 || l.Goal != ledgerGoal {
-		return errors.New("ledger belongs to a different goal/version")
+	if !protocol.ledgerMatchesPolicy(l, policy) {
+		return errors.New("ledger belongs to a different goal/version/budget; refusing to reset or expand it")
+	}
+	if l.Entries == nil || len(l.Entries) > policy.MaxRequests {
+		return errors.New("ledger history is absent or exceeds its immutable budget")
 	}
 	for i, x := range l.Entries {
-		if x.Index != i+1 || x.Model != SelectionModel || x.ReserveMicroUSD != RequestReserveMicroUSD {
+		if x.Index != i+1 || x.Model != protocol.model() || x.ReserveMicroUSD != RequestReserveMicroUSD {
 			return errors.New("ledger history is inconsistent")
 		}
 	}
@@ -94,32 +125,59 @@ func ledgerChange(path string, f func(*Ledger) error) (err error) {
 	if e = tmp.Close(); e != nil {
 		return e
 	}
-	return os.Rename(name, path)
+	if e = os.Rename(name, path); e != nil {
+		return e
+	}
+	directory, e := os.Open(filepath.Dir(path))
+	if e != nil {
+		return e
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
 
 func reserve(path string) (int, error) {
+	return reserveWithPolicy(path, legacyLedgerPolicy())
+}
+
+func reserveWithPolicy(path string, policy LedgerPolicy) (int, error) {
+	return reserveForProtocol(path, policy, indexedProtocol)
+}
+
+func reserveForProtocol(path string, policy LedgerPolicy, protocol extractionProtocol) (int, error) {
+	policy = policy.effective()
 	index := 0
-	e := ledgerChange(path, func(l *Ledger) error {
+	e := ledgerChangeForProtocol(path, policy, protocol, func(l *Ledger) error {
 		if l.HaltReason != "" {
 			return fmt.Errorf("goal API ledger halted: %s; no request sent", l.HaltReason)
+		}
+		if protocol.fullModelAccounting() && !protocol.validFullModelHistory(l.Entries) {
+			return errors.New("full-model ledger has unresolved or disputed history; no request sent")
 		}
 		var spent int64
 		for _, e := range l.Entries {
 			spent += e.ReserveMicroUSD
 		}
-		if len(l.Entries) >= MaxLiveRequests || spent+RequestReserveMicroUSD > MaxLiveMicroUSD {
+		if len(l.Entries) >= policy.MaxRequests || spent+RequestReserveMicroUSD > policy.MaxMicroUSD {
 			return errors.New("goal API request/cost limit reached; no request sent")
 		}
 		index = len(l.Entries) + 1
-		l.Entries = append(l.Entries, LedgerEntry{Index: index, Started: time.Now().UTC().Format(time.RFC3339Nano), Status: "reserved_unknown_outcome", Model: SelectionModel, ReserveMicroUSD: RequestReserveMicroUSD})
+		l.Entries = append(l.Entries, LedgerEntry{Index: index, Started: time.Now().UTC().Format(time.RFC3339Nano), Status: "reserved_unknown_outcome", Model: protocol.model(), ReserveMicroUSD: RequestReserveMicroUSD})
 		return nil
 	})
 	return index, e
 }
 
 func finishReservation(path string, index int, status, id string, input, output int) error {
+	return finishReservationWithPolicy(path, legacyLedgerPolicy(), index, status, id, input, output)
+}
+
+func finishReservationWithPolicy(path string, policy LedgerPolicy, index int, status, id string, input, output int) error {
+	return finishReservationForProtocol(path, policy, indexedProtocol, index, status, id, input, output)
+}
+
+func finishReservationForProtocol(path string, policy LedgerPolicy, protocol extractionProtocol, index int, status, id string, input, output int) error {
 	var settlementErr error
-	err := ledgerChange(path, func(l *Ledger) error {
+	err := ledgerChangeForProtocol(path, policy, protocol, func(l *Ledger) error {
 		if index < 1 || index > len(l.Entries) {
 			return errors.New("reservation absent")
 		}
@@ -131,6 +189,12 @@ func finishReservation(path string, index int, status, id string, input, output 
 		e.ResponseID = id
 		e.InputTokens = input
 		e.OutputTokens = output
+		if protocol.fullModelAccounting() && status == "model_mismatch" {
+			// Keep the permanent reservation and reported token counts, but do not
+			// price an unidentified model or allow another request from this ledger.
+			l.HaltReason = "returned model does not match full-model accounting profile"
+			return nil
+		}
 		// Persist a halt even when accounting cannot be trusted. Returning an
 		// error from the mutation itself would discard this safety state.
 		if input < 0 || output < 0 || input > 1_000_000 || output > 1_000_000 {
@@ -139,7 +203,7 @@ func finishReservation(path string, index int, status, id string, input, output 
 			return nil
 		}
 		// Full input price (ignore caching discounts); round microdollars upward.
-		e.EstimatedMicroUSD = (int64(input)*4 + int64(output)*16 + 9) / 10
+		e.EstimatedMicroUSD = protocol.estimatedMicroUSD(input, output)
 		if e.EstimatedMicroUSD > e.ReserveMicroUSD {
 			l.HaltReason = "reported usage exceeds conservative reservation"
 			settlementErr = errors.New(l.HaltReason)
@@ -153,9 +217,11 @@ func finishReservation(path string, index int, status, id string, input, output 
 }
 
 type reservedTransport struct {
-	Path  string
-	Index int
-	Base  http.RoundTripper
+	protocol extractionProtocol
+	Path     string
+	Policy   LedgerPolicy
+	Index    int
+	Base     http.RoundTripper
 }
 
 func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -166,11 +232,14 @@ func (t *reservedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("only the approved OpenAI Responses endpoint is permitted")
 	}
 	// Even treating every request byte as a token is below the $0.05 reserve at
-	// the recorded prices: 24k input bytes + 1600 output tokens + ample overhead.
-	if r.ContentLength <= 0 || r.ContentLength > 24000 {
+	// the recorded prices: 24k legacy input bytes (up to 64KiB for mini-model
+	// evidence protocols), or 16k full-model input bytes, plus 1600 output
+	// tokens. Full model leaves $0.0052 for additional input overhead. No
+	// policy limit is increased. Reported over-reserve usage halts the ledger.
+	if r.ContentLength <= 0 || r.ContentLength > t.protocol.requestLimit() {
 		return nil, fmt.Errorf("request size %d is outside the accounted bound", r.ContentLength)
 	}
-	index, e := reserve(t.Path)
+	index, e := reserveForProtocol(t.Path, t.Policy, t.protocol)
 	if e != nil {
 		return nil, e
 	}

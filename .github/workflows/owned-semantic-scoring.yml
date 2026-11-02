@@ -1,0 +1,26 @@
+name: Owned intent semantic scoring safeguards
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  offline-scoring:
+    name: Raw owned-v4 fact scoring and review invariants (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out evaluator source and fixed regression corpus
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify pure scoring without credentials or a live runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY KICADAI_LIVE_PROVIDER_TESTS KICADAI_OWNED_REHEARSAL_ROOT
+          node --test specs/board-family-v2/owned-evidence-05/scoring.test.mjs

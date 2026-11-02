@@ -1,0 +1,1 @@
+Create the SHT31 standard profile with exactly 4.7k pull-ups at 100 kHz and 100 pF total bus capacitance. Do not change the profile, resistors or capacitance requirement.

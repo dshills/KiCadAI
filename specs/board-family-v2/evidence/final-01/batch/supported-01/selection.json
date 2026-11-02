@@ -1,0 +1,85 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "The requested pressure monitoring board using the BMP280 sensor and a 100 kHz I2C bus with standard 4.7k pull-ups and declared 200 pF bus capacitance matches the esp32_bmp280_v1 family with standard profile. Default supply and ambient conditions are applied as specified by the family envelope; these are operating bounds, not measurements.",
+    "clauses": [
+      {
+        "text": "Create a wired pressure-monitoring board with a BMP280 and a 100 kHz I2C bus.",
+        "disposition": "supported",
+        "reason": "Request is for a wired pressure-monitoring board with BMP280 sensor at 100 kHz I2C bus, matching esp32_bmp280_v1 family standard profile."
+      },
+      {
+        "text": " Use the standard 4.7k pull-ups",
+        "disposition": "supported",
+        "reason": "Standard profile uses 4.7k pull-ups; the request matches this standard setting."
+      },
+      {
+        "text": " and declare 200 pF total bus capacitance.",
+        "disposition": "supported",
+        "reason": "Total bus capacitance declared as 200 pF, which is within family profile maximum for standard (50-200 pF)."
+      },
+      {
+        "text": " Use the supported default power and ambient limits.",
+        "disposition": "supported",
+        "reason": "Request for supported default power and ambient limits matches the family declared envelope and range."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 200
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Request is for a wired pressure-monitoring board with BMP280 sensor at 100 kHz I2C bus, matching esp32_bmp280_v1 family standard profile.",
+        "text": "Create a wired pressure-monitoring board with a BMP280 and a 100 kHz I2C bus."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Standard profile uses 4.7k pull-ups; the request matches this standard setting.",
+        "text": "Use the standard 4.7k pull-ups"
+      },
+      {
+        "disposition": "supported",
+        "reason": "Total bus capacitance declared as 200 pF, which is within family profile maximum for standard (50-200 pF).",
+        "text": "and declare 200 pF total bus capacitance."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Request for supported default power and ambient limits matches the family declared envelope and range.",
+        "text": "Use the supported default power and ambient limits."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 200,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "The requested pressure monitoring board using the BMP280 sensor and a 100 kHz I2C bus with standard 4.7k pull-ups and declared 200 pF bus capacitance matches the esp32_bmp280_v1 family with standard profile. Default supply and ambient conditions are applied as specified by the family envelope; these are operating bounds, not measurements."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_08d594747ba67f79016aa7dd44e1c887d18b56adcda90535f0",
+  "usage": {
+    "input_tokens": 1583,
+    "output_tokens": 345,
+    "total_tokens": 1928
+  },
+  "ledger_index": 1,
+  "seconds": 4.8349795
+}

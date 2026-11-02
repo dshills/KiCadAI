@@ -1,0 +1,107 @@
+{
+  "decision": {
+    "disposition": "clarify",
+    "message": "The requirement extraction could not be validated; no board was generated.",
+    "clauses": [
+      {
+        "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+        "disposition": "clarify",
+        "reason": "The requirement extraction could not be validated; no board was generated."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please."
+    },
+    {
+      "id": 1,
+      "text": " My total bus capacitance is 100 pF."
+    },
+    {
+      "id": 2,
+      "text": " Keep that profile and all those values unchanged."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          },
+          {
+            "kind": "profile",
+            "quote": "standard profile",
+            "state": "required",
+            "value": "standard"
+          },
+          {
+            "kind": "number",
+            "number": 4700,
+            "quote": "4.7k pull-ups",
+            "value": "pullup_ohms"
+          },
+          {
+            "kind": "number",
+            "number": 100000,
+            "quote": "100 kHz I2C bus",
+            "value": "clock_hz"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "number",
+            "number": 100,
+            "quote": "total bus capacitance is 100 pF",
+            "value": "total_bus_capacitance_pf"
+          }
+        ],
+        "id": 1
+      },
+      {
+        "facts": [
+          {
+            "kind": "profile",
+            "quote": "that profile",
+            "state": "required",
+            "value": "standard"
+          },
+          {
+            "kind": "number",
+            "number": 4700,
+            "quote": "all those values",
+            "value": "pullup_ohms"
+          },
+          {
+            "kind": "number",
+            "number": 100000,
+            "quote": "all those values",
+            "value": "clock_hz"
+          }
+        ],
+        "id": 2
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0b38917690554455016aa817613fc087d1a6903cb8581c830c",
+  "usage": {
+    "input_tokens": 2498,
+    "output_tokens": 213,
+    "total_tokens": 2711
+  },
+  "ledger_index": 10,
+  "seconds": 2.667833958
+}

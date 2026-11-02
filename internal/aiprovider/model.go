@@ -39,6 +39,11 @@ type GenerateRequest struct {
 	Attempt           int            `json:"attempt"`
 	Diagnostics       []Diagnostic   `json:"diagnostics,omitempty"`
 	MaxOutputTokens   int            `json:"-"`
+	// DirectSourceJSON is opt-in: Prompt is an application-owned JSON object,
+	// sent directly as user input; CapabilityContext becomes trusted instructions.
+	// Never put user-authored requirements in CapabilityContext in this mode.
+	// Legacy requests retain their exact wrapped input format.
+	DirectSourceJSON bool `json:"-"`
 }
 
 type Diagnostic struct {
@@ -139,6 +144,14 @@ func ValidateGenerateRequest(request GenerateRequest) error {
 	}
 	if request.Attempt < 1 || request.Attempt > 2 {
 		return newProviderError(ErrorConfiguration, "AI attempt must be 1 or 2", nil)
+	}
+	if request.DirectSourceJSON {
+		if request.Attempt != 1 || len(request.Diagnostics) != 0 {
+			return newProviderError(ErrorConfiguration, "direct source JSON requires one first attempt without diagnostics", nil)
+		}
+		if !strings.HasPrefix(prompt, "{") || !json.Valid([]byte(prompt)) {
+			return newProviderError(ErrorConfiguration, "direct source JSON must be a JSON object", nil)
+		}
 	}
 	if request.MaxOutputTokens != 0 {
 		if err := ValidateOutputTokenLimit(request.MaxOutputTokens); err != nil {

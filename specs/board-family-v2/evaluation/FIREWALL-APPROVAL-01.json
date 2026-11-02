@@ -1,0 +1,16 @@
+{
+  "status": "explicit-user-approved-rule-saved-and-verified",
+  "recorded_utc": "2026-09-14T11:39:59Z",
+  "user_message": "approved",
+  "approval_context": "May I add a LuLu Allow rule for the qualified evaluator /Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/runtime-01/kicadai-board-family, restricted to api.openai.com:443, leaving all other firewall settings unchanged?",
+  "executable": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/runtime-01/kicadai-board-family",
+  "remote_domain": "api.openai.com",
+  "remote_port": 443,
+  "action": "Allow",
+  "regex": false,
+  "verification": "LuLu Add Rule dialog showed the exact executable, api.openai.com, port 443, Allow selected and regex unchecked before saving. After saving, filtering Rules by .cache/board-family-v2/runtime-01 displayed kicadai-board-family with api.openai.com:443 Allow.",
+  "limitation": "The dialog has no TCP-only selector; approval and saved restriction are hostname and port. The evaluator itself uses HTTPS over TCP.",
+  "other_firewall_settings_changed": false,
+  "live_requests_before_verification": 0,
+  "scope": "Separate host-access approval only; does not enlarge the frozen 14-request/USD 1.00 API budget or permit a probe, retry, runtime change or recovery baseline."
+}

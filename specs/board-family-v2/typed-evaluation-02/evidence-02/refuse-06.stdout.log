@@ -1,0 +1,1 @@
+{"disposition":"unsupported","message":"Assembled-board ambient accuracy requires bench characterization; software qualification cannot guarantee it.","output":".cache/board-family-v2/typed-evaluation-02-final/refuse-06","passed":false}

@@ -1,0 +1,96 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "Selected esp32_sht31_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply.",
+    "clauses": [
+      {
+        "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+        "disposition": "supported",
+        "reason": "Selected esp32_sht31_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_sht31_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "original_request": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please."
+    },
+    {
+      "id": 1,
+      "text": " Do not run the heater at any time."
+    },
+    {
+      "id": 2,
+      "text": " Use the reviewed default power and ambient limits."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          },
+          {
+            "kind": "profile",
+            "quote": "fast profile",
+            "state": "required",
+            "value": "fast"
+          },
+          {
+            "kind": "number",
+            "number": 100,
+            "quote": "100 pF total bus loading",
+            "value": "total_bus_capacitance_pf"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "feature",
+            "quote": "Do not run the heater at any time",
+            "state": "forbidden",
+            "value": "heater_operation"
+          }
+        ],
+        "id": 1
+      },
+      {
+        "facts": [
+          {
+            "kind": "none"
+          }
+        ],
+        "id": 2
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0c477a1d9ffdacf7016aa816b39d8c87d1b8afb7fe2f6103b7",
+  "usage": {
+    "input_tokens": 2482,
+    "output_tokens": 127,
+    "total_tokens": 2609
+  },
+  "ledger_index": 5,
+  "seconds": 2.380047875
+}

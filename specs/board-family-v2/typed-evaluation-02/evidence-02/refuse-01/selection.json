@@ -1,0 +1,100 @@
+{
+  "decision": {
+    "disposition": "clarify",
+    "message": "The requirement extraction could not be validated; no board was generated.",
+    "clauses": [
+      {
+        "text": "Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+        "disposition": "clarify",
+        "reason": "The requirement extraction could not be validated; no board was generated."
+      }
+    ],
+    "configuration": null
+  },
+  "original_request": "Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+  "request_clauses": [
+    {
+      "id": 0,
+      "text": "Please put a BMP280 and an SHT31 together on one ESP32 board."
+    },
+    {
+      "id": 1,
+      "text": " I need both pressure and humidity measurements;"
+    },
+    {
+      "id": 2,
+      "text": " omitting either sensor won't meet the requirement."
+    }
+  ],
+  "raw_intent": {
+    "clauses": [
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "BMP280",
+            "state": "required",
+            "value": "BMP280"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          }
+        ],
+        "id": 0
+      },
+      {
+        "facts": [
+          {
+            "kind": "measurement",
+            "quote": "pressure",
+            "state": "required",
+            "value": "pressure"
+          },
+          {
+            "kind": "measurement",
+            "quote": "humidity",
+            "state": "required",
+            "value": "humidity"
+          }
+        ],
+        "id": 1
+      },
+      {
+        "facts": [
+          {
+            "kind": "sensor",
+            "quote": "BMP280",
+            "state": "required",
+            "value": "BMP280"
+          },
+          {
+            "kind": "sensor",
+            "quote": "SHT31",
+            "state": "required",
+            "value": "SHT31"
+          }
+        ],
+        "id": 2
+      }
+    ],
+    "version": "2"
+  },
+  "admission_version": "typed-requirements-02",
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0001314c55c34d84016aa816ffa7dc87d1acfd93de25f76506",
+  "usage": {
+    "input_tokens": 2467,
+    "output_tokens": 151,
+    "total_tokens": 2618
+  },
+  "ledger_index": 9,
+  "seconds": 3.294245916
+}

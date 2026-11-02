@@ -1,0 +1,41 @@
+{
+  "checks": [
+    "required native layer/drill outputs",
+    "Gerber X2 layer identity, units and terminators",
+    "Gerber job two-layer 1.6 mm stack",
+    "placement reference/value/package/position/rotation against every native footprint",
+    "plated and non-plated circular drill hits against native pads and vias, 0.00051 mm serialization tolerance"
+  ],
+  "files_sha256": {
+    "drill-report.txt": "d9833e89c394419438bc273c3e80b90c813d0045ccb532fd99061560bdbf56f4",
+    "drill.log": "3991cbd570aad2516241d178a616e807fdfc0a4170018603cfc4641bf01b6c8b",
+    "drill/board-NPTH-drl_map.svg": "2d6a9dfb79a5e08c9a1ddb1191540e00a6234628e52fb82b492db78c19a5af37",
+    "drill/board-NPTH.drl": "109e6b2edc11659d4d2c2a3c6fd4a049a4c100937e41935149233b1975c24684",
+    "drill/board-PTH-drl_map.svg": "c4e3ce5ebb43c5f06b20039dcef07df675d94187099271342250d8d59f36ecbf",
+    "drill/board-PTH.drl": "ed69d275ab4f759f633d28ae534bcce8419a852cafd40671091ef87483da9228",
+    "gerbers.log": "949ab0def3cfcd1d14b4a6b1ed2559e13aecb887368c283a5d2e10e15be09ca1",
+    "gerbers/board-B_Cu.gbr": "5419baf834327c7ddc2d0726db1909338d812bd3a64097f747c06608de496bd5",
+    "gerbers/board-B_Mask.gbr": "322e2f098382eab48ed744b94354f6386cd5eb991c4a166eb35863f3f36c8fd9",
+    "gerbers/board-B_Paste.gbr": "50a8337b20dc7d01d1ed1e9e6b085fc5b3cbe68b5fd715ddbf4ed79adadd749c",
+    "gerbers/board-B_Silkscreen.gbr": "419da1de8892f6b84cdcde6066553c1f9fa22e9999844a2c2297783c2dae12c3",
+    "gerbers/board-Edge_Cuts.gbr": "5e1d3a474773b5c00f81084ea0650e038e8248bc039694dc05012183d936dfcb",
+    "gerbers/board-F_Cu.gbr": "8f23865b28642f86a959c8c42a136646e4fe092ad6375140b9113cd6a22ff1be",
+    "gerbers/board-F_Mask.gbr": "70691f339e7f8a16a2fdce1bf61e0ca62a93eccbc409163bac4cce6e0ee1eb17",
+    "gerbers/board-F_Paste.gbr": "4336be7ce0ae09fee1b8fba5b44ab4e2878ef5f6b1229918e93659e59c59cf27",
+    "gerbers/board-F_Silkscreen.gbr": "4f24f6c2cdaf68a801b51621a3f7f92b0bf57bab12886eff50893b4a5b66097a",
+    "gerbers/board-job.gbrjob": "53337b5586fcbd6c3a8785cabea7b163fa20aee947fc354fc1eb6640d38a752d",
+    "placement.csv": "d667ba2d1e2144bc796c996a52c0dcd20cbf439c4f410563aae43c7eafbca059",
+    "placement.log": "eb8c778e543de4fd67d42f0205be5b60ab3ec5ea2f374135e3dce82b8ffa1f96"
+  },
+  "kicad_version": "10.0.3",
+  "limitations": [
+    "No fabrication order or assembly authorization. Fabricator must confirm stack, finish, tolerances and accepted file conventions.",
+    "Position CSV includes all parts, including through-hole headers; it is not a machine-specific assembly program. Verify component orientation/pin 1 with the assembler.",
+    "KiCad job size includes the 0.1 mm outline stroke (120.1x80.1 mm); nominal board dimensions follow the 120x80 mm Edge.Cuts centerline.",
+    "Raw exports contain native timestamps; preserve these bytes and normalize timestamps only for explicitly labeled replay comparisons."
+  ],
+  "origin": "absolute board origin; placement and drill Y is negative native board Y",
+  "source_pcb_sha256": "3bd2db5e6f7682a789792ef281fb9143c89e91fde74a57b6a5fcae56533b997b",
+  "status": "software-validated-exports-not-fabrication-approval",
+  "units": "mm"
+}

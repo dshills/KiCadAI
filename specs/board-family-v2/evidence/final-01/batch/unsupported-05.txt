@@ -1,0 +1,1 @@
+Build a BMP280 pressure controller powered directly by 5 V USB, with wireless telemetry. Keep all these requirements.

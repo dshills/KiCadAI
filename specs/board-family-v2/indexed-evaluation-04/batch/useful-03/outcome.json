@@ -1,0 +1,52 @@
+{
+  "id": "useful-03",
+  "prompt_sha256": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+  "state": "recorded-outcome",
+  "started_utc": "2026-09-15T11:15:43.967Z",
+  "execution": {
+    "exit_code": 1,
+    "signal": null,
+    "child_pid": 29164,
+    "child_terminal_observed": true,
+    "timed_out": false,
+    "spawn_error": null,
+    "log_overflow": false,
+    "storage_error": false,
+    "wall_seconds": 3.530761666999999
+  },
+  "audit_execution": {
+    "exit_code": 0,
+    "signal": null,
+    "child_pid": 29178,
+    "child_terminal_observed": true,
+    "timed_out": false,
+    "spawn_error": null,
+    "log_overflow": false,
+    "storage_error": false,
+    "wall_seconds": 0.013186165999999503
+  },
+  "collection_class": "recorded-model-failure",
+  "advance": true,
+  "model_correct": false,
+  "response_id": "resp_0b9d51a71e7e8e08016aa928e030b087d19593be7536cd1592",
+  "ledger_index": 3,
+  "files_sha256": {
+    "attempt.json": "f15725f61d841c69f0cd3bf8574a6990b3e1b3231198f9bcd863d3efa3c869d9",
+    "audit.process.json": "ba46d89ba75bf8e9d7fb7ac982b989fd7021ce57b8566d0ab44e325a950c1c26",
+    "audit.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audit.stdout.log": "8b930fd6ef1a3252f55af367173efd9e916a2826c8f0b273a08ab58b9184726a",
+    "board/selection.json": "61416430bd03352085866adcabef5483fe4bd5b446c94385ac8cb53789148e67",
+    "command.process.json": "3a0f522351087eb2da837f51b1cf78d2ace7c41545c4f7e2e6bb2c5ea188763c",
+    "command.stderr.log": "d01bfef9d1a939a6af007c3b5660ada79c6fdbec7e4746f8ab678a4aa6594475",
+    "command.stdout.log": "07489119965b46bd843a74d807f176b939187b841249c0cdbeaee96b006d2d56",
+    "journal/request/body.bin": "f1db0680a3846454f7244549e166f4acf001657840ac62efebae7d7708c6745b",
+    "journal/request/receipt.json": "443fc766fb9625e779b0171f1918918b8674efaa6071e3980c221f9d4fab0684",
+    "journal/response.bin": "c19c4338b476c5d34428bcb4bba3747f35e01d029e08a2ccf53e83284a587715",
+    "journal/response/receipt.json": "a95295656507ca29b4fd1cc80217b50c67b645c5a29b52a2bbc69a13ef00f704",
+    "journal/selection/ledger.json": "36c5d62a222b1bcdbda02816f5fc3b41015cbdd1d80eac2f033de1e28f94f9f5",
+    "journal/selection/receipt.json": "7f143e72d7df09a4db4a6602bb4338707d90c631bc415c722f5ba145af588dd9",
+    "journal/selection/selection.json": "61416430bd03352085866adcabef5483fe4bd5b446c94385ac8cb53789148e67",
+    "journal/start.json": "5025434a3db84fdd2512245d1faf0165b8daff0ea0f460cc5b1b68a13927a0bb",
+    "prompt.txt": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309"
+  }
+}

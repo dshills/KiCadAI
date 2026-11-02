@@ -1,0 +1,65 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "The request is supported using the esp32_sht31_v1 family with the standard 100 kHz I2C profile and normal operating limits (3.2–3.4 V supply, 10–35 °C ambient, 4.7k pull-ups, 50–70 pF bus capacitance). Heater control as described is a firmware behavior, which is compatible with the hardware configuration.",
+    "clauses": [
+      {
+        "text": "Create an SHT31 controller using the normal supported electrical limits.",
+        "disposition": "supported",
+        "reason": "Request specifies SHT31 controller using normal electrical limits, heater off at startup and on during humidity measurement — all within supported capabilities of esp32_sht31_v1 family."
+      },
+      {
+        "text": " Keep its heater off at startup, but run the heater continuously while taking normal humidity measurements.",
+        "disposition": "supported",
+        "reason": "Heater control behavior described is supported by firmware choices; heater off at startup and on during humidity measurement is feasible and allowed."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_sht31_v1",
+      "profile": "standard",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 70
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Request specifies SHT31 controller using normal electrical limits, heater off at startup and on during humidity measurement — all within supported capabilities of esp32_sht31_v1 family.",
+        "text": "Create an SHT31 controller using the normal supported electrical limits."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Heater control behavior described is supported by firmware choices; heater off at startup and on during humidity measurement is feasible and allowed.",
+        "text": "Keep its heater off at startup, but run the heater continuously while taking normal humidity measurements."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_sht31_v1",
+      "profile": "standard",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 70,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "The request is supported using the esp32_sht31_v1 family with the standard 100 kHz I2C profile and normal operating limits (3.2–3.4 V supply, 10–35 °C ambient, 4.7k pull-ups, 50–70 pF bus capacitance). Heater control as described is a firmware behavior, which is compatible with the hardware configuration."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0beccc0b47a27f4f016aa7de3707cc87d1bc41ec0029450363",
+  "usage": {
+    "input_tokens": 1562,
+    "output_tokens": 277,
+    "total_tokens": 1839
+  },
+  "ledger_index": 12,
+  "seconds": 3.877827
+}

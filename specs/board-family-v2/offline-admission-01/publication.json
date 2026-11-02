@@ -1,0 +1,26 @@
+{
+  "status": "offline-correction-published-not-live-acceptance",
+  "created_utc": "2026-09-14T13:45:02.611Z",
+  "source_run": ".cache/board-family-v2/offline-admission-01-run-02",
+  "files_sha256": {
+    "README.md": "92662a0d1f2fea962fcd97eb86c62becfeefe32eb2f083062ffb049e71601581",
+    "REVIEW.md": "db9050ffa5adb0c680192ded76eda37823ec74597e2c444d0da9219b407ac4d5",
+    "check.mjs": "621738d291e2bbedce1fbb2614efef1cb5433cafe2ef7c30c419ae0de0ee9117",
+    "verification/admission-fuzz.log": "ae66ccc4b7dae833cf15732ecdb1744c48c8511a0da8266e1898073e747b86e3",
+    "verification/admission-race.log": "3e435d9a3901f80f81c5ce04ab6b4c1b1217003dc1f5f1c34bb7fa6a948b0bae",
+    "verification/admission-tests.log": "c6fe6e8cb95111acb81ced04b1688cae1fd1e00ac7d407366dc2c802b32ff2ef",
+    "verification/admission.cover": "74c11358a2052158e39c69080c71421110490e7a37e97d8fcd643d0529406201",
+    "verification/build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verification/contract.json": "7b1e633f58e4a80cfeaf06e4077d736c5a6afac58ada29fb55315e253014d204",
+    "verification/export-contract.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verification/full-lint.log": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+    "verification/full-short-regression.log": "cd94a93181f416b606fa8b2fa0a0529fc0fd79f1941f8171d63910922343232f",
+    "verification/historical-after.log": "abe5e5a205d150c3efe7bbfdb0c8987193f61fda1b6a3bfc744c492f1259f87d",
+    "verification/historical-before.log": "abe5e5a205d150c3efe7bbfdb0c8987193f61fda1b6a3bfc744c492f1259f87d",
+    "verification/native-bmp280-standard.log": "894054579314bee33686851ef88a8b6ad11941fd8c6b829e7f44e820d38c3f7b",
+    "verification/native-sht31-standard.log": "ea74f3bedad6bf06f2a7562a0f8c15b44ca35cb0fb28a475cd436326636eb00d",
+    "verification/node-safeguards.log": "584748b9d49cc1cf83de8b2ef993ca1bc48612232f3f32187b74b2f00dca8a46",
+    "verification/receipt.json": "7bf8ef932e947f87cc1dbe39f6f3cf619194323a1bacc44d091b18a97eeee12e",
+    "verify.mjs": "bbc4ac4ba6697abf6303d783255b8f98aa4b772368c746b68ff6d2fc7b2c6ce1"
+  }
+}

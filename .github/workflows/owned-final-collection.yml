@@ -1,0 +1,37 @@
+name: Owned intent final collection safeguards
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  final-collector:
+    name: Final owned-v4 gates and terminal evidence (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact evaluator source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test live gates with only the test transport and no credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY KICADAI_LIVE_PROVIDER_TESTS
+          unset KICADAI_OWNED_PROCESS_MODE KICADAI_OWNED_CORPUS_FAILURE KICADAI_INDEXED_PROCESS_MODE KICADAI_INDEXED_CORPUS_FAILURE
+          unset KICADAI_OFFLINE_NATIVE_CLI KICADAI_OWNED_REHEARSAL_ROOT
+          go test -c -o "$RUNNER_TEMP/owned-final-board-family.test" ./cmd/kicadai-board-family
+          KICADAI_OWNED_TEST_BINARY="$RUNNER_TEMP/owned-final-board-family.test" \
+            node --test specs/board-family-v2/owned-evidence-05/final-runtime.test.mjs \
+              specs/board-family-v2/owned-evidence-05/final-collector.test.mjs \
+              specs/board-family-v2/owned-evidence-05/final-scoring.test.mjs

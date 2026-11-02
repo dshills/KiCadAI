@@ -1,0 +1,11 @@
+{
+  "admission_version": "3-indexed-quantities-experimental",
+  "original_request": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+  "policy": {
+    "goal": "board-family-v2-indexed-final-03",
+    "max_requests": 14,
+    "max_micro_usd": 1000000
+  },
+  "status": "prepared-not-transport-authority",
+  "version": "indexed-evidence-journal-1"
+}

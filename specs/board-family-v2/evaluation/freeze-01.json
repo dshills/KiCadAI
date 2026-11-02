@@ -1,0 +1,27 @@
+{
+  "evaluation_id": "board-family-v2-final-01",
+  "status": "frozen-payload-and-cases-pending-user-budget-approval",
+  "created_utc": "2026-09-13T19:43:00.246Z",
+  "proposed_max_physical_requests": 14,
+  "proposed_max_micro_usd": 1000000,
+  "request_reservation_micro_usd": 50000,
+  "files_sha256": {
+    "specs/board-family-v2/evaluation/cases-01.json": "17416678d10724156b845fd6ecde26fa5bd1ec6cf212c4f98220ac2d645a8678",
+    "specs/board-family-v2/evaluation/PROTOCOL-01.md": "1574d3771742fb0c2da8ed513d5d731e1d243c85a61fc4aacaa19ae7f2a58659",
+    "specs/board-family-v2/evaluation/LIVE_CONTRACT-01.json": "7b1e633f58e4a80cfeaf06e4077d736c5a6afac58ada29fb55315e253014d204"
+  },
+  "case_counts": {
+    "supported": 5,
+    "clarify": 3,
+    "unsupported": 6
+  },
+  "offline_checkpoint_commit": "43573273",
+  "old_ledger_sha256": "e074e37858576b6487e8f738025156d881f8f7bc80276e21117b76e6828d822f",
+  "old_ledger_requests": 41,
+  "execution_preconditions": [
+    "Explicit new user request/dollar budget approval must be recorded separately.",
+    "Implement and offline-test separate v2 goal-scoped budget enforcement before any live dispatch.",
+    "Bind the final execution binary and source, and prove the exported payload matches this frozen contract.",
+    "Do not alter frozen cases, prior ledger, or historical evidence."
+  ]
+}

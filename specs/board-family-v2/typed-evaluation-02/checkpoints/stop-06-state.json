@@ -1,0 +1,1331 @@
+{
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "bindings": {
+    "approval_sha256": "4c89fbfceb98f1b2ba34ec89810170a4b269eec6107ce147670c424633e5af04",
+    "runtime_sha256": "1410dfa077f9a05fde1f53e8bfc4ed1175dfcd798737b7200c3dd88f5b76a540",
+    "freeze_sha256": "4109d31c0f1e808b7ef9e45963e7e2f0f1b8d0592ae487b713f42c3f8dbeb998"
+  },
+  "planned_case_ids": [
+    "useful-01",
+    "useful-02",
+    "useful-03",
+    "useful-04",
+    "useful-05",
+    "choice-01",
+    "choice-02",
+    "choice-03",
+    "refuse-01",
+    "refuse-02",
+    "refuse-03",
+    "refuse-04",
+    "refuse-05",
+    "refuse-06"
+  ],
+  "owner_pid": 64052,
+  "status": "stopped",
+  "started_utc": "2026-09-14T15:42:31.253Z",
+  "records": [
+    {
+      "id": "useful-01",
+      "state": "finished",
+      "expected_disposition": "supported",
+      "prompt_sha256": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+      "started_utc": "2026-09-14T15:42:31.328Z",
+      "exit_code": 0,
+      "signal": null,
+      "child_pid": 59761,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 6.644406792,
+      "output_checks_pass": true,
+      "response_id": "resp_072537027edab313016aa815e848e087d1a0b23cac0ddb8e4f",
+      "ledger_index": 1,
+      "raw": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "pressure",
+            "matches": [
+              {
+                "clause_id": 1,
+                "fact_index": 0
+              }
+            ]
+          },
+          {
+            "id": "profile",
+            "matches": [
+              {
+                "clause_id": 2,
+                "fact_index": 0
+              }
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-source-bound-review"
+      },
+      "admitted": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "bundle": {
+        "validation_sha256": "0e6a2c5c9b4e899d63b8f1cace82f70e9910e11f13bd0e8655d725c9cbf3fc4c",
+        "files_compared": {
+          "board.kicad_pcb": {
+            "current_raw_sha256": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+            "example_raw_sha256": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+            "normalized_fields": [],
+            "compared_sha256": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d"
+          },
+          "board.kicad_pro": {
+            "current_raw_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+            "example_raw_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+            "normalized_fields": [],
+            "compared_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e"
+          },
+          "board.kicad_sch": {
+            "current_raw_sha256": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc",
+            "example_raw_sha256": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc",
+            "normalized_fields": [],
+            "compared_sha256": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc"
+          },
+          "bom.csv": {
+            "current_raw_sha256": "3a058f8abd6d209fb56248cef12a584791a1ea21ccde3b604d602c540ed34e31",
+            "example_raw_sha256": "3a058f8abd6d209fb56248cef12a584791a1ea21ccde3b604d602c540ed34e31",
+            "normalized_fields": [],
+            "compared_sha256": "3a058f8abd6d209fb56248cef12a584791a1ea21ccde3b604d602c540ed34e31"
+          },
+          "bom.json": {
+            "current_raw_sha256": "c5ccabeb26ea24c3a1de19d080529ad68a3b2b43809a42f49a44352de1abe4d0",
+            "example_raw_sha256": "c5ccabeb26ea24c3a1de19d080529ad68a3b2b43809a42f49a44352de1abe4d0",
+            "normalized_fields": [],
+            "compared_sha256": "c5ccabeb26ea24c3a1de19d080529ad68a3b2b43809a42f49a44352de1abe4d0"
+          },
+          "configuration.json": {
+            "current_raw_sha256": "454415920ebd7c99a58bc844102a4dd9fc3e5934c39dd4af9275807d58602272",
+            "example_raw_sha256": "454415920ebd7c99a58bc844102a4dd9fc3e5934c39dd4af9275807d58602272",
+            "normalized_fields": [],
+            "compared_sha256": "454415920ebd7c99a58bc844102a4dd9fc3e5934c39dd4af9275807d58602272"
+          },
+          "electrical.json": {
+            "current_raw_sha256": "94cf431e66db81151199f97ba978cfd5ac2632faaa5376e0e1a782bb50be079f",
+            "example_raw_sha256": "94cf431e66db81151199f97ba978cfd5ac2632faaa5376e0e1a782bb50be079f",
+            "normalized_fields": [],
+            "compared_sha256": "94cf431e66db81151199f97ba978cfd5ac2632faaa5376e0e1a782bb50be079f"
+          },
+          "footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": {
+            "current_raw_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+            "example_raw_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+            "normalized_fields": [],
+            "compared_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422"
+          },
+          "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": {
+            "current_raw_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+            "example_raw_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+            "normalized_fields": [],
+            "compared_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+            "example_raw_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+            "normalized_fields": [],
+            "compared_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+            "example_raw_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+            "normalized_fields": [],
+            "compared_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+            "example_raw_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+            "normalized_fields": [],
+            "compared_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d"
+          },
+          "footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": {
+            "current_raw_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+            "example_raw_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+            "normalized_fields": [],
+            "compared_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c"
+          },
+          "footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": {
+            "current_raw_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+            "example_raw_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+            "normalized_fields": [],
+            "compared_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd"
+          },
+          "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": {
+            "current_raw_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+            "example_raw_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+            "normalized_fields": [],
+            "compared_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400"
+          },
+          "fp-lib-table": {
+            "current_raw_sha256": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5",
+            "example_raw_sha256": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5",
+            "normalized_fields": [],
+            "compared_sha256": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5"
+          },
+          "lib/kicadai_resolved_Connector_Generic.kicad_sym": {
+            "current_raw_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+            "example_raw_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+            "normalized_fields": [],
+            "compared_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40"
+          },
+          "lib/kicadai_resolved_RF_Module.kicad_sym": {
+            "current_raw_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+            "example_raw_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+            "normalized_fields": [],
+            "compared_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb"
+          },
+          "lib/kicadai_resolved_Switch.kicad_sym": {
+            "current_raw_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+            "example_raw_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+            "normalized_fields": [],
+            "compared_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105"
+          },
+          "lib/kicadai_sensor_pressure.kicad_sym": {
+            "current_raw_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+            "example_raw_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+            "normalized_fields": [],
+            "compared_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc"
+          },
+          "manufacturing/drill-report.txt": {
+            "current_raw_sha256": "e6dc415a9a2d2feb8aeb186d26beed3c0947bb611c210b4f1ccac5e60ebd4493",
+            "example_raw_sha256": "82d2ed05bac8dd4b9d3ca23fc684e284574486c7d3d5dc3b0921383b99f88f59",
+            "normalized_fields": [
+              "Drill report creation timestamp"
+            ],
+            "compared_sha256": "a5fbaa067effe318f699ce5a4b3239150cca593528044bdef995700881b06d03"
+          },
+          "manufacturing/drill/board-NPTH-drl_map.svg": {
+            "current_raw_sha256": "039c6546cf1abdd1a7f1fffb42434422dc15d9dba58e99b2296432fe8e1e1da5",
+            "example_raw_sha256": "635992f5bfda3a8e02cd21a70eb74510f5aacd0e709a83d4f14656a59e55b088",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "15e138ce3cd19100984a083ef3c8733d91ad86810e8d91d5c989fe7dc1663836"
+          },
+          "manufacturing/drill/board-NPTH.drl": {
+            "current_raw_sha256": "0380788b4b048ac638bd9f7ccc9b080d4abd3ebdb79fb8b443bb78b0d9f14d44",
+            "example_raw_sha256": "18081a1082c270cdafc41885f380171c4f79b16cd6e3bcfe678acb313e4b19c1",
+            "normalized_fields": [
+              "Excellon creator comment timestamp",
+              "Excellon X2 creation timestamp"
+            ],
+            "compared_sha256": "5850e198d329b3646d14d2308276698006082f8969a6d07302190b47de46a00e"
+          },
+          "manufacturing/drill/board-PTH-drl_map.svg": {
+            "current_raw_sha256": "f5da055855031e32272554552c14d143a704c29b2ec8f4ec5d7ab3255dd27388",
+            "example_raw_sha256": "370c8739a3a601a7ee60a1617fcbf9f6f66a50e62692f1a9b9dc810db815f691",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "486900edeca91a36f62c85290cb9707ebaddcb1ac6fb66ed1ae10506a79d8f77"
+          },
+          "manufacturing/drill/board-PTH.drl": {
+            "current_raw_sha256": "ff077e0e8b7b87d0c332e58e62eba979c247105d68fbd890b71635ef52d03271",
+            "example_raw_sha256": "4f59dcd8bb2bb8182a934bedff9e7ab102bdac59e9c6b2bfc4015b48db2ebf19",
+            "normalized_fields": [
+              "Excellon creator comment timestamp",
+              "Excellon X2 creation timestamp"
+            ],
+            "compared_sha256": "cee0a3e79fcd188a4b35f419098c20ba9a9e3256cd44ff85511ddbba76cc176d"
+          },
+          "manufacturing/gerbers/board-B_Cu.gbr": {
+            "current_raw_sha256": "b510f3317e4682b0b5a7a6063f872f14b2a08094e5870672cd6bc62f7311f3ab",
+            "example_raw_sha256": "bfd6150a2ecb66960dfdee0908f736ea411a3c4838182b234e96489ecd8e4434",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "b7b4494b74c1f9ab27d3ef91674f1c510f121e72872f26c50fd7d60f91145744"
+          },
+          "manufacturing/gerbers/board-B_Mask.gbr": {
+            "current_raw_sha256": "1c9b2465bc53dd4a2e19a60510bbfff9b122df1704459507bddb5315200e021c",
+            "example_raw_sha256": "8deacf824f03ca554d339c4f4bc8818fb6a281209f52107509bee1e1bb894888",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "469289ac16283a25673ff4b017644ff43b2698e0ff47c89be98b76bf969131a7"
+          },
+          "manufacturing/gerbers/board-B_Paste.gbr": {
+            "current_raw_sha256": "e70d8469afa652f2270b2a1e41c5e264901c7afb73c51ab0411454714b364741",
+            "example_raw_sha256": "422073dea2f02c16b570e000333afb923821c703a28b49a0bda8ff9f2d55cf33",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "17fbd6fb7ce07a83c7d50faa9bf3933b70c6c41ac143b12e02531b8438226572"
+          },
+          "manufacturing/gerbers/board-B_Silkscreen.gbr": {
+            "current_raw_sha256": "48c2796e5bf170c5a0b4f2cd0b342f7c35f8823c15a0be325351deaeffcfb673",
+            "example_raw_sha256": "7854e30b5a59ef003e9b2823cc292b7259d4a5e91488114f91226b6cf8ff38c1",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "16e2fe3c17ab0f99376e58da298bc24aea3af60be3465630149e18a6ca4e4bc2"
+          },
+          "manufacturing/gerbers/board-Edge_Cuts.gbr": {
+            "current_raw_sha256": "937c04c552f3813512f22730b9e8c47e1fc7e491882732e7988574da2805672d",
+            "example_raw_sha256": "3c3effe5ff0683fefe1188005a558213f2737cae882ee5c6d14b3daf470026d5",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "947932a0121193f249bdbed4ee671116762bfd72c669ddff5abe50cc7f0ff922"
+          },
+          "manufacturing/gerbers/board-F_Cu.gbr": {
+            "current_raw_sha256": "838752d9b2a1aaa8f8eb65af7038f7da20bf682ec69625d7630b26434f9329b5",
+            "example_raw_sha256": "ab95413b9e953275873623d81b4e4d1778b28e8d52d4324844e87e92f4c29d3b",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "ac432c8b03badabfac70fa708182ac14780bd9627fb83f44e7299ae7b726eaf0"
+          },
+          "manufacturing/gerbers/board-F_Mask.gbr": {
+            "current_raw_sha256": "81c6cff5dbd7de2b9ee1b53c554d5cbc5b006abce5cbd5c0f6976df36bd7d9a8",
+            "example_raw_sha256": "0b140264aa72e63d9bc1b80885156d9e8a4ff16a2f46bb163952cb858390c2d9",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "3c9cb45386742102972e39c3193a8a51c30f4f1ef5389efaa3ae54c0c88ee358"
+          },
+          "manufacturing/gerbers/board-F_Paste.gbr": {
+            "current_raw_sha256": "020bc998e61591d9014a8e8a76d6eba853fd073fd97354ff63c4c3bf6fb96cea",
+            "example_raw_sha256": "2b35c4d63879edfced29a8d2ee2b068d1d6676dc33344a44ef1371410060be7b",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "4e559da635ac2395607801ebb7918860c3f3bd0116415f6f47073cca6bdb985b"
+          },
+          "manufacturing/gerbers/board-F_Silkscreen.gbr": {
+            "current_raw_sha256": "aa467eaeb0d8688ff5276b635db13a338b4586a657b0899d3847eda6595b24b9",
+            "example_raw_sha256": "2b23b09a75a3dccc605beb033f11bb449d611b1966d33cbdb29e12db28962d97",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "c15b81685e2bc543b9b4f9987b1839894f2c923680a9e9623340d14799e35532"
+          },
+          "manufacturing/gerbers/board-job.gbrjob": {
+            "current_raw_sha256": "38e8fd0e230043b7fc0edb895a7e733c83e3cc763360ef6f57c16a0ce0040a3e",
+            "example_raw_sha256": "202ced4fb0134304cf05e10e47f3420b4ec6050f8f5e041691f57006c293bb1b",
+            "normalized_fields": [
+              "Gerber job header creation timestamp"
+            ],
+            "compared_sha256": "de4e6f1c18bbc3bc765fe309d977eb76b104cecbbd1a69a9472a600109741eb1"
+          },
+          "manufacturing/placement.csv": {
+            "current_raw_sha256": "ea6998c0de6543893aeef571bc3c9f5bf0ca439ff82bbabcf2613ac7df69ba84",
+            "example_raw_sha256": "ea6998c0de6543893aeef571bc3c9f5bf0ca439ff82bbabcf2613ac7df69ba84",
+            "normalized_fields": [],
+            "compared_sha256": "ea6998c0de6543893aeef571bc3c9f5bf0ca439ff82bbabcf2613ac7df69ba84"
+          },
+          "preview/board.svg": {
+            "current_raw_sha256": "5a5b70c652f1314246d92b959d5707ec43a2bff5ba9ee9dd8e0f272bc1ec697a",
+            "example_raw_sha256": "29f2ffa4b08b0f1284231ce81c02783580f390eb50202f7d0115cbd306b0de72",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "0a7bf8fbdb855cccb1c06e331779443011cd24c866c9f9f631470ace4663c113"
+          },
+          "preview/pcb.svg": {
+            "current_raw_sha256": "a22f6ff2b3da9e5c12a2aac9402e60fb08fafc97772726c668a36fa563d997f9",
+            "example_raw_sha256": "a618011eb75d095865bcecad6d71bfc5f6347fee2a142be0150b31e29a1e190e",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "1bf45deab8cd7a7c57219ba6d5e8f6cf509e151bf9f4bb759313af192767e765"
+          },
+          "sym-lib-table": {
+            "current_raw_sha256": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff",
+            "example_raw_sha256": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff",
+            "normalized_fields": [],
+            "compared_sha256": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff"
+          }
+        },
+        "all_files_sha256": {
+          "board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc",
+          "bom.csv": "3a058f8abd6d209fb56248cef12a584791a1ea21ccde3b604d602c540ed34e31",
+          "bom.json": "c5ccabeb26ea24c3a1de19d080529ad68a3b2b43809a42f49a44352de1abe4d0",
+          "configuration.json": "454415920ebd7c99a58bc844102a4dd9fc3e5934c39dd4af9275807d58602272",
+          "drc.json": "23057a02c93ad978a1125eac7b26fe326b6e8606630ae70e3ef154d5b47ae369",
+          "drc.log": "e10098257fb4e34f1b932bf28698552043af56ef13af1c2411170b1294ffd2ec",
+          "electrical.json": "94cf431e66db81151199f97ba978cfd5ac2632faaa5376e0e1a782bb50be079f",
+          "erc.json": "896a106f621cdae4b66d03a88cfbba952689456e1dd49fc68a360bcb03e88cde",
+          "erc.log": "fba763371ec12be8cfeae9048f11cfc5b7309fbc5587dff4f89336b5083a58c8",
+          "footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+          "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+          "footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+          "footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+          "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+          "fp-lib-table": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5",
+          "lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+          "lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+          "lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+          "lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+          "manufacturing/drill-report.txt": "e6dc415a9a2d2feb8aeb186d26beed3c0947bb611c210b4f1ccac5e60ebd4493",
+          "manufacturing/drill.log": "71e5935a664fbf29d9ee78e81a1677a9ccb21bd28816108fc320ff7910b70a17",
+          "manufacturing/drill/board-NPTH-drl_map.svg": "039c6546cf1abdd1a7f1fffb42434422dc15d9dba58e99b2296432fe8e1e1da5",
+          "manufacturing/drill/board-NPTH.drl": "0380788b4b048ac638bd9f7ccc9b080d4abd3ebdb79fb8b443bb78b0d9f14d44",
+          "manufacturing/drill/board-PTH-drl_map.svg": "f5da055855031e32272554552c14d143a704c29b2ec8f4ec5d7ab3255dd27388",
+          "manufacturing/drill/board-PTH.drl": "ff077e0e8b7b87d0c332e58e62eba979c247105d68fbd890b71635ef52d03271",
+          "manufacturing/gerbers.log": "0eae1e486aa761c46733c434609d65f3eab49fa03996cd460e2fb12688f1f5bd",
+          "manufacturing/gerbers/board-B_Cu.gbr": "b510f3317e4682b0b5a7a6063f872f14b2a08094e5870672cd6bc62f7311f3ab",
+          "manufacturing/gerbers/board-B_Mask.gbr": "1c9b2465bc53dd4a2e19a60510bbfff9b122df1704459507bddb5315200e021c",
+          "manufacturing/gerbers/board-B_Paste.gbr": "e70d8469afa652f2270b2a1e41c5e264901c7afb73c51ab0411454714b364741",
+          "manufacturing/gerbers/board-B_Silkscreen.gbr": "48c2796e5bf170c5a0b4f2cd0b342f7c35f8823c15a0be325351deaeffcfb673",
+          "manufacturing/gerbers/board-Edge_Cuts.gbr": "937c04c552f3813512f22730b9e8c47e1fc7e491882732e7988574da2805672d",
+          "manufacturing/gerbers/board-F_Cu.gbr": "838752d9b2a1aaa8f8eb65af7038f7da20bf682ec69625d7630b26434f9329b5",
+          "manufacturing/gerbers/board-F_Mask.gbr": "81c6cff5dbd7de2b9ee1b53c554d5cbc5b006abce5cbd5c0f6976df36bd7d9a8",
+          "manufacturing/gerbers/board-F_Paste.gbr": "020bc998e61591d9014a8e8a76d6eba853fd073fd97354ff63c4c3bf6fb96cea",
+          "manufacturing/gerbers/board-F_Silkscreen.gbr": "aa467eaeb0d8688ff5276b635db13a338b4586a657b0899d3847eda6595b24b9",
+          "manufacturing/gerbers/board-job.gbrjob": "38e8fd0e230043b7fc0edb895a7e733c83e3cc763360ef6f57c16a0ce0040a3e",
+          "manufacturing/manifest.json": "4d7b146d12d0496d0754f128ef6bd796a0e756f99ae76de19ffc11946636858a",
+          "manufacturing/placement.csv": "ea6998c0de6543893aeef571bc3c9f5bf0ca439ff82bbabcf2613ac7df69ba84",
+          "manufacturing/placement.log": "393e25ffc37ce5d0ad13e3f1a103f8efbbe46daa7cec7d14125fc3f1ac5f2ffb",
+          "pcb-preview.log": "630d5291ed40b6c516a55664ac77636f4276b99173c28ca68cb4c36d4915d68b",
+          "preview/board.svg": "5a5b70c652f1314246d92b959d5707ec43a2bff5ba9ee9dd8e0f272bc1ec697a",
+          "preview/pcb.svg": "a22f6ff2b3da9e5c12a2aac9402e60fb08fafc97772726c668a36fa563d997f9",
+          "schematic-preview.log": "34b55894a902d05378fc896c488489ff71e6ec1188e6a48d02907ce57e51f80c",
+          "sym-lib-table": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff",
+          "validation.json": "0e6a2c5c9b4e899d63b8f1cace82f70e9910e11f13bd0e8655d725c9cbf3fc4c"
+        }
+      },
+      "files_sha256": {
+        "useful-01.txt": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+        "useful-01.stdout.log": "b167ab8db761e6b9475db35d97c9ea645000fed760166720845f133787b2f1b0",
+        "useful-01.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "useful-01.ledger.json": "a2c88b7ffd3cd08d8c3deb5e120a0b7e19670efa0ecacb54f2f9774331425fbf",
+        "useful-01/board.kicad_pcb": "6c5a8f759988ba31c542757df70dd58bc9bce6e987c1f994daf72449e405a32d",
+        "useful-01/board.kicad_prl": "17fd2530bde826c57486affa122d0a9446a8a4fe73175fb09efea655f55b1903",
+        "useful-01/board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "useful-01/board.kicad_sch": "0591c6efdcb86f256c8e54dde9861aa704e7fadcb1ab9f7367e7e9c7ddd119bc",
+        "useful-01/bom.csv": "3a058f8abd6d209fb56248cef12a584791a1ea21ccde3b604d602c540ed34e31",
+        "useful-01/bom.json": "c5ccabeb26ea24c3a1de19d080529ad68a3b2b43809a42f49a44352de1abe4d0",
+        "useful-01/configuration.json": "454415920ebd7c99a58bc844102a4dd9fc3e5934c39dd4af9275807d58602272",
+        "useful-01/drc.json": "23057a02c93ad978a1125eac7b26fe326b6e8606630ae70e3ef154d5b47ae369",
+        "useful-01/drc.log": "e10098257fb4e34f1b932bf28698552043af56ef13af1c2411170b1294ffd2ec",
+        "useful-01/electrical.json": "94cf431e66db81151199f97ba978cfd5ac2632faaa5376e0e1a782bb50be079f",
+        "useful-01/erc.json": "896a106f621cdae4b66d03a88cfbba952689456e1dd49fc68a360bcb03e88cde",
+        "useful-01/erc.log": "fba763371ec12be8cfeae9048f11cfc5b7309fbc5587dff4f89336b5083a58c8",
+        "useful-01/footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+        "useful-01/footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+        "useful-01/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+        "useful-01/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+        "useful-01/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+        "useful-01/footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+        "useful-01/footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+        "useful-01/footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+        "useful-01/fp-lib-table": "2968b9ba4a9f211edcf6eddb98fb6eadf542afe87e232f86bfda6b8bf42799c5",
+        "useful-01/lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+        "useful-01/lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+        "useful-01/lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+        "useful-01/lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+        "useful-01/manufacturing/drill-report.txt": "e6dc415a9a2d2feb8aeb186d26beed3c0947bb611c210b4f1ccac5e60ebd4493",
+        "useful-01/manufacturing/drill.log": "71e5935a664fbf29d9ee78e81a1677a9ccb21bd28816108fc320ff7910b70a17",
+        "useful-01/manufacturing/drill/board-NPTH-drl_map.svg": "039c6546cf1abdd1a7f1fffb42434422dc15d9dba58e99b2296432fe8e1e1da5",
+        "useful-01/manufacturing/drill/board-NPTH.drl": "0380788b4b048ac638bd9f7ccc9b080d4abd3ebdb79fb8b443bb78b0d9f14d44",
+        "useful-01/manufacturing/drill/board-PTH-drl_map.svg": "f5da055855031e32272554552c14d143a704c29b2ec8f4ec5d7ab3255dd27388",
+        "useful-01/manufacturing/drill/board-PTH.drl": "ff077e0e8b7b87d0c332e58e62eba979c247105d68fbd890b71635ef52d03271",
+        "useful-01/manufacturing/gerbers.log": "0eae1e486aa761c46733c434609d65f3eab49fa03996cd460e2fb12688f1f5bd",
+        "useful-01/manufacturing/gerbers/board-B_Cu.gbr": "b510f3317e4682b0b5a7a6063f872f14b2a08094e5870672cd6bc62f7311f3ab",
+        "useful-01/manufacturing/gerbers/board-B_Mask.gbr": "1c9b2465bc53dd4a2e19a60510bbfff9b122df1704459507bddb5315200e021c",
+        "useful-01/manufacturing/gerbers/board-B_Paste.gbr": "e70d8469afa652f2270b2a1e41c5e264901c7afb73c51ab0411454714b364741",
+        "useful-01/manufacturing/gerbers/board-B_Silkscreen.gbr": "48c2796e5bf170c5a0b4f2cd0b342f7c35f8823c15a0be325351deaeffcfb673",
+        "useful-01/manufacturing/gerbers/board-Edge_Cuts.gbr": "937c04c552f3813512f22730b9e8c47e1fc7e491882732e7988574da2805672d",
+        "useful-01/manufacturing/gerbers/board-F_Cu.gbr": "838752d9b2a1aaa8f8eb65af7038f7da20bf682ec69625d7630b26434f9329b5",
+        "useful-01/manufacturing/gerbers/board-F_Mask.gbr": "81c6cff5dbd7de2b9ee1b53c554d5cbc5b006abce5cbd5c0f6976df36bd7d9a8",
+        "useful-01/manufacturing/gerbers/board-F_Paste.gbr": "020bc998e61591d9014a8e8a76d6eba853fd073fd97354ff63c4c3bf6fb96cea",
+        "useful-01/manufacturing/gerbers/board-F_Silkscreen.gbr": "aa467eaeb0d8688ff5276b635db13a338b4586a657b0899d3847eda6595b24b9",
+        "useful-01/manufacturing/gerbers/board-job.gbrjob": "38e8fd0e230043b7fc0edb895a7e733c83e3cc763360ef6f57c16a0ce0040a3e",
+        "useful-01/manufacturing/manifest.json": "4d7b146d12d0496d0754f128ef6bd796a0e756f99ae76de19ffc11946636858a",
+        "useful-01/manufacturing/placement.csv": "ea6998c0de6543893aeef571bc3c9f5bf0ca439ff82bbabcf2613ac7df69ba84",
+        "useful-01/manufacturing/placement.log": "393e25ffc37ce5d0ad13e3f1a103f8efbbe46daa7cec7d14125fc3f1ac5f2ffb",
+        "useful-01/pcb-preview.log": "630d5291ed40b6c516a55664ac77636f4276b99173c28ca68cb4c36d4915d68b",
+        "useful-01/preview/board.svg": "5a5b70c652f1314246d92b959d5707ec43a2bff5ba9ee9dd8e0f272bc1ec697a",
+        "useful-01/preview/pcb.svg": "a22f6ff2b3da9e5c12a2aac9402e60fb08fafc97772726c668a36fa563d997f9",
+        "useful-01/schematic-preview.log": "34b55894a902d05378fc896c488489ff71e6ec1188e6a48d02907ce57e51f80c",
+        "useful-01/selection.json": "e9fb4c1597ef40a692df5a2b04284814c0182f23f458676332ae64a94772365c",
+        "useful-01/sym-lib-table": "b745208c03fe298722c7b3dabef7bcf115fe6353c8f2e806954aafb5bb5e7eff",
+        "useful-01/validation.json": "0e6a2c5c9b4e899d63b8f1cace82f70e9910e11f13bd0e8655d725c9cbf3fc4c"
+      }
+    },
+    {
+      "id": "useful-02",
+      "state": "finished",
+      "expected_disposition": "supported",
+      "prompt_sha256": "3875569f50031b85f8baee364ff9574645afe637351311a09e894dfc5bc72b88",
+      "started_utc": "2026-09-14T15:42:38.087Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 59811,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 3.9296281670000006,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "useful-02.txt": "3875569f50031b85f8baee364ff9574645afe637351311a09e894dfc5bc72b88",
+        "useful-02.stdout.log": "ac2c569bc8a7b1fbb5045b08aea8d6622d92c309c5e34d3703524715b06b28b3",
+        "useful-02.stderr.log": "0a6f22d89197b4ab5e4dfb2f0836404108dd4f7288bd8cdb3c49941ed4c84219",
+        "useful-02.ledger.json": "be2c03e1dc5424ad0d9466bc5fe796ed1358a40e8adaedea39fc4b2d70b597a8",
+        "useful-02/selection.json": "c97529d0ab932771a8de1fd769042df70a6242b2879ef56c5008f72dff9d2758"
+      }
+    },
+    {
+      "id": "useful-03",
+      "state": "finished",
+      "expected_disposition": "supported",
+      "prompt_sha256": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+      "started_utc": "2026-09-14T15:43:55.302Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 62131,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 3.4545991670000005,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "useful-03.txt": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+        "useful-03.stdout.log": "d2b30ad4e4072e597ea5768d98b07fbaf35b8d28f120b0be75299fbd0eac7457",
+        "useful-03.stderr.log": "7d2ec76e4ce997cb0fec86509cc66a6ed82aacf7a393a8bfe03a598615f7512e",
+        "useful-03.ledger.json": "b6af7b9774650c6dc749a7631b9f32ff8a06d877510d48a753190d021cfa3742",
+        "useful-03/selection.json": "a54345210500f50686912e0fb76af136a60075908145f5cbe7286e332a9a83ae"
+      }
+    },
+    {
+      "id": "useful-04",
+      "state": "finished",
+      "expected_disposition": "supported",
+      "prompt_sha256": "50ce54728682c6695fa32b141be7bfda424659a5eef0e2d3ea57d031dec317c9",
+      "started_utc": "2026-09-14T15:44:54.767Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 62612,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 5.239305542,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "useful-04.txt": "50ce54728682c6695fa32b141be7bfda424659a5eef0e2d3ea57d031dec317c9",
+        "useful-04.stdout.log": "6e1f3ac03cb3dc9f41e3ebfa9bede6e1ebf93fb42476c151ad6b0ed594b84e22",
+        "useful-04.stderr.log": "9ab0b837c1f638c74bc8d082f5306e3cc92de76c6916022686cb22aa4655421a",
+        "useful-04.ledger.json": "eee6baf9ce0dbf730ddd12a39e3f36457b22b0eec8bee616575d43cea41a9f37",
+        "useful-04/selection.json": "4664834dd5206aed506843bd3505a6d181a11bdb3d8374a07a7f944995817eea"
+      }
+    },
+    {
+      "id": "useful-05",
+      "state": "finished",
+      "expected_disposition": "supported",
+      "prompt_sha256": "641165b916600ae406b3e8a14df919992bc86f0682fccefd9a2ffeea462ead30",
+      "started_utc": "2026-09-14T15:45:55.326Z",
+      "exit_code": 0,
+      "signal": null,
+      "child_pid": 63125,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 6.489700125000001,
+      "output_checks_pass": true,
+      "response_id": "resp_0c477a1d9ffdacf7016aa816b39d8c87d1b8afb7fe2f6103b7",
+      "ledger_index": 5,
+      "raw": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matches": [
+              {
+                "clause_id": 0,
+                "fact_index": 0
+              }
+            ]
+          },
+          {
+            "id": "profile",
+            "matches": [
+              {
+                "clause_id": 0,
+                "fact_index": 1
+              }
+            ]
+          },
+          {
+            "id": "capacitance",
+            "matches": [
+              {
+                "clause_id": 0,
+                "fact_index": 2
+              }
+            ]
+          },
+          {
+            "id": "heater-forbidden",
+            "matches": [
+              {
+                "clause_id": 1,
+                "fact_index": 0
+              }
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-source-bound-review"
+      },
+      "admitted": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "bundle": {
+        "validation_sha256": "8c0c66b3c30c425f971122aae2514413c163012c8e03d3423bace4e3fbeda994",
+        "files_compared": {
+          "board.kicad_pcb": {
+            "current_raw_sha256": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722",
+            "example_raw_sha256": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722",
+            "normalized_fields": [],
+            "compared_sha256": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722"
+          },
+          "board.kicad_pro": {
+            "current_raw_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+            "example_raw_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+            "normalized_fields": [],
+            "compared_sha256": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e"
+          },
+          "board.kicad_sch": {
+            "current_raw_sha256": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c",
+            "example_raw_sha256": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c",
+            "normalized_fields": [],
+            "compared_sha256": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c"
+          },
+          "bom.csv": {
+            "current_raw_sha256": "4fca397090d2babfbde81d31ea11b0fd142eed150573122a9ec8134b786f15f5",
+            "example_raw_sha256": "4fca397090d2babfbde81d31ea11b0fd142eed150573122a9ec8134b786f15f5",
+            "normalized_fields": [],
+            "compared_sha256": "4fca397090d2babfbde81d31ea11b0fd142eed150573122a9ec8134b786f15f5"
+          },
+          "bom.json": {
+            "current_raw_sha256": "63c14f4a14c853723d4fa146165f16e7ba41e2e492394fc95307ba5995d27e5c",
+            "example_raw_sha256": "63c14f4a14c853723d4fa146165f16e7ba41e2e492394fc95307ba5995d27e5c",
+            "normalized_fields": [],
+            "compared_sha256": "63c14f4a14c853723d4fa146165f16e7ba41e2e492394fc95307ba5995d27e5c"
+          },
+          "configuration.json": {
+            "current_raw_sha256": "7f23af611d48548d7323d68e2b3e154f8a2606e5a2204e5c5ee8b5825cd9bad7",
+            "example_raw_sha256": "7f23af611d48548d7323d68e2b3e154f8a2606e5a2204e5c5ee8b5825cd9bad7",
+            "normalized_fields": [],
+            "compared_sha256": "7f23af611d48548d7323d68e2b3e154f8a2606e5a2204e5c5ee8b5825cd9bad7"
+          },
+          "electrical.json": {
+            "current_raw_sha256": "b4305cf07bd7af5d951c460fcf58eeebc90080a0f46c6127e4c4f118c2e76924",
+            "example_raw_sha256": "b4305cf07bd7af5d951c460fcf58eeebc90080a0f46c6127e4c4f118c2e76924",
+            "normalized_fields": [],
+            "compared_sha256": "b4305cf07bd7af5d951c460fcf58eeebc90080a0f46c6127e4c4f118c2e76924"
+          },
+          "footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": {
+            "current_raw_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+            "example_raw_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+            "normalized_fields": [],
+            "compared_sha256": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422"
+          },
+          "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": {
+            "current_raw_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+            "example_raw_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+            "normalized_fields": [],
+            "compared_sha256": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+            "example_raw_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+            "normalized_fields": [],
+            "compared_sha256": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+            "example_raw_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+            "normalized_fields": [],
+            "compared_sha256": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d"
+          },
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": {
+            "current_raw_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+            "example_raw_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+            "normalized_fields": [],
+            "compared_sha256": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d"
+          },
+          "footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": {
+            "current_raw_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+            "example_raw_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+            "normalized_fields": [],
+            "compared_sha256": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c"
+          },
+          "footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": {
+            "current_raw_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+            "example_raw_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+            "normalized_fields": [],
+            "compared_sha256": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd"
+          },
+          "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": {
+            "current_raw_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+            "example_raw_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+            "normalized_fields": [],
+            "compared_sha256": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400"
+          },
+          "footprints/Sensor_Humidity.pretty/SHT31-DIS_SensirionV7_MaskPaste.kicad_mod": {
+            "current_raw_sha256": "836b440d41c678d72e2e7124dd25d51adbab43243c2d146e15b3a81c0de62814",
+            "example_raw_sha256": "836b440d41c678d72e2e7124dd25d51adbab43243c2d146e15b3a81c0de62814",
+            "normalized_fields": [],
+            "compared_sha256": "836b440d41c678d72e2e7124dd25d51adbab43243c2d146e15b3a81c0de62814"
+          },
+          "footprints/Sensor_Humidity.pretty/Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm.kicad_mod": {
+            "current_raw_sha256": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66",
+            "example_raw_sha256": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66",
+            "normalized_fields": [],
+            "compared_sha256": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66"
+          },
+          "fp-lib-table": {
+            "current_raw_sha256": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db",
+            "example_raw_sha256": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db",
+            "normalized_fields": [],
+            "compared_sha256": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db"
+          },
+          "lib/kicadai_resolved_Connector_Generic.kicad_sym": {
+            "current_raw_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+            "example_raw_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+            "normalized_fields": [],
+            "compared_sha256": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40"
+          },
+          "lib/kicadai_resolved_RF_Module.kicad_sym": {
+            "current_raw_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+            "example_raw_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+            "normalized_fields": [],
+            "compared_sha256": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb"
+          },
+          "lib/kicadai_resolved_Switch.kicad_sym": {
+            "current_raw_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+            "example_raw_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+            "normalized_fields": [],
+            "compared_sha256": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105"
+          },
+          "lib/kicadai_sensor_humidity.kicad_sym": {
+            "current_raw_sha256": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34",
+            "example_raw_sha256": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34",
+            "normalized_fields": [],
+            "compared_sha256": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34"
+          },
+          "lib/kicadai_sensor_pressure.kicad_sym": {
+            "current_raw_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+            "example_raw_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+            "normalized_fields": [],
+            "compared_sha256": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc"
+          },
+          "manufacturing/drill-report.txt": {
+            "current_raw_sha256": "aec32b1a7c0e505aa43c5f53a77dc42d8e025b513e4ec8585d24ffcce1dffd58",
+            "example_raw_sha256": "a0913e51c8644db5ad98bc485919822953bdb03cc38ecdccf4c7ac15cffd3290",
+            "normalized_fields": [
+              "Drill report creation timestamp"
+            ],
+            "compared_sha256": "2f398a35858e127d40d75adfecb01301c6270cb09d55ce5f302df3f4554a683b"
+          },
+          "manufacturing/drill/board-NPTH-drl_map.svg": {
+            "current_raw_sha256": "4df4a49b9bfd678a5f0c3d14e08db44a64be717d5666fb3741ae3b6ea98503ae",
+            "example_raw_sha256": "aa77cf034975e00aeeec6c543c6d0c40792dda0ed284dd1237b8b34fbeff37a7",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "15e138ce3cd19100984a083ef3c8733d91ad86810e8d91d5c989fe7dc1663836"
+          },
+          "manufacturing/drill/board-NPTH.drl": {
+            "current_raw_sha256": "cb0d20d9dfb6fd9525bcd6b5281b34aedb5d52f21b92fddf846147bface1aa36",
+            "example_raw_sha256": "2083a9ec4205e37ef11c2d22c941c6a013bc1e9c4e5eeb7dfde045e5a536bed4",
+            "normalized_fields": [
+              "Excellon creator comment timestamp",
+              "Excellon X2 creation timestamp"
+            ],
+            "compared_sha256": "5850e198d329b3646d14d2308276698006082f8969a6d07302190b47de46a00e"
+          },
+          "manufacturing/drill/board-PTH-drl_map.svg": {
+            "current_raw_sha256": "87c653c51a842cf8418ee9c55a854858a4eec11862aae06c73198d7650bb2558",
+            "example_raw_sha256": "f8eccd65a38615c5b2381437b8622584c81f5346baf589a8892c28301c86ba64",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "2f84fb68d1b5f1ae1bcfa82c087098bdcc6320367099c34d0e254ae91b4c6c5c"
+          },
+          "manufacturing/drill/board-PTH.drl": {
+            "current_raw_sha256": "bd86ef09171f99a0eca188ef853acc338075b0d04f909d3d50c373c7810e9a57",
+            "example_raw_sha256": "f3bacfe41dbdb8173404b5d5fd2d2eb64ecd75450db0a13ad12880f539f03a8b",
+            "normalized_fields": [
+              "Excellon creator comment timestamp",
+              "Excellon X2 creation timestamp"
+            ],
+            "compared_sha256": "3d68c2e33131d2a625af4b08b75e3d723926a61778fa969f9b6bd548a18dfba3"
+          },
+          "manufacturing/gerbers/board-B_Cu.gbr": {
+            "current_raw_sha256": "d806045ea0b8f44cbd2dc1604bc76e609339e1c841973af44281a11a0ce74a53",
+            "example_raw_sha256": "5ecfe61af1ce6a3b89a1d1ef734a8faacf92dfa8865920f182fa4e6b64ecc215",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "da819941a774c5e5ed23f36849abef46b02c679140761e13c5332685ea12be82"
+          },
+          "manufacturing/gerbers/board-B_Mask.gbr": {
+            "current_raw_sha256": "a1c1f3306f2480aa7580369eaf82781aa47fd563319f722ab2386cffec3dad34",
+            "example_raw_sha256": "111e0192db71bea163614d0af21085503f2db6225246ffae37e28c1edbd0ebeb",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "469289ac16283a25673ff4b017644ff43b2698e0ff47c89be98b76bf969131a7"
+          },
+          "manufacturing/gerbers/board-B_Paste.gbr": {
+            "current_raw_sha256": "96c2e2508e5285e0e9560d5d13461860c4b1d5dbbcddb93e31ba0e3ad5d46bf3",
+            "example_raw_sha256": "d49079f9f5f7282f06a11254c393fa83b226bae344791b1f7283654aca919efb",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "17fbd6fb7ce07a83c7d50faa9bf3933b70c6c41ac143b12e02531b8438226572"
+          },
+          "manufacturing/gerbers/board-B_Silkscreen.gbr": {
+            "current_raw_sha256": "48babc4a512af75f01bc1b5c3b35f182979d1c7fafdb4ea2ad0cfd2105770a09",
+            "example_raw_sha256": "82cbe5ec66e7cdd8d6713f69b2d4d55ab1f9d8d841ca1ec944df5dd396d58e6c",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "16e2fe3c17ab0f99376e58da298bc24aea3af60be3465630149e18a6ca4e4bc2"
+          },
+          "manufacturing/gerbers/board-Edge_Cuts.gbr": {
+            "current_raw_sha256": "1e7d61607f062583dfec0f85bf271425b201069a84d7277c03769f5e637d07a7",
+            "example_raw_sha256": "b707ab0d1ce39660bf4ef5896aed795db427feb5d26a38192b3dd2b8ccac65ec",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "947932a0121193f249bdbed4ee671116762bfd72c669ddff5abe50cc7f0ff922"
+          },
+          "manufacturing/gerbers/board-F_Cu.gbr": {
+            "current_raw_sha256": "4e6685b7e92f91585de7040f95f6759b805e1e565aa23ef7064da0f2723d8828",
+            "example_raw_sha256": "4bf17f757c249aecab37db52aa65b95f6783499c5129f11fa8377672f063f240",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "e4a1a66f27e1916e9aff2b9fca2c96be1d6f0c9a3aa62e465179f88f07c39e21"
+          },
+          "manufacturing/gerbers/board-F_Mask.gbr": {
+            "current_raw_sha256": "6c06284d970363906c5be36151b42bf63b46f6a1dd76954d606220c6dbf2e31c",
+            "example_raw_sha256": "ac2a74be438c29bbe21d7d94b2c6347a22b2299435a9d3e19524a850ee44cb2e",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "8ce6f5cf78fdc39a7e594753d4ae31e734e3ef31eeec6b3f98c331c073045225"
+          },
+          "manufacturing/gerbers/board-F_Paste.gbr": {
+            "current_raw_sha256": "d733419504cd35313628911b1dc54db2d12e3dfcbeb419695769a6d1958e9f16",
+            "example_raw_sha256": "6c2199d3decde261c0944a7e2e7f24bbab7d0f7b0516e4bc6179288e541289aa",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "033666d7b1f98c5b6d565fcad7061419f0a2b011538a9f8090efac6c1f7cee28"
+          },
+          "manufacturing/gerbers/board-F_Silkscreen.gbr": {
+            "current_raw_sha256": "9b63dbe270d81ea3120387638d5bceef9cd5516245347939812ec6deaec97378",
+            "example_raw_sha256": "d34aa6a12c4a161c65b5341dcea7ace71ede412a91c1315310fc8b97a8bc4717",
+            "normalized_fields": [
+              "Gerber X2 creation timestamp",
+              "Gerber creator comment timestamp"
+            ],
+            "compared_sha256": "403140f3bcc69e6f7ec1444c7c9e1d64946d9c0ca44e34265ff5851802dc403a"
+          },
+          "manufacturing/gerbers/board-job.gbrjob": {
+            "current_raw_sha256": "197fce5c2125c0a898f044f8cf91e51020fc306c2262d1addb77948ccbcaa1a6",
+            "example_raw_sha256": "df0f1581b21ed1f116b3360d2c5a09187c5bc8976ce0016f429591de3a144548",
+            "normalized_fields": [
+              "Gerber job header creation timestamp"
+            ],
+            "compared_sha256": "de4e6f1c18bbc3bc765fe309d977eb76b104cecbbd1a69a9472a600109741eb1"
+          },
+          "manufacturing/placement.csv": {
+            "current_raw_sha256": "05f45769194bafc8b77b7c4365c264becfa45fbd52c013405b9e917ecec6ff3b",
+            "example_raw_sha256": "05f45769194bafc8b77b7c4365c264becfa45fbd52c013405b9e917ecec6ff3b",
+            "normalized_fields": [],
+            "compared_sha256": "05f45769194bafc8b77b7c4365c264becfa45fbd52c013405b9e917ecec6ff3b"
+          },
+          "preview/board.svg": {
+            "current_raw_sha256": "a060d22f73271ad3d48b61d3498744edb29fbe2625bd7e3e95839e5e04f65de3",
+            "example_raw_sha256": "64b83623f4d4b76a01a5fe927551cc41022cdbbe870521ca5e2ed963c0267744",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "73849aa388b79579f4d27c085b3358a50eac943b10e5c38c94da0005fd7de254"
+          },
+          "preview/pcb.svg": {
+            "current_raw_sha256": "f6078534cd57f338ca63181117b8712e718dfae54b6546c1a4bb0fb38e86a838",
+            "example_raw_sha256": "930493a6c6a411aeba7d81dc6df4ae0b3825926b9f6568314865cfe2ec107d62",
+            "normalized_fields": [
+              "Native SVG title timestamp"
+            ],
+            "compared_sha256": "3a460bd1d2f3551a61f083ddc8830512ee66a901c597838be0298bc6e5e143de"
+          },
+          "sym-lib-table": {
+            "current_raw_sha256": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9",
+            "example_raw_sha256": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9",
+            "normalized_fields": [],
+            "compared_sha256": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9"
+          }
+        },
+        "all_files_sha256": {
+          "board.kicad_pcb": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722",
+          "board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+          "board.kicad_sch": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c",
+          "bom.csv": "4fca397090d2babfbde81d31ea11b0fd142eed150573122a9ec8134b786f15f5",
+          "bom.json": "63c14f4a14c853723d4fa146165f16e7ba41e2e492394fc95307ba5995d27e5c",
+          "configuration.json": "7f23af611d48548d7323d68e2b3e154f8a2606e5a2204e5c5ee8b5825cd9bad7",
+          "drc.json": "0b5ba1e4e88b5556a6214e98e3053aa684a825b913e1b870f8a320f3593d632f",
+          "drc.log": "3802192608d81946a39b30d0d465f3f4dc1998ca59f2be214839940ee5880f7b",
+          "electrical.json": "b4305cf07bd7af5d951c460fcf58eeebc90080a0f46c6127e4c4f118c2e76924",
+          "erc.json": "7e4ed75dabe3391bd4fcf19534c290a7aec24dfbcee9d79f6189af402a732b5f",
+          "erc.log": "0b0687598e6f143bbdb98ac6bd4c5d0592858b9ea53011706832e8be28fb4ebe",
+          "footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+          "footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+          "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+          "footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+          "footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+          "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+          "footprints/Sensor_Humidity.pretty/SHT31-DIS_SensirionV7_MaskPaste.kicad_mod": "836b440d41c678d72e2e7124dd25d51adbab43243c2d146e15b3a81c0de62814",
+          "footprints/Sensor_Humidity.pretty/Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm.kicad_mod": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66",
+          "fp-lib-table": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db",
+          "lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+          "lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+          "lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+          "lib/kicadai_sensor_humidity.kicad_sym": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34",
+          "lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+          "manufacturing/drill-report.txt": "aec32b1a7c0e505aa43c5f53a77dc42d8e025b513e4ec8585d24ffcce1dffd58",
+          "manufacturing/drill.log": "078fda14a837eba5f63ab61c7535d531939dd9928b456aa0386176e13e5b4904",
+          "manufacturing/drill/board-NPTH-drl_map.svg": "4df4a49b9bfd678a5f0c3d14e08db44a64be717d5666fb3741ae3b6ea98503ae",
+          "manufacturing/drill/board-NPTH.drl": "cb0d20d9dfb6fd9525bcd6b5281b34aedb5d52f21b92fddf846147bface1aa36",
+          "manufacturing/drill/board-PTH-drl_map.svg": "87c653c51a842cf8418ee9c55a854858a4eec11862aae06c73198d7650bb2558",
+          "manufacturing/drill/board-PTH.drl": "bd86ef09171f99a0eca188ef853acc338075b0d04f909d3d50c373c7810e9a57",
+          "manufacturing/gerbers.log": "9f15c1b69de7fb38671ce45464c34d9585008435137249e1b964652a55a59cd5",
+          "manufacturing/gerbers/board-B_Cu.gbr": "d806045ea0b8f44cbd2dc1604bc76e609339e1c841973af44281a11a0ce74a53",
+          "manufacturing/gerbers/board-B_Mask.gbr": "a1c1f3306f2480aa7580369eaf82781aa47fd563319f722ab2386cffec3dad34",
+          "manufacturing/gerbers/board-B_Paste.gbr": "96c2e2508e5285e0e9560d5d13461860c4b1d5dbbcddb93e31ba0e3ad5d46bf3",
+          "manufacturing/gerbers/board-B_Silkscreen.gbr": "48babc4a512af75f01bc1b5c3b35f182979d1c7fafdb4ea2ad0cfd2105770a09",
+          "manufacturing/gerbers/board-Edge_Cuts.gbr": "1e7d61607f062583dfec0f85bf271425b201069a84d7277c03769f5e637d07a7",
+          "manufacturing/gerbers/board-F_Cu.gbr": "4e6685b7e92f91585de7040f95f6759b805e1e565aa23ef7064da0f2723d8828",
+          "manufacturing/gerbers/board-F_Mask.gbr": "6c06284d970363906c5be36151b42bf63b46f6a1dd76954d606220c6dbf2e31c",
+          "manufacturing/gerbers/board-F_Paste.gbr": "d733419504cd35313628911b1dc54db2d12e3dfcbeb419695769a6d1958e9f16",
+          "manufacturing/gerbers/board-F_Silkscreen.gbr": "9b63dbe270d81ea3120387638d5bceef9cd5516245347939812ec6deaec97378",
+          "manufacturing/gerbers/board-job.gbrjob": "197fce5c2125c0a898f044f8cf91e51020fc306c2262d1addb77948ccbcaa1a6",
+          "manufacturing/manifest.json": "531c2156c32e5d4776ed8db0ec3b8dd5158f4500f565b11e536452b83c781b67",
+          "manufacturing/placement.csv": "05f45769194bafc8b77b7c4365c264becfa45fbd52c013405b9e917ecec6ff3b",
+          "manufacturing/placement.log": "8f85debf5b47c90dfc81312cf41145741edf177c761106b34db7748d8ce0fcd8",
+          "pcb-preview.log": "65f97dd82125c94ba30b66dec3d47edf7f472ea8cf23e4b56f349e0e964f6cd3",
+          "preview/board.svg": "a060d22f73271ad3d48b61d3498744edb29fbe2625bd7e3e95839e5e04f65de3",
+          "preview/pcb.svg": "f6078534cd57f338ca63181117b8712e718dfae54b6546c1a4bb0fb38e86a838",
+          "schematic-preview.log": "f9f8dc4da4e363be3af3984fe03c89357f6f9cf2a46bad27c23f7c648f492a62",
+          "sym-lib-table": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9",
+          "validation.json": "8c0c66b3c30c425f971122aae2514413c163012c8e03d3423bace4e3fbeda994"
+        }
+      },
+      "files_sha256": {
+        "useful-05.txt": "641165b916600ae406b3e8a14df919992bc86f0682fccefd9a2ffeea462ead30",
+        "useful-05.stdout.log": "98963a72e5d7e3634c33f35e8eba3f10a7af18b6ec097c4f35a4c38b30ee8dd0",
+        "useful-05.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "useful-05.ledger.json": "8741e0d198742a7c58aa7449b09fe019b409228e50b84895b5a5d4787c903ed2",
+        "useful-05/board.kicad_pcb": "57063b772ad6ec5bcec5dec036dac506e55eff326a8758e596250eca980ba722",
+        "useful-05/board.kicad_prl": "17fd2530bde826c57486affa122d0a9446a8a4fe73175fb09efea655f55b1903",
+        "useful-05/board.kicad_pro": "bd3a8d8fa0bde57fe7b5562661c145881257ae596cb9ec6b8aba295f2779505e",
+        "useful-05/board.kicad_sch": "9a79fa2ba2bc6220e94cce1e129f062b8adeb0585198e5916d48657c09aada4c",
+        "useful-05/bom.csv": "4fca397090d2babfbde81d31ea11b0fd142eed150573122a9ec8134b786f15f5",
+        "useful-05/bom.json": "63c14f4a14c853723d4fa146165f16e7ba41e2e492394fc95307ba5995d27e5c",
+        "useful-05/configuration.json": "7f23af611d48548d7323d68e2b3e154f8a2606e5a2204e5c5ee8b5825cd9bad7",
+        "useful-05/drc.json": "0b5ba1e4e88b5556a6214e98e3053aa684a825b913e1b870f8a320f3593d632f",
+        "useful-05/drc.log": "3802192608d81946a39b30d0d465f3f4dc1998ca59f2be214839940ee5880f7b",
+        "useful-05/electrical.json": "b4305cf07bd7af5d951c460fcf58eeebc90080a0f46c6127e4c4f118c2e76924",
+        "useful-05/erc.json": "7e4ed75dabe3391bd4fcf19534c290a7aec24dfbcee9d79f6189af402a732b5f",
+        "useful-05/erc.log": "0b0687598e6f143bbdb98ac6bd4c5d0592858b9ea53011706832e8be28fb4ebe",
+        "useful-05/footprints/Button_Switch_SMD.pretty/SW_SPST_B3U-1000P.kicad_mod": "eda17d0080381f3ec34defa3fc3284692d5103ec98e74903959e4e789f1f0422",
+        "useful-05/footprints/Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod": "d79e6ec3e0561b0022986d50fc9d95504b6c33e76629fd8f048ab79b19e9055d",
+        "useful-05/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+        "useful-05/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x04_P2.54mm_Vertical.kicad_mod": "3fb110242e0652cb7868fc053738b591cf6f8553392474e245f62647af770e0d",
+        "useful-05/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x06_P2.54mm_Vertical.kicad_mod": "15316f8af5ebc37c24997b323299544239bbda1bf060f7ae7b16c494d7bee73d",
+        "useful-05/footprints/Package_LGA.pretty/Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering.kicad_mod": "2d347f96edd5501ce89cd2fcfb70bbcc54606bbd66b0262c5b7202591d3a2b4c",
+        "useful-05/footprints/RF_Module.pretty/ESP32-WROOM-32E.kicad_mod": "ea07a8e726b6d67ccfe86107b674d50252cb26e8531e95dde648b02fef385fdd",
+        "useful-05/footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+        "useful-05/footprints/Sensor_Humidity.pretty/SHT31-DIS_SensirionV7_MaskPaste.kicad_mod": "836b440d41c678d72e2e7124dd25d51adbab43243c2d146e15b3a81c0de62814",
+        "useful-05/footprints/Sensor_Humidity.pretty/Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm.kicad_mod": "a6af9f807d4214a1828b37901485ed729d7a2eca6e6e2bb33f1a4aea0f198e66",
+        "useful-05/fp-lib-table": "89354d535e426b4b4e6336878b3b554972dbb8c8bf5daee6720d53e7cc1659db",
+        "useful-05/lib/kicadai_resolved_Connector_Generic.kicad_sym": "92f8370b899ac812efabe06ef4455506a39341cb2192070a82ac440144431b40",
+        "useful-05/lib/kicadai_resolved_RF_Module.kicad_sym": "03ed2062cdc1f95bc4eedb0595d387a13ace5237a4821cb5f82d5d14de1462bb",
+        "useful-05/lib/kicadai_resolved_Switch.kicad_sym": "56f88b73aae375c111d8220d8ba00beb8c654ad7cc25a2ab933712a2c3607105",
+        "useful-05/lib/kicadai_sensor_humidity.kicad_sym": "5d5a09e4e846d40c775987fefec633d5c38826b40a7fa64f68c35105e99fac34",
+        "useful-05/lib/kicadai_sensor_pressure.kicad_sym": "77312939840dc7664bc351509604155a6e04b0205f956a53c602a06410505dcc",
+        "useful-05/manufacturing/drill-report.txt": "aec32b1a7c0e505aa43c5f53a77dc42d8e025b513e4ec8585d24ffcce1dffd58",
+        "useful-05/manufacturing/drill.log": "078fda14a837eba5f63ab61c7535d531939dd9928b456aa0386176e13e5b4904",
+        "useful-05/manufacturing/drill/board-NPTH-drl_map.svg": "4df4a49b9bfd678a5f0c3d14e08db44a64be717d5666fb3741ae3b6ea98503ae",
+        "useful-05/manufacturing/drill/board-NPTH.drl": "cb0d20d9dfb6fd9525bcd6b5281b34aedb5d52f21b92fddf846147bface1aa36",
+        "useful-05/manufacturing/drill/board-PTH-drl_map.svg": "87c653c51a842cf8418ee9c55a854858a4eec11862aae06c73198d7650bb2558",
+        "useful-05/manufacturing/drill/board-PTH.drl": "bd86ef09171f99a0eca188ef853acc338075b0d04f909d3d50c373c7810e9a57",
+        "useful-05/manufacturing/gerbers.log": "9f15c1b69de7fb38671ce45464c34d9585008435137249e1b964652a55a59cd5",
+        "useful-05/manufacturing/gerbers/board-B_Cu.gbr": "d806045ea0b8f44cbd2dc1604bc76e609339e1c841973af44281a11a0ce74a53",
+        "useful-05/manufacturing/gerbers/board-B_Mask.gbr": "a1c1f3306f2480aa7580369eaf82781aa47fd563319f722ab2386cffec3dad34",
+        "useful-05/manufacturing/gerbers/board-B_Paste.gbr": "96c2e2508e5285e0e9560d5d13461860c4b1d5dbbcddb93e31ba0e3ad5d46bf3",
+        "useful-05/manufacturing/gerbers/board-B_Silkscreen.gbr": "48babc4a512af75f01bc1b5c3b35f182979d1c7fafdb4ea2ad0cfd2105770a09",
+        "useful-05/manufacturing/gerbers/board-Edge_Cuts.gbr": "1e7d61607f062583dfec0f85bf271425b201069a84d7277c03769f5e637d07a7",
+        "useful-05/manufacturing/gerbers/board-F_Cu.gbr": "4e6685b7e92f91585de7040f95f6759b805e1e565aa23ef7064da0f2723d8828",
+        "useful-05/manufacturing/gerbers/board-F_Mask.gbr": "6c06284d970363906c5be36151b42bf63b46f6a1dd76954d606220c6dbf2e31c",
+        "useful-05/manufacturing/gerbers/board-F_Paste.gbr": "d733419504cd35313628911b1dc54db2d12e3dfcbeb419695769a6d1958e9f16",
+        "useful-05/manufacturing/gerbers/board-F_Silkscreen.gbr": "9b63dbe270d81ea3120387638d5bceef9cd5516245347939812ec6deaec97378",
+        "useful-05/manufacturing/gerbers/board-job.gbrjob": "197fce5c2125c0a898f044f8cf91e51020fc306c2262d1addb77948ccbcaa1a6",
+        "useful-05/manufacturing/manifest.json": "531c2156c32e5d4776ed8db0ec3b8dd5158f4500f565b11e536452b83c781b67",
+        "useful-05/manufacturing/placement.csv": "05f45769194bafc8b77b7c4365c264becfa45fbd52c013405b9e917ecec6ff3b",
+        "useful-05/manufacturing/placement.log": "8f85debf5b47c90dfc81312cf41145741edf177c761106b34db7748d8ce0fcd8",
+        "useful-05/pcb-preview.log": "65f97dd82125c94ba30b66dec3d47edf7f472ea8cf23e4b56f349e0e964f6cd3",
+        "useful-05/preview/board.svg": "a060d22f73271ad3d48b61d3498744edb29fbe2625bd7e3e95839e5e04f65de3",
+        "useful-05/preview/pcb.svg": "f6078534cd57f338ca63181117b8712e718dfae54b6546c1a4bb0fb38e86a838",
+        "useful-05/schematic-preview.log": "f9f8dc4da4e363be3af3984fe03c89357f6f9cf2a46bad27c23f7c648f492a62",
+        "useful-05/selection.json": "e41377d7fb0b7be421c86bdf07a344f2d7577d1dc6a64e0622bd5de721879b0a",
+        "useful-05/sym-lib-table": "b2917c957c89160d92a07309398ebacadec246057705be43a9c616b7f06949f9",
+        "useful-05/validation.json": "8c0c66b3c30c425f971122aae2514413c163012c8e03d3423bace4e3fbeda994"
+      }
+    },
+    {
+      "id": "choice-01",
+      "state": "finished",
+      "expected_disposition": "clarify",
+      "prompt_sha256": "bc7be7d62fdcec5a6b3ed6911b2d83672c67add8f485b2f371df1679a1828da1",
+      "started_utc": "2026-09-14T15:46:01.939Z",
+      "exit_code": 0,
+      "signal": null,
+      "child_pid": 63164,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 1.150006209,
+      "output_checks_pass": true,
+      "response_id": "resp_01cba8e5280ecf37016aa816ba1fc887d187f4c827c1619abc",
+      "ledger_index": 6,
+      "raw": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-source-bound-review"
+      },
+      "admitted": {
+        "disposition_matches": false,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": false,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "files_sha256": {
+        "choice-01.txt": "bc7be7d62fdcec5a6b3ed6911b2d83672c67add8f485b2f371df1679a1828da1",
+        "choice-01.stdout.log": "35cf274b944b7c8ce07ce7b66a7c26994f899989dae7bf94d1e8993bd7faf7fc",
+        "choice-01.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "choice-01.ledger.json": "a96d325129dcd6b5a044e7907122f781e393475a839cf73ee4e30a446fd687c4",
+        "choice-01/selection.json": "c3346bbd35060535138ad5426a857706a28b292fb13495b5df4d5da503956c45"
+      }
+    },
+    {
+      "id": "choice-02",
+      "state": "finished",
+      "expected_disposition": "clarify",
+      "prompt_sha256": "0ae7a2afd13996c5cd9cbfdfc9ae46fe9ae833e36818151567192683c2ba82ca",
+      "started_utc": "2026-09-14T15:46:03.197Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 63168,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 2.630435416999999,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "choice-02.txt": "0ae7a2afd13996c5cd9cbfdfc9ae46fe9ae833e36818151567192683c2ba82ca",
+        "choice-02.stdout.log": "26ae7aa57ffbb7c95eb38dc916a22041d5eb1b5a7849d2d7444fa46b90f8891a",
+        "choice-02.stderr.log": "91f5c6a30d98ca4ff49de11c47731740bd30c9e12d5cc0a8cd34f398de90a954",
+        "choice-02.ledger.json": "ef0e6e2442f3335f7a18702b4712ad056255fb7d81c8e10e7b2c867520890bcd",
+        "choice-02/selection.json": "dfc4bac5adc1be3b8b198dfee85fb815a7e194ec83415604cc21d43652f54a16"
+      }
+    },
+    {
+      "id": "choice-03",
+      "state": "finished",
+      "expected_disposition": "clarify",
+      "prompt_sha256": "36ee7c7c2d3ecc3b8e4346632edac9d4a44a8227d0ca1f5d770dc7d8a725f109",
+      "started_utc": "2026-09-14T15:47:09.392Z",
+      "exit_code": 0,
+      "signal": null,
+      "child_pid": 63570,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 1.8534171249999998,
+      "output_checks_pass": true,
+      "response_id": "resp_0e4ec252554e61e3016aa816fd9be887d1be9610307c63e605",
+      "ledger_index": 8,
+      "raw": {
+        "structure_pass": true,
+        "required_facts_present": true,
+        "requirements": [
+          {
+            "id": "sensor",
+            "matches": [
+              {
+                "clause_id": 0,
+                "fact_index": 0
+              }
+            ]
+          },
+          {
+            "id": "standard-choice",
+            "matches": [
+              {
+                "clause_id": 1,
+                "fact_index": 0
+              }
+            ]
+          },
+          {
+            "id": "fast-choice",
+            "matches": [
+              {
+                "clause_id": 1,
+                "fact_index": 1
+              }
+            ]
+          }
+        ],
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-source-bound-review"
+      },
+      "admitted": {
+        "disposition_matches": true,
+        "configuration_matches": true,
+        "complete_original_clauses": true,
+        "clause_dispositions_consistent": true,
+        "automatic_checks_pass": true,
+        "semantic_review": "pending-explicit-source-bound-review"
+      },
+      "files_sha256": {
+        "choice-03.txt": "36ee7c7c2d3ecc3b8e4346632edac9d4a44a8227d0ca1f5d770dc7d8a725f109",
+        "choice-03.stdout.log": "5144513547f847d7efa17f210834d865495f09c3a5bcdef786f72d45d0f835e5",
+        "choice-03.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "choice-03.ledger.json": "202997480acd9b674b2a341444a636aa50868bf0c9c8b64bf87397409fa5f565",
+        "choice-03/selection.json": "7408219d2a3e227e3da35c6d73039454f920ee8b593c9e9e2b49962d7b686788"
+      }
+    },
+    {
+      "id": "refuse-01",
+      "state": "finished",
+      "expected_disposition": "unsupported",
+      "prompt_sha256": "8e2b690786b0db1175db63a7b460029bc39836ce41ea85d29dee787c8d72eef0",
+      "started_utc": "2026-09-14T15:47:11.354Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 63584,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 3.322638083,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "refuse-01.txt": "8e2b690786b0db1175db63a7b460029bc39836ce41ea85d29dee787c8d72eef0",
+        "refuse-01.stdout.log": "80562bb88f6c15fecaffc7b9eee9080e340759bb0c9621459fb8d7d03564104f",
+        "refuse-01.stderr.log": "5c6c0c663e2390d6f312f13cd9f4f75ec4bb014812c0c289d28e7398dbf4bead",
+        "refuse-01.ledger.json": "d33432ab97a3a43ec683c507888e88441f495153e894d6c69578b898d76f587b",
+        "refuse-01/selection.json": "5aabc1b0a21609b19a16406b9cb015260989714be6233c3b65b15169010f1911"
+      }
+    },
+    {
+      "id": "refuse-02",
+      "state": "finished",
+      "expected_disposition": "unsupported",
+      "prompt_sha256": "04a8e730de28d908f362deeb7be0bc529b0481dcf4e0320843d3713372fd542f",
+      "started_utc": "2026-09-14T15:48:48.829Z",
+      "exit_code": 1,
+      "signal": null,
+      "child_pid": 64068,
+      "child_terminal_observed": true,
+      "timed_out": false,
+      "spawn_error": null,
+      "wall_seconds": 2.700061709,
+      "output_checks_pass": false,
+      "execution_or_evidence_failure": "execution failed; never retry this case\n\n1 !== 0\n",
+      "files_sha256": {
+        "refuse-02.txt": "04a8e730de28d908f362deeb7be0bc529b0481dcf4e0320843d3713372fd542f",
+        "refuse-02.stdout.log": "8fdea87ce658baddc0d17ed64ecd1b605bf8f09269bc31aa5845346595f8c16c",
+        "refuse-02.stderr.log": "d77400590dfb19faefa91bfdbce778eaa7624e44e5b1deb519258bbe0c057934",
+        "refuse-02.ledger.json": "8487d2d31089783da3df531203e26227a8a646dbde484b0f0c09e51c5d2f91cb",
+        "refuse-02/selection.json": "960dc5936fdbac697fd9b87d4dc819c9c6eb1c9ed97a3202b4dde3447942ad48"
+      }
+    }
+  ],
+  "ledger_entries": [
+    {
+      "index": 1,
+      "started_utc": "2026-09-14T15:42:31.349345Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_072537027edab313016aa815e848e087d1a0b23cac0ddb8e4f",
+      "input_tokens": 2464,
+      "output_tokens": 85,
+      "estimated_micro_usd": 1122
+    },
+    {
+      "index": 2,
+      "started_utc": "2026-09-14T15:42:38.103457Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_05b220c4a7ecf745016aa815ee54d087d19ee455333e93ae90",
+      "input_tokens": 2516,
+      "output_tokens": 183,
+      "estimated_micro_usd": 1300
+    },
+    {
+      "index": 3,
+      "started_utc": "2026-09-14T15:43:55.340534Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0608d4461500c1a6016aa8163b976087d1a059b847a1a2ac78",
+      "input_tokens": 2516,
+      "output_tokens": 287,
+      "estimated_micro_usd": 1466
+    },
+    {
+      "index": 4,
+      "started_utc": "2026-09-14T15:44:54.786478Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0d3c6e182aeddcfa016aa81677063c87d1a4ac5c05f268ea90",
+      "input_tokens": 2495,
+      "output_tokens": 148,
+      "estimated_micro_usd": 1235
+    },
+    {
+      "index": 5,
+      "started_utc": "2026-09-14T15:45:55.344526Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0c477a1d9ffdacf7016aa816b39d8c87d1b8afb7fe2f6103b7",
+      "input_tokens": 2482,
+      "output_tokens": 127,
+      "estimated_micro_usd": 1196
+    },
+    {
+      "index": 6,
+      "started_utc": "2026-09-14T15:46:01.956977Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_01cba8e5280ecf37016aa816ba1fc887d187f4c827c1619abc",
+      "input_tokens": 2424,
+      "output_tokens": 50,
+      "estimated_micro_usd": 1050
+    },
+    {
+      "index": 7,
+      "started_utc": "2026-09-14T15:46:03.215237Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_08fc84fdf70ba659016aa816bb942087d19868972e7422ed74",
+      "input_tokens": 2467,
+      "output_tokens": 145,
+      "estimated_micro_usd": 1219
+    },
+    {
+      "index": 8,
+      "started_utc": "2026-09-14T15:47:09.41013Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0e4ec252554e61e3016aa816fd9be887d1be9610307c63e605",
+      "input_tokens": 2442,
+      "output_tokens": 101,
+      "estimated_micro_usd": 1139
+    },
+    {
+      "index": 9,
+      "started_utc": "2026-09-14T15:47:11.370048Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0001314c55c34d84016aa816ffa7dc87d1acfd93de25f76506",
+      "input_tokens": 2467,
+      "output_tokens": 151,
+      "estimated_micro_usd": 1229
+    },
+    {
+      "index": 10,
+      "started_utc": "2026-09-14T15:48:48.846851Z",
+      "status": "completed",
+      "model": "gpt-4.1-mini-2025-04-14",
+      "reserve_micro_usd": 50000,
+      "response_id": "resp_0b38917690554455016aa817613fc087d1a6903cb8581c830c",
+      "input_tokens": 2498,
+      "output_tokens": 213,
+      "estimated_micro_usd": 1340
+    }
+  ],
+  "metrics": {
+    "planned_cases": 14,
+    "attempted_cases": 10,
+    "recorded_outcomes": 10,
+    "raw_automatic_passes": 4,
+    "application_automatic_passes": 3,
+    "median_all_useful_seconds": 5.239305542,
+    "maximum_all_useful_seconds": 6.644406792,
+    "timing_target_met": true,
+    "acceptance": "not-established-by-automatic-scores"
+  },
+  "ledger_sha256": "8487d2d31089783da3df531203e26227a8a646dbde484b0f0c09e51c5d2f91cb",
+  "finished_utc": "2026-09-14T15:48:51.556Z",
+  "stop_reason": "transport/accounting/protocol/native evidence failure; no retry"
+}

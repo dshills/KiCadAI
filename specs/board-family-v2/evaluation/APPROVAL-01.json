@@ -1,0 +1,18 @@
+{
+  "status": "explicit-user-approved",
+  "evaluation_id": "board-family-v2-final-01",
+  "max_physical_requests": 14,
+  "max_micro_usd": 1000000,
+  "existing_key_only": true,
+  "runtime_sha256": "6cc472ae95b6f802d4c3ff4d8e2d2a0b82baa52e3879eb298207e3695b6b31a2",
+  "freeze_sha256": "80d0d774a49f15240bbc159cd53da765eb9ee9e376b6e352509be3e76372c074",
+  "user_message": "approved",
+  "approval_context": "To proceed, do you approve up to 14 API requests, capped at $1 total, using the existing key for the frozen final evaluation?",
+  "recorded_utc": "2026-09-14T09:44:00Z",
+  "pricing_rechecked_utc": "2026-09-14T09:44:00Z",
+  "pricing_source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini",
+  "pinned_model": "gpt-4.1-mini-2025-04-14",
+  "standard_input_usd_per_million_tokens": 0.40,
+  "standard_output_usd_per_million_tokens": 1.60,
+  "scope": "One frozen 14-case batch only. Preserve all attempts; no retries, recovery baseline, model/prompt changes, firewall changes or fabrication authority."
+}

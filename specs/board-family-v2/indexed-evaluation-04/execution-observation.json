@@ -1,0 +1,19 @@
+{
+  "kind": "implementing-agent-tool-observation-not-provider-attestation",
+  "batch_id": "indexed-final-04",
+  "observed_utc": "2026-09-15T11:16:47Z",
+  "tool_session_id": 44077,
+  "terminal_exit_code": 0,
+  "terminal_stdout": {"status":"collection-complete-semantic-review-pending","mode":"live","planned_cases":14,"recorded_outcomes":14,"recorded_model_failures":2,"total_wall_seconds":59.481600791,"acceptance":"not-established-by-collection"},
+  "launches": 1,
+  "firewall_readback": {
+    "application": "LuLu",
+    "dialog": "Edit Existing Rule",
+    "executable": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/indexed-runtime-03-02/kicadai-board-family",
+    "hostname": "api.openai.com",
+    "port": "443",
+    "regex": false,
+    "allow": true
+  },
+  "note": "Actual terminal completion and saved rule were observed through tools. This is a reviewer record, not a signed provider assertion. No key or request Authorization header is included."
+}

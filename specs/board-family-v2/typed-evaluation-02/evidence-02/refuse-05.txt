@@ -1,0 +1,1 @@
+Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.

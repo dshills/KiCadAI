@@ -1,0 +1,15 @@
+{
+  "status": "user-approved-rule-saved-and-ui-verified",
+  "recorded_utc": "2026-09-14 15:42:20 UTC",
+  "approval": "APPROVAL-02.json",
+  "program_path": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/typed-runtime-02-01/kicadai-board-family",
+  "binary_sha256": "016997a848add505913fed77447183fe48adb425a1e58313d5296fa3f236f663",
+  "action": "Allow",
+  "remote_address": "api.openai.com",
+  "remote_port": 443,
+  "regex": false,
+  "profile": "Default",
+  "protocol_selector": "LuLu exposes hostname and port but no TCP-only selector; evaluator uses TCP",
+  "verification": "Before save the Add Rule dialog showed the exact program path, api.openai.com, 443, Allow selected and regex off. After save, the rules list filtered by typed-runtime-02-01 showed kicadai-board-family and api.openai.com:443 Allow.",
+  "other_settings_changed": false
+}

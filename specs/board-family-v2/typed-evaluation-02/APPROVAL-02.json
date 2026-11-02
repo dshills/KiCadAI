@@ -1,0 +1,41 @@
+{
+  "status": "explicit-user-approved",
+  "evaluation_id": "board-family-v2-typed-final-02",
+  "max_physical_requests": 14,
+  "max_micro_usd": 1000000,
+  "existing_key_only": true,
+  "model": "gpt-4.1-mini-2025-04-14",
+  "runtime_sha256": "1410dfa077f9a05fde1f53e8bfc4ed1175dfcd798737b7200c3dd88f5b76a540",
+  "freeze_sha256": "4109d31c0f1e808b7ef9e45963e7e2f0f1b8d0592ae487b713f42c3f8dbeb998",
+  "user_message": "approved",
+  "recorded_utc": "2026-09-14T15:40:18Z",
+  "allow_unattempted_resume": true,
+  "approval_context": {
+    "source": "New user message received after completion of exact-head CI and after two explicit request_user_input_async approval questions",
+    "budget_question": "Approve a new frozen typed-evaluation-02 batch: at most 14 physical OpenAI requests and USD 1.00 total, existing key, pinned gpt-4.1-mini-2025-04-14, no retries; includes resuming only never-attempted cases in the same immutable batch/budget after verified terminal prior process; execution waits for green exact-head CI.",
+    "firewall_question": "If needed, allow only /Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/typed-runtime-02-01/kicadai-board-family to api.openai.com:443. LuLu offers hostname/port but no TCP-only selector; evaluator uses TCP.",
+    "separate_firewall_scope": {
+      "allowedIfNeeded": true,
+      "executable": "/Users/dshills/Development/projects/KiCadAI/.cache/board-family-v2/typed-runtime-02-01/kicadai-board-family",
+      "host": "api.openai.com",
+      "port": 443,
+      "noTCPSelector": true
+    }
+  },
+  "execution_limits": {
+    "one_frozen_batch": true,
+    "no_retries": true,
+    "no_probes": true,
+    "no_recovery_baseline": true,
+    "no_model_or_contract_changes": true,
+    "no_gemini_review": true,
+    "no_fabrication_or_physical_work": true
+  },
+  "verified_ci": {
+    "commit": "9db09dfc29244c4160e83867698e100d5221f55a",
+    "standard_run": 34862239873,
+    "standard_jobs_passed": 25,
+    "runner_run": 34862239958,
+    "runner_jobs_passed": 1
+  }
+}

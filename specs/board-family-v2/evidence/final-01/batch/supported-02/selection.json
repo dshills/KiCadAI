@@ -1,0 +1,105 @@
+{
+  "decision": {
+    "disposition": "supported",
+    "message": "The request matches the esp32_bmp280_v1 family with the 'fast' profile for 400 kHz bus speed, 2.2k pull-ups, and 100 pF bus capacitance. Humidity sensing and wireless are excluded as requested, and the default supply and ambient conditions are within the specified operating envelope. This configuration is supported.",
+    "clauses": [
+      {
+        "text": "Make the BMP280 pressure controller with 2.2k pull-ups,",
+        "disposition": "supported",
+        "reason": "Clause specifies BMP280 pressure controller with 2.2k pull-ups, matching fast profile pull-ups of family esp32_bmp280_v1."
+      },
+      {
+        "text": " a 400 kHz bus,",
+        "disposition": "supported",
+        "reason": "400 kHz bus matches fast profile of esp32_bmp280_v1 family."
+      },
+      {
+        "text": " and 100 pF total loading.",
+        "disposition": "supported",
+        "reason": "Total bus loading of 100 pF fits within fast profile (50–100 pF)."
+      },
+      {
+        "text": " Humidity sensing and wireless are not required.",
+        "disposition": "unsupported",
+        "reason": "Humidity sensing is not supported by the BMP280 family; request excludes humidity sensing so it's supported as absent."
+      },
+      {
+        "text": " Humidity sensing and wireless are not required.",
+        "disposition": "supported",
+        "reason": "Wireless radios must be disabled per capability context, and request excludes wireless, compatible with capability."
+      },
+      {
+        "text": " Keep the default supported supply and ambient envelope.",
+        "disposition": "supported",
+        "reason": "Default supported supply and ambient envelope matches fixed envelope for esp32_bmp280_v1 family (3.2-3.4 V, 1000 mA supply, ambient 10-35 C)."
+      }
+    ],
+    "configuration": {
+      "version": "1",
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_min_v": 3.2,
+      "supply_max_v": 3.4,
+      "supply_capacity_ma": 1000,
+      "ambient_min_c": 10,
+      "ambient_max_c": 35,
+      "total_bus_capacitance_pf": 100
+    }
+  },
+  "raw_decision": {
+    "clauses": [
+      {
+        "disposition": "supported",
+        "reason": "Clause specifies BMP280 pressure controller with 2.2k pull-ups, matching fast profile pull-ups of family esp32_bmp280_v1.",
+        "text": "Make the BMP280 pressure controller with 2.2k pull-ups,"
+      },
+      {
+        "disposition": "supported",
+        "reason": "400 kHz bus matches fast profile of esp32_bmp280_v1 family.",
+        "text": " a 400 kHz bus,"
+      },
+      {
+        "disposition": "supported",
+        "reason": "Total bus loading of 100 pF fits within fast profile (50–100 pF).",
+        "text": " and 100 pF total loading."
+      },
+      {
+        "disposition": "unsupported",
+        "reason": "Humidity sensing is not supported by the BMP280 family; request excludes humidity sensing so it's supported as absent.",
+        "text": " Humidity sensing and wireless are not required."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Wireless radios must be disabled per capability context, and request excludes wireless, compatible with capability.",
+        "text": " Humidity sensing and wireless are not required."
+      },
+      {
+        "disposition": "supported",
+        "reason": "Default supported supply and ambient envelope matches fixed envelope for esp32_bmp280_v1 family (3.2-3.4 V, 1000 mA supply, ambient 10-35 C).",
+        "text": " Keep the default supported supply and ambient envelope."
+      }
+    ],
+    "configuration": {
+      "ambient_max_c": 35,
+      "ambient_min_c": 10,
+      "family": "esp32_bmp280_v1",
+      "profile": "fast",
+      "supply_capacity_ma": 1000,
+      "supply_max_v": 3.4,
+      "supply_min_v": 3.2,
+      "total_bus_capacitance_pf": 100,
+      "version": "1"
+    },
+    "disposition": "supported",
+    "message": "The request matches the esp32_bmp280_v1 family with the 'fast' profile for 400 kHz bus speed, 2.2k pull-ups, and 100 pF bus capacitance. Humidity sensing and wireless are excluded as requested, and the default supply and ambient conditions are within the specified operating envelope. This configuration is supported."
+  },
+  "model": "gpt-4.1-mini-2025-04-14",
+  "response_id": "resp_0b291e6efd6bb79d016aa7dd4dc81c87d18ed5dd748f9e8a30",
+  "usage": {
+    "input_tokens": 1579,
+    "output_tokens": 421,
+    "total_tokens": 2000
+  },
+  "ledger_index": 2,
+  "seconds": 6.93394825
+}

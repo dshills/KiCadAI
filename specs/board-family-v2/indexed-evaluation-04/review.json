@@ -1,0 +1,3245 @@
+{
+  "status": "source-bound-semantic-review",
+  "reviewer": {
+    "kind": "implementing-agent",
+    "name": "Codex implementing agent; not independent review"
+  },
+  "reviewed_utc": "2026-09-15T11:17:57Z",
+  "bindings": {
+    "plan_sha256": "fa0e4b6c3f5fde0b54ebaf2836305bc0b86f804efbf5f94eeb050071e5ee91cf",
+    "manifest_sha256": "d3996a549ae1995f933179f8f73e93e21e23cb559465830ec5291b9ecc8322e4",
+    "result_sha256": "3398d3004f3d996eda544e0ef370517fab79a0fd9375d4c3dc4e6af182ca6697",
+    "cases_sha256": "90bbc1f728374a9d3ba55d1fa7ff5583ede74bf6107f833eb51758ae5ebee867",
+    "selection_sha256": {
+      "useful-01": "806bab97d050cafa41787e2dbf067fff1edc48348742343e74483db0c4527031",
+      "useful-02": "26d90de65915325ac27e8c709daf6206486805cdc10af1fb1f1386edccf36bf3",
+      "useful-03": "61416430bd03352085866adcabef5483fe4bd5b446c94385ac8cb53789148e67",
+      "useful-04": "f4670690f70071913b6ec3b34913368abe62a9b1c556ec1a688a771ee23c3c1f",
+      "useful-05": "f14ab825f4efe1217dab41c6a1beb81eb1d58c86a86fcbdddd99c021b5e75b40",
+      "choice-01": "a116c610379c2f190b3e2b04fe70e14a60f566bcc55245a20214fd7a5743b518",
+      "choice-02": "71328d39085373fe177e6f87752c671c429ca327c4c57438875e54d8516b03f6",
+      "choice-03": "e30fd7a138883694568f798a1af1d34810b26b9fa4b4b278e3c4086c99e68e14",
+      "refuse-01": "17c23f8889b5be662a2d4f5efe7ef6e53dc42cd1495838e393ba2d419264219a",
+      "refuse-02": "533427295516bc7de295fbbfa9d4ec9f0a9047cd5e7ae8678c098b2f583b52a7",
+      "refuse-03": "950bf6cebb61415181d3117c84730f9afa58b1eedb90ec98c785cd87e2898fc2",
+      "refuse-04": "36c78e8d82a7c13626c2521799a645d250c5ad5d466f41931e77ea4830b64182",
+      "refuse-05": "2c01bbe0f89518bf79bad786d180c3731831ac900379b70ac1fa9e414cd8e349",
+      "refuse-06": "3a36bfe0654af3cd8b1a7357dae9724a921bab1fc9c39f5543811adccf042fcb"
+    }
+  },
+  "cases": [
+    {
+      "id": "useful-01",
+      "original_prompt": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "Wireless operation is unsupported; radios must remain disabled.",
+        "clauses": [
+          {
+            "text": "Hello! Could you put together a wired pressure monitor for my desk? Your standard profile and reviewed default operating limits are fine. Thank you.",
+            "disposition": "unsupported",
+            "reason": "Wireless operation is unsupported; radios must remain disabled."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Politeness and desk context must not cause clarification. Preserve pressure and standard profile; do not invent electrical limits or extra capabilities. Use catalog defaults.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "e61ba7dcef080c2c8b16d2c6be4785f7147142e40d768c09c858351ec238e7e0",
+      "selection_sha256": "806bab97d050cafa41787e2dbf067fff1edc48348742343e74483db0c4527031",
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Both requested facts are present, but an invented affirmative wireless fact causes false refusal of a supported wired pressure board.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "pressure"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Could you put together a wired pressure monitor for my desk?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 explicitly asks for pressure measurement. No named sensor is inferred."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "wireless_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Could you put together a wired pressure monitor for my desk?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Clause 1 asks for a wired monitor, not wireless operation. The affirmative wireless requirement is invented."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              2
+            ],
+            "state": "required",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 2,
+              "text": " Your standard profile and reviewed default operating limits are fine."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 2 expressly accepts the standard profile and reviewed defaults."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "pressure",
+          "requirement": {
+            "id": "pressure",
+            "description": "Pressure measurement is actually requested; no sensor was named.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 1 explicitly asks for pressure measurement. No named sensor is inferred."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "The standard profile is selected, not an unresolved choice.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Clause 2 expressly accepts the standard profile and reviewed defaults."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "False refusal: the wireless restriction is true for the catalog but irrelevant to this wired request. No board was generated."
+      }
+    },
+    {
+      "id": "useful-02",
+      "original_prompt": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance. Humidity and wireless telemetry are not needed. The reviewed default supply and ambient limits are acceptable.",
+      "decision_context": {
+        "disposition": "supported",
+        "message": "Selected esp32_bmp280_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply.",
+        "clauses": [
+          {
+            "text": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance. Humidity and wireless telemetry are not needed. The reviewed default supply and ambient limits are acceptable.",
+            "disposition": "supported",
+            "reason": "Selected esp32_bmp280_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_bmp280_v1",
+          "profile": "fast",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "review_rubric": "Infer fast from exact bus/resistor values without inventing an explicit named profile fact. Retain both exclusions and all quantities.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "3875569f50031b85f8baee364ff9574645afe637351311a09e894dfc5bc72b88",
+      "selection_sha256": "26d90de65915325ac27e8c709daf6206486805cdc10af1fb1f1386edccf36bf3",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "All six requirements and their negation/quantity roles are faithful. Fast is inferred by the application from exact values, not invented as an explicitly named profile fact.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests BMP280."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "pullup_ohms"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 45,
+              "end": 55,
+              "text": "2.2 kilohm",
+              "fields": {
+                "pullup_ohms": 2200
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 0 is 2.2 kilohm pull-ups, exactly 2200 ohms."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              1
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "clock_hz"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 1,
+              "clause_id": 0,
+              "start": 70,
+              "end": 83,
+              "text": "400 kilohertz",
+              "fields": {
+                "clock_hz": 400000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 1 in clause 0 is a 400 kilohertz I2C bus, exactly 400000 Hz."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              2
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 2,
+              "clause_id": 0,
+              "start": 96,
+              "end": 102,
+              "text": "100 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 100
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 2 in clause 0 declares 100 pF total bus capacitance."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "not_required",
+            "value": "humidity"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Humidity and wireless telemetry are not needed."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 says humidity is not needed; not_required preserves the exclusion without inventing a prohibition."
+        },
+        {
+          "fact_index": 5,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "not_required",
+            "value": "wireless_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Humidity and wireless telemetry are not needed."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 says wireless telemetry is not needed; the state is not_required, not required."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly requests BMP280."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "2.2 kilohms means 2200 ohms.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 2200
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Quantity 0 in clause 0 is 2.2 kilohm pull-ups, exactly 2200 ohms."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "400 kilohertz means 400000 Hz I2C clock.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 400000
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Quantity 1 in clause 0 is a 400 kilohertz I2C bus, exactly 400000 Hz."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Declared bus capacitance is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            3
+          ],
+          "notes": "Supported by fact 3: Quantity 2 in clause 0 declares 100 pF total bus capacitance."
+        },
+        {
+          "id": "humidity-excluded",
+          "requirement": {
+            "id": "humidity-excluded",
+            "description": "Humidity is not required, not an additional sensor requirement or a prohibition.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            4
+          ],
+          "notes": "Supported by fact 4: Clause 1 says humidity is not needed; not_required preserves the exclusion without inventing a prohibition."
+        },
+        {
+          "id": "wireless-excluded",
+          "requirement": {
+            "id": "wireless-excluded",
+            "description": "Wireless telemetry is excluded from requirements, not demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "wireless_operation",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            5
+          ],
+          "notes": "Supported by fact 5: Clause 1 says wireless telemetry is not needed; the state is not_required, not required."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The exact BMP280 fast configuration with 100 pF and reviewed operating defaults was generated. All 39 compared native/export deliverables matched the reviewed example."
+      }
+    },
+    {
+      "id": "useful-03",
+      "original_prompt": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance. I only mean reducing pull-up current, not whole-board power or battery operation. Use the normal reviewed operating limits.",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "The source-referenced extraction could not be validated; no board was generated.",
+        "clauses": [
+          {
+            "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance. I only mean reducing pull-up current, not whole-board power or battery operation. Use the normal reviewed operating limits.",
+            "disposition": "clarify",
+            "reason": "The source-referenced extraction could not be validated; no board was generated."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Do not recast a clear pull-up-only optimization as battery support or an ambiguous low-power request.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "c34ee4a1d080a1a94a917f9ba948b2b8086b006c8203f14da7215a0b8bb8d309",
+      "selection_sha256": "61416430bd03352085866adcabef5483fe4bd5b446c94385ac8cb53789148e67",
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0,
+              2
+            ],
+            "state": "required",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance."
+            },
+            {
+              "id": 2,
+              "text": " Use the normal reviewed operating limits."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": false,
+          "notes": "BMP280 is explicitly required in clause 0. The additional citation to clause 2 (normal operating limits) does not support sensor identity."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "low_current"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly selects the pull-up-only low_current profile."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "pullup_ohms"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 58,
+              "end": 61,
+              "text": "10k",
+              "fields": {
+                "pullup_ohms": 10000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 0 denotes 10k pull-ups, exactly 10000 ohms."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              1
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "clock_hz"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 1,
+              "clause_id": 0,
+              "start": 78,
+              "end": 85,
+              "text": "100 kHz",
+              "fields": {
+                "clock_hz": 100000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 1 in clause 0 denotes a 100 kHz bus, exactly 100000 Hz."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              2
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 board using the low_current profile: 10k I2C pull-ups, a 100 kHz bus and 100 pF total capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 2,
+              "clause_id": 0,
+              "start": 94,
+              "end": 100,
+              "text": "100 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 100
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 2 in clause 0 denotes 100 pF total capacitance."
+        },
+        {
+          "fact_index": 5,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "not_required",
+            "value": "whole_board_low_power"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I only mean reducing pull-up current, not whole-board power or battery operation."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 58,
+              "end": 61,
+              "text": "10k",
+              "fields": {
+                "pullup_ohms": 10000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": false,
+          "notes": "Clause 1 excludes whole-board power optimization, but quantity 0 is an unrelated 10k pull-up value in uncited clause 0. The recorded validator rejects fact 5 for invalid, duplicated or uncited source quantity."
+        },
+        {
+          "fact_index": 6,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "not_required",
+            "value": "battery_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I only mean reducing pull-up current, not whole-board power or battery operation."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 58,
+              "end": 61,
+              "text": "10k",
+              "fields": {
+                "pullup_ohms": 10000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": false,
+          "notes": "Clause 1 excludes battery operation, but the attached quantity 0 belongs to uncited clause 0 and measures pull-up resistance, not battery scope."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "The pull-up-only low_current profile is explicitly requested.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "low_current",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "Pull-ups are 10000 ohms.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 10000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "I2C clock is 100000 Hz.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 100000
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Bus capacitance is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "power-scope",
+          "requirement": {
+            "id": "power-scope",
+            "description": "Whole-board power optimization is not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "whole_board_low_power",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        },
+        {
+          "id": "battery-excluded",
+          "requirement": {
+            "id": "battery-excluded",
+            "description": "Battery operation is not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "battery_operation",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. The intended requirements are textually represented, but invalid cross-clause quantity citations invalidate the complete extraction. Correct individual facts cannot rescue a structurally invalid response. No facts or outputs were repaired."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Safe withholding is not useful-case success: a generic extraction-error clarification neither generates the supported board nor asks about an actual unresolved user requirement."
+      }
+    },
+    {
+      "id": "useful-04",
+      "original_prompt": "Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+      "decision_context": {
+        "disposition": "supported",
+        "message": "Selected esp32_sht31_v1/standard from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply.",
+        "clauses": [
+          {
+            "text": "Would you make an indoor temperature and humidity monitor for me? Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits. I don't need pressure measurement. Thanks!",
+            "disposition": "supported",
+            "reason": "Selected esp32_sht31_v1/standard from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_sht31_v1",
+          "profile": "standard",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 70
+        }
+      },
+      "review_rubric": "Select SHT31 from required measurements. Politeness and the negative pressure clause must not cause false refusal or generic restatement.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "50ce54728682c6695fa32b141be7bfda424659a5eef0e2d3ea57d031dec317c9",
+      "selection_sha256": "f4670690f70071913b6ec3b34913368abe62a9b1c556ec1a688a771ee23c3c1f",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "Both measurements, the standard profile, 70 pF and the pressure exclusion are preserved without inventing a named sensor.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "temperature"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Would you make an indoor temperature and humidity monitor for me?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests an indoor temperature monitor."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "humidity"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Would you make an indoor temperature and humidity monitor for me?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 also explicitly requests humidity measurement."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              2
+            ],
+            "state": "not_required",
+            "value": "pressure"
+          },
+          "source_context": [
+            {
+              "id": 2,
+              "text": " I don't need pressure measurement."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 2 says pressure measurement is not needed."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 explicitly selects the standard profile."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Please use your standard profile, 70 pF total bus capacitance, and the reviewed default electrical and ambient limits."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 100,
+              "end": 105,
+              "text": "70 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 70
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 1 declares exactly 70 pF total bus capacitance."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "temperature",
+          "requirement": {
+            "id": "temperature",
+            "description": "Temperature is required; no exact sensor was named.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "temperature",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly requests an indoor temperature monitor."
+        },
+        {
+          "id": "humidity",
+          "requirement": {
+            "id": "humidity",
+            "description": "Humidity is required.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 0 also explicitly requests humidity measurement."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Standard profile is selected.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            3
+          ],
+          "notes": "Supported by fact 3: Clause 1 explicitly selects the standard profile."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Bus capacitance is 70 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 70
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            4
+          ],
+          "notes": "Supported by fact 4: Quantity 0 in clause 1 declares exactly 70 pF total bus capacitance."
+        },
+        {
+          "id": "pressure-excluded",
+          "requirement": {
+            "id": "pressure-excluded",
+            "description": "Pressure is excluded from requirements.",
+            "any_of": [
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "not_required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Clause 2 says pressure measurement is not needed."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The application selected SHT31 standard from required measurements, retained 70 pF and defaults, and produced 42 matching native/export deliverables."
+      }
+    },
+    {
+      "id": "useful-05",
+      "original_prompt": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+      "decision_context": {
+        "disposition": "supported",
+        "message": "Selected esp32_sht31_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply.",
+        "clauses": [
+          {
+            "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please. Do not run the heater at any time. Use the reviewed default power and ambient limits.",
+            "disposition": "supported",
+            "reason": "Selected esp32_sht31_v1/fast from the source-bound requirement extraction. Operating limits are declared bounds, not measurements. The fixed catalog conditions and separate firmware/assembly/bench obligations still apply."
+          }
+        ],
+        "configuration": {
+          "version": "1",
+          "family": "esp32_sht31_v1",
+          "profile": "fast",
+          "supply_min_v": 3.2,
+          "supply_max_v": 3.4,
+          "supply_capacity_ma": 1000,
+          "ambient_min_c": 10,
+          "ambient_max_c": 35,
+          "total_bus_capacitance_pf": 100
+        }
+      },
+      "review_rubric": "The negative heater instruction must not be mistaken for an affirmative demand.",
+      "required_reason": null,
+      "question_must_resolve": null,
+      "prompt_sha256": "641165b916600ae406b3e8a14df919992bc86f0682fccefd9a2ffeea462ead30",
+      "selection_sha256": "f14ab825f4efe1217dab41c6a1beb81eb1d58c86a86fcbdddd99c021b5e75b40",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "The explicitly named SHT31 fast configuration, bus loading and global heater prohibition are faithfully preserved.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly names SHT31."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "fast"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly selects the fast profile."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "forbidden",
+            "value": "heater_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Do not run the heater at any time."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 says not to run the heater at any time, supporting forbidden heater operation."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "For this wired controller I'd like SHT31 with the fast profile and 100 pF total bus loading, please."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 67,
+              "end": 73,
+              "text": "100 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 100
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 0 states 100 pF total bus loading."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly names SHT31."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Fast profile is selected.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "fast",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 0 explicitly selects the fast profile."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "Total bus loading is 100 pF.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            3
+          ],
+          "notes": "Supported by fact 3: Quantity 0 in clause 0 states 100 pF total bus loading."
+        },
+        {
+          "id": "heater-forbidden",
+          "requirement": {
+            "id": "heater-forbidden",
+            "description": "Heater operation is explicitly forbidden, not requested.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "heater_operation",
+                "state": "forbidden"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Clause 1 says not to run the heater at any time, supporting forbidden heater operation."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "SHT31 fast with 100 pF and reviewed defaults was generated, with the heater-off contract retained and all 42 native/export comparisons passing."
+      }
+    },
+    {
+      "id": "choice-01",
+      "original_prompt": "Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "Which measurement do you need: pressure with BMP280, or temperature/humidity with SHT31?",
+        "clauses": [
+          {
+            "text": "Hello, I'd like a sensor controller for an indoor project. Can you make one?",
+            "disposition": "clarify",
+            "reason": "Which measurement do you need: pressure with BMP280, or temperature/humidity with SHT31?"
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "No measurement or sensor is specified. A targeted measurement question is required; politeness alone is not an ambiguity. Raw facts must not invent a named sensor or measurement.",
+      "required_reason": null,
+      "question_must_resolve": "Which measurement is required: pressure or temperature/humidity. No silently selected family.",
+      "prompt_sha256": "bc7be7d62fdcec5a6b3ed6911b2d83672c67add8f485b2f371df1679a1828da1",
+      "selection_sha256": "a116c610379c2f190b3e2b04fe70e14a60f566bcc55245a20214fd7a5743b518",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "No sensor, measurement or electrical requirement is supplied. Empty facts are correct; no capability is invented from indoor context or politeness.",
+      "facts": [],
+      "requirements": [],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The application asks exactly which measurement is needed and does not silently choose a family or generate a board."
+      }
+    },
+    {
+      "id": "choice-02",
+      "original_prompt": "Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project; I haven't chosen which one I need. What should we settle before you generate the board?",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "Which measurement do you need: pressure with BMP280, or temperature/humidity with SHT31?",
+        "clauses": [
+          {
+            "text": "Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project; I haven't chosen which one I need. What should we settle before you generate the board?",
+            "disposition": "clarify",
+            "reason": "Which measurement do you need: pressure with BMP280, or temperature/humidity with SHT31?"
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Both alternatives remain unresolved. Neither refusal for combined sensing nor silently choosing one is correct.",
+      "required_reason": null,
+      "question_must_resolve": "Resolve the measurement/family choice, not a fabricated requirement for both sensors.",
+      "prompt_sha256": "0ae7a2afd13996c5cd9cbfdfc9ae46fe9ae833e36818151567192683c2ba82ca",
+      "selection_sha256": "71328d39085373fe177e6f87752c671c429ca327c4c57438875e54d8516b03f6",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "Both explicitly unresolved alternatives are retained; their named sensor facts satisfy the frozen alternative-based rubric without duplicate measurement facts.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "uncertain",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project;"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 presents BMP280 pressure sensing as one either/or possibility, not a selected requirement. The later unchosen statement corroborates uncertain."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "uncertain",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Either BMP280 pressure sensing or SHT31 humidity sensing could suit this project;"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 presents SHT31 humidity sensing as the other either/or possibility. Neither family is required or forbidden."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "BMP-choice",
+          "requirement": {
+            "id": "BMP-choice",
+            "description": "BMP280/pressure is one unresolved alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "uncertain"
+              },
+              {
+                "kind": "measurement",
+                "value": "pressure",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 presents BMP280 pressure sensing as one either/or possibility, not a selected requirement. The later unchosen statement corroborates uncertain."
+        },
+        {
+          "id": "SHT-choice",
+          "requirement": {
+            "id": "SHT-choice",
+            "description": "SHT31/humidity is the other unresolved alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "uncertain"
+              },
+              {
+                "kind": "measurement",
+                "value": "humidity",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 0 presents SHT31 humidity sensing as the other either/or possibility. Neither family is required or forbidden."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The targeted measurement/family question resolves the genuine choice and does not refuse a fabricated combined-sensor demand."
+      }
+    },
+    {
+      "id": "choice-03",
+      "original_prompt": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "Which I2C profile do you require: standard, fast, or BMP280-only low_current?",
+        "clauses": [
+          {
+            "text": "Please use SHT31. I am deciding between the standard profile and the fast profile, and I don't have a preference yet.",
+            "disposition": "clarify",
+            "reason": "Which I2C profile do you require: standard, fast, or BMP280-only low_current?"
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "A missing profile may default; this explicitly undecided profile may not.",
+      "required_reason": null,
+      "question_must_resolve": "Ask which I2C profile to use, rather than silently applying a default.",
+      "prompt_sha256": "36ee7c7c2d3ecc3b8e4346632edac9d4a44a8227d0ca1f5d770dc7d8a725f109",
+      "selection_sha256": "e30fd7a138883694568f798a1af1d34810b26b9fa4b4b278e3c4086c99e68e14",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "SHT31 is selected while the two named profiles remain explicitly undecided. The application does not silently default.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please use SHT31."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 directly selects SHT31."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "uncertain",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I am deciding between the standard profile and the fast profile, and I don't have a preference yet."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 says standard is one undecided profile alternative."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "uncertain",
+            "value": "fast"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I am deciding between the standard profile and the fast profile, and I don't have a preference yet."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 says fast is the other undecided profile alternative."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is selected.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 directly selects SHT31."
+        },
+        {
+          "id": "standard-choice",
+          "requirement": {
+            "id": "standard-choice",
+            "description": "Standard is unresolved.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 1 says standard is one undecided profile alternative."
+        },
+        {
+          "id": "fast-choice",
+          "requirement": {
+            "id": "fast-choice",
+            "description": "Fast is unresolved.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "fast",
+                "state": "uncertain"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Clause 1 says fast is the other undecided profile alternative."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The application asks which I2C profile to use. Its extra BMP280-only low_current option is unnecessary UX detail but explicitly labeled as belonging to the other family, not an incorrect selection."
+      }
+    },
+    {
+      "id": "refuse-01",
+      "original_prompt": "Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "Neither family combines pressure with humidity/ambient-temperature sensing; no single-sensor substitution is authorized.",
+        "clauses": [
+          {
+            "text": "Please put a BMP280 and an SHT31 together on one ESP32 board. I need both pressure and humidity measurements; omitting either sensor won't meet the requirement.",
+            "disposition": "unsupported",
+            "reason": "Neither family combines pressure with humidity/ambient-temperature sensing; no single-sensor substitution is authorized."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Both sensors are mandatory. Preserve the conjunction and refusal of degraded substitution.",
+      "required_reason": "Neither reviewed family includes both sensors. No single-sensor substitution.",
+      "question_must_resolve": null,
+      "prompt_sha256": "8e2b690786b0db1175db63a7b460029bc39836ce41ea85d29dee787c8d72eef0",
+      "selection_sha256": "17c23f8889b5be662a2d4f5efe7ef6e53dc42cd1495838e393ba2d419264219a",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "The conjunction and prohibition on dropping either sensor are preserved along with the two required measurements.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0,
+              2
+            ],
+            "state": "required",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please put a BMP280 and an SHT31 together on one ESP32 board."
+            },
+            {
+              "id": 2,
+              "text": " omitting either sensor won't meet the requirement."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 requests BMP280 together with SHT31; clause 2 reinforces that neither sensor may be omitted."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0,
+              2
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please put a BMP280 and an SHT31 together on one ESP32 board."
+            },
+            {
+              "id": 2,
+              "text": " omitting either sensor won't meet the requirement."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 also requires SHT31; clause 2 rejects single-sensor substitution."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              1,
+              2
+            ],
+            "state": "required",
+            "value": "pressure"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I need both pressure and humidity measurements;"
+            },
+            {
+              "id": 2,
+              "text": " omitting either sensor won't meet the requirement."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 requires pressure with humidity; clause 2 reinforces the mandatory combined scope."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              1,
+              2
+            ],
+            "state": "required",
+            "value": "humidity"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I need both pressure and humidity measurements;"
+            },
+            {
+              "id": 2,
+              "text": " omitting either sensor won't meet the requirement."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 also requires humidity; clause 2 rejects omitting the corresponding sensor."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "BMP-required",
+          "requirement": {
+            "id": "BMP-required",
+            "description": "BMP280 is required, not an alternative.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 requests BMP280 together with SHT31; clause 2 reinforces that neither sensor may be omitted."
+        },
+        {
+          "id": "SHT-required",
+          "requirement": {
+            "id": "SHT-required",
+            "description": "SHT31 is also required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 0 also requires SHT31; clause 2 rejects single-sensor substitution."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The refusal correctly explains that neither reviewed family combines both measurements and does not substitute a single-sensor board."
+      }
+    },
+    {
+      "id": "refuse-02",
+      "original_prompt": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "total bus capacitance must be 50–70 pF for standard, including board, pins and connections; no stated bound was weakened.",
+        "clauses": [
+          {
+            "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please. My total bus capacitance is 100 pF. Keep that profile and all those values unchanged.",
+            "disposition": "unsupported",
+            "reason": "total bus capacitance must be 50–70 pF for standard, including board, pins and connections; no stated bound was weakened."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "An in-range invented capacitance or fast-profile substitution fails even if native validation passes.",
+      "required_reason": "100 pF exceeds the SHT31 standard maximum of 70 pF; no profile or value substitution.",
+      "question_must_resolve": null,
+      "prompt_sha256": "04a8e730de28d908f362deeb7be0bc529b0481dcf4e0320843d3713372fd542f",
+      "selection_sha256": "533427295516bc7de295fbbfa9d4ec9f0a9047cd5e7ae8678c098b2f583b52a7",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "All fixed quantities and the selected SHT31 standard profile are retained, including the out-of-range 100 pF rather than a substituted default.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests SHT31."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              0,
+              2
+            ],
+            "state": "required",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please."
+            },
+            {
+              "id": 2,
+              "text": " Keep that profile and all those values unchanged."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 selects standard, and clause 2 explicitly requires keeping that profile unchanged."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "pullup_ohms"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 42,
+              "end": 46,
+              "text": "4.7k",
+              "fields": {
+                "pullup_ohms": 4700
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 0 denotes 4.7k pull-ups, exactly 4700 ohms."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              1
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "clock_hz"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like SHT31 with the standard profile, 4.7k pull-ups and a 100 kHz I2C bus, please."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 1,
+              "clause_id": 0,
+              "start": 62,
+              "end": 69,
+              "text": "100 kHz",
+              "fields": {
+                "clock_hz": 100000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 1 in clause 0 denotes 100 kHz I2C, exactly 100000 Hz."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              2
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " My total bus capacitance is 100 pF."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 2,
+              "clause_id": 1,
+              "start": 115,
+              "end": 121,
+              "text": "100 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 100
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 2 in clause 1 declares 100 pF; it is not replaced by the 70 pF supported default."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly requests SHT31."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "Standard profile cannot be changed.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "standard",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            1
+          ],
+          "notes": "Supported by fact 1: Clause 0 selects standard, and clause 2 explicitly requires keeping that profile unchanged."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "4700 ohm pull-ups cannot be changed.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 4700
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Quantity 0 in clause 0 denotes 4.7k pull-ups, exactly 4700 ohms."
+        },
+        {
+          "id": "clock",
+          "requirement": {
+            "id": "clock",
+            "description": "100000 Hz I2C clock cannot be changed.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "clock_hz",
+                "number": 100000
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            3
+          ],
+          "notes": "Supported by fact 3: Quantity 1 in clause 0 denotes 100 kHz I2C, exactly 100000 Hz."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "100 pF must not become the 70 pF supported default.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            4
+          ],
+          "notes": "Supported by fact 4: Quantity 2 in clause 1 declares 100 pF; it is not replaced by the 70 pF supported default."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The refusal explains the standard-profile 50–70 pF bound and retains the stated incompatible value without changing profile or sensor."
+      }
+    },
+    {
+      "id": "refuse-03",
+      "original_prompt": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "The requested/forbidden profiles, I2C clock and pull-ups do not match a reviewed profile for esp32_sht31_v1. No alternative was substituted.",
+        "clauses": [
+          {
+            "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.",
+            "disposition": "unsupported",
+            "reason": "The requested/forbidden profiles, I2C clock and pull-ups do not match a reviewed profile for esp32_sht31_v1. No alternative was substituted."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Question-form wording is an actual configuration request, not uncertainty about which sensor to use.",
+      "required_reason": "The low_current/10k profile is BMP280-only; do not replace the requested SHT31.",
+      "question_must_resolve": null,
+      "prompt_sha256": "32f5ed565dd8dcb45828dc0e0906c2a0be887a9a81703d005bed0d699a2098e7",
+      "selection_sha256": "950bf6cebb61415181d3117c84730f9afa58b1eedb90ec98c785cd87e2898fc2",
+      "raw_complete": false,
+      "omitted_requirements": [
+        "Required low_current profile is corrupted into a forbidden profile."
+      ],
+      "notes": "Question-form wording is an affirmative configuration request. The model wrongly marks the requested low_current profile forbidden. The refusal happens to remain correct because 10k does not match a reviewed SHT31 profile.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests the SHT31 board."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "forbidden",
+            "value": "low_current"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups?"
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Clause 0 asks for low_current; it never forbids that profile. Catalog incompatibility must not be rewritten as user prohibition."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "pullup_ohms"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups?"
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 63,
+              "end": 66,
+              "text": "10k",
+              "fields": {
+                "pullup_ohms": 10000
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 0 in clause 0 requests 10k I2C pull-ups, exactly 10000 ohms."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              1
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "total_bus_capacitance_pf"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " Please declare 100 pF total capacitance."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 1,
+              "clause_id": 1,
+              "start": 96,
+              "end": 102,
+              "text": "100 pF",
+              "fields": {
+                "total_bus_capacitance_pf": 100
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Quantity 1 in clause 1 declares 100 pF total capacitance."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly requests the SHT31 board."
+        },
+        {
+          "id": "profile",
+          "requirement": {
+            "id": "profile",
+            "description": "low_current is requested for the wrong family.",
+            "any_of": [
+              {
+                "kind": "profile",
+                "value": "low_current",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. Question-form wording is an affirmative configuration request. The model wrongly marks the requested low_current profile forbidden. The refusal happens to remain correct because 10k does not match a reviewed SHT31 profile."
+        },
+        {
+          "id": "pullups",
+          "requirement": {
+            "id": "pullups",
+            "description": "10000 ohm pull-ups are required.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "pullup_ohms",
+                "number": 10000
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Quantity 0 in clause 0 requests 10k I2C pull-ups, exactly 10000 ohms."
+        },
+        {
+          "id": "capacitance",
+          "requirement": {
+            "id": "capacitance",
+            "description": "100 pF is explicitly declared.",
+            "any_of": [
+              {
+                "kind": "number",
+                "value": "total_bus_capacitance_pf",
+                "number": 100
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            3
+          ],
+          "notes": "Supported by fact 3: Quantity 1 in clause 1 declares 100 pF total capacitance."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The refusal truthfully states that the profile/pull-up request does not match a reviewed SHT31 profile and makes no substitution. This correct final refusal does not earn raw-extraction credit."
+      }
+    },
+    {
+      "id": "refuse-04",
+      "original_prompt": "I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "The SHT31 heater must remain off; heater operation is outside the reviewed family.",
+        "clauses": [
+          {
+            "text": "I'd like the SHT31 controller with the reviewed electrical defaults. At startup the heater should stay off. Once normal readings begin, energize its heater between the humidity samples.",
+            "disposition": "unsupported",
+            "reason": "The SHT31 heater must remain off; heater operation is outside the reviewed family."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Retain the temporal contrast. Startup-off must not erase the later affirmative heater requirement. A generic firmware caveat cannot authorize it.",
+      "required_reason": "Heater operation at any time violates the reviewed heater-off condition.",
+      "question_must_resolve": null,
+      "prompt_sha256": "ec6bead157253f7d2bb461fdfa8af981e19ba0f0c94f9c2ae86c7662bf92706a",
+      "selection_sha256": "36c78e8d82a7c13626c2521799a645d250c5ad5d466f41931e77ea4830b64182",
+      "raw_complete": true,
+      "omitted_requirements": [],
+      "notes": "The temporally scoped startup prohibition and later affirmative heater operation are both retained. The first does not erase the second.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "I'd like the SHT31 controller with the reviewed electrical defaults."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 directly requests SHT31."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              1
+            ],
+            "state": "forbidden",
+            "value": "heater_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " At startup the heater should stay off."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 forbids heater operation specifically at startup; its source citation preserves that local scope."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "feature",
+            "quantities": [],
+            "sources": [
+              2
+            ],
+            "state": "required",
+            "value": "heater_operation"
+          },
+          "source_context": [
+            {
+              "id": 2,
+              "text": " Once normal readings begin, energize its heater between the humidity samples."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 2 explicitly requires energizing the heater once normal readings begin."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 directly requests SHT31."
+        },
+        {
+          "id": "later-heater",
+          "requirement": {
+            "id": "later-heater",
+            "description": "Later heater operation is required despite the startup-off condition.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "heater_operation",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            2
+          ],
+          "notes": "Supported by fact 2: Clause 2 explicitly requires energizing the heater once normal readings begin."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The refusal explains the reviewed heater-off condition, which excludes the later required heater operation at any time. No board or generic firmware exception was supplied."
+      }
+    },
+    {
+      "id": "refuse-05",
+      "original_prompt": "Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+      "decision_context": {
+        "disposition": "clarify",
+        "message": "The source-referenced extraction could not be validated; no board was generated.",
+        "clauses": [
+          {
+            "text": "Please make a BMP280 controller powered directly from 5 V USB. I also need wireless telemetry, with no external adapter or change to either requirement.",
+            "disposition": "clarify",
+            "reason": "The source-referenced extraction could not be validated; no board was generated."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "Explain both unmet requirements. The negative adapter clause does not negate the positive power or wireless demands.",
+      "required_reason": "Direct 5 V USB power and wireless telemetry are both unsupported; no external adapter or deletion of wireless demand.",
+      "question_must_resolve": null,
+      "prompt_sha256": "827da3a2f89af2454291a0260e4635f99c5bc8d3bf08216ac2047367a5a7bc3f",
+      "selection_sha256": "2c01bbe0f89518bf79bad786d180c3731831ac900379b70ac1fa9e414cd8e349",
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "Positive USB and wireless demands are represented, but cross-clause quantity citations invalidate the extraction and an external-adapter exclusion is misclassified as a GPIO-load prohibition.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "BMP280"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 controller powered directly from 5 V USB."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests BMP280."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "usb"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 controller powered directly from 5 V USB."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 54,
+              "end": 57,
+              "text": "5 V",
+              "fields": {
+                "supply_max_v": 5,
+                "supply_min_v": 5
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 directly demands USB power and its cited quantity 0 is 5 V in the same clause."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "supply_max_v"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 controller powered directly from 5 V USB."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 54,
+              "end": 57,
+              "text": "5 V",
+              "fields": {
+                "supply_max_v": 5,
+                "supply_min_v": 5
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Direct 5 V supply supports a 5 V upper input bound; quantity 0 is correctly located in clause 0."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "supply_min_v"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please make a BMP280 controller powered directly from 5 V USB."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 54,
+              "end": 57,
+              "text": "5 V",
+              "fields": {
+                "supply_max_v": 5,
+                "supply_min_v": 5
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Direct 5 V supply also supports a 5 V lower input bound; quantity 0 is correctly located in clause 0."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "wireless_operation"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I also need wireless telemetry, with no external adapter or change to either requirement."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 54,
+              "end": 57,
+              "text": "5 V",
+              "fields": {
+                "supply_max_v": 5,
+                "supply_min_v": 5
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": false,
+          "notes": "Clause 1 affirmatively requires wireless telemetry, but the attached 5 V quantity belongs to uncited clause 0. The recorded validator rejects fact 4 for invalid, duplicated or uncited source quantity."
+        },
+        {
+          "fact_index": 5,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "forbidden",
+            "value": "external_gpio_load"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I also need wireless telemetry, with no external adapter or change to either requirement."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 0,
+              "start": 54,
+              "end": 57,
+              "text": "5 V",
+              "fields": {
+                "supply_max_v": 5,
+                "supply_min_v": 5
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "No external adapter is not a ban on external GPIO load. The attached 5 V quantity is also from uncited clause 0 and does not support this feature."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "BMP280 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "BMP280",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. Positive USB and wireless demands are represented, but cross-clause quantity citations invalidate the extraction and an external-adapter exclusion is misclassified as a GPIO-load prohibition."
+        },
+        {
+          "id": "USB-power",
+          "requirement": {
+            "id": "USB-power",
+            "description": "Direct 5 V USB power is demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "usb",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. Positive USB and wireless demands are represented, but cross-clause quantity citations invalidate the extraction and an external-adapter exclusion is misclassified as a GPIO-load prohibition."
+        },
+        {
+          "id": "wireless",
+          "requirement": {
+            "id": "wireless",
+            "description": "Wireless telemetry is also demanded.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "wireless_operation",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": false,
+          "fact_indices": [],
+          "notes": "No passing source-bound support under the unchanged whole-extraction structure and meaning checks. Positive USB and wireless demands are represented, but cross-clause quantity citations invalidate the extraction and an external-adapter exclusion is misclassified as a GPIO-load prohibition."
+        }
+      ],
+      "decision": {
+        "correct": false,
+        "targeted_or_truthful": false,
+        "notes": "Generic extraction-error clarification is not the required truthful refusal explaining both unsupported direct 5 V USB power and wireless telemetry. Withholding an invalid configuration is safe but not task success."
+      }
+    },
+    {
+      "id": "refuse-06",
+      "original_prompt": "Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+      "decision_context": {
+        "disposition": "unsupported",
+        "message": "Assembled-board ambient accuracy requires bench characterization; software qualification cannot guarantee it.",
+        "clauses": [
+          {
+            "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults. I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization.",
+            "disposition": "unsupported",
+            "reason": "Assembled-board ambient accuracy requires bench characterization; software qualification cannot guarantee it."
+          }
+        ],
+        "configuration": null
+      },
+      "review_rubric": "The 0.1 C accuracy tolerance is not an ambient operating bound. A bare sensor specification or unmeasured accuracy claim does not satisfy the request.",
+      "required_reason": "Software validation cannot guarantee the requested assembled-board ambient accuracy without measurement/calibration.",
+      "question_must_resolve": null,
+      "prompt_sha256": "a8fa1063ace7ac663d97b9fdae8441830083e1d5d39364f1cf34a699bf3af049",
+      "selection_sha256": "3a36bfe0654af3cd8b1a7357dae9724a921bab1fc9c39f5543811adccf042fcb",
+      "raw_complete": false,
+      "omitted_requirements": [],
+      "notes": "The accuracy guarantee is correctly recognized, but the response invents five prohibitions and treats an accuracy tolerance as ambient operating bounds. Correct refusal must not hide these extra-fact errors.",
+      "facts": [
+        {
+          "fact_index": 0,
+          "fact": {
+            "kind": "sensor",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "SHT31"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly names SHT31."
+        },
+        {
+          "fact_index": 1,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "temperature"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 explicitly requests temperature measurement."
+        },
+        {
+          "fact_index": 2,
+          "fact": {
+            "kind": "measurement",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "humidity"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 also explicitly requests humidity measurement."
+        },
+        {
+          "fact_index": 3,
+          "fact": {
+            "kind": "profile",
+            "quantities": [],
+            "sources": [
+              0
+            ],
+            "state": "required",
+            "value": "standard"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            }
+          ],
+          "quantity_context": [],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 0 asks to use standard electrical defaults; retaining standard is consistent with that stated preference."
+        },
+        {
+          "fact_index": 4,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0,
+              1
+            ],
+            "state": "forbidden",
+            "value": "heater_operation"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            },
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Neither cited clause states a heater prohibition. Catalog heater-off restrictions must not become user facts; the 0.1 C tolerance does not support this prohibition."
+        },
+        {
+          "fact_index": 5,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0,
+              1
+            ],
+            "state": "forbidden",
+            "value": "delivered_firmware"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            },
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "The user excludes calibration and bench characterization, not delivered firmware. Neither cited clause nor the accuracy quantity supports this prohibition."
+        },
+        {
+          "fact_index": 6,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0,
+              1
+            ],
+            "state": "forbidden",
+            "value": "custom_geometry"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            },
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "No custom-geometry prohibition is expressed. The accuracy tolerance and standard electrical defaults do not establish one."
+        },
+        {
+          "fact_index": 7,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0,
+              1
+            ],
+            "state": "forbidden",
+            "value": "external_gpio_load"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            },
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "No external-GPIO-load prohibition is expressed. The 0.1 C accuracy tolerance does not describe GPIO load."
+        },
+        {
+          "fact_index": 8,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              0,
+              1
+            ],
+            "state": "forbidden",
+            "value": "wireless_operation"
+          },
+          "source_context": [
+            {
+              "id": 0,
+              "text": "Please build an SHT31 temperature and humidity board using the standard electrical defaults."
+            },
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "No wireless-operation prohibition is expressed in either cited clause. A catalog radio-off condition is not an extracted user demand."
+        },
+        {
+          "fact_index": 9,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "ambient_max_c"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "Quantity 0 is an accuracy tolerance within 0.1 degrees C, not a maximum operating ambient temperature. Correct numeric bytes do not prove a correct quantity role."
+        },
+        {
+          "fact_index": 10,
+          "fact": {
+            "kind": "number",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "ambient_min_c"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": false,
+          "source_scope_correct": false,
+          "notes": "The same accuracy tolerance is not a minimum operating ambient temperature. The cited clause explicitly concerns guaranteed accuracy."
+        },
+        {
+          "fact_index": 11,
+          "fact": {
+            "kind": "feature",
+            "quantities": [
+              0
+            ],
+            "sources": [
+              1
+            ],
+            "state": "required",
+            "value": "accuracy_guarantee"
+          },
+          "source_context": [
+            {
+              "id": 1,
+              "text": " I need guaranteed assembled-board ambient temperature accuracy within 0.1 degrees C, without calibration or any bench characterization."
+            }
+          ],
+          "quantity_context": [
+            {
+              "id": 0,
+              "clause_id": 1,
+              "start": 163,
+              "end": 176,
+              "text": "0.1 degrees C",
+              "fields": {
+                "ambient_max_c": 0.1,
+                "ambient_min_c": 0.1
+              }
+            }
+          ],
+          "meaning_correct": true,
+          "source_scope_correct": true,
+          "notes": "Clause 1 explicitly demands assembled-board accuracy within the cited 0.1 C tolerance without calibration/bench work. The feature correctly preserves that guarantee demand."
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sensor",
+          "requirement": {
+            "id": "sensor",
+            "description": "SHT31 is required.",
+            "any_of": [
+              {
+                "kind": "sensor",
+                "value": "SHT31",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            0
+          ],
+          "notes": "Supported by fact 0: Clause 0 explicitly names SHT31."
+        },
+        {
+          "id": "accuracy",
+          "requirement": {
+            "id": "accuracy",
+            "description": "A physical assembled-board accuracy guarantee is required.",
+            "any_of": [
+              {
+                "kind": "feature",
+                "value": "accuracy_guarantee",
+                "state": "required"
+              }
+            ]
+          },
+          "passed": true,
+          "fact_indices": [
+            11
+          ],
+          "notes": "Supported by fact 11: Clause 1 explicitly demands assembled-board accuracy within the cited 0.1 C tolerance without calibration/bench work. The feature correctly preserves that guarantee demand."
+        }
+      ],
+      "decision": {
+        "correct": true,
+        "targeted_or_truthful": true,
+        "notes": "The refusal truthfully explains that software qualification cannot guarantee assembled-board ambient accuracy without bench characterization. No invented temperature bound is used to claim a working board."
+      }
+    }
+  ]
+}

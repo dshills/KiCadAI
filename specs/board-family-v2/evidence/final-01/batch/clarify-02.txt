@@ -1,0 +1,1 @@
+I could use either a BMP280 pressure board or an SHT31 humidity board, but I have not chosen which measurement matters for this project.

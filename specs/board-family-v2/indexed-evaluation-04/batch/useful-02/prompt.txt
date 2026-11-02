@@ -1,0 +1,1 @@
+I'd like the BMP280 controller, please, with 2.2 kilohm pull-ups on a 400 kilohertz I2C bus and 100 pF total bus capacitance. Humidity and wireless telemetry are not needed. The reviewed default supply and ambient limits are acceptable.

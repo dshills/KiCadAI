@@ -1,0 +1,26 @@
+{
+  "profile": {
+    "id": "fast",
+    "clock_hz": 400000,
+    "resistance_ohms": 2200,
+    "value": "2.2k",
+    "mpn": "RC0805FR-072K2L",
+    "max_bus_pf": 100,
+    "rise_limit_ns": 300
+  },
+  "worst_case_30_70_rise_ns": 188.54966900000002,
+  "time_to_80_percent_ns": 358.1482186539604,
+  "worst_case_sink_ma_per_line": 1.5634340368786497,
+  "worst_case_resistor_power_mw": 5.3156757253874085,
+  "allocated_current_ma": 596.6268680737574,
+  "source_margin_ma": 403.37313192624265,
+  "notes": [
+    "External regulated 3.3 V only; no regulator, reverse-polarity, surge, ESD, or hot-plug protection.",
+    "Radio disabled; external GPIO loads and extra pull-ups unsupported. UART is 3.3 V logic, not USB or RS-232.",
+    "I2C capacitance is a declared total bound, not a measurement; validate the assembled bus before use.",
+    "Firmware must set the selected I2C clock, disable controller internal pulls, use SDA GPIO21 / SCL GPIO22 at address 0x44, keep the SHT31 heater off, validate CRC and convert digital temperature/humidity readings. No firmware is delivered.",
+    "Supply ripple at the sensor must not exceed 50 mV peak-to-peak; supply slew within the sensor operating range must stay below 20 V/ms. Hold controller RESET until power is stable, wait at least 1 ms for sensor power-up and 1.5 ms after sensor soft reset; controller RESET does not reset the sensor.",
+    "Software-qualified reference, not manufactured-hardware performance or EMC certification.",
+    "SHT31 temperature/humidity capability excludes pressure measurement and guaranteed assembled-board ambient accuracy; controller heat, contamination, enclosure and airflow require bench characterization. No coating or wash over the sensor opening; follow Sensirion handling and assembly instructions."
+  ]
+}

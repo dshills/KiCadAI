@@ -1,0 +1,25 @@
+✔ manufacturing/gerbers/board-F_Cu.gbr: dates only; geometry and metadata remain significant (0.634875ms)
+✔ manufacturing/drill/board-PTH.drl: dates only; geometry and metadata remain significant (0.172375ms)
+✔ manufacturing/gerbers/board-job.gbrjob: dates only; geometry and metadata remain significant (0.201792ms)
+✔ manufacturing/drill-report.txt: dates only; geometry and metadata remain significant (0.115416ms)
+✔ preview/pcb.svg: dates only; geometry and metadata remain significant (0.204625ms)
+✔ No broad date removal in native, BOM or placement files (0.355416ms)
+✔ frozen cases and all five published bundles authenticate without an API call (107.249542ms)
+✔ synthetic automatic matches always leave semantic review pending (0.230958ms)
+✔ raw omissions and local corrections are separate, not model passes (0.091834ms)
+✔ wrong config, extra keys, inconsistent clauses and malformed responses fail (0.093208ms)
+✔ native evidence cannot pass using only a green boolean or a shortened bundle (32.44225ms)
+✔ approval must bind this exact goal, budget, freeze and qualified runtime (2.01525ms)
+✔ ledger verification rejects truncation, mutation, mixed goals and excess requests (0.39825ms)
+✔ resume requires a terminal runner and never returns already attempted cases (0.252459ms)
+✔ all supported attempts count in timing, including failures and unknown outcomes (0.161375ms)
+✔ durable pre-launch evidence exists in a failed local child; no retry occurs (49.563833ms)
+✔ a timed-out local child is killed and observed terminal (110.337958ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 347.517458

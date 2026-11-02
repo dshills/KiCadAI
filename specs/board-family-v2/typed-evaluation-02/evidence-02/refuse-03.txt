@@ -1,0 +1,1 @@
+Can you make the SHT31 board with your low_current profile and 10k I2C pull-ups? Please declare 100 pF total capacitance.

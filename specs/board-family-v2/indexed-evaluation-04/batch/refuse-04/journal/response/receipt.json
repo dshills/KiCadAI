@@ -1,0 +1,14 @@
+{
+  "bytes": 44923,
+  "close_error": false,
+  "content_type": "text/event-stream; charset=utf-8",
+  "eof_observed": true,
+  "http_status": 200,
+  "read_error": false,
+  "request_sha256": "59565d3ee9861b107dc82005ad8912db2d045ec746371bf1d8a96d328f4fc925",
+  "sha256": "0160185fa9ba2ae06b0beb66ff05f1777d5b9ca5a02cb4e13d45c19e82fd780c",
+  "transport_error": false,
+  "transport_started": true,
+  "truncated": false,
+  "version": "indexed-evidence-journal-1"
+}

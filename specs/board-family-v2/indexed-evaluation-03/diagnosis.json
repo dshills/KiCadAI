@@ -1,0 +1,54 @@
+{
+  "status": "offline-diagnosis-not-a-repaired-result",
+  "frames": 107,
+  "response_bytes": 45096,
+  "response_sha256": "9a8c732de3864645b1e8f20893998076cd4da10e1b2a85f3ab80e02ccb925017",
+  "request_sha256": "b2dfef3a75d7b166856e2646c8b48d8df8b9be8586a3f44afc9984cdfd5701f1",
+  "depth_limit_in_frozen_intent_validator": 12,
+  "events_exceeding_limit": [
+    {
+      "event": 0,
+      "type": "response.created",
+      "depth": 13,
+      "path": "$.response.text.format.schema.properties.facts.items.anyOf.0.properties.kind.enum.0"
+    },
+    {
+      "event": 1,
+      "type": "response.in_progress",
+      "depth": 13,
+      "path": "$.response.text.format.schema.properties.facts.items.anyOf.0.properties.kind.enum.0"
+    },
+    {
+      "event": 106,
+      "type": "response.completed",
+      "depth": 13,
+      "path": "$.response.text.format.schema.properties.facts.items.anyOf.0.properties.kind.enum.0"
+    }
+  ],
+  "raw_terminal_claim": {
+    "id": "resp_0af9d97ec5c58378016aa913babff887d186a396f729a83fc4",
+    "model": "gpt-4.1-mini-2025-04-14",
+    "status": "completed",
+    "usage": {
+      "input_tokens": 2596,
+      "input_tokens_details": {
+        "cache_write_tokens": 0,
+        "cached_tokens": 0
+      },
+      "output_tokens": 100,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 2696
+    }
+  },
+  "usage_notice": "Raw terminal fields are diagnostic only. Frozen evidence validation failed; no cost is settled or refunded and the ledger retains a USD 0.05 reservation.",
+  "known_semantic_defects": [
+    "Invented named BMP280 sensor fact",
+    "Invented affirmative wireless requirement for a wired monitor"
+  ],
+  "planned_cases": 14,
+  "physical_requests": 1,
+  "unattempted_cases": 13,
+  "verified_native_bundles": 0
+}
