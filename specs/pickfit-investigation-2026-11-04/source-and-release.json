@@ -1,0 +1,192 @@
+{
+  "source_url": "https://github.com/ncchen99/pickfit/blob/20b452d6a7b7c9d57bf74aaa119108d3e0ab3848/data/software/kicadai.json",
+  "source_sha256": "05b8cb59dda1a8fd48a4f5fd46ae038c76f15edb2138a065611daac33a4116ae",
+  "run": {
+    "id": "verify-kicadai-20261101-000504-d83f",
+    "level": "function",
+    "unverified_reason": null,
+    "os": "linux",
+    "arch": "x86_64",
+    "method": "sandbox",
+    "runner": "modal-gvisor",
+    "image": "pickfit-sbx:2649442dfa6d",
+    "checked_at": "2026-11-01T00:07:00.061394+08:00",
+    "tool_version": "1.0.1",
+    "install_method": "binary",
+    "replayed": true,
+    "steps": [
+      {
+        "command": "curl -L -o /tmp/kicadai https://github.com/dshills/KiCadAI/releases/download/v1.0.1/kicadai_v1.0.1_linux_amd64 && curl -L -o /tmp/SHA256SUMS https://github.com/dshills/KiCadAI/releases/download/v1.0.1/SHA256SUMS && mkdir -p ~/.local/bin ./bin && cp /tmp/kicadai ./bin/kicadai && cp /tmp/kicadai ~/.local/bin/kicadai && chmod +x ./bin/kicadai ~/.local/bin/kicadai",
+        "purpose": "download release binary and install"
+      }
+    ],
+    "smoke_tests": [
+      {
+        "command": "./bin/kicadai version",
+        "expected_signal": "\"version\": \"1.0.1\"",
+        "exit_code": 0,
+        "passed": true,
+        "observed_excerpt": "\"version\": \"1.0.1\",",
+        "setup": [],
+        "offline": true
+      },
+      {
+        "command": "bin/kicadai generate-led-demo --output ./out/led_demo --overwrite",
+        "expected_signal": "led_indicator.kicad_sch",
+        "exit_code": 0,
+        "passed": true,
+        "observed_excerpt": "\"led_indicator/led_indicator.kicad_sch\"",
+        "setup": [],
+        "offline": true
+      },
+      {
+        "command": "bin/kicadai inspect project ./led_indicator",
+        "expected_signal": "\"symbol_count\": 4",
+        "exit_code": 0,
+        "passed": true,
+        "observed_excerpt": "\"symbol_count\": 4,",
+        "setup": [
+          {
+            "command": "bin/kicadai generate-led-demo --output ./out/led_demo --overwrite",
+            "background": false,
+            "port": null
+          }
+        ],
+        "offline": true
+      },
+      {
+        "command": "bin/kicadai block list",
+        "expected_signal": "led_indicator",
+        "exit_code": 0,
+        "passed": true,
+        "observed_excerpt": "\"id\": \"led_indicator\",",
+        "setup": [],
+        "offline": true
+      },
+      {
+        "command": "bin/kicadai validate board ./led_indicator",
+        "expected_signal": "",
+        "exit_code": 1,
+        "passed": false,
+        "observed_excerpt": "validate reported blocking issues }",
+        "setup": [
+          {
+            "command": "bin/kicadai generate-led-demo --output ./out/led_demo --overwrite",
+            "background": false,
+            "port": null
+          }
+        ],
+        "offline": null
+      }
+    ],
+    "pitfalls": [
+      {
+        "readme_said": "Go 1.26.8+ and make build from source",
+        "actually_needed": "downloaded prebuilt kicadai_v1.0.1_linux_amd64 release binary (SHA256 df262f84...) to ./bin/kicadai and ~/.local/bin/kicadai; no Go needed",
+        "kind": "sandbox"
+      },
+      {
+        "readme_said": "bin/kicadai --output ./out/divider schematic example divider",
+        "actually_needed": "v1.0.1 binary has no `schematic` command (unknown command schematic); used `generate-led-demo`, `inspect project`, `writer check`, `validate board` syntax from cli-reference",
+        "kind": "readme_wrong"
+      },
+      {
+        "readme_said": "--output selects output project directory",
+        "actually_needed": "generate-led-demo ignored --output and wrote ./led_indicator/ with only .kicad_sch+.kicad_pro, no .kicad_pcb",
+        "kind": "readme_wrong"
+      }
+    ],
+    "blocking_error": null,
+    "judge": {
+      "verdict": "working",
+      "observed": "Screenshots show LED demo generated with schematic file, inspect reporting ok with project files, and version 1.0.1 printed.",
+      "model": "muse-spark-1.3"
+    },
+    "evidence": {
+      "trace_path": "runs/verify/verify-kicadai-20261101-000504-d83f/report.json",
+      "log_path": null,
+      "screenshot_paths": [
+        "runs/verify/verify-kicadai-20261101-000504-d83f/check-1-cmd7.judged.png",
+        "runs/verify/verify-kicadai-20261101-000504-d83f/check-2-cmd13.judged.png",
+        "runs/verify/verify-kicadai-20261101-000504-d83f/check-3-cmd4.judged.png"
+      ],
+      "evidence_url": null
+    },
+    "actor_model": "muse-spark-1.3",
+    "cost_usd": 0.133278,
+    "features": [
+      {
+        "feature": "turn behavioral requirements into KiCad projects",
+        "status": "checked",
+        "smoke_tests": [
+          1
+        ],
+        "reason": null,
+        "failure": null,
+        "note": null
+      },
+      {
+        "feature": "write native schematic and PCB files",
+        "status": "not_checked",
+        "smoke_tests": [],
+        "reason": "not_shown",
+        "failure": null,
+        "note": "its check passed, but the output does not show it: Output shows only .pro and .sch written and inspector warns pcb file not found."
+      },
+      {
+        "feature": "validate designs with ERC and DRC",
+        "status": "test_failed",
+        "smoke_tests": [
+          4
+        ],
+        "reason": null,
+        "failure": "sandbox",
+        "note": "writer missing footprints; validate no .kicad_pcb; KiCad CLI absent"
+      }
+    ]
+  },
+  "transcript_check": {
+    "http_status": 404,
+    "repository_tree_truncated": false,
+    "matching_run_paths": []
+  },
+  "release_manifest": {
+    "schema": "kicadai.release-manifest.v1",
+    "version": "1.0.1",
+    "commit": "b961b7a73aa9d19398d2adbaeee89de008e5d390",
+    "build_date": "2026-09-07T10:51:33-05:00",
+    "go_version": "go1.26.8",
+    "cgo_enabled": false,
+    "artifacts": [
+      "kicadai_v1.0.1_darwin_amd64",
+      "kicadai_v1.0.1_darwin_arm64",
+      "kicadai_v1.0.1_linux_amd64",
+      "kicadai_v1.0.1_linux_arm64"
+    ]
+  },
+  "release_checksums": "4b83ef66503710e7780e9dd71b0c897506723e281445b5757f2de4970279e234  RELEASE_MANIFEST.json\nd9558206e754fc50176d09c3bc1b51f0b0dbce8d73bf21a2731079e59c63a247  kicadai_v1.0.1_darwin_amd64\ne794f99a7170107aaf00168a01349c56592c3c864fbe4003d6849024203a9f1d  kicadai_v1.0.1_darwin_arm64\ndf262f84d793adc86399d2556cc52f1e4feff4053c15bd3adb18268c36b1ae85  kicadai_v1.0.1_linux_amd64\n7450a4be4a5633a135913b1703017959fbf8a3d72330f961496f457251106293  kicadai_v1.0.1_linux_arm64\n",
+  "downloaded_assets": [
+    {
+      "name": "kicadai_v1.0.1_darwin_arm64",
+      "bytes": 40679314,
+      "sha256": "e794f99a7170107aaf00168a01349c56592c3c864fbe4003d6849024203a9f1d"
+    },
+    {
+      "name": "kicadai_v1.0.1_linux_amd64",
+      "bytes": 46731426,
+      "sha256": "df262f84d793adc86399d2556cc52f1e4feff4053c15bd3adb18268c36b1ae85"
+    },
+    {
+      "name": "RELEASE_MANIFEST.json",
+      "bytes": 380,
+      "sha256": "4b83ef66503710e7780e9dd71b0c897506723e281445b5757f2de4970279e234"
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 462,
+      "sha256": "976a4f966d36c2628b3a6874d06e28d3f4cfd9617e4c38b5110013648f3ca3d5"
+    }
+  ],
+  "linux_execution": false,
+  "linux_runtime_limitation": "Docker client exists; configured OrbStack daemon unavailable. No runtime started or installed."
+}

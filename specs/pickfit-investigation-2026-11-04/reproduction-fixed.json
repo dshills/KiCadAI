@@ -1,0 +1,32 @@
+{
+  "runs": [
+    {
+      "command": [
+        "/Users/dshills/Development/projects/KiCadAI/bin/kicadai",
+        "generate-led-demo",
+        "--output",
+        "./requested",
+        "--overwrite"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/fixed-generate-led-demo",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"generate-led-demo and generate-project accept no positional arguments; place global flags before the command\"\n}\n",
+      "stderr": "generate-led-demo and generate-project accept no positional arguments; place global flags before the command\n",
+      "files": []
+    },
+    {
+      "command": [
+        "/Users/dshills/Development/projects/KiCadAI/bin/kicadai",
+        "generate-project",
+        "--output",
+        "./requested",
+        "--overwrite"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/fixed-generate-project",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"generate-led-demo and generate-project accept no positional arguments; place global flags before the command\"\n}\n",
+      "stderr": "generate-led-demo and generate-project accept no positional arguments; place global flags before the command\n",
+      "files": []
+    }
+  ]
+}

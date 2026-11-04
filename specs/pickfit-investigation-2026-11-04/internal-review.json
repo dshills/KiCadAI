@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-04",
+  "method": "Internal Codex self-review, as explicitly requested after Prism failure; not an independent human/external review",
+  "prism_attempts": [
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "exit_status": 4,
+      "result": "No report; context deadline exceeded while awaiting https://api.anthropic.com/v1/messages response headers"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "exit_status": 4,
+      "result": "One bounded retry; same timeout; no review report"
+    }
+  ],
+  "scope": [
+    "Both LED-generator dispatch aliases",
+    "Go global-flag parsing boundary and preserved valid-prefix semantics",
+    "Guard returns before output selection, design generation or filesystem writes",
+    "JSON failure envelope and nonzero exit",
+    "Requested/default directory sentinel preservation, including parsed overwrite plus unparsed output",
+    "Release-vs-source docs and unavailable Linux transcript distinction",
+    "Native warning-only exit is not zero-findings acceptance"
+  ],
+  "finding": {
+    "severity": "test gap",
+    "description": "Initial tests did not seed an existing default directory for leading --overwrite plus trailing --output.",
+    "resolution": "Added regression for each alias; both default and requested sentinels and inventories must remain unchanged."
+  },
+  "outcome": "No remaining actionable finding in the scoped patch after local verification",
+  "source_hashes": [
+    {
+      "path": "cmd/kicadai/main.go",
+      "sha256": "0b5e827bcc14b4959cfcadf4877a0a06997caba2af3bf81a42d870d07bda980f"
+    },
+    {
+      "path": "cmd/kicadai/led_cli_arguments_test.go",
+      "sha256": "e20f2c5ac59cf46afeab5d1297631d54fed355e4f4b0540340e0a48c12f7f77c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "f2113a2f58af554e2489bdde8dadcf7f4bd5c8e1b35a9880b88a883a877b2ca7"
+    },
+    {
+      "path": "docs/cli-reference.md",
+      "sha256": "ef26246d83a65c40fca4b720093bb49c076a6e3819ce948458357b84d410714f"
+    }
+  ]
+}

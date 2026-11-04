@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-04",
+  "runs": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-short",
+        "./cmd/kicadai",
+        "./internal/kicadfiles/design",
+        "./internal/kicadfiles/checks",
+        "./internal/buildinfo",
+        "-count=1"
+      ],
+      "exit_status": 0,
+      "stdout": "ok  \tkicadai/cmd/kicadai\t31.796s\nok  \tkicadai/internal/kicadfiles/design\t0.670s\nok  \tkicadai/internal/kicadfiles/checks\t0.086s\nok  \tkicadai/internal/buildinfo\t1.063s\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "make",
+        "lint"
+      ],
+      "exit_status": 0,
+      "stdout": "./scripts/check-go-format.sh\nGOCACHE=\"/Users/dshills/Development/projects/KiCadAI/.cache/go/build\" GOMODCACHE=\"/Users/dshills/Development/projects/KiCadAI/.cache/go/mod\" go vet ./...\n0 issues.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_status": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "source_hashes": [
+    {
+      "path": "cmd/kicadai/main.go",
+      "sha256": "0b5e827bcc14b4959cfcadf4877a0a06997caba2af3bf81a42d870d07bda980f"
+    },
+    {
+      "path": "cmd/kicadai/led_cli_arguments_test.go",
+      "sha256": "e20f2c5ac59cf46afeab5d1297631d54fed355e4f4b0540340e0a48c12f7f77c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "f2113a2f58af554e2489bdde8dadcf7f4bd5c8e1b35a9880b88a883a877b2ca7"
+    },
+    {
+      "path": "docs/cli-reference.md",
+      "sha256": "ef26246d83a65c40fca4b720093bb49c076a6e3819ce948458357b84d410714f"
+    }
+  ]
+}

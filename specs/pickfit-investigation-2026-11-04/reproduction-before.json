@@ -1,0 +1,363 @@
+{
+  "environment": "macOS Darwin/arm64; KiCad CLI 10.0.3; no provider calls",
+  "runs": [
+    {
+      "label": "v1.0.1-mac-release-version",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "version"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/version",
+      "exit_status": 0,
+      "stdout": "{\n  \"name\": \"kicadai\",\n  \"version\": \"1.0.1\",\n  \"commit\": \"b961b7a73aa9d19398d2adbaeee89de008e5d390\",\n  \"build_date\": \"2026-09-07T10:51:33-05:00\",\n  \"go_version\": \"go1.26.8\",\n  \"platform\": \"darwin/arm64\",\n  \"modified\": false\n}\n",
+      "stderr": "",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-schematic",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--output",
+        "./out/divider",
+        "schematic",
+        "example",
+        "divider"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/schematic",
+      "exit_status": 1,
+      "stdout": "",
+      "stderr": "unknown command \"schematic\"\n\nkicadai is a Go client for KiCad's IPC API.\n\nUsage:\n  kicadai [global flags] <command>\n\nCommands:\n  capabilities  Report detected KiCad API capabilities\n  capability    Report generation contracts and manage evidence-driven capability expansion\n  config        Print resolved connection configuration\n  documents     List open KiCad documents\n  draw-led-demo Execute the LED indicator schematic plan when supported\n  generate-led-demo Generate a direct-file LED indicator KiCad project\n  generate-project  Generate a direct-file LED indicator KiCad project\n  generate      Generate projects from structured requests\n  block         List, inspect, and validate built-in circuit blocks\n  fabrication   List, show, and validate fabrication profiles\n  component     List, select, onboard, promote, and validate component catalog records\n  circuit       Preflight or create projects from strict generic circuit graphs\n  requirement   Create projects from strict behavior-only requirements\n  open-topology Discover and promote primitive circuits from behavior-only requirements\n  check         Run KiCad CLI ERC/DRC checks\n  design        Create AI design workflow projects\n  writer        Check generated writer correctness\n  validate      Validate generated board electrical correctness\n  inspect       Inspect KiCad projects and files\n  intent        Compile, plan, or explain high-level AI design intent requests\n  library       Index and query KiCad symbol and footprint libraries\n  evaluate      Evaluate KiCad projects and files\n  pinmap        List or validate symbol-footprint pinmaps\n  place         Run PCB placement planning\n  route         Run PCB routing\n  repair        Plan, export-bundle, or apply validation repair attempts\n  schematic-ir  Validate, normalize, create transactions, or write schematic design IR\n  export        Export review and fabrication artifacts\n  plan-led-demo Print a deterministic LED indicator schematic plan\n  ping          Check whether KiCad responds to the API\n  roundtrip     Run KiCad CLI round-trip checks\n  transaction   Build, validate, plan, or apply structured edit transactions\n  version       Print KiCadAI application version information\n  kicad-version Print connected KiCad version information\n  help          Print this help text\n\nGlobal flags:\n  --socket string       KiCad IPC endpoint, for example ipc:///tmp/kicad/api.sock\n  --token string        KiCad API token\n  --client-name string  Client name sent to KiCad\n  --timeout-ms int      IPC timeout in milliseconds\n  --document-type string Document filter: all, schematic, pcb, symbol, footprint, drawing_sheet, project\n  --document string      Schematic document identifier for plan commands\n  --origin-x int64      Plan origin X in KiCad internal units (1 mm = 1,000,000 IU)\n  --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)\n  --prefix string        Reference/value prefix for plan commands\n  --output string        Output project directory for generation commands\n  --target string        Project, schematic, or PCB target for repair commands\n  --request string       Structured request JSON path for generator commands\n  --capability-registry string Reviewed supported-capability registry for requirement generation\n  --text string          Natural-language intent text\n  --file string          Natural-language intent text file\n  --prompt string        AI-provider natural-language design request\n  --prompt-file string   AI-provider request file (avoids shell history)\n  --provider string      AI intent provider: openai or recorded\n  --ai-profile string    Explicit AI schema profile, including behavioral-intent-v1 and generic-circuit-v1\n  --promotion-readiness string Declared promotion readiness: expected_fail, candidate, pass, or blocked\n  --model string         AI provider model override\n  --provider-record string Recorded AI response fixture path\n  --follow-up string      Behavioral clarification answer JSON path\n  --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)\n  --ai-max-output-tokens int Maximum provider output tokens; profile default when omitted\n  --ai-background        Use OpenAI background polling (requires temporary provider storage)\n  --format string        Output format for supported commands: json or text (default json)\n  --strict              Treat blocking draft clarifications as command errors\n  --name string          Project/design name for generation commands\n  --seed string          Deterministic seed for generation commands\n  --lib-vcc string      VCC symbol library ID for LED demo (default: power:VCC)\n  --lib-gnd string      GND symbol library ID for LED demo (default: power:GND)\n  --lib-resistor string Resistor symbol library ID for LED demo (default: Device:R)\n  --lib-led string      LED symbol library ID for LED demo (default: Device:LED)\n  --execute             Required for mutation commands\n  --with-pcb            Include PCB output for generation commands\n  --overwrite           Allow generation commands to replace an existing project directory\n  --allow-imported-apply Explicitly allow transaction apply to mutate an existing imported project\n  --json                Compatibility alias for --format json\n  --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting\n  --manufacturer-profile string Local fabrication manufacturer profile ID, for example generic_assembly\n  --manufacturer-profile-dir string Directory of local fabrication profile JSON snapshots\n  --keep-artifacts      Keep KiCad-backed artifact workspaces\n  --artifact-dir string Directory for retained KiCad-backed artifacts\n  --timeout duration    KiCad CLI timeout, for example 10s or 2m\n  --allowlist string    Round-trip or ERC/DRC allowlist JSON path\n  --case string         Block verification manifest path\n  --suite string        Block verification suite directory\n  --builtins            Run built-in block verification manifests\n  --kicad-corpus        Run only built-in block manifests included in the KiCad corpus\n  --kicad-corpus-tier string Comma-separated KiCad corpus tier filter\n  --require-erc         Require KiCad ERC evidence for block verification\n  --require-drc         Require KiCad DRC evidence for board validation or block verification\n  --allow-missing-drc   Do not fail board validation when KiCad DRC is unavailable\n  --strict-zones        Treat zones without fill evidence as blocking\n  --strict-unrouted     Treat unrouted multi-pad nets as blocking\n  --zone-refill string  KiCad zone refill policy: never, before_validation, after_repair_before_validation\n  --require-kicad-roundtrip Require KiCad round-trip evidence for writer checks\n  --strict-diffs        Treat benign round-trip differences as writer failures\n  --allow-unrouted      Allow unrouted nets in writer checks\n  --klc-root string        KiCad Library Convention repository root\n  --symbols-root string    KiCad symbol library root\n  --footprints-root string KiCad footprint library root\n  --templates-root string  KiCad template library root\n  --library-cache string   Library resolver cache file path\n  --refresh-library-cache  Rebuild library resolver cache\n  --catalog-dir string     Component catalog directory (default: data/components)\n  --source-dir string      Component lifecycle/availability source directory\n  --family string          Component family filter\n  --package string         Component package filter\n  --value-kind string      Component value kind filter\n  --value string           Component value filter\n  --acceptance string      Component acceptance level\n  --mode string                      Routing mode: single_layer, two_layer, validate_only\n  --route-mode string                Alias for --mode\n  --grid float                       Routing grid in millimeters\n  --trace-width float                Routing trace width in millimeters\n  --clearance float                  Routing clearance in millimeters\n  --allow-partial                    Allow partial routing results\n  --repair                           Include validation repair planning in design create\n  --repair-apply                     Apply generated-project validation repairs during design create\n  --max-repair-attempts int          Maximum validation repair attempts (default 3)\n  --skip-routing                     Skip design workflow board routing\n  --placement-board-width float      Placement feedback board width in millimeters (default 100)\n  --placement-board-height float     Placement feedback board height in millimeters (default 60)\n  --placement-board-margin float     Placement feedback board margin in millimeters (default 2)\n  --placement-estimated-width float  Placement feedback estimated component width in millimeters (default 2)\n  --placement-estimated-height float Placement feedback estimated component height in millimeters (default 1.25)\n  --skip-placement-feedback          Skip placement feedback in block project generation output\n  --feedback                         Include grouped operation feedback for transaction commands\n  --pretty                           Pretty-print JSON output\n\n",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-report-led",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "generate-led-demo",
+        "--output",
+        "./out/led_demo",
+        "--overwrite"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags",
+      "exit_status": 0,
+      "stdout": "{\n  \"project_name\": \"led_indicator\",\n  \"project_dir\": \"led_indicator\",\n  \"written_files\": [\n    \"led_indicator/led_indicator.kicad_pro\",\n    \"led_indicator/led_indicator.kicad_sch\"\n  ]\n}\n",
+      "stderr": "",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "v1.0.1-mac-release-inspect",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "inspect",
+        "project",
+        "./led_indicator"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags",
+      "exit_status": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"command\": \"inspect\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"root\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator\",\n    \"name\": \"led_indicator\",\n    \"files\": [\n      {\n        \"kind\": \"project\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_pro\",\n        \"exists\": true\n      },\n      {\n        \"kind\": \"schematic\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n        \"exists\": true\n      },\n      {\n        \"kind\": \"pcb\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_pcb\",\n        \"exists\": false\n      }\n    ],\n    \"schematic\": {\n      \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n      \"format_version\": \"20260306\",\n      \"generator\": \"eeschema\",\n      \"symbol_count\": 4,\n      \"wire_count\": 3,\n      \"label_count\": 1,\n      \"junction_count\": 1,\n      \"no_connect_count\": 0,\n      \"sheet_count\": 0,\n      \"symbols\": [\n        \"#PWR01\",\n        \"#PWR02\",\n        \"D1\",\n        \"R1\"\n      ],\n      \"object_counts\": {\n        \"junction\": 1,\n        \"label\": 1,\n        \"lib_symbols\": 4,\n        \"no_connect\": 0,\n        \"raw_item\": 0,\n        \"sheet\": 0,\n        \"sheet_symbol\": 1,\n        \"symbol\": 4,\n        \"wire\": 3\n      },\n      \"inspection_depth\": \"structured\",\n      \"preservation\": {\n        \"status\": \"clean\",\n        \"scope\": \"imported\",\n        \"summary\": {\n          \"files\": 1,\n          \"preservation_only\": 0,\n          \"unsupported\": 0\n        },\n        \"files\": [\n          {\n            \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n            \"kind\": \"schematic\",\n            \"ownership\": \"imported_user\",\n            \"mutability\": \"read_only\"\n          }\n        ]\n      },\n      \"issues\": []\n    },\n    \"preservation\": {\n      \"status\": \"clean\",\n      \"scope\": \"imported\",\n      \"summary\": {\n        \"files\": 2,\n        \"preservation_only\": 0,\n        \"unsupported\": 0\n      },\n      \"files\": [\n        {\n          \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_pro\",\n          \"kind\": \"project\",\n          \"ownership\": \"imported_user\",\n          \"mutability\": \"read_only\"\n        },\n        {\n          \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n          \"kind\": \"schematic\",\n          \"ownership\": \"imported_user\",\n          \"mutability\": \"read_only\"\n        }\n      ]\n    },\n    \"manifest\": {\n      \"present\": false,\n      \"stale\": false\n    },\n    \"issues\": [\n      {\n        \"code\": \"MISSING_FILE\",\n        \"severity\": \"warning\",\n        \"path\": \"pcb\",\n        \"message\": \"pcb file not found\"\n      }\n    ]\n  },\n  \"issues\": [],\n  \"artifacts\": []\n}\n",
+      "stderr": "",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "v1.0.1-mac-release-report-validate",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "validate",
+        "board",
+        "./led_indicator"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"validate\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"./led_indicator\",\n    \"status\": \"error\",\n    \"fabrication_ready\": false,\n    \"fabrication_reason\": \"one or more board-validation checks could not complete\",\n    \"checks\": [\n      {\n        \"name\": \"pcb_structural_validation\",\n        \"status\": \"error\",\n        \"required\": true,\n        \"issues\": [\n          {\n            \"code\": \"INVALID_ARGUMENT\",\n            \"severity\": \"error\",\n            \"path\": \"./led_indicator\",\n            \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator: no .kicad_pcb file found\"\n          }\n        ]\n      }\n    ],\n    \"issues\": [\n      {\n        \"code\": \"INVALID_ARGUMENT\",\n        \"severity\": \"error\",\n        \"path\": \"./led_indicator\",\n        \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator: no .kicad_pcb file found\"\n      }\n    ],\n    \"artifacts\": [],\n    \"summary\": {\n      \"total_checks\": 1,\n      \"passed_checks\": 0,\n      \"failed_checks\": 0,\n      \"skipped_checks\": 0,\n      \"error_checks\": 1,\n      \"total_issues\": 1,\n      \"blocking_issues\": 1,\n      \"by_code\": {\n        \"INVALID_ARGUMENT\": 1\n      }\n    }\n  },\n  \"issues\": [\n    {\n      \"code\": \"INVALID_ARGUMENT\",\n      \"severity\": \"error\",\n      \"path\": \"./led_indicator\",\n      \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/trailing-flags/led_indicator: no .kicad_pcb file found\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "validate reported blocking issues\n",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "v1.0.1-mac-release-correct-led",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--output",
+        "./out/led_demo",
+        "--overwrite",
+        "generate-led-demo"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/leading-flags",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"led_demo\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"stat out: no such file or directory\"\n}\n",
+      "stderr": "stat out: no such file or directory\n",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-correct-led-pcb",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--output",
+        "./out/led_demo",
+        "--with-pcb",
+        "generate-led-demo"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/with-pcb",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"led_demo\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"stat out: no such file or directory\"\n}\n",
+      "stderr": "stat out: no such file or directory\n",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-drc-demo",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "drc",
+        "./out/led_demo/led_demo.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/with-pcb",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"./out/led_demo/led_demo.kicad_pcb\",\n    \"checks\": [\n      {\n        \"kind\": \"\",\n        \"status\": \"\",\n        \"target_path\": \"\",\n        \"file_type\": \"\",\n        \"summary\": {\n          \"total_findings\": 0\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"message\": \"stat ./out/led_demo/led_demo.kicad_pcb: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "check reported blocking issues\n",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-erc-fixture",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "erc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/native-fixtures",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch\",\n    \"checks\": [\n      {\n        \"kind\": \"\",\n        \"status\": \"\",\n        \"target_path\": \"\",\n        \"file_type\": \"\",\n        \"summary\": {\n          \"total_findings\": 0\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"message\": \"stat /Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "check reported blocking issues\n",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-drc-fixture",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "drc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/native-fixtures",
+      "exit_status": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb\",\n    \"checks\": [\n      {\n        \"kind\": \"drc\",\n        \"status\": \"fail\",\n        \"target_path\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb\",\n        \"file_type\": \"pcb\",\n        \"project_context\": \"standalone\",\n        \"units\": \"mm\",\n        \"kicad_cli_path\": \"/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli\",\n        \"kicad_version\": \"10.0.3\",\n        \"command\": [\n          \"/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli\",\n          \"pcb\",\n          \"drc\",\n          \"--format\",\n          \"json\",\n          \"--severity-all\",\n          \"--exit-code-violations\",\n          \"--units\",\n          \"mm\",\n          \"--output\",\n          \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-1231096158/drc.json\",\n          \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-1231096158/drc_pass.kicad_pcb\"\n        ],\n        \"working_dir\": \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-1231096158\",\n        \"exit_code\": 5,\n        \"duration_ms\": 1772,\n        \"report_path\": \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-1231096158/drc.json\",\n        \"stdout\": \"Found 4 violations\\nFound 0 unconnected items\\nSaved DRC Report to /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-1231096158/drc.json\\n\",\n        \"findings\": [\n          {\n            \"id\": \"6c01991e206d0a663064b988c3bda66b\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"lib_footprint_mismatch\",\n            \"code\": \"lib_footprint_mismatch\",\n            \"message\": \"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\",\n            \"references\": [\n              \"D1\"\n            ],\n            \"location\": {\n              \"x\": 45,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Footprint\",\n                \"id\": \"599eb214-bd5f-597c-a76a-a687d31a24ae\",\n                \"reference\": \"D1\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\\\",\\\"items\\\":[{\\\"description\\\":\\\"Footprint D1\\\",\\\"pos\\\":{\\\"x\\\":45,\\\"y\\\":20},\\\"uuid\\\":\\\"599eb214-bd5f-597c-a76a-a687d31a24ae\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"lib_footprint_mismatch\\\"}\",\n            \"repair_category\": \"footprint\"\n          },\n          {\n            \"id\": \"3b800611abb04c038ed1a521e7e81db3\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"lib_footprint_mismatch\",\n            \"code\": \"lib_footprint_mismatch\",\n            \"message\": \"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\",\n            \"references\": [\n              \"R1\"\n            ],\n            \"location\": {\n              \"x\": 25,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Footprint\",\n                \"id\": \"4528e193-512e-5ff1-9931-31a0f49503df\",\n                \"reference\": \"R1\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\\\",\\\"items\\\":[{\\\"description\\\":\\\"Footprint R1\\\",\\\"pos\\\":{\\\"x\\\":25,\\\"y\\\":20},\\\"uuid\\\":\\\"4528e193-512e-5ff1-9931-31a0f49503df\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"lib_footprint_mismatch\\\"}\",\n            \"repair_category\": \"footprint\"\n          },\n          {\n            \"id\": \"14800152f5d3f7faac98d70072814967\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"via_dangling\",\n            \"code\": \"via_dangling\",\n            \"message\": \"Via is not connected or connected on only one layer\",\n            \"location\": {\n              \"x\": 20,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Via\",\n                \"id\": \"5dd61c37-2bd8-5b2a-a952-308e04bb0121\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Via is not connected or connected on only one layer\\\",\\\"items\\\":[{\\\"description\\\":\\\"Via [VCC] on F.Cu - B.Cu\\\",\\\"pos\\\":{\\\"x\\\":20,\\\"y\\\":20},\\\"uuid\\\":\\\"5dd61c37-2bd8-5b2a-a952-308e04bb0121\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"via_dangling\\\"}\",\n            \"repair_category\": \"connectivity\"\n          },\n          {\n            \"id\": \"feef639b64817d8590ff943dac7c80cc\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"via_dangling\",\n            \"code\": \"via_dangling\",\n            \"message\": \"Via is not connected or connected on only one layer\",\n            \"location\": {\n              \"x\": 50,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Via\",\n                \"id\": \"58a012cc-abb7-5a30-8b7f-947a3ca18e62\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Via is not connected or connected on only one layer\\\",\\\"items\\\":[{\\\"description\\\":\\\"Via [GND] on F.Cu - B.Cu\\\",\\\"pos\\\":{\\\"x\\\":50,\\\"y\\\":20},\\\"uuid\\\":\\\"58a012cc-abb7-5a30-8b7f-947a3ca18e62\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"via_dangling\\\"}\",\n            \"repair_category\": \"connectivity\"\n          }\n        ],\n        \"summary\": {\n          \"total_findings\": 4,\n          \"by_severity\": {\n            \"warning\": 4\n          },\n          \"by_category\": {\n            \"connectivity\": 2,\n            \"footprint\": 2\n          },\n          \"by_reference\": {\n            \"D1\": 1,\n            \"R1\": 1\n          },\n          \"prompt\": \"4 ERC/DRC finding(s); categories: connectivity=2, footprint=2; refs: D1=1, R1=1\"\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\",\n      \"refs\": [\n        \"D1\"\n      ],\n      \"suggestion\": \"repair category: footprint\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\",\n      \"refs\": [\n        \"R1\"\n      ],\n      \"suggestion\": \"repair category: footprint\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Via is not connected or connected on only one layer\",\n      \"suggestion\": \"repair category: connectivity\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Via is not connected or connected on only one layer\",\n      \"suggestion\": \"repair category: connectivity\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "",
+      "files": []
+    },
+    {
+      "label": "v1.0.1-mac-release-missing-tool",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/kicadai_v1.0.1_darwin_arm64",
+        "--kicad-cli",
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad",
+        "check",
+        "drc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/v1.0.1-mac-release/missing-tool",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"path\": \"check.kicad_cli\",\n      \"message\": \"stat /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "stat /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad: no such file or directory\n",
+      "files": []
+    },
+    {
+      "label": "current-source-before-version",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "version"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/version",
+      "exit_status": 0,
+      "stdout": "{\n  \"name\": \"kicadai\",\n  \"version\": \"1.0.2-0.20261029193817-be5dc1b19e04\",\n  \"commit\": \"be5dc1b19e041d86987efa66e9e08eed9743316e\",\n  \"build_date\": \"2026-10-29T19:38:17Z\",\n  \"go_version\": \"go1.26.10\",\n  \"platform\": \"darwin/arm64\",\n  \"modified\": false\n}\n",
+      "stderr": "",
+      "files": []
+    },
+    {
+      "label": "current-source-before-schematic",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--output",
+        "./out/divider",
+        "schematic",
+        "example",
+        "divider"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/schematic",
+      "exit_status": 0,
+      "stdout": "{\n  \"schema\": \"kicadai.schematic-assistant.v1.report\",\n  \"spec\": {\n    \"name\": \"divider\",\n    \"family\": \"divider\",\n    \"input_v\": 5,\n    \"r1_ohms\": 10000,\n    \"r2_ohms\": 10000,\n    \"load_ohms\": 0\n  },\n  \"spec_sha256\": \"e28fab5758a3a8e8fc2a4fd85135e5b55b680023a04102f3b7db93d3db69e8c9\",\n  \"status\": \"candidate\",\n  \"checks\": [\n    {\n      \"name\": \"Confirmed specification\",\n      \"status\": \"checked\",\n      \"detail\": \"The exact canonical specification matches its confirmation hash.\",\n      \"evidence\": \"session.json\"\n    },\n    {\n      \"name\": \"Analytical bounds\",\n      \"status\": \"checked\",\n      \"detail\": \"Finite SI values, supported family, explicit load, and resistor power budget checked.\",\n      \"evidence\": \"report.json\"\n    },\n    {\n      \"name\": \"imported_preservation\",\n      \"status\": \"checked\",\n      \"detail\": \"Existing KiCadAI schematic evaluator; see full issues in internal-checks.json.\",\n      \"evidence\": \"internal-checks.json\"\n    },\n    {\n      \"name\": \"schematic_validation\",\n      \"status\": \"checked\",\n      \"detail\": \"Existing KiCadAI schematic evaluator; see full issues in internal-checks.json.\",\n      \"evidence\": \"internal-checks.json\"\n    },\n    {\n      \"name\": \"schematic_electrical\",\n      \"status\": \"checked\",\n      \"detail\": \"Existing KiCadAI schematic evaluator; see full issues in internal-checks.json.\",\n      \"evidence\": \"internal-checks.json\"\n    },\n    {\n      \"name\": \"KiCad ERC\",\n      \"status\": \"not_checked\",\n      \"detail\": \"Not requested. Re-run into a new directory with --require-erc to require installed-KiCad validation.\"\n    },\n    {\n      \"name\": \"Hardware behavior\",\n      \"status\": \"not_checked\",\n      \"detail\": \"No assembled hardware or measured results exist in this workflow.\"\n    },\n    {\n      \"name\": \"PCB / manufacturing\",\n      \"status\": \"not_applicable\",\n      \"detail\": \"No PCB or manufacturing approval is produced.\"\n    }\n  ],\n  \"measurements\": [\n    {\n      \"name\": \"Output voltage\",\n      \"value\": 2.5,\n      \"unit\": \"V\",\n      \"explanation\": \"VIN × (R2 || load) / (R1 + (R2 || load)); 0 load means no load resistor.\"\n    },\n    {\n      \"name\": \"Input current\",\n      \"value\": 0.00025,\n      \"unit\": \"A\",\n      \"explanation\": \"Current drawn from the ideal input source.\"\n    },\n    {\n      \"name\": \"Output resistance\",\n      \"value\": 5000,\n      \"unit\": \"ohm\",\n      \"explanation\": \"Thevenin resistance before adding the specified load.\"\n    },\n    {\n      \"name\": \"R1 dissipation\",\n      \"value\": 0.000625,\n      \"unit\": \"W\",\n      \"explanation\": \"Ideal DC power; compare with a real part's derated rating.\"\n    },\n    {\n      \"name\": \"R2 dissipation\",\n      \"value\": 0.000625,\n      \"unit\": \"W\",\n      \"explanation\": \"Ideal DC power; not a manufacturer thermal model.\"\n    }\n  ],\n  \"parts\": [\n    {\n      \"ref\": \"TP1\",\n      \"value\": \"5 V maximum\",\n      \"purpose\": \"External input connection; the voltage source is not generated.\"\n    },\n    {\n      \"ref\": \"R1\",\n      \"value\": \"10000 ohm\",\n      \"purpose\": \"Upper divider resistor or RC series resistor.\"\n    },\n    {\n      \"ref\": \"TP2\",\n      \"value\": \"VOUT\",\n      \"purpose\": \"Output observation point; load is included only when explicitly specified.\"\n    },\n    {\n      \"ref\": \"R2\",\n      \"value\": \"10000 ohm\",\n      \"purpose\": \"Lower divider resistor.\"\n    }\n  ],\n  \"limitations\": [\n    \"Ideal zero-impedance source and ideal passive components; computed values are not measurements or simulator results.\",\n    \"No tolerance sweep, parasitic, source-loading, capacitor ESR/leakage, temperature or manufacturer model is qualified.\",\n    \"The 0.125 W dissipation budget is a workflow bound, not a verified component rating. Select appropriately derated real components.\",\n    \"This is a schematic-only candidate, not a PCB, manufacturing package, physical validation or fabrication approval.\"\n  ],\n  \"diagram\": \"diagram.svg\",\n  \"diagram_description\": \"Functional illustration of the confirmed specification, not evidence of native layout. Open the KiCad project for exact geometry.\",\n  \"artifacts\": {\n    \".kicadai/manifest.json\": \"cb8ac4f5eac66535e44b29abb09733c8f5ecb555b63f7c8e75678b17a4b23a13\",\n    \".kicadai/transaction.json\": \"77688db673ba1782292866bffb59a5476d2bd826524de508649880272805478d\",\n    \"diagram.svg\": \"e54afa42b5e189c8e48f001ed5d291775a54b25862b1ebdadcfcfbd6fee83015\",\n    \"divider.kicad_pro\": \"84c0a8659cfc9e09cbc519d2a9feb9170864e11adff6c33f0d95ef3dd7f7ff36\",\n    \"divider.kicad_sch\": \"88febef41d51cbd5f297d3ab4ab1063b51d2558b1e61bc9a6ab10e864df316f3\",\n    \"internal-checks.json\": \"d00525ebff675d57e87366185a6a7c137c68ac9a7db56f146235661e335f0c18\",\n    \"session.json\": \"badc61a2ea26e823a0d66a0678f3cea6d137800aca39f2c1589b7ac13a5d1861\",\n    \"source-ir.json\": \"b479a0b89beed5a9d6a622f7c069233ae277299632c6c7aba0073b26cf82eb99\"\n  }\n}\n",
+      "stderr": "",
+      "files": [
+        "out/divider/diagram.svg",
+        "out/divider/divider.kicad_pro",
+        "out/divider/divider.kicad_sch",
+        "out/divider/internal-checks.json",
+        "out/divider/manifest.json",
+        "out/divider/report.html",
+        "out/divider/report.json",
+        "out/divider/session.json",
+        "out/divider/source-ir.json"
+      ]
+    },
+    {
+      "label": "current-source-before-report-led",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "generate-led-demo",
+        "--output",
+        "./out/led_demo",
+        "--overwrite"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags",
+      "exit_status": 0,
+      "stdout": "{\n  \"project_name\": \"led_indicator\",\n  \"project_dir\": \"led_indicator\",\n  \"written_files\": [\n    \"led_indicator/led_indicator.kicad_pro\",\n    \"led_indicator/led_indicator.kicad_sch\"\n  ]\n}\n",
+      "stderr": "",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "current-source-before-inspect",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "inspect",
+        "project",
+        "./led_indicator"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags",
+      "exit_status": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"command\": \"inspect\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"root\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator\",\n    \"name\": \"led_indicator\",\n    \"files\": [\n      {\n        \"kind\": \"project\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_pro\",\n        \"exists\": true\n      },\n      {\n        \"kind\": \"schematic\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n        \"exists\": true\n      },\n      {\n        \"kind\": \"pcb\",\n        \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_pcb\",\n        \"exists\": false\n      }\n    ],\n    \"schematic\": {\n      \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n      \"format_version\": \"20260306\",\n      \"generator\": \"eeschema\",\n      \"symbol_count\": 4,\n      \"wire_count\": 3,\n      \"label_count\": 1,\n      \"junction_count\": 1,\n      \"no_connect_count\": 0,\n      \"sheet_count\": 0,\n      \"symbols\": [\n        \"#PWR01\",\n        \"#PWR02\",\n        \"D1\",\n        \"R1\"\n      ],\n      \"object_counts\": {\n        \"junction\": 1,\n        \"label\": 1,\n        \"lib_symbols\": 4,\n        \"no_connect\": 0,\n        \"raw_item\": 0,\n        \"sheet\": 0,\n        \"sheet_symbol\": 1,\n        \"symbol\": 4,\n        \"wire\": 3\n      },\n      \"inspection_depth\": \"structured\",\n      \"preservation\": {\n        \"status\": \"clean\",\n        \"scope\": \"imported\",\n        \"summary\": {\n          \"files\": 1,\n          \"preservation_only\": 0,\n          \"unsupported\": 0\n        },\n        \"files\": [\n          {\n            \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n            \"kind\": \"schematic\",\n            \"ownership\": \"imported_user\",\n            \"mutability\": \"read_only\"\n          }\n        ]\n      },\n      \"issues\": []\n    },\n    \"preservation\": {\n      \"status\": \"clean\",\n      \"scope\": \"imported\",\n      \"summary\": {\n        \"files\": 2,\n        \"preservation_only\": 0,\n        \"unsupported\": 0\n      },\n      \"files\": [\n        {\n          \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_pro\",\n          \"kind\": \"project\",\n          \"ownership\": \"imported_user\",\n          \"mutability\": \"read_only\"\n        },\n        {\n          \"path\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator/led_indicator.kicad_sch\",\n          \"kind\": \"schematic\",\n          \"ownership\": \"imported_user\",\n          \"mutability\": \"read_only\"\n        }\n      ]\n    },\n    \"manifest\": {\n      \"present\": false,\n      \"stale\": false\n    },\n    \"issues\": [\n      {\n        \"code\": \"MISSING_FILE\",\n        \"severity\": \"warning\",\n        \"path\": \"pcb\",\n        \"message\": \"pcb file not found\"\n      }\n    ]\n  },\n  \"issues\": [],\n  \"artifacts\": []\n}\n",
+      "stderr": "",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "current-source-before-report-validate",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "validate",
+        "board",
+        "./led_indicator"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"validate\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"./led_indicator\",\n    \"status\": \"error\",\n    \"fabrication_ready\": false,\n    \"fabrication_reason\": \"one or more board-validation checks could not complete\",\n    \"checks\": [\n      {\n        \"name\": \"pcb_structural_validation\",\n        \"status\": \"error\",\n        \"required\": true,\n        \"issues\": [\n          {\n            \"code\": \"INVALID_ARGUMENT\",\n            \"severity\": \"error\",\n            \"path\": \"./led_indicator\",\n            \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator: no .kicad_pcb file found\"\n          }\n        ]\n      }\n    ],\n    \"issues\": [\n      {\n        \"code\": \"INVALID_ARGUMENT\",\n        \"severity\": \"error\",\n        \"path\": \"./led_indicator\",\n        \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator: no .kicad_pcb file found\"\n      }\n    ],\n    \"artifacts\": [],\n    \"summary\": {\n      \"total_checks\": 1,\n      \"passed_checks\": 0,\n      \"failed_checks\": 0,\n      \"skipped_checks\": 0,\n      \"error_checks\": 1,\n      \"total_issues\": 1,\n      \"blocking_issues\": 1,\n      \"by_code\": {\n        \"INVALID_ARGUMENT\": 1\n      }\n    }\n  },\n  \"issues\": [\n    {\n      \"code\": \"INVALID_ARGUMENT\",\n      \"severity\": \"error\",\n      \"path\": \"./led_indicator\",\n      \"message\": \"/private/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/trailing-flags/led_indicator: no .kicad_pcb file found\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "validate reported blocking issues\n",
+      "files": [
+        "led_indicator/led_indicator.kicad_pro",
+        "led_indicator/led_indicator.kicad_sch"
+      ]
+    },
+    {
+      "label": "current-source-before-correct-led",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--output",
+        "./out/led_demo",
+        "--overwrite",
+        "generate-led-demo"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/leading-flags",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"led_demo\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"stat out: no such file or directory\"\n}\n",
+      "stderr": "stat out: no such file or directory\n",
+      "files": []
+    },
+    {
+      "label": "current-source-before-correct-led-pcb",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--output",
+        "./out/led_demo",
+        "--with-pcb",
+        "generate-led-demo"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/with-pcb",
+      "exit_status": 1,
+      "stdout": "{\n  \"project_name\": \"led_demo\",\n  \"project_dir\": \"\",\n  \"written_files\": null,\n  \"error\": \"stat out: no such file or directory\"\n}\n",
+      "stderr": "stat out: no such file or directory\n",
+      "files": []
+    },
+    {
+      "label": "current-source-before-drc-demo",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "drc",
+        "./out/led_demo/led_demo.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/with-pcb",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"./out/led_demo/led_demo.kicad_pcb\",\n    \"checks\": [\n      {\n        \"kind\": \"\",\n        \"status\": \"\",\n        \"target_path\": \"\",\n        \"file_type\": \"\",\n        \"summary\": {\n          \"total_findings\": 0\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"message\": \"stat ./out/led_demo/led_demo.kicad_pcb: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "check reported blocking issues\n",
+      "files": []
+    },
+    {
+      "label": "current-source-before-erc-fixture",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "erc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/native-fixtures",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch\",\n    \"checks\": [\n      {\n        \"kind\": \"\",\n        \"status\": \"\",\n        \"target_path\": \"\",\n        \"file_type\": \"\",\n        \"summary\": {\n          \"total_findings\": 0\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"message\": \"stat /Users/dshills/Development/projects/KiCadAI/examples/checks/erc_pass/erc_pass.kicad_sch: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "check reported blocking issues\n",
+      "files": []
+    },
+    {
+      "label": "current-source-before-drc-fixture",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--kicad-cli",
+        "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "check",
+        "drc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/native-fixtures",
+      "exit_status": 0,
+      "stdout": "{\n  \"ok\": true,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"data\": {\n    \"target\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb\",\n    \"checks\": [\n      {\n        \"kind\": \"drc\",\n        \"status\": \"fail\",\n        \"target_path\": \"/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb\",\n        \"file_type\": \"pcb\",\n        \"project_context\": \"standalone\",\n        \"units\": \"mm\",\n        \"kicad_cli_path\": \"/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli\",\n        \"kicad_version\": \"10.0.3\",\n        \"command\": [\n          \"/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli\",\n          \"pcb\",\n          \"drc\",\n          \"--format\",\n          \"json\",\n          \"--severity-all\",\n          \"--exit-code-violations\",\n          \"--units\",\n          \"mm\",\n          \"--output\",\n          \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-292956069/drc.json\",\n          \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-292956069/drc_pass.kicad_pcb\"\n        ],\n        \"working_dir\": \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-292956069\",\n        \"exit_code\": 5,\n        \"duration_ms\": 1203,\n        \"report_path\": \"/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-292956069/drc.json\",\n        \"stdout\": \"Found 4 violations\\nFound 0 unconnected items\\nSaved DRC Report to /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-check-drc-292956069/drc.json\\n\",\n        \"findings\": [\n          {\n            \"id\": \"6c01991e206d0a663064b988c3bda66b\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"lib_footprint_mismatch\",\n            \"code\": \"lib_footprint_mismatch\",\n            \"message\": \"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\",\n            \"references\": [\n              \"D1\"\n            ],\n            \"location\": {\n              \"x\": 45,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Footprint\",\n                \"id\": \"599eb214-bd5f-597c-a76a-a687d31a24ae\",\n                \"reference\": \"D1\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\\\",\\\"items\\\":[{\\\"description\\\":\\\"Footprint D1\\\",\\\"pos\\\":{\\\"x\\\":45,\\\"y\\\":20},\\\"uuid\\\":\\\"599eb214-bd5f-597c-a76a-a687d31a24ae\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"lib_footprint_mismatch\\\"}\",\n            \"repair_category\": \"footprint\"\n          },\n          {\n            \"id\": \"3b800611abb04c038ed1a521e7e81db3\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"lib_footprint_mismatch\",\n            \"code\": \"lib_footprint_mismatch\",\n            \"message\": \"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\",\n            \"references\": [\n              \"R1\"\n            ],\n            \"location\": {\n              \"x\": 25,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Footprint\",\n                \"id\": \"4528e193-512e-5ff1-9931-31a0f49503df\",\n                \"reference\": \"R1\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\\\",\\\"items\\\":[{\\\"description\\\":\\\"Footprint R1\\\",\\\"pos\\\":{\\\"x\\\":25,\\\"y\\\":20},\\\"uuid\\\":\\\"4528e193-512e-5ff1-9931-31a0f49503df\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"lib_footprint_mismatch\\\"}\",\n            \"repair_category\": \"footprint\"\n          },\n          {\n            \"id\": \"14800152f5d3f7faac98d70072814967\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"via_dangling\",\n            \"code\": \"via_dangling\",\n            \"message\": \"Via is not connected or connected on only one layer\",\n            \"location\": {\n              \"x\": 20,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Via\",\n                \"id\": \"5dd61c37-2bd8-5b2a-a952-308e04bb0121\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Via is not connected or connected on only one layer\\\",\\\"items\\\":[{\\\"description\\\":\\\"Via [VCC] on F.Cu - B.Cu\\\",\\\"pos\\\":{\\\"x\\\":20,\\\"y\\\":20},\\\"uuid\\\":\\\"5dd61c37-2bd8-5b2a-a952-308e04bb0121\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"via_dangling\\\"}\",\n            \"repair_category\": \"connectivity\"\n          },\n          {\n            \"id\": \"feef639b64817d8590ff943dac7c80cc\",\n            \"kind\": \"drc\",\n            \"severity\": \"warning\",\n            \"rule\": \"via_dangling\",\n            \"code\": \"via_dangling\",\n            \"message\": \"Via is not connected or connected on only one layer\",\n            \"location\": {\n              \"x\": 50,\n              \"y\": 20,\n              \"units\": \"mm\"\n            },\n            \"objects\": [\n              {\n                \"type\": \"Via\",\n                \"id\": \"58a012cc-abb7-5a30-8b7f-947a3ca18e62\"\n              }\n            ],\n            \"raw\": \"{\\\"description\\\":\\\"Via is not connected or connected on only one layer\\\",\\\"items\\\":[{\\\"description\\\":\\\"Via [GND] on F.Cu - B.Cu\\\",\\\"pos\\\":{\\\"x\\\":50,\\\"y\\\":20},\\\"uuid\\\":\\\"58a012cc-abb7-5a30-8b7f-947a3ca18e62\\\"}],\\\"severity\\\":\\\"warning\\\",\\\"type\\\":\\\"via_dangling\\\"}\",\n            \"repair_category\": \"connectivity\"\n          }\n        ],\n        \"summary\": {\n          \"total_findings\": 4,\n          \"by_severity\": {\n            \"warning\": 4\n          },\n          \"by_category\": {\n            \"connectivity\": 2,\n            \"footprint\": 2\n          },\n          \"by_reference\": {\n            \"D1\": 1,\n            \"R1\": 1\n          },\n          \"prompt\": \"4 ERC/DRC finding(s); categories: connectivity=2, footprint=2; refs: D1=1, R1=1\"\n        }\n      }\n    ]\n  },\n  \"issues\": [\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Footprint 'LED_0805_2012Metric' does not match copy in library 'LED_SMD'\",\n      \"refs\": [\n        \"D1\"\n      ],\n      \"suggestion\": \"repair category: footprint\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Footprint 'R_0805_2012Metric' does not match copy in library 'Resistor_SMD'\",\n      \"refs\": [\n        \"R1\"\n      ],\n      \"suggestion\": \"repair category: footprint\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Via is not connected or connected on only one layer\",\n      \"suggestion\": \"repair category: connectivity\"\n    },\n    {\n      \"code\": \"VALIDATION_FAILED\",\n      \"severity\": \"warning\",\n      \"message\": \"Via is not connected or connected on only one layer\",\n      \"suggestion\": \"repair category: connectivity\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "",
+      "files": []
+    },
+    {
+      "label": "current-source-before-missing-tool",
+      "command": [
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-before",
+        "--kicad-cli",
+        "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad",
+        "check",
+        "drc",
+        "/Users/dshills/Development/projects/KiCadAI/examples/checks/drc_pass/drc_pass.kicad_pcb"
+      ],
+      "cwd": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/missing-tool",
+      "exit_status": 1,
+      "stdout": "{\n  \"ok\": false,\n  \"command\": \"check\",\n  \"version\": \"0.1.0\",\n  \"issues\": [\n    {\n      \"code\": \"KICAD_CLI_FAILED\",\n      \"severity\": \"error\",\n      \"path\": \"check.kicad_cli\",\n      \"message\": \"stat /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad: no such file or directory\"\n    }\n  ],\n  \"artifacts\": []\n}\n",
+      "stderr": "stat /var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/not-installed-kicad: no such file or directory\n",
+      "files": []
+    }
+  ]
+}
