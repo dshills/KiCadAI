@@ -42,6 +42,18 @@ captures KiCad's returned token in memory for that process only.
 
 ## CLI Overview
 
+Global flags shown by `kicadai --help` must appear before the command:
+`kicadai --output ./out/led_demo --with-pcb generate-led-demo`. Create `./out`
+first. The two direct LED generator aliases accept no positional arguments;
+maintained source rejects trailing flags instead of silently ignoring them as
+v1.0.1 did. A subcommand with explicitly documented local options is separate
+from this global flag rule.
+
+This file describes maintained source. The guided `schematic` family and other
+schematic-first workflows were introduced after v1.0.1 and are not in that
+published binary. See the [version-specific quick starts](../README.md#run-it-in-under-ten-minutes)
+and [release installation guide](installation.md).
+
 Structured project-analysis and generation commands return JSON by default.
 Use `--format text` only for commands that expose a human-readable summary.
 The legacy `--json` flag remains accepted as a compatibility alias for

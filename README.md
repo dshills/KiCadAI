@@ -184,6 +184,11 @@ that arbitrary dense boards are supported.
 
 ## Run It In Under Ten Minutes
 
+### Maintained source (newer than v1.0.1)
+
+The `schematic`, `capability explore`, `review`, `doctor`, `conformance`, `repro`,
+`adapter`, and `family` workflows below were added after the v1.0.1 tag. Build
+the maintained source to use them; downloading v1.0.1 does not provide them.
 For a small schematic-first workflow that needs no API key, try:
 
 ```sh
@@ -204,6 +209,27 @@ solver comparisons and compact failure replay, see
 For an existing schematic, use `review schematic`; use `doctor` to diagnose
 local dependencies. See [project review and local integrations](docs/project-review-and-integration.md)
 for catalog self-test kits and the versioned NetForm adapter.
+
+### Published v1.0.1 binary
+
+After [installing and verifying v1.0.1](docs/installation.md), use its supported
+direct-file LED example instead. Put global flags **before** the command, and
+create the parent output directory first:
+
+```sh
+mkdir -p ./out
+kicadai --output ./out/led_demo generate-led-demo
+# Optional minimal PCB output (not a placed/routed or manufacturing-ready board):
+kicadai --output ./out/led_with_pcb --with-pcb generate-led-demo
+```
+
+The project files use the output directory's basename unless `--name` is set.
+Without `--with-pcb`, only a schematic and project are generated. These offline
+examples need neither an API key nor installed KiCad. Native ERC/DRC checks do
+require KiCad. These file-writer demos can report ERC/DRC findings; they are not
+clean-check acceptance examples (see [check fixtures](examples/checks/README.md)).
+v1.0.1 silently ignores trailing flags such as
+`generate-led-demo --output DIR`; maintained source rejects them before writing.
 
 Released binaries require no Go installation. KiCad 10.0.3 is the supported v1
 reference for installed-KiCad validation and promotion claims. KiCad 9 remains

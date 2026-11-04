@@ -61,6 +61,8 @@ const usageTemplate = `kicadai is a Go client for KiCad's IPC API.
 Usage:
   kicadai [global flags] <command>
 
+Global flags must precede the command (for example, --output DIR generate-led-demo).
+
 Commands:
   capabilities  Report detected KiCad API capabilities
   capability    Explore workflows, render capability docs, or manage generation contracts
@@ -5838,6 +5840,12 @@ type generationResult struct {
 }
 
 func (a app) runGenerateLEDDemo(opts cliOptions, stdout io.Writer) error {
+	// flag.FlagSet stops at the command. Never silently discard trailing flags
+	// and then write to a default directory or ignore an overwrite request.
+	if len(opts.commandArgs) != 0 {
+		err := errors.New("generate-led-demo and generate-project accept no positional arguments; place global flags before the command")
+		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: opts.name, ProjectDir: opts.output}, err)
+	}
 	name := opts.name
 	output := opts.output
 	if output == "" {

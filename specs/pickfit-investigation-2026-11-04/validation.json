@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-04",
+  "baseline_commit": "be5dc1b19e041d86987efa66e9e08eed9743316e",
+  "runs": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-short",
+        "./cmd/kicadai",
+        "./internal/kicadfiles/design",
+        "./internal/kicadfiles/checks",
+        "./internal/buildinfo"
+      ],
+      "exit_status": 0,
+      "stdout": "ok  \tkicadai/cmd/kicadai\t(cached)\nok  \tkicadai/internal/kicadfiles/design\t(cached)\nok  \tkicadai/internal/kicadfiles/checks\t(cached)\nok  \tkicadai/internal/buildinfo\t(cached)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "make",
+        "lint"
+      ],
+      "exit_status": 0,
+      "stdout": "./scripts/check-go-format.sh\nGOCACHE=\"/Users/dshills/Development/projects/KiCadAI/.cache/go/build\" GOMODCACHE=\"/Users/dshills/Development/projects/KiCadAI/.cache/go/mod\" go vet ./...\n0 issues.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "./internal/kicadfiles/checks",
+        "-run",
+        "^TestOptionalKiCadCLIReportFixtureGeneration$",
+        "-count=1",
+        "-v"
+      ],
+      "environment": {
+        "KICADAI_RUN_KICAD_CLI": "1",
+        "KICADAI_KICAD_CLI": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+        "KICADAI_KICAD_FIXTURE_TARGET": "/var/folders/td/c4mswb0s037__1vkvqxf_dfc0000gn/T/kicadai-pickfit-20261104-96803-rszwip/current-source-before/schematic/out/divider/divider.kicad_sch"
+      },
+      "exit_status": 0,
+      "stdout": "=== RUN   TestOptionalKiCadCLIReportFixtureGeneration\n--- PASS: TestOptionalKiCadCLIReportFixtureGeneration (1.02s)\nPASS\nok  \tkicadai/internal/kicadfiles/checks\t1.124s\n",
+      "stderr": ""
+    }
+  ],
+  "changed_source_hashes": [
+    {
+      "path": "cmd/kicadai/main.go",
+      "sha256": "0b5e827bcc14b4959cfcadf4877a0a06997caba2af3bf81a42d870d07bda980f"
+    },
+    {
+      "path": "cmd/kicadai/led_cli_arguments_test.go",
+      "sha256": "abd58cb04f1e54cee7d2bcbb524658d79c3abf69fa1c78b6187283d07f847340"
+    }
+  ]
+}
